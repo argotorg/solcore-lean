@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
 
@@ -99,6 +101,93 @@ open Core Frontend SourceInference GeneralHeap CoreProof ReadOnly
 open GenericExpressionMeaning (Certificate FaultRep agree_prefix rename_prefix)
 open DataPatternValues DataExpressionSequence
 
+
+/-- An outcome wrapper around the existing measured source judgment. -/
+inductive ExpressionTraceAt (program : Program) (size : Nat) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (environment : Dynamic.Environment)
+    (before : Dynamic.Heap) (id : ExpressionId) : Dynamic.ExpressionOutcome → Dynamic.Heap → Prop where
+  | value {value after} (trace : SourceExecutionSize.ExpressionEvaluates program size context evidence source environment before id value after) :
+      ExpressionTraceAt program size context evidence source environment before id (.value value) after
+  | fault {reason after} (trace : SourceExecutionSize.ExpressionFaults program size context evidence source environment before id reason after) :
+      ExpressionTraceAt program size context evidence source environment before id (.fault reason) after
+
+theorem ExpressionTraceAt.sound {program size context evidence source environment before id outcome after}
+    (trace : ExpressionTraceAt program size context evidence source environment before id outcome after) :
+    Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after := by
+  cases trace with
+  | value trace => exact .value trace.sound
+  | fault trace => exact .fault trace.sound
+
+theorem ExpressionTraceAt.has_size {program context evidence source environment before id outcome after}
+    (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after) :
+    ∃ size, ExpressionTraceAt program size context evidence source environment before id outcome after := by
+  cases trace with
+  | value trace => obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionEvaluates.has_size trace; exact ⟨size, .value sized⟩
+  | fault trace => obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionFaults.has_size trace; exact ⟨size, .fault sized⟩
+
+inductive TraceAt (program : Program) (size : Nat) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (environment : Dynamic.Environment)
+    (before : Dynamic.Heap) (ids : List ExpressionId) : Outcome → Dynamic.Heap → Prop where
+  | values {values after} (trace : SourceExecutionSize.ExpressionsEvaluate program size context evidence source environment before ids values after) :
+      TraceAt program size context evidence source environment before ids (.ok values) after
+  | fault {reason after} (trace : SourceExecutionSize.ExpressionsFault program size context evidence source environment before ids reason after) :
+      TraceAt program size context evidence source environment before ids (.error reason) after
+
+theorem TraceAt.sound {program size context evidence source environment before ids outcome after}
+    (trace : TraceAt program size context evidence source environment before ids outcome after) :
+    Trace program context evidence source environment before ids outcome after := by
+  cases trace with
+  | values trace => exact .values trace.sound
+  | fault trace => exact .fault trace.sound
+
+theorem TraceAt.has_size {program context evidence source environment before ids outcome after}
+    (trace : Trace program context evidence source environment before ids outcome after) :
+    ∃ size, TraceAt program size context evidence source environment before ids outcome after := by
+  cases trace with
+  | values trace => obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionsEvaluate.has_size trace; exact ⟨size, .values sized⟩
+  | fault trace => obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionsFault.has_size trace; exact ⟨size, .fault sized⟩
+
+def ExpressionPreservesAt (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (certificate : Certificate) (faults : FaultRep) (entry : ProtectedExpressionMeaning.Entry) : Prop :=
+  ∀ {scope id lowered}, certificate scope id lowered →
+  ∀ {node}, source.lookupExpression? id = some node →
+  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ outcome after},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment →
+    EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+    entry scope mapping world before store canonical →
+    ExpressionTraceAt program size context evidence source environment before id outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
+      GenericExpressionMeaning.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
+
+def ExpressionReflectsAt (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (certificate : Certificate) (faults : FaultRep) (entry : ProtectedExpressionMeaning.Entry) : Prop :=
+  ∀ {scope id lowered}, certificate scope id lowered →
+  ∀ {node}, source.lookupExpression? id = some node →
+  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ value finalStore},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment →
+    EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+    entry scope mapping world before store canonical →
+    EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore →
+    ∃ sourceSize outcome after finalMap finalWorld,
+      ExpressionTraceAt program sourceSize context evidence source environment before id outcome after ∧
+      GenericExpressionMeaning.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
@@ -107,8 +196,289 @@ variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Proje
   {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
 include transport
 
-/-- Successful evaluation keeps left-to-right effects and every represented
-payload, including captured references inside earlier argument values. -/
+
+omit transport in
+private theorem preserves_at_of_unbounded
+    (meaning : ProtectedExpressionMeaning.Preserves model program context evidence source certificate faults entry)
+    (size : Nat) : ExpressionPreservesAt size model program context evidence source certificate faults entry := by
+  intro scope id lowered generated node found mapping world admin environment canonical actual actualContext before store ξ outcome after
+    environments heaps locals agrees typed installed trace
+  exact meaning generated found environments heaps locals agrees typed installed trace.sound
+
+omit transport in
+private theorem reflects_at_of_unbounded
+    (meaning : ProtectedExpressionMeaning.Reflects model program context evidence source certificate faults entry)
+    (size : Nat) : ExpressionReflectsAt size model program context evidence source certificate faults entry := by
+  intro scope id lowered generated node found mapping world admin environment canonical actual actualContext before store ξ value finalStore
+    environments heaps locals agrees typed installed evaluated
+  obtain ⟨outcome, after, finalMap, finalWorld, trace, rest⟩ := meaning generated found environments heaps locals agrees typed installed evaluated.sound
+  obtain ⟨sourceSize, sized⟩ := ExpressionTraceAt.has_size trace
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sized, rest⟩
+
+theorem preserves_values_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt size model program context evidence source certificate faults entry)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (installedEntry : entry scope mapping world before store canonical)
+    {size : Nat}
+    (execution : SourceExecutionSize.ExpressionsEvaluate program size context evidence source environment before ids sources after) (bounded : size ≤ budget) :
+    ∃ values finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inRight .word (packValues values)) finalStore ∧
+      Values model finalMap finalWorld sourceTypes (codes.map (·.type)) sources values ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  induction tree generalizing size mapping world actual actualContext before store ξ sources after with
+  | nil =>
+    cases execution
+    exact ⟨[], store, mapping, world, .inRight .unit, .nil, heaps,
+      .refl _, .refl _, .refl _ _, .refl _⟩
+  | single found generated =>
+    cases execution with
+    | cons head tail =>
+      cases tail
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
+      cases represented with
+      | value payload =>
+        exact ⟨[_], finalStore, finalMap, finalWorld, evaluated, .cons payload .nil,
+          finalHeaps, maps, worlds, frame, metadata⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    cases execution with
+    | cons head rest =>
+      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        obtain ⟨values, finalStore, finalMap, finalWorld, second, restRep, finalHeaps,
+          maps, worlds, frame, metadata⟩ := ih
+            (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix layout coreValue)
+            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) rest
+            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+        have nonempty : values ≠ [] := by
+          intro absent
+          have lengths := restRep.length.2
+          simp [absent] at lengths
+        refine ⟨coreValue :: values, finalStore, finalMap, finalWorld, ?_,
+          .cons (model.extend payload maps worlds) restRep, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
+        rw [rename_prefix] at second
+        have combined := LocalSequence.pair_success lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+        simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
+
+theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt size model program context evidence source certificate faults entry)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {reason : Dynamic.SemanticFault}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (installedEntry : entry scope mapping world before store canonical)
+    {size : Nat}
+    (execution : SourceExecutionSize.ExpressionsFault program size context evidence source environment before ids reason after) (bounded : size ≤ budget) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  induction tree generalizing size mapping world actual actualContext before store ξ after with
+  | nil => cases execution
+  | single found generated =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
+          finalHeaps, maps, worlds, frame, metadata⟩
+    | tail _ failed => cases failed
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
+      cases represented with
+      | fault matched =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata⟩
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
+    | tail head failed =>
+      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
+          maps, worlds, frame, metadata⟩ := ih
+            (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix layout coreValue)
+            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) failed
+            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
+        rw [rename_prefix] at second
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+
+theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionReflectsAt size model program context evidence source certificate faults entry)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (installedEntry : entry scope mapping world before store canonical)
+    {size : Nat}
+    (evaluated : EvaluationSize size actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) (bounded : size < budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      TraceAt program sourceSize context evidence source environment before ids outcome after ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  induction tree generalizing size mapping world actual actualContext before store ξ value finalStore with
+  | nil =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (show Evaluates actual store
+      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
+    exact ⟨_, .ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
+      .refl _, .refl _, .refl _ _, .refl _⟩
+  | single found generated =>
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+      maps, worlds, frame, metadata⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry evaluated
+    cases represented with
+    | value payload =>
+      cases execution with
+      | value trace => exact ⟨_, .ok [_], after, finalMap, finalWorld,
+          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata⟩
+    | fault matched =>
+      cases execution with
+      | fault trace => exact ⟨_, .error _, after, finalMap, finalWorld,
+          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    change EvaluationSize size actual store ((LocalSequence.pair lowered.type
+      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
+      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
+    rw [pair_rename] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft first _ =>
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+        maps, worlds, frame, metadata⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry first
+      cases represented with
+      | fault matched =>
+        cases execution with
+        | fault trace =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.pair_left_failure lowered.type
+            (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound)
+          exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
+            finalHeaps, maps, worlds, frame, metadata⟩
+    | caseRight first continuation =>
+      obtain ⟨sourceSize, outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+        meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry first
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        rename_i middleStore coreValue
+        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
+            (coreValue :: actual) := agree_prefix layout coreValue
+        cases execution with
+        | value firstSource =>
+          cases continuation with
+          | caseLeft second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted (by omega)
+            cases result with
+            | fault matched =>
+              cases sourceTrace with
+              | fault tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_right_failure lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
+                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata⟩
+          | caseRight second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted (by omega)
+            cases result with
+            | @values sources values restRep =>
+              cases sourceTrace with
+              | values tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_success lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                have nonempty : values ≠ [] := by
+                  intro absent
+                  have lengths := restRep.length.2
+                  simp [absent] at lengths
+                refine ⟨_, .ok (sourceValue :: sources), after, finalMap, finalWorld,
+                  .values (.cons firstSource tailSource), ?_, finalHeaps,
+                  firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata⟩
+                simpa [packValues, nonempty] using
+                  Result.values (codes := lowered :: nextCode :: codes)
+                    (.cons (model.extend payload maps worlds) restRep)
+
+theorem preserves_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt size model program context evidence source certificate faults entry)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Outcome}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (installedEntry : entry scope mapping world before store canonical)
+    {size : Nat}
+    (execution : TraceAt program size context evidence source environment before ids outcome after) (bounded : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  cases execution with
+  | values execution =>
+    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata⟩  := preserves_values_bounded transport budget tree meaning environments heaps locals layout actualTyped installedEntry execution bounded
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
+      finalHeaps, maps, worlds, frame, metadata⟩
+  | fault execution =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata⟩  := preserves_fault_bounded transport budget tree meaning environments heaps locals layout actualTyped installedEntry execution bounded
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
+      finalHeaps, maps, worlds, frame, metadata⟩
+
 theorem preserves_values (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ProtectedExpressionMeaning.Preserves model program context evidence source certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
@@ -128,49 +498,11 @@ theorem preserves_values (tree : Tree source certificate scope ids sourceTypes c
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing mapping world actual actualContext before store ξ sources after with
-  | nil =>
-    cases execution
-    exact ⟨[], store, mapping, world, .inRight .unit, .nil, heaps,
-      .refl _, .refl _, .refl _ _, .refl _⟩
-  | single found generated =>
-    cases execution with
-    | cons head tail =>
-      cases tail
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | value payload =>
-        exact ⟨[_], finalStore, finalMap, finalWorld, evaluated, .cons payload .nil,
-          finalHeaps, maps, worlds, frame, metadata⟩
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    cases execution with
-    | cons head rest =>
-      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        obtain ⟨values, finalStore, finalMap, finalWorld, second, restRep, finalHeaps,
-          maps, worlds, frame, metadata⟩ := ih
-            (environments.extend firstMaps firstWorlds) middleHeaps
-            (locals.mono firstMetadata) (agree_prefix layout coreValue)
-            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) rest
-        have nonempty : values ≠ [] := by
-          intro absent
-          have lengths := restRep.length.2
-          simp [absent] at lengths
-        refine ⟨coreValue :: values, finalStore, finalMap, finalWorld, ?_,
-          .cons (model.extend payload maps worlds) restRep, finalHeaps,
-          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
-        rw [rename_prefix] at second
-        have combined := LocalSequence.pair_success lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
-        simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
+  obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionsEvaluate.has_size execution
+  exact preserves_values_bounded transport size tree (fun child _ => preserves_at_of_unbounded meaning child)
+    environments heaps locals layout actualTyped installedEntry sized (Nat.le_refl size)
 
-/-- A source fault evaluates only its successful prefix. The generated helper
-propagates the exact token without evaluating later arguments. -/
+
 theorem preserves_fault (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ProtectedExpressionMeaning.Preserves model program context evidence source certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
@@ -189,48 +521,11 @@ theorem preserves_fault (tree : Tree source certificate scope ids sourceTypes co
       faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing mapping world actual actualContext before store ξ after with
-  | nil => cases execution
-  | single found generated =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
-      cases represented with
-      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
-          finalHeaps, maps, worlds, frame, metadata⟩
-    | tail _ failed => cases failed
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
-      cases represented with
-      | fault matched =>
-        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata⟩
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
-    | tail head failed =>
-      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
-          maps, worlds, frame, metadata⟩ := ih
-            (environments.extend firstMaps firstWorlds) middleHeaps
-            (locals.mono firstMetadata) (agree_prefix layout coreValue)
-            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) failed
-        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
-          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
-        rw [rename_prefix] at second
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+  obtain ⟨size, sized⟩ := SourceExecutionSize.ExpressionsFault.has_size execution
+  exact preserves_fault_bounded transport size tree (fun child _ => preserves_at_of_unbounded meaning child)
+    environments heaps locals layout actualTyped installedEntry sized (Nat.le_refl size)
 
-/-- Every completed evaluation of the actual generated bundle constructs a
-finite source trace. Typed inserted temporary slots are admitted through
-the child theorem's explicit renaming; no exact closure weakening is used. -/
+
 theorem reflects (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ProtectedExpressionMeaning.Reflects model program context evidence source certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
@@ -249,98 +544,12 @@ theorem reflects (tree : Tree source certificate scope ids sourceTypes codes)
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing mapping world actual actualContext before store ξ value finalStore with
-  | nil =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (show Evaluates actual store
-      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
-    exact ⟨.ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
-      .refl _, .refl _, .refl _ _, .refl _⟩
-  | single found generated =>
-    obtain ⟨outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals layout actualTyped installedEntry evaluated
-    cases represented with
-    | value payload =>
-      cases execution with
-      | value trace => exact ⟨.ok [_], after, finalMap, finalWorld,
-          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata⟩
-    | fault matched =>
-      cases execution with
-      | fault trace => exact ⟨.error _, after, finalMap, finalWorld,
-          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    change Evaluates actual store ((LocalSequence.pair lowered.type
-      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
-      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
-    rw [pair_rename] at evaluated
-    have complete := evaluated
-    cases evaluated with
-    | caseLeft first _ =>
-      obtain ⟨outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals layout actualTyped installedEntry first
-      cases represented with
-      | fault matched =>
-        cases execution with
-        | fault trace =>
-          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalSequence.pair_left_failure lowered.type
-            (SourceCoreCalls.packArguments (nextCode :: codes)).type first)
-          exact ⟨.error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
-            finalHeaps, maps, worlds, frame, metadata⟩
-    | caseRight first continuation =>
-      obtain ⟨outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning generated found environments heaps locals layout actualTyped installedEntry first
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        rename_i middleStore coreValue
-        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
-            (coreValue :: actual) := agree_prefix layout coreValue
-        cases execution with
-        | value firstSource =>
-          cases continuation with
-          | caseLeft second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted
-            cases result with
-            | fault matched =>
-              cases sourceTrace with
-              | fault tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
-                  (LocalSequence.pair_right_failure lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first second)
-                exact ⟨.error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
-                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata⟩
-          | caseRight second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted
-            cases result with
-            | @values sources values restRep =>
-              cases sourceTrace with
-              | values tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
-                  (LocalSequence.pair_success lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first second)
-                have nonempty : values ≠ [] := by
-                  intro absent
-                  have lengths := restRep.length.2
-                  simp [absent] at lengths
-                refine ⟨.ok (sourceValue :: sources), after, finalMap, finalWorld,
-                  .values (.cons firstSource tailSource), ?_, finalHeaps,
-                  firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata⟩
-                simpa [packValues, nonempty] using
-                  Result.values (codes := lowered :: nextCode :: codes)
-                    (.cons (model.extend payload maps worlds) restRep)
+  obtain ⟨size, sized⟩ := evaluation_has_size evaluated
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, rest⟩ :=
+    reflects_bounded transport (size + 1) tree (fun child _ => reflects_at_of_unbounded meaning child)
+      environments heaps locals layout actualTyped installedEntry sized (by omega)
+  exact ⟨outcome, after, finalMap, finalWorld, trace.sound, rest⟩
+
 
 theorem preserves (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ProtectedExpressionMeaning.Preserves model program context evidence source certificate faults entry)
@@ -360,17 +569,9 @@ theorem preserves (tree : Tree source certificate scope ids sourceTypes codes)
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  cases execution with
-  | values execution =>
-    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := preserves_values transport tree meaning environments heaps locals layout actualTyped installedEntry execution
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
-  | fault execution =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := preserves_fault transport tree meaning environments heaps locals layout actualTyped installedEntry execution
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
+  obtain ⟨size, sized⟩ := TraceAt.has_size execution
+  exact preserves_bounded transport size tree (fun child _ => preserves_at_of_unbounded meaning child)
+    environments heaps locals layout actualTyped installedEntry sized (Nat.le_refl size)
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedDataExpressionSequence
 
