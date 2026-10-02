@@ -444,6 +444,9 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMemberNativeTyping
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralNativeTyping
 import Solcore.SourceSemantics.CoreLowering.CallableCallEvidenceCertificates
+import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinNativeTyping
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionSpineEvaluation
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
