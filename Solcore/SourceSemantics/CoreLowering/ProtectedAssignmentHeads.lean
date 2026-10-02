@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentPreservation
@@ -73,7 +74,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_fault (errors : head.Errors registry faults)
+theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
     (next : Expr) (output : Ty) :
@@ -87,7 +88,7 @@ theorem preserves_fault (errors : head.Errors registry faults)
   cases shape with
   | bare empty layout =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩ :=
-      ProtectedBareAssignment.preserves_fault layout empty extension meaning observations right found rightView rightType profile
+      ProtectedBareAssignment.preserves_fault_reachable layout empty extension meaning observations right found rightView rightType profile
         environments heaps locals agrees actualTyped installed slot writable trace next output invalid errors.operands
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       transport.extend installed maps worlds preservation metadata⟩
@@ -98,8 +99,23 @@ theorem preserves_fault (errors : head.Errors registry faults)
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       transport.extend installed maps worlds frame metadata⟩
 
+include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
+/-- Compatibility entry point retaining the original diagnostic receipt. -/
+theorem preserves_fault (errors : head.Errors registry faults)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
+    (next : Expr) (output : Ty) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      entry scope finalMap finalWorld after finalStore canonical := by
+  exact preserves_fault_reachable functions extension program evidence transport meaning faithful observations head
+    environments heaps locals agrees actualTyped installed errors.reachable trace next output
+
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
-theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
+theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
     (∃ reason token after finalMap finalWorld,
@@ -121,7 +137,7 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
   cases shape with
   | bare empty layout =>
-    have result := ProtectedBareAssignment.reflects layout empty extension reflection observations right found rightView rightType profile
+    have result := ProtectedBareAssignment.reflects_reachable layout empty extension reflection observations right found rightView rightType profile
       environments heaps locals agrees actualTyped installed slot writable errors.operands completed
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata =>
@@ -139,6 +155,31 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head
       ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
     · exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata, transport.extend installed maps worlds frame metadata⟩
     · exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
+
+include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
+/-- Compatibility entry point retaining the original diagnostic receipt. -/
+theorem reflects (functionTypes : FunctionRuntimeViews functions) (errors : head.Errors registry faults)
+    {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
+    (∃ reason token after finalMap finalWorld,
+      Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after ∧
+      value = .inLeft output (.word token) ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      entry scope finalMap finalWorld after finalStore canonical) ∨
+    (∃ updated after written finalMap finalWorld slots,
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+        environment before assignment.target rhs updated after ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
+      entry scope finalMap finalWorld after written canonical ∧
+      Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
+  exact reflects_reachable functions extension program evidence transport meaning reflection faithful observations head
+    environments heaps locals agrees actualTyped installed functionTypes errors.reachable completed
+
 end Head
 end Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
 
@@ -208,6 +249,24 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
+theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
+    (next : Expr) (output : Ty) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical := by
+  exact ProtectedAssignmentHeads.Head.preserves_fault_reachable functions extension program evidence
+    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
+    (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
+      uninitialized missing bodyUninitialized bodyMissing unique owners) faithful observations head environments heaps locals agrees actualTyped installed errors trace next output
+
+include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
+  uninitialized missing bodyUninitialized bodyMissing in
+/-- Compatibility entry point retaining the original diagnostic receipt. -/
 theorem preserves_fault (errors : head.Errors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
@@ -218,13 +277,40 @@ theorem preserves_fault (errors : head.Errors registry faults)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical := by
-  exact ProtectedAssignmentHeads.Head.preserves_fault functions extension program evidence
-    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
-    (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
-      uninitialized missing bodyUninitialized bodyMissing unique owners) faithful observations head environments heaps locals agrees actualTyped installed errors trace next output
+  exact preserves_fault_reachable functions extension evidence faithful observations head environments heaps locals agrees actualTyped installed
+    valid unique owners runtimeViews uninitialized missing bodyUninitialized bodyMissing errors.reachable trace next output
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
+theorem reflects_reachable (errors : head.ReachableErrors registry faults)
+    {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
+    (∃ reason token after finalMap finalWorld,
+      Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after ∧
+      value = .inLeft output (.word token) ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical) ∨
+    (∃ updated after written finalMap finalWorld slots,
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+        environment before assignment.target rhs updated after ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
+      NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after written canonical ∧
+      Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
+  exact ProtectedAssignmentHeads.Head.reflects_reachable functions extension program evidence
+    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
+    (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
+      uninitialized missing bodyUninitialized bodyMissing unique owners)
+    (NamedCallExpressions.Tree.reflects functions extension faithful observations runtimeViews evidence valid
+      uninitialized missing bodyUninitialized bodyMissing) faithful observations head environments heaps locals agrees actualTyped installed runtimeViews errors completed
+
+include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
+  uninitialized missing bodyUninitialized bodyMissing in
+/-- Compatibility entry point retaining the original diagnostic receipt. -/
 theorem reflects (errors : head.Errors registry faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
@@ -244,11 +330,7 @@ theorem reflects (errors : head.Errors registry faults)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after written canonical ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  exact ProtectedAssignmentHeads.Head.reflects functions extension program evidence
-    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
-    (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
-      uninitialized missing bodyUninitialized bodyMissing unique owners)
-    (NamedCallExpressions.Tree.reflects functions extension faithful observations runtimeViews evidence valid
-      uninitialized missing bodyUninitialized bodyMissing) faithful observations head environments heaps locals agrees actualTyped installed runtimeViews errors completed
+  exact reflects_reachable functions extension evidence faithful observations head environments heaps locals agrees actualTyped installed
+    valid unique owners runtimeViews uninitialized missing bodyUninitialized bodyMissing errors.reachable completed
 
 end Solcore.SourceSemantics.CoreLowering.NamedAssignmentHeads

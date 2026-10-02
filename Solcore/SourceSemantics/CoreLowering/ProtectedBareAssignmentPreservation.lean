@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentRhs
 
 /-! Forward finite meaning of bare assignments. These laws preserve the exact
@@ -127,7 +128,7 @@ private theorem no_target_fault
 /-- All independently specified bare assignment faults retain RHS prefix
 state. A target fault or structural traversal fault contradicts the empty
 path and live lexical reference, rather than being silently reclassified. -/
-theorem preserves_fault
+theorem preserves_fault_reachable
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
@@ -149,7 +150,7 @@ theorem preserves_fault
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator id reason after)
     (next : Expr) (outputType : Ty) (invalid : Word)
-    (invalidToken : faults (.invalidAssignmentOperands operator) invalid) :
+    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
@@ -188,10 +189,46 @@ theorem preserves_fault
             (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by simpa only [layout.sameType] using failed
         exact ⟨invalid, rhsStore, rhsMap, rhsWorld,
           phase.wrap (LanguageResult.bind_success outputType result.evaluated (LanguageResult.bind_failure outputType failed)),
-          invalidToken, result.heaps, result.maps, result.worlds, result.frame, result.metadata⟩
+          invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata⟩
       · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
   | structuralUpdate resolve _ _ _ _ fault =>
     obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve
     cases fault
+
+/-- Compatibility entry point retaining the original operand-token premise. -/
+theorem preserves_fault
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (installed : entry scope mapping world before store canonical)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator id reason after)
+    (next : Expr) (outputType : Ty) (invalid : Word)
+    (invalidToken : faults (.invalidAssignmentOperands operator) invalid) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  exact preserves_fault_reachable layout bare extension meaning observations generated found rhsView rhsCore profile
+    environments heaps locals agrees actualTyped installed slot rootTyped trace next outputType invalid
+    (AssignmentOperandDiagnostics.of_unconditional invalidToken)
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignment
