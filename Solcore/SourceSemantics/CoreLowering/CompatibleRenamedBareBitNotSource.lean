@@ -36,6 +36,33 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
       Result checked registry functions program context evidence source faults prepared place environment before store
         mapping world actual actualContext ξ next output value finalStore
 
+inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
+    {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (faults : FaultRep) (prepared : Prepared) (place : PlaceResolution)
+    (environment : Dynamic.Environment) (before : Dynamic.Heap) (store : Store) (mapping : LocationMap)
+    (world : StoreTyping) (actual : Environment) (actualContext : Core.Context) (ξ : Renaming)
+    (next : Expr) (output : Ty) (value : Value) (finalStore : Store) : Prop where
+  | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word}
+      (trace : SourceExecutionSize.SourcePlaceBitNotFaults program sourceSize context evidence source environment before place reason before)
+      (result : value = .inLeft output (.word token)) (represented : faults reason token)
+      (storeEq : finalStore = store) :
+      ResultAt size checked registry functions program context evidence source faults prepared place environment before store
+        mapping world actual actualContext ξ next output value finalStore
+  | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {replacement : Value} {after : Dynamic.Heap}
+      {written : Store} {slots : Environment}
+      (trace : SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source Dynamic.BitNotSnapshot
+        environment before place updated after)
+      (represented : ValueRep checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType)
+      (heaps : HeapRepresents checked registry functions mapping world after written)
+      (frame : AdministrativePreserved mapping store mapping written) (metadata : Dynamic.HeapMetadataExtend before after)
+      (count : slots.length = 7)
+      (typed : RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions)
+      (bounded : remainingSize < size)
+      (continuation : EvaluationSize remainingSize (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) :
+      ResultAt size checked registry functions program context evidence source faults prepared place environment before store
+        mapping world actual actualContext ξ next output value finalStore
+
 variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions compilation.checked.catalog.definitions} {functions : FunctionModel compilation.checked.catalog ambient}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -43,6 +70,18 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
   {administrativeContext actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
   {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store} {index : Nat} {ξ : Renaming}
   {identities : Dynamic.Value → Word → Prop}
+
+/-- Erasing sizes preserves the independent source outcome and actual seven slots. -/
+theorem ResultAt.erase {size : Nat} {faults : FaultRep} {next : Expr} {output : Ty}
+    {result : Value} {finalStore : Store}
+    (receipt : ResultAt size compilation.checked registry functions program context evidence source faults prepared place
+      environment before store mapping world actual actualContext ξ next output result finalStore) :
+    Result compilation.checked registry functions program context evidence source faults prepared place
+      environment before store mapping world actual actualContext ξ next output result finalStore := by
+  cases receipt with
+  | fault trace same represented stores => exact .fault trace.sound same represented stores
+  | success trace represented heaps frame metadata count typed _ continuation =>
+    exact .success trace.sound represented heaps frame metadata count typed continuation.sound
 
 private theorem writes_functional {heap left right : Dynamic.Heap} {location : Dynamic.Location} {value : Option Dynamic.Value}
     (first : Dynamic.Heap.Writes heap location value left) (second : Dynamic.Heap.Writes heap location value right) : left = right := by
@@ -126,6 +165,56 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
 
 /-- The sole runtime premise is completion of the real renamed code. It
 produces an independent source fault/write and the actual typed continuation. -/
+theorem reflects_sized (layout : Layout prepared) (bare : place.projections = [])
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {faults : FaultRep} {next : Expr} {output : Ty} {operator : Option BinaryOp} {invalid : Word}
+    {result : Value} {finalStore : Store}
+    (token : faults (.invalidUnaryOperand .bitNot) invalid)
+    {size : Nat} (completed : EvaluationSize size actual store
+      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
+        next output operator true invalid).rename ξ) result finalStore) :
+    ResultAt size compilation.checked registry functions program context evidence source faults prepared place environment before store
+      mapping world actual actualContext ξ next output result finalStore := by
+  obtain ⟨scheme, schemeLookup, _, _, bodyEq⟩ := rootTyped.scheme
+  obtain ⟨sourceLocation, cell, sourceLookup, sourceRead, cellType, _⟩ := locals.lookup schemeLookup
+  have cellType := cellType.trans bodyEq
+  obtain ⟨target, nativeLookup, reference⟩ := environments.lookup_visible sourceLookup slot
+  obtain ⟨optional, nativeRead, represented⟩ := heaps.read_at reference sourceRead
+  cases represented with
+  | uninitialized projected =>
+    have initial : Dynamic.RootInitialValue _ none := .uninitialized (by
+      rintro ⟨key, value, same⟩
+      have impossible : prepared.route.rootSourceType = .mapping key value := cellType.symm.trans same
+      rw [impossible] at profile
+      rcases profile with impossible | impossible <;> cases impossible)
+    have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
+      (evidence := evidence) (source := source) bare sourceLookup sourceRead initial
+    obtain ⟨resultEq, storeEq⟩ := absent_reflects layout (agrees nativeLookup) nativeRead completed.sound
+    obtain ⟨sourceSize, sourceTrace⟩ := SourceExecutionSize.SourcePlaceBitNotFaults.has_size (.uninitialized trace rfl)
+    exact .fault sourceTrace resultEq token storeEq
+  | @initialized type _payload sourceValue value related =>
+    simp only at cellType
+    subst type
+    have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
+      (evidence := evidence) (source := source) bare sourceLookup sourceRead Dynamic.RootInitialValue.initialized
+    obtain ⟨updated, replacement, after, written, slots, applies, sourceWrite, represented, finalHeaps,
+      frame, metadata, count, typed, _agreement, remaining⟩ := initialized_prefix_sized layout observations profile heaps
+        reference sourceRead nativeRead related (agrees nativeLookup) actualTyped operator invalid
+    obtain ⟨sourceSize, sourceTrace⟩ := SourceExecutionSize.SourcePlaceSnapshotUpdate.has_size
+      (.intro trace (.intro sourceRead rfl .initialized (.leaf applies) sourceWrite))
+    obtain ⟨remainingSize, smaller, continuation⟩ := remaining completed
+    exact .success sourceTrace represented finalHeaps frame metadata count typed smaller continuation
+
 theorem reflects (layout : Layout prepared) (bare : place.projections = [])
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
@@ -146,32 +235,8 @@ theorem reflects (layout : Layout prepared) (bare : place.projections = [])
         next output operator true invalid).rename ξ) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared place environment before store
       mapping world actual actualContext ξ next output result finalStore := by
-  obtain ⟨scheme, schemeLookup, _, _, bodyEq⟩ := rootTyped.scheme
-  obtain ⟨sourceLocation, cell, sourceLookup, sourceRead, cellType, _⟩ := locals.lookup schemeLookup
-  have cellType := cellType.trans bodyEq
-  obtain ⟨target, nativeLookup, reference⟩ := environments.lookup_visible sourceLookup slot
-  obtain ⟨optional, nativeRead, represented⟩ := heaps.read_at reference sourceRead
-  cases represented with
-  | uninitialized projected =>
-    have initial : Dynamic.RootInitialValue _ none := .uninitialized (by
-      rintro ⟨key, value, same⟩
-      have impossible : prepared.route.rootSourceType = .mapping key value := cellType.symm.trans same
-      rw [impossible] at profile
-      rcases profile with impossible | impossible <;> cases impossible)
-    have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
-      (evidence := evidence) (source := source) bare sourceLookup sourceRead initial
-    obtain ⟨resultEq, storeEq⟩ := absent_reflects layout (agrees nativeLookup) nativeRead completed
-    exact .fault (.uninitialized trace rfl) resultEq token storeEq
-  | @initialized type _payload sourceValue value related =>
-    simp only at cellType
-    subst type
-    have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
-      (evidence := evidence) (source := source) bare sourceLookup sourceRead Dynamic.RootInitialValue.initialized
-    obtain ⟨updated, replacement, after, written, slots, applies, sourceWrite, represented, finalHeaps,
-      frame, metadata, count, typed, agreement⟩ := initialized_prefix layout observations profile heaps
-        reference sourceRead nativeRead related (agrees nativeLookup) actualTyped operator invalid
-    exact .success (.intro trace (.intro sourceRead rfl .initialized (.leaf applies) sourceWrite))
-      represented finalHeaps frame metadata count typed ((agreement next output).unwrap completed)
+  obtain ⟨size, sized⟩ := evaluation_has_size completed
+  exact (reflects_sized layout bare observations profile environments heaps locals agrees actualTyped slot rootTyped token sized).erase
 
 private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dynamic.Location} {cell : Dynamic.Cell}
     {reason : Dynamic.SemanticFault}

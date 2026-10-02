@@ -1,5 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNotNative
-import Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareBitNotContracts
 
 /-! A numeric bare snapshot creates a real mapped commit and an exact typed
 seven-slot continuation in the actual renamed environment. Its Unit RHS has
@@ -43,35 +42,11 @@ theorem initialized_prefix (layout : Layout prepared)
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
           next output operator true invalid).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  obtain ⟨updated, replacement, related, applies, modified, _⟩ :=
-    CompatiblePlaceNumericBitNotModifier.success observations profile represented
-      (environment := rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
-      (snapshot := .var 1) (rhs := .var 0) (.var rfl) operator store invalid
-  have written := DataPlaceCommitReflection.source_writes read updated
-  obtain ⟨finalStore, coreWritten, finalHeaps, frame⟩ := heaps.write_initialized reference read related written
-  let slots : Environment := [.unit, replacement, replacement, .unit, .inRight .unit value, .unit,
-    .cellRef (OptionalCell.cellType prepared.route.rootType) target]
-  refine ⟨updated, replacement, _, finalStore, slots, applies, written, related, finalHeaps, frame,
-    .of_write written, rfl, ?_, ?_⟩
-  · exact .cons .unit (.cons related.runtime_hasType (.cons related.runtime_hasType
-      (.cons .unit (.cons (.inRight represented.runtime_hasType) (.cons .unit (.cons (.cellRef reference.typed) actualTyped))))))
-  · intro next output
-    rw [execute_rename layout]
-    have rhs : Evaluates (snapshotEnvironment prepared.route.rootType target .unit (.inRight .unit value) actual)
-        store (shift 3 (LanguageResult.success .unit)) (.inRight .word .unit) store := by
-      simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success]
-      exact .inRight .unit
-    have modifier : Evaluates (rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
-        store (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid)
-        (.inRight .word replacement) store := by simpa only [← layout.sameType] using modified
-    exact (ContinuationAgreement.letE (.var lookup)).trans
-      ((ContinuationAgreement.bind (CompatibleBareBitNotNative.keys_evaluates _ _)).trans
-        ((ContinuationAgreement.bind (CompatibleBareBitNotNative.getter_evaluates layout nativeRead)).trans
-          ((ContinuationAgreement.bind rhs).trans
-            ((ContinuationAgreement.bind modifier).trans
-              ((ContinuationAgreement.bind (CompatibleBareBitNotNative.setter_evaluates layout
-                (.inRight .unit value) replacement nativeRead)).trans
-                (ContinuationAgreement.letE (.storeCell (.var rfl) nativeRead (.inRight (.var rfl)) coreWritten)))))))
+  obtain ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
+    frame, metadata, count, typed, agreement, _⟩ :=
+    initialized_prefix_sized layout observations profile heaps reference read nativeRead represented lookup actualTyped operator invalid
+  exact ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
+    frame, metadata, count, typed, agreement⟩
 
 /-- Absence returns the unary token in the actual environment and skips every
 continuation. The physical store, including unrelated captured cells, is exact. -/
