@@ -260,6 +260,10 @@ import Solcore.Test.SourceCoreRecursiveNamedTraceBounds
 import Solcore.Test.SourceCoreRecursiveBuiltinNativeTyping
 import Solcore.Test.SourceCoreCallableCoercionSpine
 import Solcore.Test.SourceCoreMatchReachableDiagnostics
+import Solcore.Test.SourceCoreImperativeNativePolicyTyping
+import Solcore.Test.SourceCorePreparedMatchDiagnostics
+import Solcore.Test.SourceCoreCallableCoercionEvidenceOrigins
+import Solcore.Test.SourceCoreCallableIndexedLambdaImperativeNativeTyping
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2683,6 +2687,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveBuiltinNativeTyping.run
   SourceCoreCallableCoercionSpine.run
   SourceCoreMatchReachableDiagnostics.run
+  SourceCoreRecursiveNamedTraceBounds.runBounds
+  SourceCoreImperativeNativePolicyTyping.run
+  SourceCorePreparedMatchDiagnostics.run
+  SourceCoreCallableCoercionEvidenceOrigins.run
+  SourceCoreCallableIndexedLambdaImperativeNativeTyping.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run

@@ -379,8 +379,7 @@ end Tests.SourceCoreRecursiveNamedTraceBounds
 namespace Tests.SourceCoreRecursiveNamedTraceBounds
 open Solcore Core Frontend
 
-def run : IO Unit := do
-  Tests.SourceCoreRecursiveNamedCatalog.run
+def runBounds : IO Unit := do
   let reason := Word.ofNatModulo 19
   let artifact ← SourceCoreUnifiedCorpusSupport.prepare "original native helper bounds"
     "function helper() returns (Word) { return 19; }" ["helper"]
@@ -403,5 +402,9 @@ def run : IO Unit := do
         (LanguageResult.observeResult completed == .failed reason expected)
         "original call/frame trace lost a captured fault write or frame restoration on resume"
   IO.println "recursive named trace bounds: all 40 source judgment bridges; actual source call/body children, original Core call/frame/parameter/finish sizes, typed parameter continuation, guarded pointwise budgets, captured faults and resume GREEN"
+
+def run : IO Unit := do
+  Tests.SourceCoreRecursiveNamedCatalog.run
+  runBounds
 
 end Tests.SourceCoreRecursiveNamedTraceBounds

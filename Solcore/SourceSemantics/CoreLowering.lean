@@ -447,6 +447,11 @@ import Solcore.SourceSemantics.CoreLowering.CallableCallEvidenceCertificates
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinNativeTyping
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSpineEvaluation
+import Solcore.SourceSemantics.CoreLowering.ImperativeNativePolicyTyping
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBoundedContracts
+import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchPreparedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionEvidenceOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaImperativeNativeTyping
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
