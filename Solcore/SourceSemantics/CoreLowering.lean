@@ -469,6 +469,14 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareBitNotContracts
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBuiltinHeadBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedDataExpressionHeadBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedAssignmentHeadContracts
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

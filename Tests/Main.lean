@@ -280,6 +280,13 @@ import Solcore.Test.SourceCoreRecursiveNamedBareAssignmentBounds
 import Solcore.Test.SourceCoreRecursiveNamedExpressionBounds
 import Solcore.Test.SourceCoreCallableCoercionSourceSelection
 import Solcore.Test.SourceCoreRecursiveNamedBareBitNotBounds
+import Solcore.Test.SourceCoreRecursiveNamedBitNotStatementBounds
+import Solcore.Test.SourceCoreRecursiveNamedExpressionCompositionsBounds
+import Solcore.Test.SourceCoreRecursiveNamedPlaceAssignmentBounds
+import Solcore.Test.SourceCoreCallableCoercionMethodBodyMeaning
+import Solcore.Test.SourceCoreRecursiveNamedBuiltinBounds
+import Solcore.Test.SourceCoreRecursiveNamedDataExpressionBounds
+import Solcore.Test.SourceCoreRecursiveNamedAssignmentHeadBounds
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2723,6 +2730,12 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedExpressionBounds.run
   SourceCoreCallableCoercionSourceSelection.run
   SourceCoreRecursiveNamedBareBitNotBounds.run
+  SourceCoreRecursiveNamedExpressionCompositionsBounds.run
+  SourceCoreRecursiveNamedPlaceAssignmentBounds.run
+  SourceCoreCallableCoercionMethodBodyMeaning.run
+  SourceCoreRecursiveNamedBuiltinBounds.run
+  SourceCoreRecursiveNamedDataExpressionBounds.run
+  SourceCoreRecursiveNamedAssignmentHeadBounds.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
