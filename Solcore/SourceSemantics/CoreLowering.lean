@@ -452,6 +452,11 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBoundedContracts
 import Solcore.SourceSemantics.CoreLowering.BuiltinImperativeMatchPreparedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionEvidenceOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaImperativeNativeTyping
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionPlanProvenance
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedCachedNativeTyping
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForPreparedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
