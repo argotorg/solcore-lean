@@ -2005,7 +2005,7 @@ private def validateSpecializationEvidenceAndExtend
     | .statement _ => pure ()
   pure extended
 
-private def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
+def prepareExecutablePlanEvidenceAux (program : CheckedProgram)
     (helperBudget : Nat) : Nat → Nat → Plan → Except RuntimeError Plan
   | 0, next, plan =>
       match plan.specializations[next]? with
