@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceRhs
 import Solcore.SourceSemantics.CoreLowering.ProtectedExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceResolution
@@ -55,6 +56,59 @@ variable {administrativeContext actualContext : Core.Context} {environment : Dyn
 
 /-- Every source RHS outcome executes under the actual saved snapshot slots.
 The returned live-root receipt is derived from the IH's new heap. -/
+theorem preserves_at (size : Nat)
+    {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+    (meaning : RecursiveNamedBoundedContracts.PreservesAt size (payloadModel checked registry functions) program context evidence source certificate faults entry)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment canonical)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes initialWorld coreEnvironment actualContext ambient.definitions)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (installed : entry scope initialMap initialWorld before initialStore canonical)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment targetHeap id outcome after) :
+    ∃ value store mapping world, Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
+      resolution id node (renamed lowered ξ) environment outcome after value store mapping world := by
+  have snapshotTyped := snapshot_runtimeTyped resolution actualTyped
+  obtain ⟨value, store, mapping, world, evaluated, represented, heaps, maps, worlds, frame, metadata⟩ :=
+    meaning generated found (environments.extend resolution.maps resolution.worlds) resolution.heaps (locals.mono resolution.metadata)
+      (DataPlaceChildExpressions.prefix_agrees agrees
+        [.inRight .unit resolution.snapshot, packValues resolution.values, .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) snapshotTyped (transport.extend installed resolution.maps resolution.worlds resolution.frame resolution.metadata) trace
+  refine ⟨value, store, mapping, world, trace.sound, ?_, represented, heaps, maps, worlds, frame, metadata,
+    latest_of_heap resolution heaps maps worlds metadata⟩
+  simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
+    List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
+    SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated
+
+theorem reflects_at (size : Nat)
+    {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+    (meaning : RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel checked registry functions) program context evidence source certificate faults entry)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) initialMap initialWorld administrativeContext scope environment canonical)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes initialWorld coreEnvironment actualContext ambient.definitions)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (installed : entry scope initialMap initialWorld before initialStore canonical)
+    {value : Value} {store : Store}
+    (evaluated : CoreProof.EvaluationSize size
+      (snapshotEnvironment prepared.route.rootType resolution.target (packValues resolution.values) (.inRight .unit resolution.snapshot) coreEnvironment)
+      resolution.store (shift 3 (lowered.expression.rename ξ)) value store) :
+    ∃ sourceSize outcome after mapping world,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment targetHeap id outcome after ∧
+      Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
+      resolution id node (renamed lowered ξ) environment outcome after value store mapping world := by
+  have snapshotTyped := snapshot_runtimeTyped resolution actualTyped
+  obtain ⟨sourceSize, outcome, after, mapping, world, trace, represented, heaps, maps, worlds, frame, metadata⟩ :=
+    meaning generated found (environments.extend resolution.maps resolution.worlds) resolution.heaps (locals.mono resolution.metadata)
+      (DataPlaceChildExpressions.prefix_agrees agrees
+        [.inRight .unit resolution.snapshot, packValues resolution.values, .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) snapshotTyped
+      (transport.extend installed resolution.maps resolution.worlds resolution.frame resolution.metadata)
+      (by simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
+        List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
+        SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
+  exact ⟨sourceSize, outcome, after, mapping, world, trace, trace.sound, evaluated.sound, represented, heaps, maps, worlds, frame, metadata,
+    latest_of_heap resolution heaps maps worlds metadata⟩
+
 theorem preserves
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel checked registry functions) program context evidence source certificate faults entry)
@@ -68,20 +122,10 @@ theorem preserves
     (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment targetHeap id outcome after) :
     ∃ value store mapping world, Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
       resolution id node (renamed lowered ξ) environment outcome after value store mapping world := by
-  have snapshotTyped := snapshot_runtimeTyped resolution actualTyped
-  obtain ⟨value, store, mapping, world, evaluated, represented, heaps, maps, worlds, frame, metadata⟩ :=
-    meaning generated found (environments.extend resolution.maps resolution.worlds) resolution.heaps (locals.mono resolution.metadata)
-      (DataPlaceChildExpressions.prefix_agrees agrees
-        [.inRight .unit resolution.snapshot, packValues resolution.values, .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) snapshotTyped (transport.extend installed resolution.maps resolution.worlds resolution.frame resolution.metadata) trace
-  refine ⟨value, store, mapping, world, trace, ?_, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap resolution heaps maps worlds metadata⟩
-  simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
-    List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
-    SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated
+  obtain ⟨size, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size trace
+  exact preserves_at resolution size transport (RecursiveNamedBoundedContracts.preserves_at_of_unbounded meaning size)
+    generated found environments agrees actualTyped locals installed sized
 
-/-- Completed RHS code reconstructs the independent source outcome and the
-post-RHS live root, without supplying a source execution or child evaluation IH
-at one preselected runtime environment. -/
 theorem reflects
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (meaning : ProtectedExpressionMeaning.Reflects (payloadModel checked registry functions) program context evidence source certificate faults entry)
@@ -97,17 +141,11 @@ theorem reflects
       resolution.store (shift 3 (lowered.expression.rename ξ)) value store) :
     ∃ outcome after mapping world, Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
       resolution id node (renamed lowered ξ) environment outcome after value store mapping world := by
-  have snapshotTyped := snapshot_runtimeTyped resolution actualTyped
-  obtain ⟨outcome, after, mapping, world, trace, represented, heaps, maps, worlds, frame, metadata⟩ :=
-    meaning generated found (environments.extend resolution.maps resolution.worlds) resolution.heaps (locals.mono resolution.metadata)
-      (DataPlaceChildExpressions.prefix_agrees agrees
-        [.inRight .unit resolution.snapshot, packValues resolution.values, .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) snapshotTyped
-      (transport.extend installed resolution.maps resolution.worlds resolution.frame resolution.metadata)
-      (by simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
-        List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
-        SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
-  exact ⟨outcome, after, mapping, world, trace, evaluated, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap resolution heaps maps worlds metadata⟩
+  obtain ⟨size, sized⟩ := CoreProof.evaluation_has_size evaluated
+  obtain ⟨sourceSize, outcome, after, mapping, world, _, result⟩ :=
+    reflects_at resolution size transport (RecursiveNamedBoundedContracts.reflects_at_of_unbounded meaning size)
+      generated found environments agrees actualTyped locals installed sized
+  exact ⟨outcome, after, mapping, world, result⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceRhs
 

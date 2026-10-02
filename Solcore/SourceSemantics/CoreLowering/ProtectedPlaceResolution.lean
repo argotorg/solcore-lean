@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceResolution
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceKeys
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceLayout
@@ -39,7 +40,7 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
 The protected child theorem receives the real entry at every key heap
 and hidden reference slot. Independent writable-local typing and environment agreement
 recover the exact raw root declaration type. -/
-theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -62,7 +63,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
       (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
-    (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
+      RecursiveNamedBoundedContracts.PreservesAt size (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry))
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -75,19 +77,19 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (installed : entry scope mapping world before store canonical)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceResolves program context evidence source environment before place sourceTarget after) :
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceResolves program size context evidence source environment before place sourceTarget after) (bounded : size ≤ budget) :
     ∃ execution : Execution compilation.checked registry functions prepared (renamedCodes codes ξ) sourceTypes place leaf sourceTarget
       coreEnvironment store mapping world before after,
       coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) := by
   cases trace with
-  | @intro _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
+  | @intro _ _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
       lookup initialRead evaluate currentRead initialValue selection =>
     obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible lookup slot
     obtain ⟨sources, values, keyStore, keyMap, keyWorld, shaped, keyEvaluated, keysRelated,
       keyHeaps, keyMaps, keyWorlds, keyFrame, metadata⟩ :=
-      ProtectedPlaceKeys.preserves transport children meaning environments heaps locals
+      ProtectedPlaceKeys.preserves_bounded budget transport children meaning environments heaps locals
         (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
-        (.cons (.cellRef reference.typed) actualTyped) installed evaluate
+        (.cons (.cellRef reference.typed) actualTyped) installed evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
     have keyEvaluation : Evaluates (referenceEnvironment prepared.route.rootType target coreEnvironment) store
         (shift 1 (SourceCoreCalls.packArguments (renamedCodes codes ξ)).expression) (.inRight .word (packValues values)) keyStore := by
       simpa only [DataPlaceChildExpressions.rename_prefix, packed_renamed_expression, List.length_cons, List.length_nil,
@@ -170,6 +172,51 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
               worlds := keyWorlds.trans extension
               frame := keyFrame.trans frame
               metadata := metadata }, agrees coreLookup⟩
+
+theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (path : PreparedPath compilation.checked source site prepared.route.rootSourceType place.projections
+      0 prepared.steps prepared.keys leaf)
+    (views : KeyViews path sourceTypes)
+    (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (keyTypes : prepared.keyTypes = codes.map (·.type))
+    (leafProjected : compilation.checked.catalog.project leaf = .ok prepared.route.leafType)
+    (virtual : ∀ key value, prepared.route.rootSourceType = .mapping key value →
+      CompatibleMapping.VirtualRoot.Generated compilation prepared.route key value)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (nonempty : prepared.steps ≠ [])
+    (getterTyped : HasType ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
+        actualContext)
+      (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
+      (LanguageResult.resultType prepared.optionalLeaf) ambient.definitions)
+    {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+    (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before after : Dynamic.Heap} {store : Store} {sourceTarget : Dynamic.ResolvedPlace} {index : Nat}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (installed : entry scope mapping world before store canonical)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    (trace : Dynamic.SourcePlaceResolves program context evidence source environment before place sourceTarget after) :
+    ∃ execution : Execution compilation.checked registry functions prepared (renamedCodes codes ξ) sourceTypes place leaf sourceTarget
+      coreEnvironment store mapping world before after,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) := by
+  obtain ⟨size, sized⟩ := SourceExecutionSize.SourcePlaceResolves.has_size trace
+  exact preserves_bounded size path views children keyTypes leafProjected virtual registryExtension nonempty getterTyped transport
+    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) faithful observations
+    environments heaps locals agrees actualTyped installed slot rootTyped sized (Nat.le_refl size)
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceResolution
 
