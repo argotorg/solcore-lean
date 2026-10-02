@@ -241,6 +241,10 @@ import Solcore.Test.SourceCoreConstructorNativeTyping
 import Solcore.Test.SourceCoreDataLeafNativeTyping
 import Solcore.Test.SourceCoreAssignmentReachableDiagnostics
 import Solcore.Test.SourceCoreProtectedNamedFor
+import Solcore.Test.SourceCoreCallableIndexedLambdaScalarNativeTyping
+import Solcore.Test.SourceCoreBuiltinNativeTyping
+import Solcore.Test.SourceCoreNamedForFunctionBody
+import Solcore.Test.SourceCoreAssignmentDiagnosticCertificates
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2648,6 +2652,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableIndexedLambdaGeneration.run
   SourceCoreAssignmentReachableDiagnostics.run
   SourceCoreProtectedNamedFor.run
+  SourceCoreCallableIndexedLambdaScalarNativeTyping.run
+  SourceCoreNamedForFunctionBody.run
+  SourceCoreAssignmentDiagnosticCertificates.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run

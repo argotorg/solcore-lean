@@ -432,6 +432,10 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorNativ
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionDataLeafNativeTyping
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
 import Solcore.SourceSemantics.CoreLowering.NamedImperativeForStatements
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaScalarNativeTyping
+import Solcore.SourceSemantics.CoreLowering.BuiltinCallNativeTyping
+import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
