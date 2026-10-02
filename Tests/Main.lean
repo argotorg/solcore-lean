@@ -252,6 +252,10 @@ import Solcore.Test.SourceCoreCatalogNominalCoverage
 import Solcore.Test.SourceCoreCallableAuthenticatedCallEvidence
 import Solcore.Test.SourceCoreRecursiveNamedCatalog
 import Solcore.Test.SourceCoreForHeaderReachableDiagnostics
+import Solcore.Test.SourceCoreCompatibleMemberNativeTyping
+import Solcore.Test.SourceCoreGeneralExpressionNativeTyping
+import Solcore.Test.SourceCoreCallableCallEvidenceCertificates
+import Solcore.Test.SourceCoreImperativeForReachableDiagnostics
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2669,6 +2673,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableAuthenticatedCallEvidence.run
   SourceCoreRecursiveNamedCatalog.run
   SourceCoreForHeaderReachableDiagnostics.run
+  SourceCoreGeneralExpressionNativeTyping.run
+  SourceCoreCallableCallEvidenceCertificates.run
+  SourceCoreImperativeForReachableDiagnostics.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
