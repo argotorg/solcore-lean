@@ -57,7 +57,7 @@ private def methodKey (context : Context) (node : ExpressionNode)
   (SourceCompilationPlan.exactCallKey context.plan context.owner node.id method.specialized.key)
     |>.mapError SourceCoreBasic.Error.callPreparation
 
-private def applyCoercions (program : CheckedProgram) (projectType : Projector) (context : Context)
+def applyCoercions (program : CheckedProgram) (projectType : Projector) (context : Context)
     (caller : SourceSpecialization.SpecializedFunction) (available : SourceCompilationPlan.EvidenceEnvironment)
     (scope : Scope) (node : ExpressionNode) (callables : SourceCoreFunctions.CallablePolicy) :
     Lowered → List CoercionStep → Except Error Lowered
