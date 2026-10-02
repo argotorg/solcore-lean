@@ -43,9 +43,126 @@ structure Certificate {checked : Checked} {base : Base checked}
     source expressionSyntax solved reasonAt administrative context scope (.statements true statements) expected type flow
   errors : GenericImperativeFor.Tree.Errors registry faults tree
 
-/-- Keep the real compiler equation and the exact flow traversal. Their
-composition fixes the actual finish code without an additional code equality
-supplied by a caller. The tree is independent static evidence. -/
+/-- The chosen operand diagnostic policy is retained by the static body receipt.
+The tree, emitted finish code and actual compiler equations are unchanged. -/
+structure CertificateFor (diagnosticPolicy : AssignmentDiagnosticPolicy) {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
+    {values : SourceCoreCompatibleValues.Context}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions} {program : Program}
+    (bodies : NamedCallExpressions.Bodies prepared values ambient.definitions program)
+    (layouts : SourceCoreAllocationLayouts.Prepared)
+    (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
+    (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
+    (source : TypedSource) (expressionSyntax : ExpressionId → Prop) (context : SourceSemantics.Context)
+    (solved : List SolvedRequirement) (reasonAt : ExpressionId → Word)
+    (administrative : Core.Context)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (scope : SourceCoreLocalCell.Scope) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (policy : SourceCoreLoops.Policy)
+    (fuel : Nat) (fellThrough escaped : Word) (code : Expr) where private mk ::
+  accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel source scope
+    statements type reasonAt fellThrough escaped = .ok code
+  projection : values.checked.catalog.project expected = .ok type
+  flow : Expr
+  generated : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope
+    statements type reasonAt true escaped = .ok flow
+  emitted : code = CompatibleStatements.finish type flow fellThrough escaped
+  tree : NamedImperativeForStatements.Tree bodies layouts owner active frame globals onError compilation expressionFuel
+    source expressionSyntax solved reasonAt administrative context scope (.statements true statements) expected type flow
+  errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+/-- Preserve the original record while exposing its unconditional policy. -/
+def Certificate.to_for
+    {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
+    {values : SourceCoreCompatibleValues.Context}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions} {program : Program}
+    {bodies : NamedCallExpressions.Bodies prepared values ambient.definitions program}
+    {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+    {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {scope : SourceCoreLocalCell.Scope} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {policy : SourceCoreLoops.Policy}
+    {fuel : Nat} {fellThrough escaped : Word} {code : Expr}
+    (certificate : Certificate bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax context solved reasonAt administrative registry faults scope statements
+      expected type policy fuel fellThrough escaped code) :
+    CertificateFor .unconditional bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax context solved reasonAt administrative registry faults scope statements
+      expected type policy fuel fellThrough escaped code :=
+  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+
+/-- The compatibility record has the same fields, with no additional premise. -/
+def CertificateFor.to_strict
+    {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
+    {values : SourceCoreCompatibleValues.Context}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions} {program : Program}
+    {bodies : NamedCallExpressions.Bodies prepared values ambient.definitions program}
+    {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+    {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {scope : SourceCoreLocalCell.Scope} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {policy : SourceCoreLoops.Policy}
+    {fuel : Nat} {fellThrough escaped : Word} {code : Expr}
+    (certificate : CertificateFor .unconditional bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax context solved reasonAt administrative registry faults scope statements
+      expected type policy fuel fellThrough escaped code) :
+    Certificate bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax context solved reasonAt administrative registry faults scope statements
+      expected type policy fuel fellThrough escaped code :=
+  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+
+def of_extracted_for {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
+    {values : SourceCoreCompatibleValues.Context}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions} {program : Program}
+    {bodies : NamedCallExpressions.Bodies prepared values ambient.definitions program}
+    {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {source : TypedSource} {expressionSyntax : ExpressionId → Prop} {context : SourceSemantics.Context}
+    {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+    {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {scope : SourceCoreLocalCell.Scope} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {policy : SourceCoreLoops.Policy}
+    {fuel : Nat} {fellThrough escaped : Word} {code flow : Expr}
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel source scope
+      statements type reasonAt fellThrough escaped = .ok code)
+    (projection : values.checked.catalog.project expected = .ok type)
+    (generated : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope
+      statements type reasonAt true escaped = .ok flow)
+    (tree : NamedImperativeForStatements.Tree bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax solved reasonAt administrative context scope (.statements true statements) expected type flow)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    CertificateFor diagnosticPolicy bodies layouts owner active frame globals onError compilation expressionFuel
+      source expressionSyntax context solved reasonAt administrative registry faults scope statements
+      expected type policy fuel fellThrough escaped code := by
+  have emitted : code = CompatibleStatements.finish type flow fellThrough escaped := by
+    unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
+    rw [generated] at accepted
+    exact Except.ok.inj accepted.symm
+  exact ⟨accepted, projection, flow, generated, emitted, tree, errors⟩
+
+/-- Backward-compatible unconditional entry. -/
 def of_extracted
     {checked : Checked} {base : Base checked}
     {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
@@ -74,12 +191,8 @@ def of_extracted
     (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
     Certificate bodies layouts owner active frame globals onError compilation expressionFuel
       source expressionSyntax context solved reasonAt administrative registry faults scope statements
-      expected type policy fuel fellThrough escaped code := by
-  have emitted : code = CompatibleStatements.finish type flow fellThrough escaped := by
-    unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
-    rw [generated] at accepted
-    exact Except.ok.inj accepted.symm
-  exact ⟨accepted, projection, flow, generated, emitted, tree, errors⟩
+      expected type policy fuel fellThrough escaped code :=
+  (of_extracted_for accepted projection generated tree errors).to_strict
 
 variable {checked : Checked} {base : Base checked}
   {prepared : SourceCoreCallableIndexedAncestry.Prepared base}
@@ -116,8 +229,8 @@ variable {checked : Checked} {base : Base checked}
   (functionLeaves : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
   (functionTypes : FunctionRuntimeViews functions)
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.preserves
-    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+theorem CertificateFor.preserves {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -148,8 +261,8 @@ theorem Certificate.preserves
         scope finalMap finalWorld after finalStore canonical := by
   obtain ⟨resultContext, control, sourceTrace, exit⟩ := trace_control trace
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
-    certificate.tree.preserves functions definitions registered extension faithful functionLeaves functionTypes function.evidence
-      unique owners uninitialized missing bodyUninitialized bodyMissing certificate.errors contextValid
+    certificate.tree.preserves_reachable functions definitions registered extension faithful functionLeaves functionTypes function.evidence
+      unique owners uninitialized missing bodyUninitialized bodyMissing certificate.errors.reachable contextValid
       environments heaps locals agrees actualTyped reference read unmapped installed sourceTrace
   obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
     cases same
@@ -163,8 +276,8 @@ theorem Certificate.preserves
     NamedImperativeForStatements.retained functions installed maps worlds frame metadata⟩
 
 include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
-theorem Certificate.reflects
-    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+theorem CertificateFor.reflects {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -196,8 +309,8 @@ theorem Certificate.reflects
   rw [certificate.emitted, ImperativeFunctionFinish.rename] at evaluated
   obtain ⟨flowValue, middleStore, flowEval⟩ := ImperativeFunctionFinish.input evaluated
   obtain ⟨resultContext, control, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
-    certificate.tree.reflects functions definitions registered extension faithful functionLeaves functionTypes function.evidence
-      unique owners uninitialized missing bodyUninitialized bodyMissing certificate.errors contextValid
+    certificate.tree.reflects_reachable functions definitions registered extension faithful functionLeaves functionTypes function.evidence
+      unique owners uninitialized missing bodyUninitialized bodyMissing certificate.errors.reachable contextValid
       environments heaps locals agrees actualTyped reference read unmapped installed flowEval
   obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
     cases same
@@ -242,8 +355,8 @@ include definitions registered escapedFault extension faithful functionLeaves fu
 /-- Finite source call completion and completed Core execution are equivalent.
 Suspension is outside both sides; no common fuel bound or termination premise
 is required. The stronger preceding theorems retain result and heap relations. -/
-theorem Certificate.finite_iff
-    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+theorem CertificateFor.finite_iff {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    (certificate : CertificateFor diagnosticPolicy bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
       function.resultType type policy fuel fellThrough escaped code)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -282,5 +395,107 @@ theorem Certificate.finite_iff
     obtain ⟨runtimeFuel, completed⟩ :=
       Core.evaluation_runStateful_complete_with_sufficient_fuel evaluated
     exact ⟨runtimeFuel, value, finalStore, completed runtimeFuel (Nat.le_refl _)⟩
+include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
+theorem Certificate.preserves
+    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
+      scope mapping world before store canonical)
+    (trace : FunctionCallBody.Trace program function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧
+      NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
+        scope finalMap finalWorld after finalStore canonical := by
+  exact certificate.to_for.preserves functions extension definitions registered
+    contextValid unique owners escapedFault uninitialized missing bodyUninitialized bodyMissing faithful functionLeaves functionTypes
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+
+include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
+theorem Certificate.reflects
+    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
+      scope mapping world before store canonical)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      FunctionCallBody.Trace program function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧
+      NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
+        scope finalMap finalWorld after finalStore canonical := by
+  exact certificate.to_for.reflects functions extension definitions registered
+    contextValid unique owners escapedFault uninitialized missing bodyUninitialized bodyMissing faithful functionLeaves functionTypes
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+
+include definitions registered escapedFault extension faithful functionLeaves functionTypes contextValid unique owners uninitialized missing bodyUninitialized bodyMissing in
+/-- Finite source call completion and completed Core execution are equivalent.
+Suspension is outside both sides; no common fuel bound or termination premise
+is required. The stronger preceding theorems retain result and heap relations. -/
+theorem Certificate.finite_iff
+    (certificate : Certificate bodies layouts owner active frameLayout globals onError compilation expressionFuel function.source expressionSyntax context solved reasonAt administrative registry faults scope function.body
+      function.resultType type policy fuel fellThrough escaped code)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store : Store} {ξ : Renaming}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
+      scope mapping world before store canonical)
+:
+    (∃ runtimeFuel value finalStore,
+      Core.runStateful runtimeFuel (.initial (code.rename ξ) actual store) =
+        .done value finalStore) ↔
+    (∃ outcome after,
+      FunctionCallBody.Trace program function context environment before outcome after) := by
+  exact certificate.to_for.finite_iff functions extension definitions registered
+    contextValid unique owners escapedFault uninitialized missing bodyUninitialized bodyMissing faithful functionLeaves functionTypes
+    environments heaps locals agrees actualTyped reference read unmapped installed
+
 
 end Solcore.SourceSemantics.CoreLowering.NamedForFunctionBody

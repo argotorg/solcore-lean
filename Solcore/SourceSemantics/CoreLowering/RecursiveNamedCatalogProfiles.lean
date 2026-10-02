@@ -69,7 +69,79 @@ structure Profile (headers : Inventory prepared values ambient.definitions progr
     (.statements true header.function.body) header.function.resultType header.output flow
   errors : GenericImperativeFor.Tree.Errors registry faults tree
 
-/-- Actual body and flow pass equations determine the real finish wrapper. -/
+/-- Static profiles select operand laws without storing runtime body meaning. -/
+structure ProfileFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (headers : Inventory prepared values ambient.definitions program)
+    (header : Header prepared values ambient.definitions program)
+    (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
+    (expressionSyntax : ExpressionId → Prop) (administrative : Core.Context)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) where private mk ::
+  accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+    header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
+  projection : values.checked.catalog.project header.function.resultType = .ok header.output
+  flow : Expr
+  generated : SourceCoreLoops.lowerFlowStatementsWithPolicy header.policy header.fuel header.function.source
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+    header.output header.reasonAt true header.escaped = .ok flow
+  emitted : header.body = CompatibleStatements.finish header.output flow header.fellThrough header.escaped
+  tree : GenericImperativeFor.Tree header.layouts header.owner header.active prepared.layout.frame header.globals
+    header.onError values header.function.source expressionSyntax
+    (fun context => Expressions headers compilation expressionFuel header.function.source context header.solved header.reasonAt)
+    ambient.definitions administrative header.context
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+    (.statements true header.function.body) header.function.resultType header.output flow
+  errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+/-- Keep the original static record as the unconditional interface. -/
+def Profile.to_for
+    {headers : Inventory prepared values ambient.definitions program}
+    {header : Header prepared values ambient.definitions program}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (certificate : Profile headers header compilation expressionFuel expressionSyntax administrative registry faults) :
+    ProfileFor .unconditional headers header compilation expressionFuel expressionSyntax administrative registry faults :=
+  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+
+/-- Restore only the original unconditional record, field by field. -/
+def ProfileFor.to_strict
+    {headers : Inventory prepared values ambient.definitions program}
+    {header : Header prepared values ambient.definitions program}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (certificate : ProfileFor .unconditional headers header compilation expressionFuel expressionSyntax administrative registry faults) :
+    Profile headers header compilation expressionFuel expressionSyntax administrative registry faults :=
+  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+
+def ProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {headers : Inventory prepared values ambient.definitions program}
+    {header : Header prepared values ambient.definitions program}
+    {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
+    {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+      header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
+    (projection : values.checked.catalog.project header.function.resultType = .ok header.output)
+    (generated : SourceCoreLoops.lowerFlowStatementsWithPolicy header.policy header.fuel header.function.source
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+      header.output header.reasonAt true header.escaped = .ok flow)
+    (tree : GenericImperativeFor.Tree header.layouts header.owner header.active prepared.layout.frame header.globals
+      header.onError values header.function.source expressionSyntax
+      (fun context => Expressions headers compilation expressionFuel header.function.source context header.solved header.reasonAt)
+      ambient.definitions administrative header.context
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      (.statements true header.function.body) header.function.resultType header.output flow)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults := by
+  have emitted : header.body = CompatibleStatements.finish header.output flow header.fellThrough header.escaped := by
+    unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
+    rw [generated] at accepted
+    exact Except.ok.inj accepted.symm
+  exact ⟨accepted, projection, flow, generated, emitted, tree, errors⟩
+
+/-- Backward-compatible unconditional extraction. -/
 def Profile.of_extracted
     {headers : Inventory prepared values ambient.definitions program}
     {header : Header prepared values ambient.definitions program}
@@ -90,12 +162,8 @@ def Profile.of_extracted
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       (.statements true header.function.body) header.function.resultType header.output flow)
     (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
-    Profile headers header compilation expressionFuel expressionSyntax administrative registry faults := by
-  have emitted : header.body = CompatibleStatements.finish header.output flow header.fellThrough header.escaped := by
-    unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
-    rw [generated] at accepted
-    exact Except.ok.inj accepted.symm
-  exact ⟨accepted, projection, flow, generated, emitted, tree, errors⟩
+    Profile headers header compilation expressionFuel expressionSyntax administrative registry faults :=
+  (ProfileFor.of_extracted accepted projection generated tree errors).to_strict
 
 /-- Runtime correspondence is deliberately absent from this family. -/
 def Profiles (headers : Inventory prepared values ambient.definitions program)
@@ -105,6 +173,38 @@ def Profiles (headers : Inventory prepared values ambient.definitions program)
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) : Prop :=
   ∀ header, header ∈ headers → Nonempty
     (Profile headers header compilation expressionFuel (expressionSyntax header) (administrative header) registry faults)
+
+/-- Every header uses the same diagnostic policy; execution remains absent. -/
+def ProfilesFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (headers : Inventory prepared values ambient.definitions program)
+    (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
+    (expressionSyntax : Header prepared values ambient.definitions program → ExpressionId → Prop)
+    (administrative : Header prepared values ambient.definitions program → Core.Context)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) : Prop :=
+  ∀ header, header ∈ headers → Nonempty
+    (ProfileFor diagnosticPolicy headers header compilation expressionFuel (expressionSyntax header) (administrative header) registry faults)
+
+theorem Profiles.to_for (headers : Inventory prepared values ambient.definitions program)
+    (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
+    (expressionSyntax : Header prepared values ambient.definitions program → ExpressionId → Prop)
+    (administrative : Header prepared values ambient.definitions program → Core.Context)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profiles : Profiles headers compilation expressionFuel expressionSyntax administrative registry faults) :
+    ProfilesFor .unconditional headers compilation expressionFuel expressionSyntax administrative registry faults := by
+  intro header member
+  obtain ⟨certificate⟩ := profiles header member
+  exact ⟨certificate.to_for⟩
+
+
+theorem ProfilesFor.to_strict (headers : Inventory prepared values ambient.definitions program)
+    (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
+    (expressionSyntax : Header prepared values ambient.definitions program → ExpressionId → Prop)
+    (administrative : Header prepared values ambient.definitions program → Core.Context)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profiles : ProfilesFor .unconditional headers compilation expressionFuel expressionSyntax administrative registry faults) :
+    Profiles headers compilation expressionFuel expressionSyntax administrative registry faults := by
+  intro header member
+  obtain ⟨certificate⟩ := profiles header member
+  exact ⟨certificate.to_strict⟩
 
 /-- Existing static heads can forget their builtin-only body certificate.
 The resulting call receipt refers only to the finite header inventory. -/
