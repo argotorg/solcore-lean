@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedAssignmentHeadContracts
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
@@ -45,10 +46,11 @@ variable {values : ValuesContext} {source : TypedSource}
   (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
   (installed : entry scope mapping world before store canonical)
 
-include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment before assignment.target rhs updated after) :
+include transport extension faithful observations environments heaps locals agrees actualTyped installed in
+theorem preserves_prefix_bounded (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) {updated : Dynamic.Value} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -61,22 +63,40 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation⟩ :=
-      ProtectedBareAssignment.preserves_prefix layout empty extension meaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace invalid
+      ProtectedBareAssignment.preserves_prefix_bounded budget layout empty extension boundedMeaning observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped installed slot writable trace bounded invalid
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
       transport.extend installed maps worlds preservation metadata, continuation⟩
   | projected layout ordinary =>
     obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation⟩ :=
-      ProtectedPlaceAssignmentSuccess.preserves_prefix layout ordinary extension transport meaning faithful observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace invalid
+      ProtectedPlaceAssignmentSuccess.preserves_prefix_bounded budget layout ordinary extension transport boundedMeaning faithful observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped installed slot writable trace bounded invalid
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
-theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before assignment.target rhs updated after) :
+    ∃ finalStore finalMap finalWorld slots,
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
+      entry scope finalMap finalWorld after finalStore canonical ∧
+      ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
+        (slots ++ actual) finalStore (shift 7 (next.rename ξ))  := by
+  obtain ⟨size, sized⟩ := SourceExecutionSize.SourcePlaceAssignment.has_size trace
+  exact preserves_prefix_bounded functions extension program evidence transport faithful observations head
+    environments heaps locals agrees actualTyped installed size
+    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) sized (Nat.le_refl size)
+
+include transport extension faithful observations environments heaps locals agrees actualTyped installed in
+theorem preserves_fault_reachable_bounded (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) (errors : head.ReachableErrors registry faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
     (next : Expr) (output : Ty) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word token)) finalStore ∧ faults reason token ∧
@@ -88,16 +108,32 @@ theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults
   cases shape with
   | bare empty layout =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩ :=
-      ProtectedBareAssignment.preserves_fault_reachable layout empty extension meaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace next output invalid errors.operands
+      ProtectedBareAssignment.preserves_fault_reachable_bounded budget layout empty extension boundedMeaning observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped installed slot writable trace bounded next output invalid errors.operands
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       transport.extend installed maps worlds preservation metadata⟩
   | projected layout ordinary =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      ProtectedPlaceAssignmentFaults.preserves layout ordinary extension transport meaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped installed slot writable trace next output invalid
+      ProtectedPlaceAssignmentFaults.preserves_bounded budget layout ordinary extension transport boundedMeaning faithful observations
+      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped installed slot writable trace bounded next output invalid
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       transport.extend installed maps worlds frame metadata⟩
+
+include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
+theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    (trace : Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhs reason after)
+    (next : Expr) (output : Ty) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      entry scope finalMap finalWorld after finalStore canonical  := by
+  obtain ⟨size, sized⟩ := SourceExecutionSize.SourcePlaceAssignmentFaults.has_size trace
+  exact preserves_fault_reachable_bounded functions extension program evidence transport faithful observations head
+    environments heaps locals agrees actualTyped installed size
+    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) errors sized (Nat.le_refl size) next output
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
@@ -113,6 +149,37 @@ theorem preserves_fault (errors : head.Errors registry faults)
       entry scope finalMap finalWorld after finalStore canonical := by
   exact preserves_fault_reachable functions extension program evidence transport meaning faithful observations head
     environments heaps locals agrees actualTyped installed errors.reachable trace next output
+
+include transport extension faithful observations environments heaps locals agrees actualTyped installed in
+theorem reflects_reachable_bounded (budget : Nat)
+    (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
+    {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
+    RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
+      entry scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
+      before store mapping world (next.rename ξ) output value finalStore := by
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  cases shape with
+  | bare empty layout =>
+    have result := ProtectedBareAssignment.reflects_reachable_bounded budget layout empty extension boundedReflection observations right found rightView rightType profile
+      environments heaps locals agrees actualTyped installed slot writable errors.operands completed bounded
+    cases result with
+    | fault trace same matched finalHeaps maps worlds preservation metadata =>
+      exact .fault trace same matched finalHeaps maps worlds preservation metadata
+        (transport.extend installed maps worlds preservation metadata)
+    | success trace _ finalHeaps maps worlds preservation metadata count typed strict remaining =>
+      exact .success trace finalHeaps maps worlds preservation metadata count
+        (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
+          Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
+        (transport.extend installed maps worlds preservation metadata) strict remaining
+  | projected layout ordinary =>
+    have result := ProtectedPlaceAssignmentReflection.reflects_bounded budget layout ordinary extension transport boundedReflection functionTypes faithful observations
+      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped installed locals slot writable completed bounded
+    cases result with
+    | fault trace same matched finalHeaps maps worlds frame metadata =>
+      exact .fault trace same matched finalHeaps maps worlds frame metadata (transport.extend installed maps worlds frame metadata)
+    | committed trace finalHeaps maps worlds frame metadata count typed strict remaining =>
+      exact .success trace finalHeaps maps worlds frame metadata count typed (transport.extend installed maps worlds frame metadata) strict remaining
 
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
 theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
@@ -133,28 +200,13 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (err
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       entry scope finalMap finalWorld after written canonical ∧
-      Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
-  cases shape with
-  | bare empty layout =>
-    have result := ProtectedBareAssignment.reflects_reachable layout empty extension reflection observations right found rightView rightType profile
-      environments heaps locals agrees actualTyped installed slot writable errors.operands completed
-    cases result with
-    | fault trace same matched finalHeaps maps worlds preservation metadata =>
-      exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, preservation, metadata,
-        transport.extend installed maps worlds preservation metadata⟩
-    | success trace _ finalHeaps maps worlds preservation metadata count typed continuation =>
-      exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, preservation, metadata, count,
-        by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
-          Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
-        transport.extend installed maps worlds preservation metadata, continuation⟩
-  | projected layout ordinary =>
-    rcases ProtectedPlaceAssignmentReflection.reflects layout ordinary extension transport reflection meaning functionTypes faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped installed locals slot writable completed with
-      ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
-      ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
-    · exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata, transport.extend installed maps worlds frame metadata⟩
-    · exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
+      Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore)  := by
+  -- The historical preservation argument stays in the compatibility signature.
+  have _legacyMeaning := @meaning
+  obtain ⟨size, sized⟩ := CoreProof.evaluation_has_size completed
+  exact (reflects_reachable_bounded functions extension program evidence transport faithful observations head
+    environments heaps locals agrees actualTyped installed size
+    (RecursiveNamedBoundedContracts.reflects_below_of_unbounded reflection size) functionTypes errors sized (Nat.le_refl size)).erase
 
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
