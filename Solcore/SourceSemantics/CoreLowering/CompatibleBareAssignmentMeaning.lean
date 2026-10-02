@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentCommit
+import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
 
 /-! Completed bare assignment code reconstructs the independent source
 transaction or fault. RHS meaning is typed and instantiated in the actual
@@ -49,7 +50,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
 
 /-- Finite reflection needs no source RHS trace and no chosen child execution.
 The actual completed code is the sole runtime premise. -/
-theorem reflects
+theorem reflects_reachable
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     (meaning : TypedGenericExpressionMeaning.Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
@@ -68,7 +69,7 @@ theorem reflects
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
-    (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
+    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid)
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) :
@@ -116,7 +117,7 @@ theorem reflects
         cases result.trace with
         | value rhsTrace =>
           exact .fault (.operands (snapshot.resolves bare) rhsTrace latest.read
-            (latest.type.trans snapshot.type.symm) initialized .nil invalidOperands) rfl invalidToken
+            (latest.type.trans snapshot.type.symm) initialized .nil invalidOperands) rfl (invalidToken _ _ invalidOperands)
             result.heaps result.maps result.worlds result.frame result.metadata
       · obtain ⟨after, commitStore, trace, _, finalHeaps, frame, metadata, typed, agreement⟩ :=
           commit layout snapshot bare result rightRep replacement applied (by simpa only [layout.sameType] using modified) actualTyped
@@ -124,5 +125,34 @@ theorem reflects
           (slots := [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
             .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target]) rfl typed
           ((agreement next outputType).unwrap completed)
+
+/-- Compatibility entry point retaining the original unconditional token law. -/
+theorem reflects
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : TypedGenericExpressionMeaning.Reflects (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
+    (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
+    (completed : Evaluates actual store
+      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) :
+    Result compilation registry functions program context evidence source faults prepared place operator environment before store mapping world
+      id actual actualContext ξ next outputType value finalStore := by
+  exact reflects_reachable layout bare extension meaning observations generated found rhsView rhsCore profile
+    environments heaps locals agrees actualTyped slot rootTyped (AssignmentOperandDiagnostics.of_unconditional invalidToken) completed
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignment
