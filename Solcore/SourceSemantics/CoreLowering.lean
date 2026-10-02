@@ -438,6 +438,9 @@ import Solcore.SourceSemantics.CoreLowering.NamedForFunctionBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentDiagnosticCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableCallEvidence
 import Solcore.SourceSemantics.CoreLowering.CompatibleCatalogRegistrationPrefix
+import Solcore.SourceSemantics.CoreLowering.CompatibleCatalogNominalCoverage
+import Solcore.SourceSemantics.CoreLowering.CallableCallRequirementLayouts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that

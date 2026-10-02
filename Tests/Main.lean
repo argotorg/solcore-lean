@@ -248,6 +248,10 @@ import Solcore.Test.SourceCoreAssignmentDiagnosticCertificates
 import Solcore.Test.SourceCoreCallableCallEvidence
 import Solcore.Test.SourceCoreCatalogRegistrationPrefix
 import Solcore.Test.SourceCoreProtectedAssignmentReachableDiagnostics
+import Solcore.Test.SourceCoreCatalogNominalCoverage
+import Solcore.Test.SourceCoreCallableAuthenticatedCallEvidence
+import Solcore.Test.SourceCoreRecursiveNamedCatalog
+import Solcore.Test.SourceCoreForHeaderReachableDiagnostics
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2661,6 +2665,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableCallEvidence.run
   SourceCoreCatalogRegistrationPrefix.run
   SourceCoreProtectedAssignmentReachableDiagnostics.run
+  SourceCoreCatalogNominalCoverage.run
+  SourceCoreCallableAuthenticatedCallEvidence.run
+  SourceCoreRecursiveNamedCatalog.run
+  SourceCoreForHeaderReachableDiagnostics.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
