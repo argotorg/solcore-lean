@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
 import Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatementComposition
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedImperativeCertificates
@@ -126,13 +127,13 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate} {definitions : DataEnvironment} {administrative : Core.Context}
   {type : Ty} {continuation : SourceSemantics.Context → Scope → Expr → Prop}
 
-inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
+inductive ErrorsFor (policy : AssignmentDiagnosticPolicy) (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
     {context : SourceSemantics.Context} → {scope : Scope} → {items : List ForItemForm} → {code : Expr} →
     Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
       context scope items code → Prop where
   | nil {context scope code}
       {next : continuation context scope code}
-      : Errors registry faults (.nil next)
+      : ErrorsFor policy registry faults (.nil next)
   | uninitialized {context nextContext scope binder rest body payload}
       {monomorphic : binder.scheme.quantified = []}
       {extended : BinderExtends source.owner context binder nextContext}
@@ -144,8 +145,8 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
       {same : annotation.original = allocation.expression}
       {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         nextContext ((binder.id, payload) :: scope) rest body}
-      (remainingErrors : Errors registry faults remaining)
-      : Errors registry faults (.uninitialized monomorphic extended ordinary projected allocation annotation same remaining)
+      (remainingErrors : ErrorsFor policy registry faults remaining)
+      : ErrorsFor policy registry faults (.uninitialized monomorphic extended ordinary projected allocation annotation same remaining)
   | initialized {context nextContext scope binder initializer initializerNode lowered body rest}
       {monomorphic : binder.scheme.quantified = []}
       {extended : BinderExtends source.owner context binder nextContext}
@@ -159,28 +160,129 @@ inductive Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionC
       {same : annotation.original = allocation.expression}
       {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         nextContext ((binder.id, lowered.type) :: scope) rest body}
-      (remainingErrors : Errors registry faults remaining)
-      : Errors registry faults (.initialized monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining)
+      (remainingErrors : ErrorsFor policy registry faults remaining)
+      : ErrorsFor policy registry faults (.initialized monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining)
   | discard {context scope expression expressionNode rest lowered body}
       {found : source.lookupExpression? expression = some expressionNode}
       {value : certificates context scope expression lowered}
       {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         context scope rest body}
-      (remainingErrors : Errors registry faults remaining)
-      : Errors registry faults (.discard found value remaining)
+      (remainingErrors : ErrorsFor policy registry faults remaining)
+      : ErrorsFor policy registry faults (.discard found value remaining)
   | assign {context scope assignment operator rhs rest body}
       {head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs}
       {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         context scope rest body}
-      (remainingErrors : Errors registry faults remaining)
-      (headErrors : head.Errors registry faults)
-      : Errors registry faults (.assign head remaining)
+      (remainingErrors : ErrorsFor policy registry faults remaining)
+      (headErrors : head.ErrorsFor policy registry faults)
+      : ErrorsFor policy registry faults (.assign head remaining)
   | bitNot {context scope assignment rest body}
       {head : CompatibleBitNotStatements.Head context scope assignment}
       {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
         context scope rest body}
-      (remainingErrors : Errors registry faults remaining)
+      (remainingErrors : ErrorsFor policy registry faults remaining)
       (headErrors : head.Errors faults)
-      : Errors registry faults (.bitNot head remaining)
+      : ErrorsFor policy registry faults (.bitNot head remaining)
+
+/-- Original diagnostic receipt, with its public parameter order unchanged. -/
+abbrev Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+      context scope items code) : Prop := ErrorsFor .unconditional registry faults tree
+
+/-- Only reachable operand failures require a token interpretation. -/
+abbrev ReachableErrors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+      context scope items code) : Prop := ErrorsFor .reachable registry faults tree
+
+namespace Errors
+variable {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+
+abbrev nil {context scope code}
+      {next : continuation context scope code}
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.nil next) :=
+  @ErrorsFor.nil layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context scope code next
+
+abbrev uninitialized {context nextContext scope binder rest body payload}
+      {monomorphic : binder.scheme.quantified = []}
+      {extended : BinderExtends source.owner context binder nextContext}
+      {ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false}
+      {projected : values.checked.catalog.project binder.scheme.body = .ok payload}
+      {allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (absentRequest source scope binder payload)}
+      {annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (absentRequest source scope binder payload)}
+      {same : annotation.original = allocation.expression}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        nextContext ((binder.id, payload) :: scope) rest body}
+      (remainingErrors : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults remaining)
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.uninitialized monomorphic extended ordinary projected allocation annotation same remaining) :=
+  @ErrorsFor.uninitialized layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context nextContext scope binder rest body payload monomorphic extended ordinary projected allocation annotation same remaining remainingErrors
+
+abbrev initialized {context nextContext scope binder initializer initializerNode lowered body rest}
+      {monomorphic : binder.scheme.quantified = []}
+      {extended : BinderExtends source.owner context binder nextContext}
+      {ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false}
+      {initializerFound : source.lookupExpression? initializer = some initializerNode}
+      {sourceType : initializerNode.type = binder.scheme.body}
+      {initial : certificates context scope initializer lowered}
+      {allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (initializedRequest source scope binder lowered.type)}
+      {annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (initializedRequest source scope binder lowered.type)}
+      {same : annotation.original = allocation.expression}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        nextContext ((binder.id, lowered.type) :: scope) rest body}
+      (remainingErrors : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults remaining)
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.initialized monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining) :=
+  @ErrorsFor.initialized layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context nextContext scope binder initializer initializerNode lowered body rest monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining remainingErrors
+
+abbrev discard {context scope expression expressionNode rest lowered body}
+      {found : source.lookupExpression? expression = some expressionNode}
+      {value : certificates context scope expression lowered}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope rest body}
+      (remainingErrors : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults remaining)
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.discard found value remaining) :=
+  @ErrorsFor.discard layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context scope expression expressionNode rest lowered body found value remaining remainingErrors
+
+abbrev assign {context scope assignment operator rhs rest body}
+      {head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope rest body}
+      (remainingErrors : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults remaining)
+      (headErrors : head.Errors registry faults)
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.assign head remaining) :=
+  @ErrorsFor.assign layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context scope assignment operator rhs rest body head remaining remainingErrors headErrors
+
+abbrev bitNot {context scope assignment rest body}
+      {head : CompatibleBitNotStatements.Head context scope assignment}
+      {remaining : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+        context scope rest body}
+      (remainingErrors : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults remaining)
+      (headErrors : head.Errors faults)
+      : Errors (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation) registry faults (.bitNot head remaining) :=
+  @ErrorsFor.bitNot layouts owner active frame globals onError values source certificates definitions administrative type continuation .unconditional registry faults context scope assignment rest body head remaining remainingErrors headErrors
+
+end Errors
+
+theorem Errors.reachable {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    {tree : Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+      context scope items code}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (errors : Errors registry faults tree) : ReachableErrors registry faults tree := by
+  induction errors with
+  | @nil context scope code next =>
+    exact @ErrorsFor.nil layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context scope code next
+  | @uninitialized context nextContext scope binder rest body payload monomorphic extended ordinary projected allocation annotation same remaining remainingErrors ih =>
+    exact @ErrorsFor.uninitialized layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context nextContext scope binder rest body payload monomorphic extended ordinary projected allocation annotation same remaining ih
+  | @initialized context nextContext scope binder initializer initializerNode lowered body rest monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining remainingErrors ih =>
+    exact @ErrorsFor.initialized layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context nextContext scope binder initializer initializerNode lowered body rest monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining ih
+  | @discard context scope expression expressionNode rest lowered body found value remaining remainingErrors ih =>
+    exact @ErrorsFor.discard layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context scope expression expressionNode rest lowered body found value remaining ih
+  | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
+    exact @ErrorsFor.assign layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context scope assignment operator rhs rest body head remaining ih (GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors)
+  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
+    exact @ErrorsFor.bitNot layouts owner active frame globals onError values source certificates definitions administrative type continuation .reachable registry faults context scope assignment rest body head remaining ih headErrors
+
 end Tree
 end Solcore.SourceSemantics.CoreLowering.GenericForHeader

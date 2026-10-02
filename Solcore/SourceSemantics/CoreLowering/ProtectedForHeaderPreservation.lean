@@ -156,10 +156,10 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
 
 include definitions registered extension meaning faithful observations transport bindings in
-theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
-      context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
@@ -268,7 +268,7 @@ theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {s
     | head failed =>
       cases failed with | assignValue failed =>
         obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, _⟩ :=
-          ProtectedAssignmentHeads.Head.preserves_fault functions extension program evidence transport (meaning _ valid) faithful observations head
+          ProtectedAssignmentHeads.Head.preserves_fault_reachable functions extension program evidence transport (meaning _ valid) faithful observations head
             environments heaps locals agrees actualTyped installed headErrors failed body (LocalLoop.controlType type)
         exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩
     | tail first rest =>
@@ -305,5 +305,34 @@ theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {s
         refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata⟩
         exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+
+include definitions registered extension meaning faithful observations transport bindings in
+/-- Original API, interpreted through the reachable diagnostic receipt. -/
+theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
+    {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical) {reason : Dynamic.SemanticFault}
+    (trace : Dynamic.ForItemsFault program context evidence source environment before items finalContext reason after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧
+      faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  apply Tree.preserves_fault_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedForHeader

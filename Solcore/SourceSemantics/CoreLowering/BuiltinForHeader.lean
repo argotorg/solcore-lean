@@ -142,6 +142,35 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
     faithful observations tree valid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
+theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}
+    {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping) {reason : Dynamic.SemanticFault}
+    (trace : Dynamic.ForItemsFault program context evidence source environment before items finalContext reason after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧
+      faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  exact GenericForHeader.Tree.preserves_fault_reachable functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
+    faithful observations tree errors valid environments heaps locals agrees actualTyped reference read unmapped trace
+
+include definitions registered extension uninitialized missing faithful observations functionTypes in
+/-- Original API, interpreted through the reachable diagnostic receipt. -/
 theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
@@ -166,10 +195,36 @@ theorem Tree.preserves_fault {context finalContext : SourceSemantics.Context} {s
       faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  exact GenericForHeader.Tree.preserves_fault functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
-    faithful observations tree errors valid environments heaps locals agrees actualTyped reference read unmapped trace
+  apply Tree.preserves_fault_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
+theorem Tree.reflects_reachable     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    Result registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
+      context environment before items mapping world store value finalStore := by
+  exact GenericForHeader.Tree.reflects_reachable functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
+    faithful observations functionTypes tree errors valid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+include definitions registered extension uninitialized missing faithful observations functionTypes in
+/-- Original API, interpreted through the reachable diagnostic receipt. -/
 theorem Tree.reflects     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -191,8 +246,8 @@ theorem Tree.reflects     {context : SourceSemantics.Context} {scope : Scope} {i
     (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
     Result registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
       context environment before items mapping world store value finalStore := by
-  exact GenericForHeader.Tree.reflects functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
-    faithful observations functionTypes tree errors valid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  apply Tree.reflects_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
 theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {scope : Scope}
@@ -226,6 +281,47 @@ theorem Tree.preserves_post {context finalContext : SourceSemantics.Context} {sc
     faithful observations tree valid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
+theorem Tree.reflects_post_reachable     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    (∃ finalContext finalEnvironment after,
+      ∃ tail : Tail registry functions source solved evidence administrative frame globals contextLocation native
+        (Fallthrough type) finalContext finalEnvironment after,
+      Dynamic.ForItemsExecute program context evidence source environment before items finalContext finalEnvironment after ∧
+      value = LocalLoop.fallthroughValue type ∧ finalStore = tail.store ∧
+      LocationMap.Extends mapping tail.mapping ∧ WorldExtends world tail.world ∧
+      AdministrativePreserved mapping store tail.mapping tail.store ∧ Dynamic.HeapMetadataExtend before after ∧
+      DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+        tail.mapping tail.world administrative scope environment canonical ambient.definitions ∧
+      Dynamic.EnvironmentAgrees after context.locals environment ∧
+      RuntimeEnvironmentHasTypes tail.world actual actualContext ambient.definitions) ∨
+    (∃ finalContext reason token after finalMap finalWorld,
+      Dynamic.ForItemsFault program context evidence source environment before items finalContext reason after ∧
+      value = .inLeft (LocalLoop.controlType type) (.word token) ∧ faults reason token ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) := by
+  exact GenericForHeader.Tree.reflects_post_reachable functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
+    faithful observations functionTypes tree errors valid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+include definitions registered extension uninitialized missing faithful observations functionTypes in
+/-- Original API, interpreted through the reachable diagnostic receipt. -/
 theorem Tree.reflects_post     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative type (Fallthrough type)
       context scope items code) (errors : GenericForHeader.Tree.Errors registry faults tree)
@@ -262,7 +358,7 @@ theorem Tree.reflects_post     {context : SourceSemantics.Context} {scope : Scop
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) := by
-  exact GenericForHeader.Tree.reflects_post functions definitions registered extension program evidence (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
-    faithful observations functionTypes tree errors valid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  apply Tree.reflects_post_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.BuiltinForHeader

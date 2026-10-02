@@ -32,10 +32,10 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension meaning reflection faithful observations in
-theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
+theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
-      context scope items code) (errors : Tree.Errors registry faults tree)
+      context scope items code) (errors : Tree.ReachableErrors registry faults tree)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
@@ -121,7 +121,7 @@ theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
             (by simpa only [GenericExpressionMeaning.rename_prefix] using branch)
           exact reflected.prepend (.expression childTrace) maps worlds preservation metadata
   | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
-    rcases head.reflects functions extension program evidence (meaning _ valid) (reflection _ valid) faithful observations
+    rcases head.reflects_reachable functions extension program evidence (meaning _ valid) (reflection _ valid) faithful observations
       environments heaps locals agrees actualTyped functionTypes headErrors evaluated with
       ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
       ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, remainingEval⟩
@@ -145,5 +145,31 @@ theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
       exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata
+
+include definitions registered extension meaning reflection faithful observations in
+/-- Original API, interpreted through the reachable diagnostic receipt. -/
+theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code) (errors : Tree.Errors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    Result registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
+      context environment before items mapping world store value finalStore := by
+  apply Tree.reflects_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.GenericForHeader
