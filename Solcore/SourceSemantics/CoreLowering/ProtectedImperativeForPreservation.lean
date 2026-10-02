@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForPost
 import Solcore.SourceSemantics.CoreLowering.ProtectedForGenericEndpoint
 import Solcore.SourceSemantics.CoreLowering.ProtectedBitNotStatements
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderPost
@@ -87,6 +88,15 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+abbrev PreservingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => ProtectedFor.Body.LoopPreserves functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
 abbrev PreservingHeader (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
@@ -95,6 +105,15 @@ abbrev PreservingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
       (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
       (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
     GenericForHeader.Tree.Errors registry faults tree
+
+abbrev ReflectingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => ProtectedFor.Body.LoopReflects functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
 
 abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
@@ -106,9 +125,9 @@ abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
     GenericForHeader.Tree.Errors registry faults tree
 
 include definitions registered extension transport bindings meaning faithful observations in
-theorem header_preserves (unique : NodeOccurrencesUnique source)
+theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
-    (headers : PreservingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
@@ -136,7 +155,7 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
     rcases ForSourceViews.fault unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
     · obtain ⟨_, fault⟩ := initialFailure
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata⟩ :=
-        ProtectedForHeader.Tree.preserves_fault functions definitions registered extension program evidence transport bindings meaning faithful observations header errors
+        ProtectedForHeader.Tree.preserves_fault_reachable functions definitions registered extension program evidence transport bindings meaning faithful observations header errors
           valid environments heaps locals agrees actualTyped reference read unmapped installed fault
       exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
         evaluated, .fault matched, heaps, maps, worlds, frame, metadata⟩
@@ -150,8 +169,22 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
         represented, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
         frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2.1⟩
 
+include definitions registered extension transport bindings meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem header_preserves (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (headers : PreservingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
+    ProtectedLoopStatements.Control.HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) id expected type code := by
+  apply header_preserves_reachable (functions := functions) (headers := by rcases headers with ⟨header, errors⟩; exact ⟨header, errors.reachable⟩)
+  all_goals assumption
+
 include extension meaning transport bindings definitions registered faithful observations in
-theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_reachable (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -159,7 +192,7 @@ theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : Expr
       (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
     (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope post postCode)
-    (postErrors : GenericForHeader.Tree.Errors registry faults postTree)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
     (correct : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
       (scope := scope) false statements expected type code) :
@@ -178,9 +211,21 @@ theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : Expr
     (by
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
         mapping world before after store finalContext reason guarded continued execution
-      exact ProtectedForHeader.post_fault functions definitions registered extension program evidence transport bindings meaning faithful observations postTree postErrors
+      exact ProtectedForHeader.post_fault_reachable functions definitions registered extension program evidence transport bindings meaning faithful observations postTree postErrors
         actualValid actualAgrees actualReference guarded continued execution)
   exact result valid environments heaps locals agrees actualTyped reference read unmapped installed trace
+
+abbrev PreservesAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => Preserves (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) mode statements expected type code
+  | .initializers items condition post statements => PreservingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
 
 abbrev PreservesAt (context : SourceSemantics.Context) (scope : Scope) (position : Position)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
@@ -189,6 +234,18 @@ abbrev PreservesAt (context : SourceSemantics.Context) (scope : Scope) (position
       (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
       (globals := globals) (administrative := administrative) mode statements expected type code
   | .initializers items condition post statements => PreservingHeader (certificates := certificates) (entry := entry) functions program evidence
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
+
+abbrev ReflectsAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => Reflects (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) mode statements expected type code
+  | .initializers items condition post statements => ReflectingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
       (onError := onError) (source := source) (solved := solved)
       (administrative := administrative) (registry := registry) (faults := faults)
@@ -206,14 +263,34 @@ abbrev ReflectsAt (context : SourceSemantics.Context) (scope : Scope) (position 
       (administrative := administrative) (registry := registry) (faults := faults)
       context scope items condition post statements expected type code
 
+include extension meaning transport bindings definitions registered faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem loop_preserves (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.Errors registry faults postTree)
+    (correct : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) false statements expected type code) :
+    ProtectedFor.Body.LoopPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  apply loop_preserves_reachable (functions := functions) (postErrors := postErrors.reachable)
+  all_goals assumption
+
 include definitions registered extension transport bindings meaning faithful observations in
-theorem preservesAt (unique : NodeOccurrencesUnique source)
+theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
-    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
-    PreservesAt (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
@@ -380,9 +457,9 @@ theorem preservesAt (unique : NodeOccurrencesUnique source)
       rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (by intro _ _; simp [form]) failed with
         ⟨rfl, first⟩ | ⟨_, _, _, first, tail⟩
       · obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, observed⟩ :=
-          ProtectedAssignmentHeads.Head.preserves_fault functions extension program evidence transport
+          ProtectedAssignmentHeads.Head.preserves_fault_reachable functions extension program evidence transport
             (meaning _ contextValid) faithful observations head
-            environments heaps locals agrees actualTyped installed headErrors
+            environments heaps locals agrees actualTyped installed (GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors)
             (ScalarStatementViews.assignValue_fault unique (lookupStatement?_sound found) form first) body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds, preservation, metadata,
           _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
@@ -398,12 +475,12 @@ theorem preservesAt (unique : NodeOccurrencesUnique source)
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
     exact ProtectedLoopStatements.Control.sequence_preserves transport (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
-      (header_preserves functions definitions registered extension program evidence transport bindings meaning faithful observations unique found form initialIH) restIH
+      (header_preserves_reachable functions definitions registered extension program evidence transport bindings meaning faithful observations unique found form (by rcases initialIH with ⟨header, errors⟩; exact ⟨header, GenericForHeader.Tree.ErrorsFor.reachable errors⟩)) restIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
   | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopTree postTree nativeTyped loopErrors postErrors loopIH =>
-    have completed := loop_preserves functions definitions registered extension program evidence transport bindings meaning faithful observations unique
-      conditionFound conditionTree nativeTyped postTree postErrors loopIH
-    exact ⟨.nil completed, GenericForHeader.Tree.Errors.nil (next := completed)⟩
+    have completed := loop_preserves_reachable functions definitions registered extension program evidence transport bindings meaning faithful observations unique
+      conditionFound conditionTree nativeTyped postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors) loopIH
+    exact ⟨.nil completed, GenericForHeader.Tree.ErrorsFor.nil (policy := diagnosticPolicy) (next := completed)⟩
   | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.uninitialized mono extended ordinary projected allocation annotation same header, .uninitialized (monomorphic := mono) (extended := extended) (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation) (same := same) errors⟩
@@ -421,5 +498,19 @@ theorem preservesAt (unique : NodeOccurrencesUnique source)
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
+include definitions registered extension transport bindings meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem preservesAt (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
+    PreservesAt (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  apply preservesAt_for (functions := functions) (tree := tree) (diagnosticPolicy := .unconditional)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedImperativeFor

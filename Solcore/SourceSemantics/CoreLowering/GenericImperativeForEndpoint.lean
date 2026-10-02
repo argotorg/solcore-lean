@@ -10,7 +10,7 @@ namespace Solcore.SourceSemantics.CoreLowering.GenericImperativeFor
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open TypedLexicalWhile (Scope ValuesContext FlowRep Preserves Reflects)
 open TypedImperativeFor (LoopPreserves LoopReflects initial_state PostPreserves PostFaults PostReflects)
-variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : TypedLexicalWhile.ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
   {solved : List SolvedRequirement}
   {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (functions : FunctionModel values.checked.catalog ambient)
@@ -25,7 +25,7 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (reflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
     TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (certificates context) faults)
-variable {scope : Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
+variable {scope : TypedLexicalWhile.Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
 
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -35,7 +35,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 
 include extension meaning unique definitions registered faithful observations in
-theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
+theorem loop_preserves_reachable {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -43,7 +43,7 @@ theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNod
       (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
     (postTree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope post postCode)
-    (postErrors : GenericForHeader.Tree.Errors registry faults postTree)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
     (correct : Preserves functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) false statements expected type code) :
@@ -64,15 +64,15 @@ theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNod
       (by
         intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
           mapping world before after store finalContext reason guarded continued execution
-        exact post_fault functions definitions registered extension program evidence meaning faithful observations postTree postErrors
+        exact post_fault_reachable functions definitions registered extension program evidence meaning faithful observations postTree postErrors
           actualValid unique actualAgrees actualReference guarded.1 continued execution)
   obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, heaps, maps, worlds, frame, metadata, _⟩ :=
     entryResult valid environments heaps locals agrees actualTyped reference read unmapped trivial trace
   exact ⟨value, finalStore, finalMap, finalWorld, completed, represented, heaps, maps, worlds, frame, metadata⟩
 
-include extension meaning reflection unique definitions registered faithful observations in
-theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
-    {condition : ExpressionId} {conditionNode : ExpressionNode}
+include extension meaning unique definitions registered faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -81,6 +81,26 @@ theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
     (postTree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope post postCode)
     (postErrors : GenericForHeader.Tree.Errors registry faults postTree)
+    (correct : Preserves functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) false statements expected type code) :
+    LoopPreserves functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  apply loop_preserves_reachable (functions := functions) (postErrors := postErrors.reachable)
+  all_goals assumption
+
+include extension meaning reflection unique definitions registered faithful observations in
+theorem loop_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+    {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
     (correct : Reflects functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) false statements expected type code)
@@ -99,10 +119,33 @@ theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
       (by
         intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
           mapping world before store finalStore value guarded continued execution
-        exact post_reflects functions definitions registered extension program evidence meaning reflection faithful observations functionTypes postTree postErrors
+        exact post_reflects_reachable functions definitions registered extension program evidence meaning reflection faithful observations functionTypes postTree postErrors
           actualValid unique actualAgrees actualReference guarded.1 continued execution)
   obtain ⟨outcome, after, finalMap, finalWorld, sourceTrace, represented, heaps, maps, worlds, frame, metadata, _⟩ :=
     entryResult valid environments heaps locals agrees actualTyped reference read unmapped trivial evaluated
   exact ⟨outcome, after, finalMap, finalWorld, sourceTrace, represented, heaps, maps, worlds, frame, metadata⟩
+
+include extension meaning reflection unique definitions registered faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem loop_reflects (functionTypes : FunctionRuntimeViews functions)
+    {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.Errors registry faults postTree)
+    (correct : Reflects functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) false statements expected type code)
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    LoopReflects functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  apply loop_reflects_reachable (functions := functions) (postErrors := postErrors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeFor

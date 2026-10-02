@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AssignmentDiagnosticPolicy
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalWhileComposition
 
@@ -28,12 +29,12 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   (observations : FunctionObservations values.checked.catalog functions identities)
 
 include extension meaning faithful observations in
-theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem assignment_preserves_reachable {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
     (head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs)
-    (headErrors : head.Errors registry faults)
+    (headErrors : head.ReachableErrors registry faults)
     (unique : NodeOccurrencesUnique source)
     (continuationMeaning : Preserves (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode rest expected type body) :
     Preserves (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) := by
@@ -74,25 +75,39 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
       ⟨rfl, first⟩ | ⟨_, _, _, first, tail⟩
     · have assigned := ScalarStatementViews.assignValue_fault unique (lookupStatement?_sound found) form first
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
-        head.preserves_fault functions extension program evidence (meaning valid) faithful observations
+        head.preserves_fault_reachable functions extension program evidence (meaning valid) faithful observations
           environments heaps locals agrees actualTyped headErrors assigned body (LocalLoop.controlType type)
       exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds, frame, metadata,
         _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
     · exact go first (by cases mode <;> exact .fault tail)
 
-include extension meaning reflection faithful observations in
-theorem assignment_reflects (functionTypes : FunctionRuntimeViews functions)
-    {mode : Bool} {id : StatementId} {node : StatementNode}
+include extension meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
     (head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs)
     (headErrors : head.Errors registry faults)
+    (unique : NodeOccurrencesUnique source)
+    (continuationMeaning : Preserves (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode rest expected type body) :
+    Preserves (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) := by
+  apply assignment_preserves_reachable (functions := functions) (head := head) (headErrors := headErrors.reachable)
+  all_goals assumption
+
+include extension meaning reflection faithful observations in
+theorem assignment_reflects_reachable (functionTypes : FunctionRuntimeViews functions)
+    {mode : Bool} {id : StatementId} {node : StatementNode}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+    (head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs)
+    (headErrors : head.ReachableErrors registry faults)
     (_unique : NodeOccurrencesUnique source)
     (continuationMeaning : Reflects (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode rest expected type body) :
     Reflects (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped evaluated
-  rcases head.reflects functions extension program evidence (meaning valid) (reflection valid) faithful observations
+  rcases head.reflects_reachable functions extension program evidence (meaning valid) (reflection valid) faithful observations
     environments heaps locals agrees actualTyped functionTypes headErrors evaluated with
     ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
     ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
@@ -108,5 +123,20 @@ theorem assignment_reflects (functionTypes : FunctionRuntimeViews functions)
     exact ⟨resultContext, outcome, after, finalMap, finalWorld,
       prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignValue (lookupStatement?_sound found) form trace) tailTrace,
       represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
+
+include extension meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem assignment_reflects (functionTypes : FunctionRuntimeViews functions)
+    {mode : Bool} {id : StatementId} {node : StatementNode}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
+    (head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs)
+    (headErrors : head.Errors registry faults)
+    (_unique : NodeOccurrencesUnique source)
+    (continuationMeaning : Reflects (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode rest expected type body) :
+    Reflects (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) := by
+  apply assignment_reflects_reachable (functions := functions) (head := head) (headErrors := headErrors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperative

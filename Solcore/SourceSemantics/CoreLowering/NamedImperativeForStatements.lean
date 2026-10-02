@@ -55,6 +55,28 @@ variable {checked : Checked} {base : Base checked}
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- The finite statement tree and concrete expression/body certificates close
 all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
+theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+    {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
+    (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : GenericImperativeFor.Tree.ReachableErrors registry faults tree) :
+    ProtectedWhile.Body.Preserves functions program evidence
+      (administrative := administrative) (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (solved := solved) (frameLayout := frame) (globals := globals)
+      (scope := scope) mode statements expected type code := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ
+    contextLocation native outcome finalContext environments heaps locals agrees actualTyped reference read unmapped installed trace
+  exact ProtectedImperativeFor.preservesAt_for (diagnosticPolicy := .reachable) functions definitions registered extension program evidence
+    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
+    (NamedCallExpressions.entry_binds functions registry bodies compilation.administrativePrefix)
+    (fun context valid => NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
+      uninitialized missing bodyUninitialized bodyMissing unique owners)
+    faithful observations unique tree errors valid environments heaps locals agrees actualTyped reference read unmapped installed trace
+
+include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
+/-- The finite statement tree and concrete expression/body certificates close
+all runtime child obligations, including after source bindings, condition slots and seven-slot writes. The actual protected entry is retained as a runtime boundary. -/
 theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
@@ -65,24 +87,18 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
       (source := source) (context := context) (registry := registry) (faults := faults)
       (solved := solved) (frameLayout := frame) (globals := globals)
       (scope := scope) mode statements expected type code := by
-  intro valid mapping world actualContext environment canonical actual before after store ξ
-    contextLocation native outcome finalContext environments heaps locals agrees actualTyped reference read unmapped installed trace
-  exact ProtectedImperativeFor.preservesAt functions definitions registered extension program evidence
-    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
-    (NamedCallExpressions.entry_binds functions registry bodies compilation.administrativePrefix)
-    (fun context valid => NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
-      uninitialized missing bodyUninitialized bodyMissing unique owners)
-    faithful observations unique tree errors valid environments heaps locals agrees actualTyped reference read unmapped installed trace
+  apply Tree.preserves_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
 /-- Every completed native lexical tree reconstructs its independent source
 trace. Actual captured code/environment and frame history come from the entry,
 not from native typing or the source heap relation. -/
-theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
     (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
       context scope (.statements mode statements) expected type code)
-    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
+    (errors : GenericImperativeFor.Tree.ReachableErrors registry faults tree) :
     ProtectedWhile.Body.Reflects functions program evidence
       (administrative := administrative) (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
       (source := source) (context := context) (registry := registry) (faults := faults)
@@ -90,7 +106,7 @@ theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode 
       (scope := scope) mode statements expected type code := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ
     contextLocation native value environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  exact ProtectedImperativeFor.reflectsAt functions definitions registered extension program evidence
+  exact ProtectedImperativeFor.reflectsAt_for (diagnosticPolicy := .reachable) functions definitions registered extension program evidence
     (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
     (NamedCallExpressions.entry_binds functions registry bodies compilation.administrativePrefix)
     (fun context valid => NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
@@ -111,5 +127,22 @@ theorem retained {scope : Scope} {mapping finalMap : LocationMap} {world finalWo
     NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix
       scope finalMap finalWorld after finalStore canonical :=
   (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix).extend installed maps worlds frame metadata
+
+include definitions registered extension faithful observations runtimeViews unique owners uninitialized missing bodyUninitialized bodyMissing in
+/-- Every completed native lexical tree reconstructs its independent source
+trace. Actual captured code/environment and frame history come from the entry,
+not from native typing or the source heap relation. -/
+theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool}
+    {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {administrative : Core.Context}
+    (tree : Tree bodies layouts owner active frame globals onError compilation fuel source expressionSyntax solved reasonAt administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
+    ProtectedWhile.Body.Reflects functions program evidence
+      (administrative := administrative) (entry := NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix)
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (solved := solved) (frameLayout := frame) (globals := globals)
+      (scope := scope) mode statements expected type code := by
+  apply Tree.reflects_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.NamedImperativeForStatements

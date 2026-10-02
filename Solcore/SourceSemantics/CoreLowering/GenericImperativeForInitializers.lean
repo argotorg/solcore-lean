@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForPost
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForEndpoint
 import Solcore.SourceSemantics.CoreLowering.ForSourceViews
 
@@ -15,7 +16,7 @@ variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.
   {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
   {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
-  {values : ValuesContext} {source : TypedSource} {solved : List SolvedRequirement}
+  {values : TypedLexicalWhile.ValuesContext} {source : TypedSource} {solved : List SolvedRequirement}
   {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (functions : FunctionModel values.checked.catalog ambient)
   (definitions : layouts.definitions = ambient.definitions) (registered : frameLayout.Registered ambient.definitions)
@@ -31,11 +32,20 @@ variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.
       program context evidence source (certificates context) faults)
   {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
-  {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+  {context : SourceSemantics.Context} {scope : TypedLexicalWhile.Scope} {id : StatementId} {node : StatementNode}
   {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
   {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
 
-abbrev PreservingHeader (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+abbrev PreservingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : TypedLexicalWhile.Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => LoopPreserves functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frameLayout)
+      (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+abbrev PreservingHeader (context : SourceSemantics.Context) (scope : TypedLexicalWhile.Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   ∃ tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
@@ -44,7 +54,16 @@ abbrev PreservingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
       (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
     GenericForHeader.Tree.Errors registry faults tree
 
-abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+abbrev ReflectingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : TypedLexicalWhile.Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => LoopReflects functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frameLayout)
+      (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : TypedLexicalWhile.Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   ∃ tree : GenericForHeader.Tree layouts owner active frameLayout globals onError values source certificates ambient.definitions administrative
@@ -54,9 +73,9 @@ abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
     GenericForHeader.Tree.Errors registry faults tree
 
 include definitions registered extension meaning faithful observations in
-theorem header_preserves (unique : NodeOccurrencesUnique source)
+theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
-    (headers : PreservingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
@@ -84,7 +103,7 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
     rcases ForSourceViews.fault unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
     · obtain ⟨_, fault⟩ := initialFailure
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata⟩ :=
-        header.preserves_fault functions definitions registered extension program evidence meaning faithful observations errors
+        header.preserves_fault_reachable functions definitions registered extension program evidence meaning faithful observations errors
           valid environments heaps locals agrees actualTyped reference read unmapped fault
       exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
         evaluated, .fault matched, heaps, maps, worlds, frame, metadata⟩
@@ -98,10 +117,24 @@ theorem header_preserves (unique : NodeOccurrencesUnique source)
         represented, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
         frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2⟩
 
-include definitions registered extension meaning reflection faithful observations in
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+include definitions registered extension meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem header_preserves (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
-    (headers : ReflectingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (headers : PreservingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frameLayout := frameLayout) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
+    HeadPreserves functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) id expected type code := by
+  apply header_preserves_reachable (functions := functions) (headers := by rcases headers with ⟨header, errors⟩; exact ⟨header, errors.reachable⟩)
+  all_goals assumption
+
+include definitions registered extension meaning reflection faithful observations in
+theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (headers : ReflectingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frameLayout := frameLayout) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
@@ -111,7 +144,7 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_uniqu
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped evaluated
   obtain ⟨header, errors⟩ := headers
-  have result := header.reflects functions definitions registered extension program evidence meaning reflection faithful observations functionTypes errors
+  have result := header.reflects_reachable functions definitions registered extension program evidence meaning reflection faithful observations functionTypes errors
     valid environments heaps locals agrees actualTyped reference read unmapped evaluated
   cases result with
   | continues tail trace maps worlds frame metadata remaining =>
@@ -127,5 +160,19 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_uniqu
     subst value
     exact ⟨_, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
       (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata⟩
+
+include definitions registered extension meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (headers : ReflectingHeader (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frameLayout := frameLayout) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
+    HeadReflects functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) id expected type code := by
+  apply header_reflects_reachable (functions := functions) (headers := by rcases headers with ⟨header, errors⟩; exact ⟨header, errors.reachable⟩)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeFor

@@ -44,9 +44,9 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
-theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
-    (headers : ReflectingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (headers : ReflectingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
@@ -56,7 +56,7 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_uniqu
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨header, errors⟩ := headers
-  have result := ProtectedForHeader.Tree.reflects functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes header errors
+  have result := ProtectedForHeader.Tree.reflects_reachable functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes header errors
     valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   cases result with
   | continues tail trace maps worlds frame metadata remaining =>
@@ -72,7 +72,53 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_uniqu
     subst value
     exact ⟨_, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
       (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata⟩
+
+include definitions registered extension transport bindings meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem header_reflects (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (headers : ReflectingHeader (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
+    ProtectedLoopStatements.Control.HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) id expected type code := by
+  apply header_reflects_reachable (functions := functions) (headers := by rcases headers with ⟨header, errors⟩; exact ⟨header, errors.reachable⟩)
+  all_goals assumption
+
 include extension meaning reflection transport bindings definitions registered faithful observations in
+theorem loop_reflects_reachable (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
+    {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
+    (correct : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) false statements expected type code)
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ProtectedFor.Body.LoopReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  have result := ProtectedFor.Body.loop_reflects functions program evidence transport (reflection _ valid)
+    conditionFound conditionTree typed correct bodyCannotFault
+    (by
+      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+        mapping world before store finalStore value guarded continued execution
+      exact ProtectedForHeader.post_reflects_reachable functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes postTree postErrors
+        actualValid actualAgrees actualReference guarded continued execution)
+  exact result valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+
+include extension meaning reflection transport bindings definitions registered faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
 theorem loop_reflects (_unique : NodeOccurrencesUnique source) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -91,25 +137,17 @@ theorem loop_reflects (_unique : NodeOccurrencesUnique source) (functionTypes : 
     ProtectedFor.Body.LoopReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
-  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
-    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  have result := ProtectedFor.Body.loop_reflects functions program evidence transport (reflection _ valid)
-    conditionFound conditionTree typed correct bodyCannotFault
-    (by
-      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
-        mapping world before store finalStore value guarded continued execution
-      exact ProtectedForHeader.post_reflects functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes postTree postErrors
-        actualValid actualAgrees actualReference guarded continued execution)
-  exact result valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  apply loop_reflects_reachable (functions := functions) (postErrors := postErrors.reachable)
+  all_goals assumption
 
 include definitions registered extension transport bindings meaning reflection faithful observations in
-theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
-    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
-    ReflectsAt (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    ReflectsAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
@@ -261,9 +299,9 @@ theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : No
   | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-    rcases ProtectedAssignmentHeads.Head.reflects functions extension program evidence transport
+    rcases ProtectedAssignmentHeads.Head.reflects_reachable functions extension program evidence transport
       (meaning _ contextValid) (reflection _ contextValid) faithful observations
-      head environments heaps locals agrees actualTyped installed functionTypes headErrors evaluated with
+      head environments heaps locals agrees actualTyped installed functionTypes (GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors) evaluated with
       ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata, observed⟩ |
       ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, observed, continuation⟩
     · exact ⟨context, .fault reason, after, finalMap, finalWorld,
@@ -290,12 +328,12 @@ theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : No
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped installed evaluated
     exact ProtectedLoopStatements.Control.sequence_reflects transport (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
-      (header_reflects functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes unique found form initialIH) restIH
+      (header_reflects_reachable functions definitions registered extension program evidence transport bindings meaning reflection faithful observations functionTypes unique found form (by rcases initialIH with ⟨header, errors⟩; exact ⟨header, GenericForHeader.Tree.ErrorsFor.reachable errors⟩)) restIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopTree postTree nativeTyped loopErrors postErrors loopIH =>
-    have completed := loop_reflects functions definitions registered extension program evidence transport bindings meaning reflection faithful observations unique functionTypes
-      conditionFound conditionTree nativeTyped postTree postErrors loopIH (fun executed => loopTree.control_not_fault unique executed)
-    exact ⟨.nil completed, GenericForHeader.Tree.Errors.nil (next := completed)⟩
+    have completed := loop_reflects_reachable functions definitions registered extension program evidence transport bindings meaning reflection faithful observations unique functionTypes
+      conditionFound conditionTree nativeTyped postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors) loopIH (fun executed => loopTree.control_not_fault unique executed)
+    exact ⟨.nil completed, GenericForHeader.Tree.ErrorsFor.nil (policy := diagnosticPolicy) (next := completed)⟩
   | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.uninitialized mono extended ordinary projected allocation annotation same header, .uninitialized (monomorphic := mono) (extended := extended) (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation) (same := same) errors⟩
@@ -313,5 +351,19 @@ theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : No
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
+include definitions registered extension transport bindings meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
+    ReflectsAt (certificates := certificates) (entry := entry) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  apply reflectsAt_for (functions := functions) (tree := tree) (diagnosticPolicy := .unconditional)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedImperativeFor

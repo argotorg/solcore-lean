@@ -118,6 +118,42 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (functionTypes : FunctionRuntimeViews functions)
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
+theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : GenericImperativeFor.Tree.ReachableErrors registry faults tree)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    {outcome : Dynamic.ControlOutcome} {resultContext : SourceSemantics.Context}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (trace : Executes mode program context evidence source environment before statements resultContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact GenericImperativeFor.Tree.preserves_reachable functions definitions registered extension program evidence
+    (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
+    faithful observations tree errors contextValid unique
+    environments heaps locals agrees actualTyped reference read unmapped trace
+
+include definitions registered extension uninitialized missing faithful observations functionTypes in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
 theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
@@ -147,12 +183,46 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment resultContext after := by
-  exact GenericImperativeFor.Tree.preserves functions definitions registered extension program evidence
-    (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
-    faithful observations tree errors contextValid unique
-    environments heaps locals agrees actualTyped reference read unmapped trace
+  apply Tree.preserves_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered extension uninitialized missing faithful observations functionTypes in
+theorem Tree.reflects_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : GenericImperativeFor.Tree.ReachableErrors registry faults tree)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ resultContext outcome after finalMap finalWorld,
+      Executes mode program context evidence source environment before statements resultContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact GenericImperativeFor.Tree.reflects_reachable functions definitions registered extension program evidence
+    (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
+    (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
+    faithful observations functionTypes tree errors contextValid unique
+    environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+include definitions registered extension uninitialized missing faithful observations functionTypes in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
 theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError readFuel values source solved reasonAt ambient.definitions administrative
@@ -181,10 +251,7 @@ theorem Tree.reflects {context : SourceSemantics.Context} {scope : Scope} {mode 
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment resultContext after := by
-  exact GenericImperativeFor.Tree.reflects functions definitions registered extension program evidence
-    (fun context valid => CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing)
-    (fun context valid => CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing)
-    faithful observations functionTypes tree errors contextValid unique
-    environments heaps locals agrees actualTyped reference read unmapped evaluated
+  apply Tree.reflects_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.BuiltinImperativeFor

@@ -13,7 +13,7 @@ namespace Solcore.SourceSemantics.CoreLowering.GenericImperativeFor
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedHistory CallableIndexedAllocationCompletion CoreProof
 open TypedScopedStatements (Executes)
-open GenericImperative (assignment_preserves assignment_reflects)
+open GenericImperative (assignment_preserves assignment_reflects assignment_preserves_reachable assignment_reflects_reachable)
 open GenericImperativeWhile (conditional_preserves conditional_reflects while_preserves while_reflects)
 open TypedLexicalWhile hiding Syntax Tree Scope ValuesContext absentRequest initializedRequest sequence conditional_preserves conditional_reflects while_preserves while_reflects
 open TypedLexicalControl (LexicalResult source_view_absent source_view_initialized allocate_absent allocate_initialized sequence_rename valid_extend)
@@ -84,6 +84,18 @@ variable {identities : Dynamic.Value → Word → Prop}
   (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+abbrev PreservesAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => Preserves functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) mode statements expected type code
+  | .initializers items condition post statements => PreservingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) functions program evidence
+      (layouts := layouts) (owner := owner) (active := active) (frameLayout := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
+
 abbrev PreservesAt (context : SourceSemantics.Context) (scope : Scope) (position : Position)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   match position with
@@ -91,6 +103,18 @@ abbrev PreservesAt (context : SourceSemantics.Context) (scope : Scope) (position
       (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
       (globals := globals) (administrative := administrative) mode statements expected type code
   | .initializers items condition post statements => PreservingHeader (certificates := certificates) functions program evidence
+      (layouts := layouts) (owner := owner) (active := active) (frameLayout := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
+
+abbrev ReflectsAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => Reflects functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) mode statements expected type code
+  | .initializers items condition post statements => ReflectingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) functions program evidence
       (layouts := layouts) (owner := owner) (active := active) (frameLayout := frame) (globals := globals)
       (onError := onError) (source := source) (solved := solved)
       (administrative := administrative) (registry := registry) (faults := faults)
@@ -109,13 +133,13 @@ abbrev ReflectsAt (context : SourceSemantics.Context) (scope : Scope) (position 
       context scope items condition post statements expected type code
 
 include definitions registered extension meaning faithful observations in
-theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
+theorem Tree.preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
-    (errors : Tree.Errors registry faults tree) :
-    PreservesAt (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    (errors : Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
@@ -237,8 +261,8 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
   | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped trace
-    exact assignment_preserves functions extension program evidence (meaning context) faithful observations
-      found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+    exact assignment_preserves_reachable functions extension program evidence (meaning context) faithful observations
+      found form head (GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors) unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
@@ -250,12 +274,12 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped trace
     exact sequence_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
-      (header_preserves functions definitions registered extension program evidence meaning faithful observations unique found form initialIH) restIH
+      (header_preserves_reachable functions definitions registered extension program evidence meaning faithful observations unique found form (by rcases initialIH with ⟨header, errors⟩; exact ⟨header, GenericForHeader.Tree.ErrorsFor.reachable errors⟩)) restIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped trace
   | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopTree postTree nativeTyped loopErrors postErrors loopIH =>
-    have completed := loop_preserves functions extension program evidence unique meaning definitions registered faithful observations
-      conditionFound conditionTree nativeTyped postTree postErrors loopIH
-    exact ⟨.nil completed, GenericForHeader.Tree.Errors.nil (next := completed)⟩
+    have completed := loop_preserves_reachable functions extension program evidence unique meaning definitions registered faithful observations
+      conditionFound conditionTree nativeTyped postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors) loopIH
+    exact ⟨.nil completed, GenericForHeader.Tree.ErrorsFor.nil (policy := diagnosticPolicy) (next := completed)⟩
   | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.uninitialized mono extended ordinary projected allocation annotation same header, .uninitialized (monomorphic := mono) (extended := extended) (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation) (same := same) errors⟩
@@ -273,14 +297,29 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
-include definitions registered extension meaning reflection faithful observations in
-theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+include definitions registered extension meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
     (errors : Tree.Errors registry faults tree) :
-    ReflectsAt (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+    PreservesAt (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  apply Tree.preservesAt_for (functions := functions) (diagnosticPolicy := .unconditional)
+  all_goals assumption
+
+include definitions registered extension meaning reflection faithful observations in
+theorem Tree.reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    ReflectsAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
@@ -425,8 +464,8 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
   | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped evaluated
-    exact assignment_reflects functions extension program evidence (meaning context) (reflection context) faithful observations functionTypes
-      found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+    exact assignment_reflects_reachable functions extension program evidence (meaning context) (reflection context) faithful observations functionTypes
+      found form head (GenericAssignmentStatements.Head.ErrorsFor.reachable headErrors) unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -438,12 +477,12 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped evaluated
     exact sequence_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
-      (header_reflects functions definitions registered extension program evidence meaning reflection faithful observations functionTypes unique found form initialIH) restIH
+      (header_reflects_reachable functions definitions registered extension program evidence meaning reflection faithful observations functionTypes unique found form (by rcases initialIH with ⟨header, errors⟩; exact ⟨header, GenericForHeader.Tree.ErrorsFor.reachable errors⟩)) restIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
   | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopTree postTree nativeTyped loopErrors postErrors loopIH =>
-    have completed := loop_reflects functions extension program evidence unique meaning reflection definitions registered faithful observations functionTypes
-      conditionFound conditionTree nativeTyped postTree postErrors loopIH (fun executed => loopTree.control_not_fault unique executed)
-    exact ⟨.nil completed, GenericForHeader.Tree.Errors.nil (next := completed)⟩
+    have completed := loop_reflects_reachable functions extension program evidence unique meaning reflection definitions registered faithful observations functionTypes
+      conditionFound conditionTree nativeTyped postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors) loopIH (fun executed => loopTree.control_not_fault unique executed)
+    exact ⟨.nil completed, GenericForHeader.Tree.ErrorsFor.nil (policy := diagnosticPolicy) (next := completed)⟩
   | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.uninitialized mono extended ordinary projected allocation annotation same header, .uninitialized (monomorphic := mono) (extended := extended) (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation) (same := same) errors⟩
@@ -461,7 +500,56 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
+include definitions registered extension meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
+theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : Tree.Errors registry faults tree) :
+    ReflectsAt (certificates := certificates) functions program evidence (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  apply Tree.reflectsAt_for (functions := functions) (tree := tree) (diagnosticPolicy := .unconditional)
+  all_goals assumption
+
 include definitions registered extension meaning faithful observations in
+theorem Tree.preserves_reachable {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : Tree.ReachableErrors registry faults tree)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    {outcome : Dynamic.ControlOutcome} {resultContext : SourceSemantics.Context}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (trace : Executes mode program context evidence source environment before statements resultContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact tree.preservesAt_for (diagnosticPolicy := .reachable) functions definitions registered extension program evidence meaning faithful observations unique errors
+    contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+
+include definitions registered extension meaning faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
 theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -491,10 +579,43 @@ theorem Tree.preserves {context : SourceSemantics.Context} {scope : Scope} {mode
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment resultContext after := by
-  exact tree.preservesAt functions definitions registered extension program evidence meaning faithful observations unique errors
-    contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+  apply Tree.preserves_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations in
+theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : Tree.ReachableErrors registry faults tree)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
+    ∃ resultContext outcome after finalMap finalWorld,
+      Executes mode program context evidence source environment before statements resultContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact tree.reflectsAt_for (diagnosticPolicy := .reachable) functions definitions registered extension program evidence meaning reflection faithful observations functionTypes unique errors
+    contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+
+include definitions registered extension meaning reflection faithful observations in
+/-- Original signature, specialized to the unconditional diagnostic policy. -/
 theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
@@ -523,7 +644,7 @@ theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions) {context 
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment resultContext after := by
-  exact tree.reflectsAt functions definitions registered extension program evidence meaning reflection faithful observations functionTypes unique errors
-    contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  apply Tree.reflects_reachable (functions := functions) (tree := tree) (errors := errors.reachable)
+  all_goals assumption
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeFor
