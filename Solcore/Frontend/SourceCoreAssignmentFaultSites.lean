@@ -57,7 +57,7 @@ def Table.diagnostics (table : Table) : List (Core.Word × SourceCoreFaultSites.
 def Table.diagnostic? (table : Table) (reason : Core.Word) : Option SourceCoreFaultSites.Diagnostic :=
   (table.sites.find? fun site => decide (site.reason = reason)).map Site.diagnostic
 
-private def add (owner : Resolved.DeclarationId) (firstReason : Nat) (sites : List Site)
+def add (owner : Resolved.DeclarationId) (firstReason : Nat) (sites : List Site)
     (location : SourceCoreElaboration.ErrorSite) (span : Syntax.SourceSpan)
     (assignment : AssignmentResolution) (kind : Kind) : Except Error (List Site) := do
   if assignment.target.root.owner ≠ owner then
@@ -71,7 +71,7 @@ private def add (owner : Resolved.DeclarationId) (firstReason : Nat) (sites : Li
     | none => .error .reasonSpaceExhausted
   pure (sites ++ [{ site := location, binder := assignment.target.root, kind, span, reason, rhsType := assignment.target.type }])
 
-private def addItem (owner : Resolved.DeclarationId) (firstReason : Nat)
+def addItem (owner : Resolved.DeclarationId) (firstReason : Nat)
     (location : SourceCoreElaboration.ErrorSite) (span : Syntax.SourceSpan) :
     List Site → ForItemForm → Except Error (List Site)
   | sites, .assignValue assignment operator _ =>
@@ -80,7 +80,7 @@ private def addItem (owner : Resolved.DeclarationId) (firstReason : Nat)
   | sites, .assignBitNot assignment => add owner firstReason sites location span assignment .bitNot
   | sites, _ => pure sites
 
-private def addStatement (owner : Resolved.DeclarationId) (firstReason : Nat)
+def addStatement (owner : Resolved.DeclarationId) (firstReason : Nat)
     (sites : List Site) (node : StatementNode) : Except Error (List Site) := do
   if node.id.occurrence.owner ≠ owner then throw (.ownerMismatch owner node.id.occurrence.owner)
   let location := SourceCoreElaboration.ErrorSite.occurrence node.id.occurrence

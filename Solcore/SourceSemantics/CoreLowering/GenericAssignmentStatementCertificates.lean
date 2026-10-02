@@ -20,6 +20,37 @@ private theorem stored_type {source : TypedSource} {context : SourceSemantics.Co
 
 /-- The bare path compiles only its RHS. Its receipt therefore requires no
 certificate for unrelated source occurrences or nonexistent key computations. -/
+theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSource}
+    {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
+    {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {expression : ExpressionLowerer} {fuel : Nat} {site : SourceCoreElaboration.ErrorSite}
+    {next code : Expr} {output : Ty} {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word}
+    (bare : assignment.target.projections = [])
+    (unique : NodeOccurrencesUnique source)
+    (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
+      source.lookupExpression? rhs = some node ∧ certificate scope rhs lowered)
+    (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
+      output next reasonAt invalidProjection invalidOperand missing = .ok code) :
+    ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
+      code = head.emit next output ∧ head.invalid = invalidOperand := by
+  obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
+    CompatibleBareAssignment.of_lower bare accepted
+  obtain ⟨node, found, tree⟩ := extract lowered generated
+  have rawType := stored_type unique found rightTyped
+  refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
+    .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
+    by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq, rfl⟩
+  rcases profile with equal | word | integer
+  · exact .inl equal
+  · exact .inr (.inl (rawView.trans word))
+  · exact .inr (.inr (rawView.trans integer))
+
+/-- Compatibility projection of the actual compiler receipt. -/
 theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
     {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
     {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
@@ -38,17 +69,8 @@ theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
       output next reasonAt invalidProjection invalidOperand missing = .ok code) :
     ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
       code = head.emit next output := by
-  obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
-    CompatibleBareAssignment.of_lower bare accepted
-  obtain ⟨node, found, tree⟩ := extract lowered generated
-  have rawType := stored_type unique found rightTyped
-  refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
-    .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-    by simpa only [rawType] using rawView, sameType, ?_⟩, codeEq⟩
-  rcases profile with equal | word | integer
-  · exact .inl equal
-  · exact .inr (.inl (rawView.trans word))
-  · exact .inr (.inr (rawView.trans integer))
+  obtain ⟨head, emitted, _⟩ := Head.of_lower_bare_with_token bare unique writable rightTyped profile extract accepted
+  exact ⟨head, emitted⟩
 
 /-- Only actual ordered key occurrences are requested from the expression
 extractor. Repeated occurrences retain their repeated compiler receipts. -/
@@ -80,7 +102,7 @@ private theorem keys_of_generated {checked : Checked} {source : TypedSource} {si
   rw [PreparedPath.key_ids path] at tree
   exact ⟨types, tree, receipts.2⟩
 
-theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
+theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
     {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
@@ -101,10 +123,10 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
       output next reasonAt invalidProjection invalidOperand missing = .ok code)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
-      code = head.emit next output := by
+      code = head.emit next output ∧ head.invalid = invalidOperand := by
   classical
   by_cases bare : assignment.target.projections = []
-  · apply Head.of_lower_bare bare unique writable rightTyped profile ?_ accepted
+  · apply Head.of_lower_bare_with_token bare unique writable rightTyped profile ?_ accepted
     intro lowered generated
     obtain ⟨node, found, tree, _⟩ := extract rhs lowered (by simp) generated
     exact ⟨node, found, tree⟩
@@ -144,10 +166,36 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
         have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq]⟩
+          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl⟩
         rcases profile with equal | word | integer
         · exact .inl equal
         · exact .inr (.inl (leafView.trans word))
         · exact .inr (.inr (leafView.trans integer))
+
+/-- Compatibility projection of the actual compiler receipt. -/
+theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
+    {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
+    {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {expression : ExpressionLowerer} {fuel : Nat} {site : SourceCoreElaboration.ErrorSite}
+    {next code : Expr} {output result : Ty} {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word}
+    (unique : NodeOccurrencesUnique source) (signatures : context.signatures = values.checked.signatures)
+    (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
+      SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+    (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+      expression fuel source scope id reasonAt = .ok lowered → ∃ node,
+      source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
+      HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression (LanguageResult.resultType lowered.type) definitions)
+    (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
+      output next reasonAt invalidProjection invalidOperand missing = .ok code)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
+    ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
+      code = head.emit next output := by
+  obtain ⟨head, emitted, _⟩ := Head.of_lower_with_token unique signatures sourceTyped writable rightTyped profile extract accepted typed
+  exact ⟨head, emitted⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatements
