@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuilti
 /-! The actual successful expression pass supplies the existing recursive
 call Tree. A local admission filter states the covered source forms and their
 compiler child positions. It is not a second expression grammar. Source typing,
-ordinary metadata, exact inventory coverage and retained domain order remain
+ordinary metadata, reached selection coverage and retained domain order remain
 static inputs. No expression evaluation or called-body meaning is stored here. -/
 set_option autoImplicit false
 set_option linter.unusedSimpArgs false
@@ -453,11 +453,11 @@ theorem SelectedDeclarationLaw.of_declaration
 
 /-- The existing Tree is extracted by the actual compiler's fuel induction.
 Each child keeps its original compiler result and source type. -/
-theorem tree_of_functions_with_selected_validity
+theorem tree_of_functions_at
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
-    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (admission : Admission source admitted) (coverage : ReachedCoverage headers compilation source admitted)
     (sourceTypes : SourceTypes headers context)
     (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
       node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
@@ -629,7 +629,7 @@ theorem tree_of_functions_with_selected_validity
           obtain ⟨index, signature, specialized, codes, selected, exactRecord, _, argumentsAccepted, _, resultType, emitted, nativeTypeEq⟩ :=
             NamedCalls.Arguments.call_of_accepted metadata.owner found read form bypass accepted
           obtain ⟨header, member, slot, signatureEq, instantiationEq, headerRecord⟩ :=
-            RecursiveNamedCallSelectionCertificates.selected coverage (order id callee arguments instantiation node allowed found form) selected
+            RecursiveNamedCallSelectionCertificates.selected_at coverage allowed found form (order id callee arguments instantiation node allowed found form) selected
           subst instantiation
           obtain ⟨argumentsTyped, sourceType, calleeNode, name, calleeFound, calleeForm, calleeRequirements, calleeCoercions, valid⟩ :=
             named_source_types sourceTypes member unique found form metadata.coercions (selectedValid id node callee arguments header.instantiation header policy index signature
@@ -697,6 +697,34 @@ theorem tree_of_functions_with_selected_validity
           simp only [owner, ne_eq, not_false_eq_true, ↓reduceIte] at accepted
           cases accepted
     | literal | integerLiteral | reference | lambda | proxy => simp [compositionForm, form] at composition
+
+/-- Preserve the former whole-inventory interface as a restriction. -/
+theorem tree_of_functions_with_selected_validity
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
+    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (sourceTypes : SourceTypes headers context)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (signatures : context.signatures = values.checked.signatures)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context admitted)
+    (fragmentValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context (CompatibleExpressionBuiltins.Syntax source))
+    (selectedValid : SelectedDeclarationLaw headers compilation source context admitted)
+    (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt admitted)
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (profile : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (fragmentCoercions : ∀ id node, CompatibleExpressionBuiltins.Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    (coercions : ∀ id node, admitted id → source.lookupExpression? id = some node → node.coercions = [])
+    {fuel : Nat} {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered) :
+    Expressions headers compilation readFuel source context compilation.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_functions_at admission coverage.restrict sourceTypes order unique declarations signatures
+    constructorValid fragmentValid selectedValid policyFor native active profile fragmentCoercions coercions allowed found typed accepted
 
 /-- Preserve the original all-admitted-site interface as a restriction adapter. -/
 theorem tree_of_functions_with_validity
@@ -877,7 +905,7 @@ private theorem evidence_admitted
 Full inventory/source type/order receipts remain static inputs. The actual
 closed caller and ordinary occurrence metadata discharge the special hook;
 local specialization and qualified method callers are outside this entry. -/
-theorem tree_of_contextual_with_selected_validity
+theorem tree_of_contextual_at
     {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
     {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
     {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
@@ -887,7 +915,7 @@ theorem tree_of_contextual_with_selected_validity
     {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
     {sourceContext : SourceSemantics.Context} {admitted : ExpressionId → Prop}
     {caller : SourceSpecialization.SpecializedFunction}
-    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (admission : Admission source admitted) (coverage : ReachedCoverage headers compilation source admitted)
     (sourceTypes : SourceTypes headers sourceContext)
     (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
       node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
@@ -914,7 +942,7 @@ theorem tree_of_contextual_with_selected_validity
     rw [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at accepted
     dsimp only at accepted
     simp only [callerSelected, Except.mapError, bind, Except.bind, pure, Except.pure] at accepted
-    refine tree_of_functions_with_selected_validity admission coverage sourceTypes order unique declarations sourceSignatures constructorValid fragmentValid selectedValid
+    refine tree_of_functions_at admission coverage sourceTypes order unique declarations sourceSignatures constructorValid fragmentValid selectedValid
       ?_ native [] rfl ordinary.fragment.coercions ordinary.coercions allowed found typed accepted
     refine ⟨⟨?_, ?_, lowerPolicy, leafPolicy⟩, ?_, ?_⟩
     · intro childId childTree child budget
@@ -956,6 +984,41 @@ theorem tree_of_contextual_with_selected_validity
         representation.expressions.readExpression viewed childId) = _
       rw [contextualSource_admitted checkedProgram compilation.plan locals compilation.owner admission ordinary allowed childFound]
       simp only [bind, Except.bind, readPolicy]
+
+/-- Preserve the former whole-inventory interface as a restriction. -/
+theorem tree_of_contextual_with_selected_validity
+    {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
+    {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
+    {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {native : SourceCoreGeneralFunctions.CallableContext}
+    {skipInitializer : Option ExpressionId} {fuel readFuel : Nat}
+    {source : TypedSource} {scope : Scope} {id : ExpressionId} {node : ExpressionNode}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    {sourceContext : SourceSemantics.Context} {admitted : ExpressionId → Prop}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (sourceTypes : SourceTypes headers sourceContext)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (ordinary : Ordinary source locals compilation.owner admitted)
+    (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
+    (callerClosed : caller.assumptions = [])
+    (unique : NodeOccurrencesUnique source)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext admitted)
+    (fragmentValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (CompatibleExpressionBuiltins.Syntax source))
+    (selectedValid : SelectedDeclarationLaw headers compilation source sourceContext admitted)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (sourceSignatures : sourceContext.signatures = values.checked.signatures)
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    (readPolicy : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerPolicy : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression checkedProgram representation signatures locals parents assignments
+      diagnostics compilation (some native) none skipInitializer fuel source scope id reasonAt = .ok lowered) :
+    Expressions headers compilation readFuel source sourceContext compilation.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_contextual_at admission coverage.restrict sourceTypes order ordinary callerSelected callerClosed
+    unique constructorValid fragmentValid selectedValid declarations sourceSignatures allowed found typed readPolicy lowerPolicy leafPolicy accepted
 
 /-- Preserve the original all-admitted-site interface as a restriction adapter. -/
 theorem tree_of_contextual_with_validity

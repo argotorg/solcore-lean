@@ -29,6 +29,30 @@ structure Coverage (headers : Inventory prepared values definitions program)
     header.instantiation.parameterSubstitution.map Prod.fst =
       (header.named.specialized.parameterSubstitution.map Prod.fst).reverse
 
+/-- Only accepted declaration calls in the admitted source domain need a
+header. Unrelated globals, including coercion methods, are not covered. -/
+structure ReachedCoverage (headers : Inventory prepared values definitions program)
+    (compilation : SourceCoreFunctions.Context) (source : TypedSource)
+    (admitted : ExpressionId → Prop) : Prop where
+  plan : compilation.plan = base.plan
+  slots : ∀ policy id node callee arguments instantiation index signature specialized,
+    admitted id → source.lookupExpression? id = some node →
+    node.form = .call callee arguments (.declaration instantiation) →
+    SourceCoreFunctions.selectedSignature policy compilation source node instantiation false = .ok (index, signature) →
+    SourceCompilationPlan.exactSpecialization compilation.plan signature.key = .ok specialized →
+    ∃ header, header ∈ headers ∧ header.slot = index ∧
+      header.named.signature = signature ∧ header.named.specialized = specialized
+  ordered : ∀ header, header ∈ headers →
+    header.instantiation.parameterSubstitution.map Prod.fst =
+      (header.named.specialized.parameterSubstitution.map Prod.fst).reverse
+
+/-- Existing whole-inventory coverage restricts to the actual reached sites. -/
+theorem Coverage.restrict {source : TypedSource} {admitted : ExpressionId → Prop}
+    (coverage : Coverage headers compilation) : ReachedCoverage headers compilation source admitted := by
+  refine ⟨coverage.plan, ?_, coverage.ordered⟩
+  intro policy id node callee arguments instantiation index signature specialized _allowed _found _form selected exactRecord
+  exact coverage.slots index signature specialized (NamedCalls.selected_signature_target selected).2 exactRecord
+
 /-- The admitted occurrence uses the same domain order actually retained by
 source inference. All remaining fields come from the accepted matcher. -/
 def Ordered (plan : SourceCompilationPlan.Plan) (instantiation : DeclarationInstantiation) : Prop :=
@@ -37,10 +61,16 @@ def Ordered (plan : SourceCompilationPlan.Plan) (instantiation : DeclarationInst
     instantiation.parameterSubstitution.map Prod.fst =
       (specialized.parameterSubstitution.map Prod.fst).reverse
 
-theorem selected {policy : SourceCoreFunctions.Policy} {source : TypedSource}
+private theorem selected_record {policy : SourceCoreFunctions.Policy} {source : TypedSource}
     {node : ExpressionNode} {instantiation : DeclarationInstantiation} {index : Nat}
     {signature : SourceCoreCalls.Signature}
-    (coverage : Coverage headers compilation) (ordered : Ordered compilation.plan instantiation)
+    (plan : compilation.plan = base.plan)
+    (headerOrder : ∀ header, header ∈ headers →
+      header.instantiation.parameterSubstitution.map Prod.fst =
+        (header.named.specialized.parameterSubstitution.map Prod.fst).reverse)
+    (selects : ∀ specialized, SourceCompilationPlan.exactSpecialization compilation.plan signature.key = .ok specialized →
+      ∃ header, header ∈ headers ∧ header.slot = index ∧ header.named.signature = signature ∧ header.named.specialized = specialized)
+    (ordered : Ordered compilation.plan instantiation)
     (accepted : SourceCoreFunctions.selectedSignature policy compilation source node instantiation false =
       .ok (index, signature)) :
     ∃ header, header ∈ headers ∧ header.slot = index ∧ header.named.signature = signature ∧
@@ -50,14 +80,46 @@ theorem selected {policy : SourceCoreFunctions.Policy} {source : TypedSource}
     CallableNamedMetadata.metadata_of_selected_signature accepted
   have target := NamedCalls.selected_signature_target accepted
   obtain ⟨header, member, slot, signatureEq, specializationEq⟩ :=
-    coverage.slots index signature specialized target.2 exactRecord
+    selects specialized exactRecord
   have headerTarget : SourceCompilationPlan.exactInstantiationKey compilation.plan header.instantiation =
-      .ok signature.key := by rw [coverage.plan, ← signatureEq]; exact header.target
+      .ok signature.key := by rw [plan, ← signatureEq]; exact header.target
   have headerMatch := CallableNamedMetadata.matches_of_exact headerTarget exactRecord
   have occurrenceEq := matched.retained_canonical (ordered _ _ target.1 exactRecord)
-  have headerEq := headerMatch.retained_canonical (by simpa [← specializationEq] using coverage.ordered header member)
+  have headerEq := headerMatch.retained_canonical (by simpa [← specializationEq] using headerOrder header member)
   exact ⟨header, member, slot, signatureEq, occurrenceEq.trans headerEq.symm,
     specializationEq.symm ▸ exactRecord⟩
+
+/-- Full metadata follows from the same accepted matcher at the reached site. -/
+theorem selected_at {policy : SourceCoreFunctions.Policy} {source : TypedSource}
+    {id callee : ExpressionId} {arguments : List ExpressionId} {admitted : ExpressionId → Prop}
+    {node : ExpressionNode} {instantiation : DeclarationInstantiation} {index : Nat}
+    {signature : SourceCoreCalls.Signature}
+    (coverage : ReachedCoverage headers compilation source admitted)
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (form : node.form = .call callee arguments (.declaration instantiation))
+    (ordered : Ordered compilation.plan instantiation)
+    (accepted : SourceCoreFunctions.selectedSignature policy compilation source node instantiation false =
+      .ok (index, signature)) :
+    ∃ header, header ∈ headers ∧ header.slot = index ∧ header.named.signature = signature ∧
+      instantiation = header.instantiation ∧
+      SourceCompilationPlan.exactSpecialization compilation.plan signature.key = .ok header.named.specialized := by
+  exact selected_record coverage.plan coverage.ordered
+    (fun specialized exactRecord => coverage.slots policy id node callee arguments instantiation index signature specialized
+      allowed found form accepted exactRecord) ordered accepted
+
+/-- Compatibility with whole-inventory coverage. -/
+theorem selected {policy : SourceCoreFunctions.Policy} {source : TypedSource}
+    {node : ExpressionNode} {instantiation : DeclarationInstantiation} {index : Nat}
+    {signature : SourceCoreCalls.Signature}
+    (coverage : Coverage headers compilation) (ordered : Ordered compilation.plan instantiation)
+    (accepted : SourceCoreFunctions.selectedSignature policy compilation source node instantiation false =
+      .ok (index, signature)) :
+    ∃ header, header ∈ headers ∧ header.slot = index ∧ header.named.signature = signature ∧
+      instantiation = header.instantiation ∧
+      SourceCompilationPlan.exactSpecialization compilation.plan signature.key = .ok header.named.specialized := by
+  exact selected_record coverage.plan coverage.ordered
+    (fun specialized exactRecord => coverage.slots index signature specialized
+      (NamedCalls.selected_signature_target accepted).2 exactRecord) ordered accepted
 
 /-- Empty actual domains are one concrete way to close the order condition.
 No permutation-sensitive equality is inferred merely from the selected key. -/

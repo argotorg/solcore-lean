@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCachedRows
 
 /-! Real declaration scopes keep their residual flag. Closed constructor ranges and selected headers
 supply source instantiation validity; actual compiler receipts supply the
-existing recursive expression Tree. Static source admission, full inventory
+existing recursive expression Tree. Static source admission, reached selection
 coverage, source typing and diagnostic interpretation remain independent. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedSelectedExpressionFactory
@@ -45,7 +45,7 @@ theorem header_program_signatures (header : Header prepared values ambient.defin
 
 /-- Actual selected-site validity removes the named raw-range condition.
 Constructor ranges remain independent static source receipts. -/
-theorem tree_of_contextual
+theorem tree_of_contextual_at
     {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
     {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
     {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
@@ -55,7 +55,7 @@ theorem tree_of_contextual
     {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
     {sourceContext : SourceSemantics.Context} {admitted : ExpressionId → Prop}
     {caller : SourceSpecialization.SpecializedFunction}
-    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (admission : Admission source admitted) (coverage : ReachedCoverage headers compilation source admitted)
     (sourceTypes : SourceTypes headers sourceContext)
     (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
       node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
@@ -77,7 +77,7 @@ theorem tree_of_contextual
     (accepted : SourceCoreGeneralFunctions.lowerContextualExpression checkedProgram representation signatures locals parents assignments
       diagnostics compilation (some native) none skipInitializer fuel source scope id reasonAt = .ok lowered) :
     Expressions headers compilation readFuel source sourceContext compilation.solvedRequirements reasonAt scope id lowered := by
-  exact tree_of_contextual_with_selected_validity
+  exact RecursiveNamedExpressionCompilerCertificates.tree_of_contextual_at
     (checkedProgram := checkedProgram)
     (representation := representation)
     (signatures := signatures)
@@ -119,6 +119,42 @@ theorem tree_of_contextual
     (fragmentValid := ConstructorLaw.of_ranges lexical (constructorRanges.restrict (fun _ allowed => Or.inr allowed)))
     (selectedValid := selected_validity programSignatures)
 
+/-- Preserve the former whole-inventory interface as a restriction. -/
+theorem tree_of_contextual
+    {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
+    {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
+    {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {native : SourceCoreGeneralFunctions.CallableContext}
+    {skipInitializer : Option ExpressionId} {fuel readFuel : Nat}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    {sourceContext : SourceSemantics.Context} {admitted : ExpressionId → Prop}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (sourceTypes : SourceTypes headers sourceContext)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (ordinary : Ordinary source locals compilation.owner admitted)
+    (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
+    (callerClosed : caller.assumptions = [])
+    (unique : NodeOccurrencesUnique source)
+    (lexical : sourceContext.typeVariables = [])
+    (constructorRanges : ConstructorRanges source
+      (fun id => admitted id ∨ CompatibleExpressionBuiltins.Syntax source id))
+    (programSignatures : sourceContext.signatures = program.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (sourceSignatures : sourceContext.signatures = values.checked.signatures)
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    (readPolicy : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerPolicy : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression checkedProgram representation signatures locals parents assignments
+      diagnostics compilation (some native) none skipInitializer fuel source scope id reasonAt = .ok lowered) :
+    Expressions headers compilation readFuel source sourceContext compilation.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_contextual_at admission coverage.restrict sourceTypes order ordinary callerSelected callerClosed
+    unique lexical constructorRanges programSignatures declarations sourceSignatures allowed found typed readPolicy lowerPolicy leafPolicy accepted
+
 end Expressions
 
 variable (cached : SourceCoreUnifiedCompilation.Compiled)
@@ -155,6 +191,49 @@ variable {compilation : SourceCoreFunctions.Context} {expressionSyntax : Express
 /-- The same actual contextual compiler is used at every lexical child scope.
 Only signature-dependent source rows move between scopes. The original ledger,
 raw instantiations, admission domains and stored node identities remain fixed. -/
+theorem expressions_at
+    {checkedProgram : CheckedProgram} {signatures : ProgramSignatures}
+    {locals : SourceCoreLocalPolymorphism.Catalog} {parents : List SourceCoreLocalEvidence.Prepared}
+    {assignmentTable : SourceCoreAssignmentFaultSites.Table} {diagnostics : SourceCoreDataPlaceFaultSites.Program}
+    {native : SourceCoreGeneralFunctions.CallableContext} {skipInitializer : Option ExpressionId}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (policyExpression : header.policy.lowerExpression = SourceCoreGeneralFunctions.lowerContextualExpression
+      checkedProgram header.representation signatures locals parents assignmentTable diagnostics compilation
+      (some native) none skipInitializer)
+    (sameLedger : compilation.solvedRequirements = header.solved)
+    (admission : Admission header.function.source expressionSyntax)
+    (coverage : ReachedCoverage headers compilation header.function.source expressionSyntax) (sourceTypes : SourceTypes headers header.context)
+    (order : ∀ id callee arguments instantiation node, expressionSyntax id →
+      header.function.source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (ordinary : Ordinary header.function.source locals compilation.owner expressionSyntax)
+    (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
+    (callerClosed : caller.assumptions = [])
+    (constructorRanges : ConstructorRanges header.function.source
+      (fun id => expressionSyntax id ∨ CompatibleExpressionBuiltins.Syntax header.function.source id))
+    (expressionRead : header.representation.expressions.readExpression =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (expressionLower : header.representation.expressions.lowerRead =
+      SourceCoreCompatibleDataExpressions.lowerRead header.readFuel values)
+    (expressionLeaf : header.representation.expressions.leafLowerer =
+      SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (sourceSignatures : header.context.signatures = values.checked.signatures) :
+∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+      sourceContext.signatures = values.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext → expressionSyntax id →
+      header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered := by
+  intro sourceContext lexical _residual childSignatures scope fuel id node lowered declarations allowed found typed generated
+  rw [policyExpression] at generated
+  have tree := tree_of_contextual_at admission coverage
+    (sourceTypes_at (childSignatures.trans sourceSignatures.symm) sourceTypes) order ordinary
+    callerSelected callerClosed header.unique lexical constructorRanges
+    ((childSignatures.trans sourceSignatures.symm).trans (header_program_signatures header)) declarations
+    childSignatures allowed found typed expressionRead expressionLower expressionLeaf generated
+  simpa only [sameLedger] using tree
+
+/-- Preserve the former whole-inventory interface as a restriction. -/
 theorem expressions
     {checkedProgram : CheckedProgram} {signatures : ProgramSignatures}
     {locals : SourceCoreLocalPolymorphism.Catalog} {parents : List SourceCoreLocalEvidence.Prepared}
@@ -188,19 +267,69 @@ theorem expressions
       header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
       header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
       (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered := by
-  intro sourceContext lexical _residual childSignatures scope fuel id node lowered declarations allowed found typed generated
-  rw [policyExpression] at generated
-  have tree := tree_of_contextual admission coverage
-    (sourceTypes_at (childSignatures.trans sourceSignatures.symm) sourceTypes) order ordinary
-    callerSelected callerClosed header.unique lexical constructorRanges
-    ((childSignatures.trans sourceSignatures.symm).trans (header_program_signatures header)) declarations
-    childSignatures allowed found typed expressionRead expressionLower expressionLeaf generated
-  simpa only [sameLedger] using tree
+  exact expressions_at (cached := cached) policyExpression sameLedger admission coverage.restrict sourceTypes order ordinary
+    callerSelected callerClosed constructorRanges expressionRead expressionLower expressionLeaf sourceSignatures
 
 include member definitions sameCache complete globals recipeAccepted cachedRows ordered entry in
 /-- Actual cached typing and support still feed the unique statement traversal.
 There is no external expression/body meaning or arbitrary child native typing
 premise. Constructor raw closed ranges and independent source admission remain explicit. -/
+theorem extract_at (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    {catalogSignatures : ProgramSignatures} {catalogFuel : Nat} {catalogTypes : List TypeSystem.Ty}
+    {metadata : List SourceCoreCompatibleCatalog.Metadata} {limits : SourceCoreCompatibleCatalog.Limits} {contracts : Bool}
+    (registered : SourceCoreCompatibleCatalog.prepare catalogSignatures catalogFuel catalogTypes metadata limits contracts = .ok values.checked)
+    (prefixEq : compilation.administrativePrefix = 1) {tracked : Bool}
+    (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source invalidOperand)
+    (readPolicy : header.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      header.policy.lowerBinder header.function.source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked header.function.source scope binder)
+    (allocationPolicy : header.policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator cached.indexed.ancestry.layout.frame header.globals
+      (header.layouts.allocatorAt header.owner header.active header.onError)))
+    {checkedProgram : CheckedProgram} {signatures : ProgramSignatures}
+    {locals : SourceCoreLocalPolymorphism.Catalog} {parents : List SourceCoreLocalEvidence.Prepared}
+    {assignmentTable : SourceCoreAssignmentFaultSites.Table} {diagnostics : SourceCoreDataPlaceFaultSites.Program}
+    {native : SourceCoreGeneralFunctions.CallableContext} {skipInitializer : Option ExpressionId}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (policyExpression : header.policy.lowerExpression = SourceCoreGeneralFunctions.lowerContextualExpression
+      checkedProgram header.representation signatures locals parents assignmentTable diagnostics compilation
+      (some native) none skipInitializer)
+    (sameLedger : compilation.solvedRequirements = header.solved)
+    (admission : Admission header.function.source expressionSyntax)
+    (coverage : ReachedCoverage headers compilation header.function.source expressionSyntax) (sourceTypes : SourceTypes headers header.context)
+    (order : ∀ id callee arguments instantiation node, expressionSyntax id →
+      header.function.source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (ordinary : Ordinary header.function.source locals compilation.owner expressionSyntax)
+    (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
+    (callerClosed : caller.assumptions = [])
+    (constructorRanges : ConstructorRanges header.function.source
+      (fun id => expressionSyntax id ∨ CompatibleExpressionBuiltins.Syntax header.function.source id))
+    (expressionRead : header.representation.expressions.readExpression =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (expressionLower : header.representation.expressions.lowerRead =
+      SourceCoreCompatibleDataExpressions.lowerRead header.readFuel values)
+    (expressionLeaf : header.representation.expressions.leafLowerer =
+      SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy header.policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy header.policy values invalidProjection invalidUnary missingDefault)
+    (syntaxTree : GenericImperativeFor.Syntax header.function.source expressionSyntax header.context
+      (.statements true header.function.body) header.function.resultType)
+    (sourceSignatures : header.context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations header.function.source (bodyScope header) header.context)
+    (projection : values.checked.catalog.project header.function.resultType = .ok header.output)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+      (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
+    : Nonempty (Receipt diagnosticPolicy headers header compilation expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
+  apply RecursiveNamedCachedSupport.extract_source cached recipeAccepted rows cachedRows ordered
+    member definitions sameCache complete globals entry diagnosticPolicy registered prefixEq factory
+    readPolicy binderPolicy allocationPolicy
+    (expressions_at (cached := cached) policyExpression sameLedger admission coverage sourceTypes order ordinary callerSelected callerClosed
+      constructorRanges expressionRead expressionLower expressionLeaf sourceSignatures)
+    assignments unaryPolicy syntaxTree sourceSignatures declarations projection accepted
+
+include member definitions sameCache complete globals recipeAccepted cachedRows ordered entry in
+/-- Preserve the former whole-inventory interface as a restriction. -/
 theorem extract (diagnosticPolicy : AssignmentDiagnosticPolicy)
     {catalogSignatures : ProgramSignatures} {catalogFuel : Nat} {catalogTypes : List TypeSystem.Ty}
     {metadata : List SourceCoreCompatibleCatalog.Metadata} {limits : SourceCoreCompatibleCatalog.Limits} {contracts : Bool}
@@ -248,11 +377,10 @@ theorem extract (diagnosticPolicy : AssignmentDiagnosticPolicy)
       (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
     : Nonempty (Receipt diagnosticPolicy headers header compilation expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
-  apply RecursiveNamedCachedSupport.extract_source cached recipeAccepted rows cachedRows ordered
-    member definitions sameCache complete globals entry diagnosticPolicy registered prefixEq factory
-    readPolicy binderPolicy allocationPolicy
-    (expressions (cached := cached) policyExpression sameLedger admission coverage sourceTypes order ordinary callerSelected callerClosed
-      constructorRanges expressionRead expressionLower expressionLeaf sourceSignatures)
-    assignments unaryPolicy syntaxTree sourceSignatures declarations projection accepted
+  exact extract_at (cached := cached) (recipeAccepted := recipeAccepted) (rows := rows) (cachedRows := cachedRows)
+    (ordered := ordered) (member := member) (definitions := definitions) (sameCache := sameCache) (complete := complete)
+    (globals := globals) (entry := entry) diagnosticPolicy registered prefixEq factory readPolicy binderPolicy allocationPolicy
+    policyExpression sameLedger admission coverage.restrict sourceTypes order ordinary callerSelected callerClosed constructorRanges
+    expressionRead expressionLower expressionLeaf assignments unaryPolicy syntaxTree sourceSignatures declarations projection accepted
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedSelectedExpressionFactory
