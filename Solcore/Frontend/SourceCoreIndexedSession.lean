@@ -1241,3 +1241,110 @@ theorem Snapshot.exportPrefix_original {artifact : Artifact} {snapshot : Snapsho
       exact result.prefix
     · cases accepted
 end Solcore.Frontend.SourceCoreIndexedSession
+
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- The actual public root retains its selected function, original entry and
+argument order. Native typing alone does not identify any source declaration. -/
+def Root.FactoryShape (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts)
+    (root : Root compiled) : Prop :=
+  ∃ function index,
+    compiled.indexed.base.functions.zipIdx.find?
+      (fun item => decide (item.1.signature.key = entry.key)) = some (function, index) ∧
+    function.signature.key = entry.key ∧
+    root.key = entry.key ∧
+    root.inputs = entry.inputs.map (·.scheme.body) ∧
+    root.types = function.inputs.map Prod.snd ∧
+    root.result = entry.sourceResultType ∧
+    root.type = function.signature.resultType ∧
+    compiled.compatible.checked.catalog.project entry.sourceResultType = .ok function.signature.resultType ∧
+    root.body = SourceCoreCalls.call function.signature (index + root.types.length)
+      (SourceCoreCalls.packArguments (root.types.zipIdx.map fun (type, index) =>
+        ⟨type, Core.LanguageResult.success (.var (root.types.length - 1 - index))⟩)).expression Core.Word.zero ∧
+    Core.infer? (root.types.reverse ++
+      (SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed).map Core.Value.type)
+      root.body compiled.indexed.layouts.definitions = some (Core.LanguageResult.resultType root.type)
+
+/-- Every root in a successfully prepared recipe comes from a real indexed
+entry and the exact public call factory. This receipt contains static facts. -/
+def Root.Issued (compiled : SourceCoreUnifiedCompilation.Compiled) (root : Root compiled) : Prop :=
+  ∃ entry, entry ∈ compiled.indexed.entries ∧ root.FactoryShape compiled entry
+
+private theorem root_factory_shape {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts} {root : Root compiled}
+    (accepted : prepareRoot compiled entry = .ok root) : root.FactoryShape compiled entry := by
+  unfold prepareRoot at accepted
+  cases selected : compiled.indexed.base.functions.zipIdx.find?
+      (fun item => decide (item.1.signature.key = entry.key)) with
+  | none => simp [selected, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at accepted
+  | some pair =>
+    rcases pair with ⟨function, index⟩
+    simp only [selected, bind, Except.bind, pure, Except.pure] at accepted
+    split at accepted
+    · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+    · rename_i resultType projection
+      split at accepted
+      · rename_i same
+        split at accepted
+        · rename_i inferred
+          cases accepted
+          refine ⟨function, index, selected, ?_, rfl, rfl, rfl, rfl, rfl, ?_, rfl, inferred⟩
+          · simpa using List.find?_some selected
+          · simpa only [same] using projection
+        · contradiction
+      · contradiction
+
+private theorem root_factory_bind_ok {α β ε : Type} {action : Except ε α}
+    {next : α → Except ε β} {result : β}
+    (accepted : action >>= next = .ok result) :
+    ∃ value, action = .ok value ∧ next value = .ok result := by
+  cases action with
+  | error error => simp [bind, Except.bind] at accepted
+  | ok value => exact ⟨value, rfl, accepted⟩
+
+private theorem root_factory_mapM_member {α β ε : Type} {action : α → Except ε β}
+    {inputs : List α} {outputs : List β} {output : β}
+    (accepted : inputs.mapM action = .ok outputs) (member : output ∈ outputs) :
+    ∃ input, input ∈ inputs ∧ action input = .ok output := by
+  induction inputs generalizing outputs with
+  | nil => simp only [List.mapM_nil, pure, Except.pure, Except.ok.injEq] at accepted; subst outputs; cases member
+  | cons first rest ih =>
+    rw [List.mapM_cons] at accepted
+    obtain ⟨head, headEq, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+    cases accepted
+    rcases List.mem_cons.mp member with same | member
+    · subst output; exact ⟨first, .head _, headEq⟩
+    · obtain ⟨input, found, selected⟩ := ih tailEq member
+      exact ⟨input, .tail _ found, selected⟩
+
+/-- Successful preparation authenticates each public root's full entry and
+emitted call shape, including the real reversed input slots and global index. -/
+theorem Recipe.prepare_roots {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (accepted : Recipe.prepare compiled = .ok recipe) {root : Root recipe.compiled}
+    (member : root ∈ recipe.roots) : root.Issued recipe.compiled := by
+  unfold Recipe.prepare at accepted
+  cases roots : compiled.indexed.entries.mapM (prepareRoot compiled) with
+  | error error => simp [roots, bind, Except.bind] at accepted
+  | ok roots =>
+    cases templates : SourceCoreCallableIndexedTemplates.prepare compiled.indexed with
+    | error error => simp [roots, templates, Except.mapError, bind, Except.bind] at accepted
+    | ok cache =>
+      simp only [roots, templates, Except.mapError, bind, Except.bind, pure, Except.pure] at accepted
+      cases named : prepareNamed compiled cache with
+      | error error => simp [named] at accepted
+      | ok named =>
+        simp only [named] at accepted
+        cases builtins : prepareBuiltins compiled with
+        | error error => simp [builtins] at accepted
+        | ok builtins =>
+          simp only [builtins] at accepted
+          split at accepted
+          · cases accepted
+            obtain ⟨entry, entryMember, prepared⟩ := root_factory_mapM_member roots member
+            exact ⟨entry, entryMember, root_factory_shape prepared⟩
+          · contradiction
+
+end Solcore.Frontend.SourceCoreIndexedSession
