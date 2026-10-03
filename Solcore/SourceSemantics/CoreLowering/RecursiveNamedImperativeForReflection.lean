@@ -621,9 +621,9 @@ theorem reflectsAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (functi
     intro size bounded
     exact Control.sequence_reflects_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
-        patternContext catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
-        childrenIH)
+      (fun child within contextValid => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
+        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
+        childrenIH contextValid)
       (fun child within => remainingIH child (Nat.lt_of_le_of_lt within bounded))
 
   | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalogValid patternContext childErrors childrenIH =>
@@ -633,9 +633,9 @@ theorem reflectsAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (functi
     intro size bounded
     exact Control.sequence_stopped_reflects_at (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
-        patternContext catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
-        childrenIH)
+      (fun child within contextValid => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
+        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
+        childrenIH contextValid)
       (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
 
 include definitions registered extension transport bindings reflection faithful observations in

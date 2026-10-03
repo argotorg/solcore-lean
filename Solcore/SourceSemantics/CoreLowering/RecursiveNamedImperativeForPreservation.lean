@@ -929,9 +929,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
     intro size bounded
     exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
-        patternContext catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
-        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)))
+      (fun child within contextValid => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
+        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)) contextValid)
       remainingIH
 
   | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalogValid patternContext childErrors childrenIH =>
@@ -941,9 +941,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
     intro size bounded
     exact Control.sequence_stopped_preserves_at (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
-        patternContext catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
-        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)))
+      (fun child within contextValid => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
+        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)) contextValid)
       (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
 
 include definitions registered extension transport bindings meaningMost faithful observations in

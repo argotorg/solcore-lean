@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForTree
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchMeaning
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchContextFactory
 
 /-! Static inclusion keeps the existing imperative grammar and exact emitted
 code. CatalogSites indexes that same Match Tree: catalog validity is required
@@ -19,6 +20,34 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {definitions : DataEnvironment} {administrative : Core.Context}
 
 namespace Tree
+/-- Match metadata names the same full signature and solved-row lists. Whether
+those rows are ordinary or runtime-valid is supplied at the reached context. -/
+structure MatchContextFields (compilation : SourceCoreCompatibleDataMatches.Context)
+    (context : SourceSemantics.Context) : Prop where
+  signatures : context.signatures = compilation.signatures
+  ledger : context.solvedRequirements = compilation.solvedRequirements
+
+theorem MatchContextFields.of_ordinary
+    {compilation : SourceCoreCompatibleDataMatches.Context} {context : SourceSemantics.Context}
+    (valid : CompatiblePatternLeaves.ContextValid compilation context) :
+    MatchContextFields compilation context := ⟨valid.signatures, valid.ledger⟩
+
+theorem MatchContextFields.ordinary
+    {compilation : SourceCoreCompatibleDataMatches.Context} {context : SourceSemantics.Context}
+    {solved : List SolvedRequirement} {evidence : Dynamic.EvidenceEnvironment}
+    (fields : MatchContextFields compilation context)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) :
+    CompatiblePatternLeaves.ContextValid compilation context :=
+  ⟨fields.signatures, fields.ledger, valid.valid⟩
+
+theorem MatchContextFields.runtime
+    {compilation : SourceCoreCompatibleDataMatches.Context} {context : SourceSemantics.Context}
+    {solved : List SolvedRequirement} {evidence : Dynamic.EvidenceEnvironment}
+    (fields : MatchContextFields compilation context)
+    (valid : CompatibleRuntimeContextValidity.Valid solved context evidence) :
+    CompatiblePatternRuntime.ContextValid compilation context :=
+  ⟨fields.signatures, fields.ledger, valid.runtime⟩
+
 inductive CatalogSites (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
     {context : SourceSemantics.Context} → {scope : Scope} → {position : Position} →
     {expected : TypeSystem.Ty} → {type : Ty} → {code : Expr} →
@@ -220,7 +249,7 @@ inductive CatalogSites (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry
       {remaining : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode rest) expected type body}
       (catalog : SignatureCatalogWellFormed values.checked.signatures)
-      (patternContext : CompatiblePatternLeaves.ContextValid compilation context)
+      (patternContext : MatchContextFields compilation context)
       (childErrors : ∀ request member childContext valid, CatalogSites diagnosticPolicy registry faults (children request member childContext valid))
       (remainingErrors : CatalogSites diagnosticPolicy registry faults remaining) :
       CatalogSites diagnosticPolicy registry faults (.matchWith found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation
@@ -276,7 +305,7 @@ inductive CatalogSites (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry
       {stops : ReachableMatchContinuations.DefaultStopped source id resolution}
       {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
       (catalog : SignatureCatalogWellFormed values.checked.signatures)
-      (patternContext : CompatiblePatternLeaves.ContextValid compilation context)
+      (patternContext : MatchContextFields compilation context)
       (childErrors : ∀ request member childContext valid, CatalogSites diagnosticPolicy registry faults (children request member childContext valid))
       :
       CatalogSites diagnosticPolicy registry faults (.terminalMatch unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation
@@ -309,10 +338,10 @@ theorem CatalogSites.of_catalog {policy : AssignmentDiagnosticPolicy} {registry 
   case initializerDiscard => apply CatalogSites.initializerDiscard <;> assumption
   case initializerAssign => apply CatalogSites.initializerAssign <;> assumption
   case initializerBitNot => apply CatalogSites.initializerBitNot <;> assumption
-  case matchWith => apply CatalogSites.matchWith <;> assumption
+  case matchWith => apply CatalogSites.matchWith <;> first | assumption | exact MatchContextFields.of_ordinary (by assumption)
   case terminalBlock => apply CatalogSites.terminalBlock <;> assumption
   case terminalIf => apply CatalogSites.terminalIf <;> assumption
-  case terminalMatch => apply CatalogSites.terminalMatch <;> assumption
+  case terminalMatch => apply CatalogSites.terminalMatch <;> first | assumption | exact MatchContextFields.of_ordinary (by assumption)
 
 /-- The source positions, native code, administrative context and every static
 child are preserved by inclusion. -/
@@ -372,35 +401,158 @@ theorem CatalogSites.of_for {policy : AssignmentDiagnosticPolicy} {registry : So
   case terminalBlock => apply CatalogSites.terminalBlock <;> assumption
   case terminalIf => apply CatalogSites.terminalIf <;> assumption
 
-/-- Erasing only site catalog evidence recovers the same ReadyFor receipt. -/
+/-- Ordinary readiness additionally requires the actual root ordinary context.
+The same binder and selected-arm relations transport it to each match site. -/
 theorem CatalogSites.ready {policy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     {tree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope position expected type code}
-    (sites : CatalogSites policy registry faults tree) : ReadyFor policy registry faults tree := by
-  induction sites
-  case body => apply ReadyFor.body <;> assumption
-  case uninitialized => apply ReadyFor.uninitialized <;> assumption
-  case initialized => apply ReadyFor.initialized <;> assumption
-  case discard => apply ReadyFor.discard <;> assumption
-  case block => apply ReadyFor.block <;> assumption
-  case ifThen => apply ReadyFor.ifThen <;> assumption
-  case breaking => apply ReadyFor.breaking <;> assumption
-  case continuing => apply ReadyFor.continuing <;> assumption
-  case whileLoop => apply ReadyFor.whileLoop <;> assumption
-  case assign => apply ReadyFor.assign <;> assumption
-  case bitNot => apply ReadyFor.bitNot <;> assumption
-  case forLoop => apply ReadyFor.forLoop <;> assumption
-  case initializersDone => apply ReadyFor.initializersDone <;> assumption
-  case initializerUninitialized => apply ReadyFor.initializerUninitialized <;> assumption
-  case initializerInitialized => apply ReadyFor.initializerInitialized <;> assumption
-  case initializerDiscard => apply ReadyFor.initializerDiscard <;> assumption
-  case initializerAssign => apply ReadyFor.initializerAssign <;> assumption
-  case initializerBitNot => apply ReadyFor.initializerBitNot <;> assumption
-  case matchWith => apply ReadyFor.matchWith <;> assumption
-  case terminalBlock => apply ReadyFor.terminalBlock <;> assumption
-  case terminalIf => apply ReadyFor.terminalIf <;> assumption
-  case terminalMatch => apply ReadyFor.terminalMatch <;> assumption
+    (sites : CatalogSites policy registry faults tree)
+    {solved : List SolvedRequirement} {evidence : Dynamic.EvidenceEnvironment}
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence) : ReadyFor policy registry faults tree := by
+  revert valid
+  induction sites with
+  | @body context scope mode statements expected type code syntaxTree body =>
+    intro valid
+    exact ReadyFor.body (context := context) (scope := scope) (mode := mode) (statements := statements) (expected := expected)
+      (type := type) (code := code) (syntaxTree := syntaxTree) (body := body)
+  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form monomorphic extended ordinary projected allocation annotation same remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.uninitialized (context := context) (nextContext := nextContext) (scope := scope) (mode := mode) (id := id)
+      (node := node) (binder := binder) (rest := rest) (expected := expected) (type := type)
+      (body := body) (payload := payload) (found := found) (form := form) (monomorphic := monomorphic)
+      (extended := extended) (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation)
+      (same := same) (remaining := remaining) (remainingErrors := remainingErrors_ih (TypedLexicalControl.valid_extend valid extended))
+  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initialized (context := context) (nextContext := nextContext) (scope := scope) (mode := mode) (id := id)
+      (node := node) (binder := binder) (initializer := initializer) (initializerNode := initializerNode) (lowered := lowered)
+      (body := body) (rest := rest) (expected := expected) (type := type) (found := found)
+      (form := form) (monomorphic := monomorphic) (extended := extended) (ordinary := ordinary) (initializerFound := initializerFound)
+      (sourceType := sourceType) (initial := initial) (allocation := allocation) (annotation := annotation) (same := same)
+      (remaining := remaining) (remainingErrors := remainingErrors_ih (TypedLexicalControl.valid_extend valid extended))
+  | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type body found form notTail expressionFound value remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.discard (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (expression := expression) (expressionNode := expressionNode) (semicolon := semicolon) (rest := rest) (expected := expected)
+      (lowered := lowered) (type := type) (body := body) (found := found) (form := form)
+      (notTail := notTail) (expressionFound := expressionFound) (value := value) (remaining := remaining) (remainingErrors := remainingErrors_ih valid)
+  | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerErrors_ih remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.block (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (statements := statements) (rest := rest) (expected := expected) (type := type) (innerCode := innerCode)
+      (body := body) (found := found) (form := form) (inner := inner) (remaining := remaining)
+      (innerErrors := innerErrors_ih valid) (remainingErrors := remainingErrors_ih valid)
+  | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenTreeErrors elseTreeErrors remainingErrors thenTreeErrors_ih elseTreeErrors_ih remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.ifThen (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (condition := condition) (conditionNode := conditionNode) (thenBody := thenBody) (elseBody := elseBody) (rest := rest)
+      (expected := expected) (type := type) (conditionCode := conditionCode) (thenCode := thenCode) (elseCode := elseCode)
+      (body := body) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType)
+      (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) (remaining := remaining) (thenTreeErrors := thenTreeErrors_ih valid)
+      (elseTreeErrors := elseTreeErrors_ih valid) (remainingErrors := remainingErrors_ih valid)
+  | @breaking context scope mode id node rest expected type found form =>
+    intro valid
+    exact ReadyFor.breaking (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (rest := rest) (expected := expected) (type := type) (found := found) (form := form)
+  | @continuing context scope mode id node rest expected type found form =>
+    intro valid
+    exact ReadyFor.continuing (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (rest := rest) (expected := expected) (type := type) (found := found) (form := form)
+  | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopBody nativeTyped remaining loopBodyErrors remainingErrors loopBodyErrors_ih remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.whileLoop (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (condition := condition) (conditionNode := conditionNode) (statements := statements) (rest := rest) (expected := expected)
+      (type := type) (conditionCode := conditionCode) (loopCode := loopCode) (body := body) (selfReason := selfReason)
+      (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree)
+      (loopBody := loopBody) (nativeTyped := nativeTyped) (remaining := remaining) (loopBodyErrors := loopBodyErrors_ih valid) (remainingErrors := remainingErrors_ih valid)
+  | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.assign (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (assignment := assignment) (operator := operator) (rhs := rhs) (rest := rest) (expected := expected)
+      (type := type) (body := body) (found := found) (form := form) (head := head)
+      (remaining := remaining) (remainingErrors := remainingErrors_ih valid) (headErrors := headErrors)
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.bitNot (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (assignment := assignment) (rest := rest) (expected := expected) (type := type) (body := body)
+      (found := found) (form := form) (head := head) (remaining := remaining) (remainingErrors := remainingErrors_ih valid)
+      (headErrors := headErrors)
+  | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialErrors_ih remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.forLoop (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (initializer := initializer) (condition := condition) (post := post) (statements := statements) (rest := rest)
+      (expected := expected) (type := type) (initialCode := initialCode) (body := body) (found := found)
+      (form := form) (initial := initial) (remaining := remaining) (initialErrors := initialErrors_ih valid) (remainingErrors := remainingErrors_ih valid)
+  | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopBody postTree nativeTyped loopErrors postErrors loopErrors_ih =>
+    intro valid
+    exact ReadyFor.initializersDone (context := context) (scope := scope) (condition := condition) (conditionNode := conditionNode) (post := post)
+      (statements := statements) (expected := expected) (type := type) (conditionCode := conditionCode) (bodyCode := bodyCode)
+      (postCode := postCode) (selfReason := selfReason) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree)
+      (loopBody := loopBody) (postTree := postTree) (nativeTyped := nativeTyped) (loopErrors := loopErrors_ih valid) (postErrors := postErrors)
+  | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type monomorphic extended ordinary projected allocation annotation same remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initializerUninitialized (context := context) (nextContext := nextContext) (scope := scope) (binder := binder) (rest := rest)
+      (body := body) (payload := payload) (condition := condition) (post := post) (statements := statements)
+      (expected := expected) (type := type) (monomorphic := monomorphic) (extended := extended) (ordinary := ordinary)
+      (projected := projected) (allocation := allocation) (annotation := annotation) (same := same) (remaining := remaining)
+      (remainingErrors := remainingErrors_ih (TypedLexicalControl.valid_extend valid extended))
+  | @initializerInitialized context nextContext scope binder initializer initializerNode lowered body rest condition post statements expected type monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initializerInitialized (context := context) (nextContext := nextContext) (scope := scope) (binder := binder) (initializer := initializer)
+      (initializerNode := initializerNode) (lowered := lowered) (body := body) (rest := rest) (condition := condition)
+      (post := post) (statements := statements) (expected := expected) (type := type) (monomorphic := monomorphic)
+      (extended := extended) (ordinary := ordinary) (initializerFound := initializerFound) (sourceType := sourceType) (initial := initial)
+      (allocation := allocation) (annotation := annotation) (same := same) (remaining := remaining) (remainingErrors := remainingErrors_ih (TypedLexicalControl.valid_extend valid extended))
+  | @initializerDiscard context scope expression expressionNode rest lowered body condition post statements expected type found value remaining remainingErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initializerDiscard (context := context) (scope := scope) (expression := expression) (expressionNode := expressionNode) (rest := rest)
+      (lowered := lowered) (body := body) (condition := condition) (post := post) (statements := statements)
+      (expected := expected) (type := type) (found := found) (value := value) (remaining := remaining)
+      (remainingErrors := remainingErrors_ih valid)
+  | @initializerAssign context scope assignment operator rhs rest body condition post statements expected type head remaining remainingErrors headErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initializerAssign (context := context) (scope := scope) (assignment := assignment) (operator := operator) (rhs := rhs)
+      (rest := rest) (body := body) (condition := condition) (post := post) (statements := statements)
+      (expected := expected) (type := type) (head := head) (remaining := remaining) (remainingErrors := remainingErrors_ih valid)
+      (headErrors := headErrors)
+  | @initializerBitNot context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.initializerBitNot (context := context) (scope := scope) (assignment := assignment) (rest := rest) (body := body)
+      (condition := condition) (post := post) (statements := statements) (expected := expected) (type := type)
+      (head := head) (remaining := remaining) (remainingErrors := remainingErrors_ih valid) (headErrors := headErrors)
+  | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining catalog patternContext childErrors remainingErrors childErrors_ih remainingErrors_ih =>
+    intro valid
+    exact ReadyFor.matchWith (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (resolution := resolution) (scrutineeNode := scrutineeNode) (rest := rest) (expected := expected) (type := type)
+      (matched := matched) (body := body) (selfReason := selfReason) (control := control) (caseFacts := caseFacts)
+      (found := found) (form := form) (scrutineeFound := scrutineeFound) (scrutineeTyped := scrutineeTyped) (casesTyped := casesTyped)
+      (defaultTyped := defaultTyped) (compilation := compilation) (sameValues := sameValues) (sameDefinitions := sameDefinitions) (allocator := allocator)
+      (requests := requests) (receipt := receipt) (ordinary := ordinary) (children := children) (remaining := remaining)
+      (patternContext := patternContext.ordinary valid) (childErrors := fun request member childContext related => childErrors_ih request member childContext related (CompatibleMatchContextFactory.scoped_context related valid)) (remainingErrors := remainingErrors_ih valid)
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix unique found form inner stops issued innerErrors innerErrors_ih =>
+    intro valid
+    exact ReadyFor.terminalBlock (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (statements := statements) (rest := rest) (expected := expected) (type := type) (innerCode := innerCode)
+      (suffix := suffix) (unique := unique) (found := found) (form := form) (inner := inner)
+      (stops := stops) (issued := issued) (innerErrors := innerErrors_ih valid)
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenErrors_ih elseErrors_ih =>
+    intro valid
+    exact ReadyFor.terminalIf (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (condition := condition) (conditionNode := conditionNode) (thenBody := thenBody) (elseBody := elseBody) (rest := rest)
+      (expected := expected) (type := type) (conditionCode := conditionCode) (thenCode := thenCode) (elseCode := elseCode)
+      (suffix := suffix) (unique := unique) (found := found) (form := form) (conditionFound := conditionFound)
+      (conditionType := conditionType) (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) (thenStops := thenStops)
+      (elseStops := elseStops) (issued := issued) (thenErrors := thenErrors_ih valid) (elseErrors := elseErrors_ih valid)
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalog patternContext childErrors childErrors_ih =>
+    intro valid
+    exact ReadyFor.terminalMatch (context := context) (scope := scope) (mode := mode) (id := id) (node := node)
+      (resolution := resolution) (scrutineeNode := scrutineeNode) (rest := rest) (expected := expected) (type := type)
+      (matched := matched) (suffix := suffix) (selfReason := selfReason) (control := control) (caseFacts := caseFacts)
+      (unique := unique) (found := found) (form := form) (scrutineeFound := scrutineeFound) (scrutineeTyped := scrutineeTyped)
+      (casesTyped := casesTyped) (defaultTyped := defaultTyped) (compilation := compilation) (sameValues := sameValues) (sameDefinitions := sameDefinitions)
+      (allocator := allocator) (requests := requests) (receipt := receipt) (ordinary := ordinary) (children := children)
+      (stops := stops) (issued := issued) (patternContext := patternContext.ordinary valid) (childErrors := fun request member childContext related => childErrors_ih request member childContext related (CompatibleMatchContextFactory.scoped_context related valid))
 
 end Tree
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeMatch

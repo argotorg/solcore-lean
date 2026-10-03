@@ -131,7 +131,7 @@ end Concrete
 /-- For inclusion supplies the static site evidence without any catalog premise. -/
 abbrev for_without_catalog := @GenericImperativeMatch.Tree.CatalogSites.of_for
 
-/-- Dropping site validity keeps the original diagnostics and exact native code. -/
+/-- The same ordinary root context reconstructs readiness at every actual site. -/
 abbrev same_ready := @GenericImperativeMatch.Tree.CatalogSites.ready
 
 private def content : String := String.intercalate "\n" [
