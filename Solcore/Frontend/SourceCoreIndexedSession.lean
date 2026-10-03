@@ -1611,3 +1611,381 @@ theorem Checkpoint.RootStart.simple_inputs {artifact : Artifact} {session : Sess
   exact ⟨root, encoded.native, selected, related, projected, initial⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+namespace DataInput
+mutual
+  def publicValue : SourceCoreDataValues.Value → Value
+    | .unit => .unit
+    | .bool value => .bool value
+    | .word value => .word value
+    | .integer value => .integer value
+    | .product left right => .product (publicValue left) (publicValue right)
+    | .proxy inner => .proxy inner
+    | .constructed metadata payloads => .constructed metadata (publicValues payloads)
+    | .mapping key value entries => .mapping key value (publicEntries entries)
+  termination_by value => sizeOf value
+  decreasing_by all_goals simp_wf; omega
+
+  def publicValues : List SourceCoreDataValues.Value → List Value
+    | [] => []
+    | head :: tail => publicValue head :: publicValues tail
+  termination_by values => sizeOf values
+  decreasing_by all_goals simp_wf; omega
+
+  def publicEntries : List (SourceCoreDataValues.Value × SourceCoreDataValues.Value) → List (Value × Value)
+    | [] => []
+    | (key, value) :: tail => (publicValue key, publicValue value) :: publicEntries tail
+  termination_by entries => sizeOf entries
+  decreasing_by all_goals simp_wf; omega
+end
+end DataInput
+
+open SourceInference TypeSystem
+
+private theorem data_applyMany_not_function (head : Ty) (arguments : List Ty)
+    (nonfunction : ∀ left right, SourceCoreRawMetadata.runtimeType head ≠ .function left right) :
+    ∀ left right, SourceCoreRawMetadata.runtimeType (Ty.applyMany head arguments) ≠ .function left right := by
+  induction arguments generalizing head with
+  | nil => exact nonfunction
+  | cons argument rest ih =>
+    exact ih (.application head argument) (by intro left right; simp [SourceCoreRawMetadata.runtimeType])
+
+private theorem data_constructor_not_function {registry : SourceCoreRawMetadata.Registry}
+    {expected : Ty} {metadata : DataConstructorInstantiation}
+    (inserted : SourceCoreRawMetadata.Inserted registry expected (.constructor metadata)) :
+    ∀ left right, SourceCoreRawMetadata.runtimeType expected ≠ .function left right := by
+  have authentic := inserted.authenticated
+  change SourceCoreRawMetadata.constructorAuthentic registry.signatures metadata = true at authentic
+  unfold SourceCoreRawMetadata.constructorAuthentic at authentic
+  split at authentic <;> try cases authentic
+  split at authentic <;> try cases authentic
+  split at authentic <;> try cases authentic
+  split at authentic <;> try cases authentic
+  rename_i arguments found
+  simp only [Bool.and_eq_true, decide_eq_true_eq] at authentic
+  rw [inserted.runtime_compatible, SourceCoreRawMetadata.Metadata.type, authentic.2]
+  exact data_applyMany_not_function _ arguments (by intro left right; simp [SourceCoreRawMetadata.runtimeType])
+
+private def RawDataCorrespondence (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (slots : Registry artifact world) (registry : SourceCoreRawMetadata.Registry) (expected : Ty)
+    (carrier : SourceCoreDataValues.Value) (encoded : SourceCoreCompatibleValues.Extended registry Core.Value),
+    encodeRaw authority slots fuel registry expected (DataInput.publicValue carrier) = .ok encoded →
+    SourceCoreCompatibleValues.encodeRaw fuel artifact.recipe.compiled.compatible.checked registry expected carrier = .ok encoded
+
+private def PayloadDataCorrespondence (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (slots : Registry artifact world) (registry : SourceCoreRawMetadata.Registry) (types : List Ty)
+    (carriers : List SourceCoreDataValues.Value) (encoded : SourceCoreCompatibleValues.Extended registry Core.Value),
+    encodePayloads authority slots fuel registry types (DataInput.publicValues carriers) = .ok encoded →
+    ∀ index, SourceCoreCompatibleValues.encodePayloadsRaw fuel artifact.recipe.compiled.compatible.checked
+      registry types carriers index = .ok encoded
+
+private def EntriesDataCorrespondence (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (slots : Registry artifact world) (registry : SourceCoreRawMetadata.Registry) (key value : Ty)
+    (layout : Core.OrderedMapping.Layout) (carriers : List (SourceCoreDataValues.Value × SourceCoreDataValues.Value))
+    (encoded : SourceCoreCompatibleValues.Extended registry Core.Value),
+    encodeEntries authority slots fuel registry key value layout (DataInput.publicEntries carriers) = .ok encoded →
+    ∀ index, SourceCoreCompatibleValues.encodeEntriesRaw fuel artifact.recipe.compiled.compatible.checked
+      registry key value layout carriers index = .ok encoded
+
+private theorem raw_data_succ {fuel : Nat} (raw : RawDataCorrespondence fuel)
+    (payload : PayloadDataCorrespondence fuel) (entries : EntriesDataCorrespondence fuel) :
+    RawDataCorrespondence (fuel + 1) := by
+  intro artifact world authority slots registry expected carrier encoded accepted
+  cases carrier with
+  | unit | bool value | word value | integer value =>
+    simp only [DataInput.publicValue] at accepted
+    cases erased : SourceCoreRawMetadata.runtimeType expected <;>
+      (unfold encodeRaw at accepted; rw [erased] at accepted)
+    all_goals try (solve | cases accepted)
+    case constructor id =>
+      cases id with
+      | declaration => cases accepted
+      | builtin builtin =>
+        cases builtin <;> try (solve | cases accepted)
+        all_goals cases accepted; simp [SourceCoreCompatibleValues.encodeRaw, erased]
+  | product left right =>
+    simp only [DataInput.publicValue] at accepted
+    cases erased : SourceCoreRawMetadata.runtimeType expected <;>
+      (unfold encodeRaw at accepted; rw [erased] at accepted)
+    case product leftType rightType =>
+      obtain ⟨a, aEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨b, bEq, accepted⟩ := root_factory_bind_ok accepted
+      have first := raw authority slots registry leftType left a (simple_mapError_ok aEq)
+      have second := raw authority slots a.registry rightType right b (simple_mapError_ok bEq)
+      cases accepted
+      unfold SourceCoreCompatibleValues.encodeRaw
+      rw [erased]
+      simp only [first, second, Except.mapError, bind, Except.bind, pure, Except.pure]
+    all_goals try (solve | cases accepted)
+    case constructor id => cases id <;> try (solve | cases accepted)
+                           rename_i builtin; cases builtin <;> cases accepted
+  | proxy inner =>
+    simp only [DataInput.publicValue] at accepted
+    cases erased : SourceCoreRawMetadata.runtimeType expected <;>
+      (unfold encodeRaw at accepted; rw [erased] at accepted)
+    case proxy expectedInner => exact simple_mapError_ok accepted
+    all_goals try (solve | cases accepted)
+    case constructor id => cases id <;> try (solve | cases accepted)
+                           rename_i builtin; cases builtin <;> cases accepted
+  | mapping key value carriers =>
+    simp only [DataInput.publicValue] at accepted
+    cases erased : SourceCoreRawMetadata.runtimeType expected <;>
+      (unfold encodeRaw at accepted; rw [erased] at accepted)
+    case mapping keyType valueType =>
+      obtain ⟨inserted, insertEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨layout, layoutEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨encodedEntries, entriesEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨fallback, fallbackEq, accepted⟩ := root_factory_bind_ok accepted
+      have insertedEq := simple_mapError_ok insertEq
+      have selectedLayout := simple_mapError_ok layoutEq
+      have encodedEntriesEq := entries authority slots inserted.registry key value layout carriers encodedEntries entriesEq 0
+      have actualFallback := simple_mapError_ok fallbackEq
+      cases accepted
+      unfold SourceCoreCompatibleValues.encodeRaw
+      rw [erased]
+      simp only [insertedEq, selectedLayout, encodedEntriesEq, actualFallback, Except.mapError, bind, Except.bind, pure, Except.pure]
+    all_goals try (solve | cases accepted)
+    case constructor id => cases id <;> try (solve | cases accepted)
+                           rename_i builtin; cases builtin <;> cases accepted
+  | constructed metadata carriers =>
+    simp only [DataInput.publicValue] at accepted
+    have step : ∀ (inserted : SourceCoreRawMetadata.Inserted registry expected (.constructor metadata))
+        tag (fields : SourceCoreCompatibleValues.Extended inserted.registry Core.Value),
+        registry.intern expected (.constructor metadata) = .ok inserted →
+        artifact.recipe.compiled.compatible.checked.resolveConstructor metadata = .ok tag →
+        encodePayloads authority slots fuel inserted.registry metadata.payloadTypes
+          (DataInput.publicValues carriers) = .ok fields →
+        encoded = ⟨fields.registry, inserted.preserves.trans fields.preserves,
+          .constructed tag (.pair (.word inserted.id) fields.value)⟩ →
+        SourceCoreCompatibleValues.encodeRaw (fuel + 1) artifact.recipe.compiled.compatible.checked
+          registry expected (.constructed metadata carriers) = .ok encoded := by
+      intro inserted tag fields insertedEq resolved fieldsEq same
+      have fieldEncoding := payload authority slots inserted.registry metadata.payloadTypes carriers fields fieldsEq 0
+      have nonfunction := data_constructor_not_function inserted
+      subst encoded
+      cases erased : SourceCoreRawMetadata.runtimeType expected
+      case function left right => exact False.elim (nonfunction left right erased)
+      all_goals
+        unfold SourceCoreCompatibleValues.encodeRaw
+        rw [erased]
+      all_goals try (solve | simp only [insertedEq, resolved, fieldEncoding, Except.mapError, bind, Except.bind, pure, Except.pure])
+    cases erased : SourceCoreRawMetadata.runtimeType expected <;>
+      (unfold encodeRaw at accepted; rw [erased] at accepted)
+    case constructor id =>
+      cases id <;> try (rename_i builtin; cases builtin)
+      all_goals
+        obtain ⟨inserted, insertedEq, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨tag, resolved, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨fields, fieldsEq, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        exact step inserted tag fields (simple_mapError_ok insertedEq) (simple_mapError_ok resolved) fieldsEq rfl
+    all_goals
+      obtain ⟨inserted, insertedEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨tag, resolved, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨fields, fieldsEq, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact step inserted tag fields (simple_mapError_ok insertedEq) (simple_mapError_ok resolved) fieldsEq rfl
+
+private theorem data_payloads_length {fuel index : Nat} {checked : SourceCoreCompatibleCatalog.Checked}
+    {registry : SourceCoreRawMetadata.Registry} {types : List Ty} {carriers : List SourceCoreDataValues.Value}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : SourceCoreCompatibleValues.encodePayloadsRaw fuel checked registry types carriers index = .ok encoded) :
+    types.length = carriers.length := by
+  by_cases same : types.length = carriers.length
+  · exact same
+  · unfold SourceCoreCompatibleValues.encodePayloadsRaw at accepted
+    split at accepted <;> simp_all [throw, throwThe, bind, Except.bind]
+
+private theorem payload_data_succ {fuel : Nat} (raw : RawDataCorrespondence fuel)
+    (payload : PayloadDataCorrespondence fuel) : PayloadDataCorrespondence (fuel + 1) := by
+  intro artifact world authority slots registry types carriers encoded accepted index
+  cases types with
+  | nil => cases carriers with
+    | nil =>
+      simp only [DataInput.publicValues, encodePayloads] at accepted
+      cases accepted
+      unfold SourceCoreCompatibleValues.encodePayloadsRaw
+      simp only [pure, Except.pure]
+      simp
+    | cons head tail => simp only [DataInput.publicValues, encodePayloads] at accepted; cases accepted
+  | cons type types => cases carriers with
+    | nil => simp only [DataInput.publicValues, encodePayloads] at accepted; cases accepted
+    | cons head tail =>
+      cases types with
+      | nil => cases tail with
+        | nil =>
+          simp only [DataInput.publicValues, encodePayloads] at accepted
+          have actual : encodeRaw authority slots fuel registry type (DataInput.publicValue head) = .ok encoded := accepted
+          have encodedEq := raw authority slots registry type head encoded actual
+          unfold SourceCoreCompatibleValues.encodePayloadsRaw
+          simp only [encodedEq, Except.mapError]
+          simp
+        | cons next rest =>
+          simp only [DataInput.publicValues] at accepted
+          unfold encodePayloads at accepted
+          obtain ⟨first, _, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨remaining, remainingEq, accepted⟩ := root_factory_bind_ok accepted
+          have remainingEq := payload authority slots first.registry [] (next :: rest) remaining (by simpa only [DataInput.publicValues] using remainingEq) (index + 1)
+          have size := data_payloads_length remainingEq
+          simp at size
+      | cons nextTypes restTypes => cases tail with
+        | nil =>
+          simp only [DataInput.publicValues] at accepted
+          unfold encodePayloads at accepted
+          obtain ⟨first, _, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨remaining, remainingEq, accepted⟩ := root_factory_bind_ok accepted
+          have remainingEq := payload authority slots first.registry (nextTypes :: restTypes) [] remaining (by simpa only [DataInput.publicValues] using remainingEq) (index + 1)
+          have size := data_payloads_length remainingEq
+          simp at size
+        | cons next rest =>
+          simp only [DataInput.publicValues] at accepted
+          unfold encodePayloads at accepted
+          obtain ⟨first, firstEq, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨remaining, remainingEq, accepted⟩ := root_factory_bind_ok accepted
+          have firstEq := raw authority slots registry type head first firstEq
+          have remainingEq := payload authority slots first.registry (nextTypes :: restTypes) (next :: rest) remaining (by simpa only [DataInput.publicValues] using remainingEq) (index + 1)
+          have size := data_payloads_length remainingEq
+          cases accepted
+          unfold SourceCoreCompatibleValues.encodePayloadsRaw
+          simp only [List.length_cons, size, firstEq, remainingEq, Except.mapError, bind, Except.bind, pure, Except.pure]
+          simp
+
+private theorem entries_data_succ {fuel : Nat} (raw : RawDataCorrespondence fuel)
+    (entries : EntriesDataCorrespondence fuel) : EntriesDataCorrespondence (fuel + 1) := by
+  intro artifact world authority slots registry keyType valueType layout carriers encoded accepted index
+  cases carriers with
+  | nil => simp only [DataInput.publicEntries, encodeEntries] at accepted; cases accepted; unfold SourceCoreCompatibleValues.encodeEntriesRaw; rfl
+  | cons pair rest =>
+    obtain ⟨key, value⟩ := pair
+    simp only [DataInput.publicEntries] at accepted
+    unfold encodeEntries at accepted
+    obtain ⟨keyEncoded, keyEq, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨valueEncoded, valueEq, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨restEncoded, restEq, accepted⟩ := root_factory_bind_ok accepted
+    have keyEq := raw authority slots registry keyType key keyEncoded keyEq
+    have valueEq := raw authority slots keyEncoded.registry valueType value valueEncoded valueEq
+    have restEq := entries authority slots valueEncoded.registry keyType valueType layout rest restEncoded restEq (index + 1)
+    cases accepted
+    unfold SourceCoreCompatibleValues.encodeEntriesRaw
+    simp only [keyEq, valueEq, restEq, Except.mapError, bind, Except.bind, pure, Except.pure]
+
+private theorem data_correspondence (fuel : Nat) : RawDataCorrespondence fuel ∧
+    PayloadDataCorrespondence fuel ∧ EntriesDataCorrespondence fuel := by
+  induction fuel with
+  | zero =>
+    refine ⟨?_, ?_, ?_⟩
+    · intro artifact world authority slots registry expected carrier encoded accepted
+      cases accepted
+    · intro artifact world authority slots registry types carriers encoded accepted index
+      cases types <;> cases carriers <;>
+        simp_all [encodePayloads, DataInput.publicValues, SourceCoreCompatibleValues.encodePayloadsRaw,
+          SourceCoreCompatibleValues.Extended.pure, pure, Except.pure, throw, throwThe]
+    · intro artifact world authority slots registry key value layout carriers encoded accepted index
+      cases carriers with
+      | nil => simp only [DataInput.publicEntries, encodeEntries] at accepted; cases accepted; unfold SourceCoreCompatibleValues.encodeEntriesRaw; rfl
+      | cons pair rest =>
+        cases pair
+        simp only [DataInput.publicEntries, encodeEntries] at accepted
+        cases accepted
+  | succ fuel ih =>
+    exact ⟨raw_data_succ ih.1 ih.2.1 ih.2.2, payload_data_succ ih.1 ih.2.1, entries_data_succ ih.1 ih.2.2⟩
+
+/-- Data inputs retain constructor metadata and ordered mapping entries exactly.
+The existence of this carrier excludes opaque handles recursively. -/
+def DataPublic (value : Value) : Prop := ∃ carrier, value = DataInput.publicValue carrier
+
+/-- This graph records successful execution of the actual compatible data
+codec under its original registry, followed by the real final extension. -/
+def EncodedDataInput (checked : SourceCoreCompatibleCatalog.Checked)
+    (registry : SourceCoreRawMetadata.Registry) (expected : Ty) (value : Value) (native : Core.Value) : Prop :=
+  ∃ (carrier : SourceCoreDataValues.Value) (fuel : Nat) (before : SourceCoreRawMetadata.Registry)
+    (encoded : SourceCoreCompatibleValues.Extended before Core.Value),
+    value = DataInput.publicValue carrier ∧ before.signatures = checked.signatures ∧
+    SourceCoreCompatibleValues.encodeRaw fuel checked before expected carrier = .ok encoded ∧
+    encoded.value = native ∧ SourceCoreRawMetadata.Extends encoded.registry registry
+
+inductive EncodedDataInputs (checked : SourceCoreCompatibleCatalog.Checked)
+    (registry : SourceCoreRawMetadata.Registry) : List Ty → List Value → Core.Environment → Prop where
+  | nil : EncodedDataInputs checked registry [] [] []
+  | cons {expected : Ty} {value : Value} {native : Core.Value}
+      {types : List Ty} {values : List Value} {natives : Core.Environment}
+      (head : EncodedDataInput checked registry expected value native)
+      (tail : EncodedDataInputs checked registry types values natives) :
+      EncodedDataInputs checked registry (expected :: types) (value :: values) (native :: natives)
+
+private theorem data_arguments {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List Ty} {types : List Core.Ty} {arguments : List Value}
+    {encoded : Arguments artifact world types}
+    (data : ∀ argument ∈ arguments, DataPublic argument)
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
+    EncodedDataInputs artifact.recipe.compiled.compatible.checked encoded.values.registry
+      sourceTypes arguments encoded.native ∧
+    sourceTypes.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok types ∧
+    SourceCoreRawMetadata.Extends values.registry encoded.values.registry := by
+  induction sourceTypes generalizing types arguments values encoded with
+  | nil =>
+    cases types <;> cases arguments <;> try (solve | cases accepted)
+    cases accepted
+    exact ⟨.nil, rfl, .refl _⟩
+  | cons expected rest ih =>
+    cases types with
+    | nil => cases accepted
+    | cons type types =>
+      cases arguments with
+      | nil => cases accepted
+      | cons argument arguments =>
+        obtain ⟨carrier, carrierEq⟩ := data argument (by simp)
+        have tail : ∀ value ∈ arguments, DataPublic value :=
+          fun value member => data value (List.mem_cons_of_mem _ member)
+        simp only [encodeArguments] at accepted
+        cases projected : artifact.recipe.compiled.compatible.checked.catalog.project expected with
+        | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+        | ok actual =>
+          simp only [projected, bind, Except.bind] at accepted
+          split at accepted
+          · rename_i same
+            subst actual
+            obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+            obtain ⟨validated, _, accepted⟩ := root_factory_bind_ok accepted
+            obtain ⟨encodedTail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+            cases accepted
+            obtain ⟨relatedTail, projectedTail, extendedTail⟩ := ih tail tailEq
+            have correspondence := (data_correspondence fuel).1 authority slots values.registry expected carrier raw
+              (by rw [← carrierEq]; exact rawEq)
+            have beforeOwner : values.registry.signatures = artifact.recipe.compiled.compatible.checked.signatures :=
+              values.registryOwner.trans (congrArg SourceCoreCompatibleCatalog.Checked.signatures owner)
+            refine ⟨.cons ⟨carrier, fuel, values.registry, raw, carrierEq, beforeOwner,
+              correspondence, rfl, extendedTail⟩ relatedTail, ?_, raw.preserves.trans extendedTail⟩
+            simp [List.mapM_cons, projected, projectedTail, bind, Except.bind]
+          · simp [throw, throwThe] at accepted
+
+/-- Same actual root, exact native input prefix and final metadata registry,
+expressed as a proposition without a private-state accessor. -/
+def Checkpoint.DataInputs {artifact : Artifact} (session : Session artifact)
+    (key : Key) (arguments : List Value) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ (root : Root artifact.recipe.compiled) (native : Core.Environment),
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    EncodedDataInputs artifact.recipe.compiled.compatible.checked checkpoint.values.registry
+      root.inputs arguments native ∧
+    root.inputs.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok root.types ∧
+    checkpoint.state = .initial root.body (native.reverse ++ environment artifact) session.store
+
+/-- Accepted public startup supplies real data encoder equations for every
+argument, including constructors, mappings, proxies and nested products. -/
+theorem Checkpoint.RootStart.data_inputs {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments fuel)
+    (data : ∀ argument ∈ arguments, DataPublic argument) : checkpoint.DataInputs session key arguments := by
+  obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, sameValues⟩ := receipt
+  obtain ⟨related, projected, _⟩ := data_arguments data accepted
+  rw [← sameValues] at related
+  exact ⟨root, encoded.native, selected, related, projected, initial⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
