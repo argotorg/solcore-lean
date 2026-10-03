@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinMeaning
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
 
 /-! A recursive expression grammar with an open static call-head interface.
 Each node retains a finite list of child compiler results. The children are
@@ -48,6 +49,10 @@ inductive Head (calls : CallHeads) (values : ValuesContext) (source : TypedSourc
       Head calls values source context reasonAt children scope id code
   | call {id code} (head : calls children scope id code) :
       Head calls values source context reasonAt children scope id code
+  | tuple {id node ids types codes}
+      (receipt : CompatibleExpressionTuples.Header values source id node ids types codes)
+      (sequence : DataExpressionSequence.Tree source children scope ids types codes) :
+      Head calls values source context reasonAt children scope id (SourceCoreCalls.packArguments codes)
 
 inductive Tree (calls : CallHeads) (fuel : Nat) (values : ValuesContext) (source : TypedSource)
     (context : SourceSemantics.Context) (solved : List SolvedRequirement)

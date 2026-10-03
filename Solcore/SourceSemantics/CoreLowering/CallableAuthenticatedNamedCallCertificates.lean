@@ -154,6 +154,9 @@ theorem tree_projected {readFuel : Nat} {source : TypedSource} {context : Source
       | contracted metadata _ _ _ _ =>
         have same := Option.some.inj (metadata.found.symm.trans found)
         exact same ▸ metadata.projected
+    | tuple receipt _ =>
+      have same := Option.some.inj (receipt.metadata.found.symm.trans found)
+      exact same ▸ receipt.metadata.projected
     | call call =>
       cases call with
       | direct receipt certified metadata _ =>

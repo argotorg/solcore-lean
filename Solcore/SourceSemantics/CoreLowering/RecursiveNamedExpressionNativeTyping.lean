@@ -101,6 +101,7 @@ theorem tree_native
     | index header _ _ _ first second => exact index_native header (children _ _ first) (children _ _ second) (reasonAt _)
     | builtin head => exact BuiltinCallNativeTyping.Head.native head children
     | call head => exact named_native slots head children
+    | tuple _ sequence => exact packed_native sequence children
 
 include shaped complete slots in
 theorem tree_native_at {definitions : DataEnvironment}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedTupleHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedDataExpressionHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
@@ -71,6 +72,9 @@ theorem head_preserves_at (budget size : Nat) (within : size ≤ budget)
   | builtin head =>
     exact RecursiveNamedBuiltinHeadBounds.Head.preserves_at functions functionLeaves program evidence unique
       entry_transport budget size within children head
+  | tuple receipt sequence =>
+    exact RecursiveNamedTupleHeadBounds.preserves_at functions program evidence entry_transport budget size within unique children
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
   | call head =>
     exact RecursiveNamedExpressionHeadBounds.preserves_at functions budget size within unique owners
       (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
@@ -109,6 +113,9 @@ theorem head_reflects_at (budget size : Nat) (within : size ≤ budget)
   | builtin head =>
     exact RecursiveNamedBuiltinHeadBounds.Head.reflects_at functions functionLeaves program evidence
       entry_transport budget size within children head
+  | tuple receipt sequence =>
+    exact RecursiveNamedTupleHeadBounds.reflects_at functions program evidence entry_transport budget size within children
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
   | call head =>
     exact RecursiveNamedExpressionHeadBounds.reflects_at functions budget size within
       (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head

@@ -234,6 +234,9 @@ theorem Head.preserves
   | primitive head => exact ProtectedExpressionCompositions.Head.preserves functions program evidence transport unique meaning head
   | builtin head => exact ProtectedBuiltinCalls.Head.preserves functions functionLeaves program evidence unique transport meaning head
   | call head => exact callMeaning meaning head
+  | tuple receipt sequence =>
+    exact CompatibleExpressionTuples.preserves functions program evidence transport unique meaning
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
   | @constructor node instantiation ids tag header codes receipt form valid sequence =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped installedEntry trace
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
@@ -364,6 +367,9 @@ theorem Head.reflects
   | primitive head => exact ProtectedExpressionCompositions.Head.reflects functions program evidence transport meaning head
   | builtin head => exact ProtectedBuiltinCalls.Head.reflects functions functionLeaves program evidence transport meaning head
   | call head => exact callMeaning meaning head
+  | tuple receipt sequence =>
+    exact CompatibleExpressionTuples.reflects functions program evidence transport meaning
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
   | @constructor node instantiation ids tag header codes receipt form valid sequence =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped installedEntry evaluated
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
