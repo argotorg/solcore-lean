@@ -489,6 +489,14 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeSourceBound
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionSelectionIdentity
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionSelectedInvocation
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogBodyFinishBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMutualMeaning
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
