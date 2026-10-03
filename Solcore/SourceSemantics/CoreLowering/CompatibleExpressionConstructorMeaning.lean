@@ -7,6 +7,43 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructors
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload DataPatternValues
 
+variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word} {scope : Scope}
+
+/-- Static leaf support indexes the existing tree and its exact children.
+It contains only leaf membership, with no execution or heap law. -/
+inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
+    {id : ExpressionId} → {lowered : SourceCoreBasic.LoweredExpr} →
+    Tree fuel values source context solved reasonAt scope id lowered → Prop where
+  | fragment {id lowered}
+      (tree : CompatibleExpressionConditionals.Tree fuel values source context solved reasonAt scope id lowered)
+      (treeSites : CompatibleExpressionConditionals.Tree.LiteralSites literals tree) :
+      LiteralSites literals (Tree.fragment (scope := scope) tree)
+  | constructor {id node instantiation ids tag header codes}
+      (receipt : Header values source id node instantiation tag header codes)
+      (form : node.form = .constructor instantiation ids)
+      (valid : SourceSemantics.DataConstructorInstantiation.Valid context instantiation)
+      (count : ids.length = instantiation.payloadTypes.length)
+      (nodes : Nodes source ids instantiation.payloadTypes codes)
+      (children : ∀ child code, (child, code) ∈ ids.zip codes →
+        Tree fuel values source context solved reasonAt scope child code)
+      (childrenSites : ∀ child code (member : (child, code) ∈ ids.zip codes),
+        Tree.LiteralSites literals (children child code member)) :
+      LiteralSites literals (Tree.constructor (scope := scope) receipt form valid count nodes children)
+
+/-- The exact old tree restricted to the supplied static leaf certificates. -/
+def Tree.WithLiterals (literals : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun current id lowered => ∃ tree : Tree fuel values source context solved reasonAt current id lowered,
+    tree.LiteralSites literals
+
+/-- Ordinary literal membership supplies support for every original tree. -/
+theorem Tree.literalSites {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree fuel values source context solved reasonAt scope id lowered) :
+    tree.LiteralSites (fun _ id code => CompatibleExpressionLiterals.Certificate solved source id code) := by
+  induction tree with
+  | fragment tree => exact .fragment tree tree.literalSites
+  | constructor receipt form valid count nodes children childrenIH => exact .constructor receipt form valid count nodes children childrenIH
+
 private def Children (scope : Scope) (ids : List ExpressionId) (codes : List SourceCoreBasic.LoweredExpr) :
     GenericExpressionMeaning.Certificate := fun current id code => current = scope ∧ (id, code) ∈ ids.zip codes
 
@@ -47,18 +84,22 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends values.registry registry)
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  {literals : GenericExpressionMeaning.Certificate}
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
-include extension contextValid unique uninitialized in
-theorem preserves :
+include extension unique uninitialized in
+theorem preserves_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
-  intro scope id lowered tree
-  induction tree with
-  | fragment child =>
-    exact CompatibleExpressionConditionals.preserves functions extension program evidence contextValid unique uninitialized child
-  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children ih =>
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | fragment child treeSites =>
+    exact CompatibleExpressionConditionals.preserves_with_literals functions extension program evidence unique uninitialized literalMeaning ⟨child, treeSites⟩
+  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children childrenSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
     subst root
@@ -86,15 +127,26 @@ theorem preserves :
       exact ⟨_, finalStore, finalMap, finalWorld, by rw [construct_rename]; exact construct_failure tag header evaluated,
         .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
 
-include extension contextValid uninitialized in
-theorem reflects :
-    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include extension contextValid unique uninitialized in
+theorem preserves :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
-  induction tree with
-  | fragment child =>
-    exact CompatibleExpressionConditionals.reflects functions extension program evidence contextValid uninitialized child
-  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children ih =>
+  exact preserves_with_literals functions extension program evidence unique uninitialized
+    (CompatibleExpressionLiterals.preserves functions program context evidence contextValid unique faults) ⟨tree, tree.literalSites⟩
+
+include extension uninitialized in
+theorem reflects_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | fragment child treeSites =>
+    exact CompatibleExpressionConditionals.reflects_with_literals functions extension program evidence uninitialized literalMeaning ⟨child, treeSites⟩
+  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children childrenSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
     subst root
@@ -128,5 +180,13 @@ theorem reflects :
         rw [receipt.sourceType]
         exact .value (.constructed (receipt.original.extend extension) (extension.signatures.trans values.registryOwner)
           receipt.selected projected receipt.registered (valuesRep payloads))
+
+include extension contextValid uninitialized in
+theorem reflects :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  intro scope id lowered tree
+  exact reflects_with_literals functions extension program evidence uninitialized
+    (CompatibleExpressionLiterals.reflects functions program context evidence contextValid source faults) ⟨tree, tree.literalSites⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructors

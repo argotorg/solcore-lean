@@ -7,6 +7,40 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMembers
 open Core Frontend SourceInference CompatibleExpressionReads GeneralHeap ReadOnly DataPatternValues CompatiblePayload
 
+variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word} {scope : Scope}
+
+/-- Static leaf support indexes the existing tree and its exact children.
+It contains only leaf membership, with no execution or heap law. -/
+inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
+    {id : ExpressionId} → {lowered : SourceCoreBasic.LoweredExpr} →
+    Tree fuel values source context solved reasonAt scope id lowered → Prop where
+  | fragment {id lowered}
+      (tree : CompatibleExpressionConstructors.Tree fuel values source context solved reasonAt scope id lowered)
+      (treeSites : CompatibleExpressionConstructors.Tree.LiteralSites literals tree) :
+      LiteralSites literals (Tree.fragment (scope := scope) tree)
+  | member {id node base baseNode name index identity branches result child}
+      (metadata : Metadata values.checked source id node result)
+      (baseMetadata : Metadata values.checked source base baseNode child.type)
+      (form : node.form = .member base name index)
+      (layout : Layout values.checked (.occurrence id.occurrence) baseNode.type node.type index identity branches result)
+      (childTree : Tree fuel values source context solved reasonAt scope base child)
+      (childTreeSites : Tree.LiteralSites literals childTree) :
+      LiteralSites literals (Tree.member (scope := scope) metadata baseMetadata form layout childTree)
+
+/-- The exact old tree restricted to the supplied static leaf certificates. -/
+def Tree.WithLiterals (literals : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun current id lowered => ∃ tree : Tree fuel values source context solved reasonAt current id lowered,
+    tree.LiteralSites literals
+
+/-- Ordinary literal membership supplies support for every original tree. -/
+theorem Tree.literalSites {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree fuel values source context solved reasonAt scope id lowered) :
+    tree.LiteralSites (fun _ id code => CompatibleExpressionLiterals.Certificate solved source id code) := by
+  induction tree with
+  | fragment tree => exact .fragment tree tree.literalSites
+  | member metadata baseMetadata form layout childTree childTreeIH => exact .member metadata baseMetadata form layout childTree childTreeIH
+
 private theorem projectPacked_rename (types : List Ty) (index : Nat) (bundle : Expr) (ξ : Renaming) :
     (SourceCoreDataExpressions.projectPacked index types bundle).rename ξ =
       SourceCoreDataExpressions.projectPacked index types (bundle.rename ξ) := by
@@ -79,17 +113,21 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends values.registry registry)
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  {literals : GenericExpressionMeaning.Certificate}
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
-include extension contextValid unique uninitialized in
-theorem preserves :
+include extension unique uninitialized in
+theorem preserves_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
-  intro scope id lowered tree
-  induction tree with
-  | fragment child => exact CompatibleExpressionConstructors.preserves functions extension program evidence contextValid unique uninitialized child
-  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree ih =>
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | fragment child treeSites => exact CompatibleExpressionConstructors.preserves_with_literals functions extension program evidence unique uninitialized literalMeaning ⟨child, treeSites⟩
+  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -130,14 +168,25 @@ theorem preserves :
         cases shape
         exact False.elim (missing_excludes missing selected)
 
-include extension contextValid uninitialized in
-theorem reflects :
-    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include extension contextValid unique uninitialized in
+theorem preserves :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
-  induction tree with
-  | fragment child => exact CompatibleExpressionConstructors.reflects functions extension program evidence contextValid uninitialized child
-  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree ih =>
+  exact preserves_with_literals functions extension program evidence unique uninitialized
+    (CompatibleExpressionLiterals.preserves functions program context evidence contextValid unique faults) ⟨tree, tree.literalSites⟩
+
+include extension uninitialized in
+theorem reflects_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | fragment child treeSites => exact CompatibleExpressionConstructors.reflects_with_literals functions extension program evidence uninitialized literalMeaning ⟨child, treeSites⟩
+  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -167,5 +216,13 @@ theorem reflects :
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, member_intro metadata form (.value childTrace sourceAt), .value related,
             finalHeaps, maps, worlds, frame, heapMetadata⟩
+
+include extension contextValid uninitialized in
+theorem reflects :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  intro scope id lowered tree
+  exact reflects_with_literals functions extension program evidence uninitialized
+    (CompatibleExpressionLiterals.reflects functions program context evidence contextValid source faults) ⟨tree, tree.literalSites⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMembers
