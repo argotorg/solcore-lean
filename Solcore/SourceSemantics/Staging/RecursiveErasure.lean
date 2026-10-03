@@ -123,6 +123,36 @@ private theorem body_result {program : Program} {registry : Registry} {scope chi
     | semantic reason =>
       exact ⟨function.evidence, .closureBody rfl valid parameters allocate (by simpa only [StatementsPlain, source, evidence] using body)⟩
 
+private theorem global_body_result {program : Program} {registry : Registry} {scope child : Scope}
+    {context bodyContext finalContext : Context} {before bound after : Heap} {function : GlobalFunction}
+    {bodyInstance : BodyInstance} {roots : List StatementId} {arguments : List Value}
+    {environment : Environment} {parameterTypes : List TypeSystem.Ty} {outcome : BodyOutcome} {result : Outcome}
+    (instantiates : FunctionInstantiates program function.instantiation bodyInstance)
+    (covers : function.evidence.Covers bodyInstance.context)
+    (rootsEq : StatementRoots bodyInstance.source.roots roots)
+    (selected : registry.Closure (globalView bodyInstance function.evidence roots) child)
+    (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+    (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
+    (body : StatementsPlain program child bodyContext environment bound roots finalContext outcome after)
+    (resultRule : BodyResult bodyInstance.resultType outcome result) :
+    AppliesPlain program scope context before (.global function) arguments result after := by
+  have source : child.source = bodyInstance.source := registry.source selected
+  have evidence : child.evidence = function.evidence := registry.evidence selected
+  generalize typeEq : bodyInstance.resultType = type at resultRule
+  cases resultRule with
+  | returned =>
+    exact ⟨function.evidence, .global instantiates rfl covers
+      (.returned covers rootsEq parameters allocate (by simpa only [StatementsPlain, source, evidence] using body) rfl)⟩
+  | unit =>
+    exact ⟨function.evidence, .global instantiates rfl covers
+      (.unit covers typeEq rootsEq parameters allocate (by simpa only [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩)⟩
+  | @fault _ failure =>
+    cases failure with
+    | stage => trivial
+    | semantic reason =>
+      exact ⟨function.evidence, .globalBody instantiates rfl
+        (.statements rootsEq parameters allocate (by simpa only [StatementsPlain, source, evidence] using body))⟩
+
 private theorem projection {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
     (trace : Expression program registry scope context environment before id outcome after) :
@@ -214,6 +244,9 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
   case builtinArity mismatch => exact ⟨[], .builtinArity mismatch⟩
   case builtinType arity mismatch => exact ⟨[], .builtinArgumentType arity mismatch⟩
   case closureArity mismatch => exact ⟨[], .closureArity mismatch⟩
+  case globalArity instantiates mismatch => exact ⟨[], .globalArity instantiates mismatch⟩
+  case global instantiates covers roots selected parameters allocate body result ih =>
+    exact global_body_result instantiates covers roots selected parameters allocate ih result
   case closure selected valid parameters allocate body result ih => exact body_result selected valid parameters allocate ih result
   case nil => exact FunctionStatementsExecute.nil
   case returnUnit contains form => exact terminal contains (by intro e; simp [form]) (.returnUnit contains form)

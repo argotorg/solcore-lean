@@ -5,9 +5,9 @@ uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, binary tuples, conditionals,
-indirect calls without argument/output coercions, builtins, and closure bodies
+indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, discard, and returns. It deliberately has no plain
-Dynamic fallback for unsupported expressions or bodies. Global/method calls,
+Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
 coercion paths, assignments, and loops require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
@@ -19,6 +19,18 @@ inductive BodyResult : TypeSystem.Ty → BodyOutcome → Outcome → Prop where
   | returned {type value} : BodyResult type (.returned value) (.value value)
   | unit {environment} : BodyResult .unit (.fallthrough environment) (.value .unit)
   | fault {type failure} : BodyResult type (.fault failure) (.fault failure)
+
+/-- A named body has an empty lexical capture and its independent full
+invocation dictionary. This view is not itself a global callable identity;
+global application also requires genuine program instantiation and Covers. -/
+def globalView (body : BodyInstance) (evidence : EvidenceEnvironment) (roots : List StatementId) : Closure where
+  parameters := body.source.inputs
+  resultType := body.resultType
+  body := roots
+  source := body.source
+  captured := []
+  context := body.context
+  evidence := evidence
 
 mutual
   inductive Expression (program : Program) (registry : Registry) :
@@ -134,6 +146,22 @@ mutual
         (mismatch : function.parameters.length ≠ arguments.length) :
         Applies program registry scope context heap (.closure function) arguments
           (.fault (.semantic (.argumentArityMismatch function.parameters.length arguments.length))) heap
+    | globalArity {scope context heap function arguments bodyInstance}
+        (instantiates : FunctionInstantiates program function.instantiation bodyInstance)
+        (mismatch : bodyInstance.source.inputs.length ≠ arguments.length) :
+        Applies program registry scope context heap (.global function) arguments
+          (.fault (.semantic (.argumentArityMismatch bodyInstance.source.inputs.length arguments.length))) heap
+    | global {scope context before bound after function arguments environment
+          parameterTypes bodyContext finalContext bodyInstance roots child outcome result}
+        (instantiates : FunctionInstantiates program function.instantiation bodyInstance)
+        (covers : function.evidence.Covers bodyInstance.context)
+        (rootsEq : StatementRoots bodyInstance.source.roots roots)
+        (selected : registry.Closure (globalView bodyInstance function.evidence roots) child)
+        (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+        (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
+        (body : Statements program registry child bodyContext environment bound roots finalContext outcome after)
+        (resultRule : BodyResult bodyInstance.resultType outcome result) :
+        Applies program registry scope context before (.global function) arguments result after
     | closure {scope context before bound after function arguments environment parameterTypes bodyContext finalContext child outcome result}
         (selected : registry.Closure function child)
         (valid : ClosureFrame program function)

@@ -48,6 +48,9 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case global instantiates covers roots selected parameters allocate body result ih =>
+      intro s c r same
+      exact ih s c r (body_result_stage result same)
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -72,6 +75,9 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case global instantiates covers roots selected parameters allocate body result ih =>
+      intro s c r same
+      exact ih s c r (body_result_stage result same)
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -96,6 +102,9 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case global instantiates covers roots selected parameters allocate body result ih =>
+      intro s c r same
+      exact ih s c r (body_result_stage result same)
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -121,6 +130,9 @@ theorem Statements.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case global instantiates covers roots selected parameters allocate body result ih =>
+      intro s c r same
+      exact ih s c r (body_result_stage result same)
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
