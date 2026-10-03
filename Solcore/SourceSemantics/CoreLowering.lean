@@ -520,6 +520,11 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCachedRows
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitialization
 import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuations
 import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuationMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceContextFacts
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
+import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
