@@ -363,6 +363,10 @@ import Solcore.Test.SourceCoreCompatibleRuntimeContextValidity
 import Solcore.Test.SourceCoreRecursiveNamedImperativeMatchSyntax
 import Solcore.Test.SourceCoreRecursiveNamedExpressionRuntimeBounds
 import Solcore.Test.SourceCoreCompatiblePatternRuntime
+import Solcore.Test.SourceCoreCompatibleMatchRuntimeSelection
+import Solcore.Test.SourceCoreRecursiveNamedWhileRuntimeBounds
+import Solcore.Test.SourceCoreRecursiveNamedCatalogRuntimeMatchProfiles
+import Solcore.Test.SourceCoreRecursiveNamedPublicSimpleInputs
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2876,6 +2880,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCompatiblePatternLiteralRuntime.run
   SourceCoreRecursiveNamedImperativeMatchSyntax.run
   SourceCoreCompatiblePatternRuntime.run
+  SourceCoreCompatibleMatchRuntimeSelection.run
+  SourceCoreRecursiveNamedWhileRuntimeBounds.run
+  SourceCoreRecursiveNamedPublicSimpleInputs.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
