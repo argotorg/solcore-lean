@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMemberCertificates
 
 /-! The actual compatible member branch supplies its static tree. Independent
@@ -64,14 +65,14 @@ theorem member_of_functions
           by simpa only [Nat.min_self] using generated⟩
   · simp [owner, bind, Except.bind] at accepted
 
-theorem tree_of_functions
+theorem tree_of_functions_with_validity
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
     (unique : NodeOccurrencesUnique source)
     (declarations : ScopeDeclarations source scope sourceContext)
     (signatures : sourceContext.signatures = values.checked.signatures)
-    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (Syntax source))
     (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
     (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
     {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
@@ -81,7 +82,7 @@ theorem tree_of_functions
     Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
   | fragment syntaxTree =>
-    refine .fragment (CompatibleExpressionConstructors.tree_of_functions unique declarations closed residual ?_ ?_ syntaxTree found typed accepted)
+    refine .fragment (CompatibleExpressionConstructors.tree_of_functions_with_validity unique declarations (constructorValid.restrict (fun _ child => .fragment child)) ?_ ?_ syntaxTree found typed accepted)
     · exact ⟨fun id child => policyFor.special id (.fragment child), fun id child => policyFor.read id (.fragment child), policyFor.lower, policyFor.leaf⟩
     · exact fun id node child => coercions id node (.fragment child)
   | @member id original base name index originalFound form child ih =>
@@ -100,5 +101,28 @@ theorem tree_of_functions
           (policyFor.special _ (.member originalFound form child))
           (policyFor.read _ (.member originalFound form child)) policyFor.leaf accepted
       exact .member metadata baseMetadata form layout (ih baseFound baseTyped generated)
+
+/-- Compatibility with the former false residual scope. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : ScopeDeclarations source scope sourceContext)
+    (signatures : sourceContext.signatures = values.checked.signatures)
+    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node) (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_functions_with_validity (policy := policy) (body := body) (readFuel := readFuel)
+    (context := context) (values := values) (source := source) (scope := scope) (reasonAt := reasonAt)
+    (sourceContext := sourceContext) (unique := unique) (declarations := declarations) (signatures := signatures)
+    (constructorValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (policyFor := policyFor) (coercions := coercions) (id := id) (syntaxTree := syntaxTree) (node := node)
+    (found := found) (typed := typed) (fuel := fuel) (lowered := lowered) (accepted := accepted)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMembers

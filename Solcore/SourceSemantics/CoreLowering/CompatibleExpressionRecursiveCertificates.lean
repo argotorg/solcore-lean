@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionRecursiveMeaning
 
 /-! Successful ordinary Functions lowering extracts the full recursive data
@@ -235,7 +236,7 @@ private theorem child_trees
 
 /-- Actual successful lowering and independent source typing supply every
 child certificate. No semantic child assumption is part of this extraction. -/
-theorem tree_of_functions
+theorem tree_of_functions_with_validity
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
@@ -243,7 +244,7 @@ theorem tree_of_functions
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
     (signatures : sourceContext.signatures = values.checked.signatures)
-    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (Syntax source))
     (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
     (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
     {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
@@ -254,7 +255,7 @@ theorem tree_of_functions
     Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
   | fragment syntaxTree =>
-    refine .fragment (CompatibleExpressionMembers.tree_of_functions unique declarations signatures closed residual ?_ ?_ syntaxTree found typed accepted)
+    refine .fragment (CompatibleExpressionMembers.tree_of_functions_with_validity unique declarations signatures (constructorValid.restrict (fun _ child => .fragment child)) ?_ ?_ syntaxTree found typed accepted)
     · exact ⟨fun id child => policyFor.special id (.fragment child),
         fun id child => policyFor.read id (.fragment child), policyFor.lower, policyFor.leaf⟩
     · exact fun id node child => coercions id node (.fragment child)
@@ -370,7 +371,7 @@ theorem tree_of_functions
       obtain ⟨admissible, argumentsTyped, sourceType⟩ := constructor_source_types unique originalFound form receipt.metadata.coercions typed
       obtain ⟨nodes, childTrees⟩ := child_trees unique argumentsTyped arguments
         (fun id member node code found typed generated => ih id member found typed generated)
-      exact .constructor receipt form (admissible.toValid closed residual) count nodes childTrees
+      exact .constructor receipt form (constructorValid _ _ _ _ (.constructor originalFound form children) originalFound form admissible) count nodes childTrees
 
   | @member id original base name index originalFound form child ih =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -388,5 +389,30 @@ theorem tree_of_functions
           (policyFor.special _ (.member originalFound form child))
           (policyFor.read _ (.member originalFound form child)) policyFor.leaf accepted
       exact .member metadata baseMetadata form layout (ih baseFound baseTyped generated)
+
+/-- Compatibility with the former false residual scope. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (signatures : sourceContext.signatures = values.checked.signatures)
+    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_functions_with_validity (policy := policy) (body := body) (readFuel := readFuel)
+    (context := context) (values := values) (source := source) (scope := scope) (reasonAt := reasonAt)
+    (sourceContext := sourceContext) (unique := unique) (declarations := declarations) (signatures := signatures)
+    (constructorValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (policyFor := policyFor) (coercions := coercions) (id := id) (syntaxTree := syntaxTree) (node := node)
+    (found := found) (typed := typed) (fuel := fuel) (lowered := lowered) (accepted := accepted)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionRecursive

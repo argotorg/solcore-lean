@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorMeaning
 
 /-! Actual successful Functions lowering supplies recursive constructor
@@ -99,15 +100,15 @@ private theorem child_trees
         · cases same; exact child
         · exact children other otherCode remaining
 
-/-- The closed lexical type-variable condition belongs to independent source
-constructor validity; it is not inferred from equal native representations. -/
-theorem tree_of_functions
+/-- Independent source instantiation validity is consumed at each stored
+constructor occurrence; native representations do not supply this law. -/
+theorem tree_of_functions_with_validity
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
-    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (Syntax source))
     (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
     (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
     {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
@@ -132,6 +133,28 @@ theorem tree_of_functions
       obtain ⟨admissible, argumentsTyped, sourceType⟩ := constructor_source_types unique originalFound form receipt.metadata.coercions typed
       obtain ⟨nodes, childTrees⟩ := child_trees unique argumentsTyped arguments
         (fun id member node code found typed generated => ih id member found typed generated)
-      exact .constructor receipt form (admissible.toValid closed residual) count nodes childTrees
+      exact .constructor receipt form (constructorValid _ _ _ _ (.constructor originalFound form children) originalFound form admissible) count nodes childTrees
+
+/-- Compatibility with the former false residual scope. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node) (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_functions_with_validity (policy := policy) (body := body) (readFuel := readFuel)
+    (context := context) (values := values) (source := source) (scope := scope) (reasonAt := reasonAt)
+    (sourceContext := sourceContext) (unique := unique) (declarations := declarations)
+    (constructorValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (policyFor := policyFor) (coercions := coercions) (id := id) (syntaxTree := syntaxTree) (node := node)
+    (found := found) (typed := typed) (fuel := fuel) (lowered := lowered) (accepted := accepted)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructors

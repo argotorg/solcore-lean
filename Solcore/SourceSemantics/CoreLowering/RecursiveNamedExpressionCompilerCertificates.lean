@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallSelectionCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualBuiltins
 
@@ -330,7 +331,8 @@ private theorem named_source_types {source : TypedSource} {context : SourceSeman
     (sourceTypes : SourceTypes headers context) (member : header ∈ headers)
     (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
     (form : node.form = .call callee arguments (.declaration header.instantiation)) (coercions : node.coercions = [])
-    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (validInstantiation : SourceSemantics.DeclarationInstantiation.Admissible context header.instantiation →
+      SourceSemantics.DeclarationInstantiation.Valid context header.instantiation)
     (typed : ExpressionHasType source context id node.type) :
     ExpressionsHaveTypes source context arguments (header.bindings.map (fun binding => binding.1.scheme.body)) ∧
       node.type = header.function.resultType ∧
@@ -359,7 +361,7 @@ private theorem named_source_types {source : TypedSource} {context : SourceSeman
         cases calleeValid with
         | @intro calleeNode name _ contains form valid _ requirements coercions =>
           exact ⟨calleeNode, name, lookupExpression?_complete unique contains, form, requirements, coercions,
-            valid.toValid closed residual⟩
+            validInstantiation valid⟩
 
 private theorem cons_certificates {certificate : GenericExpressionMeaning.Certificate}
     {scope : Scope} {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
@@ -424,7 +426,7 @@ private theorem builtin_source_types {source : TypedSource} {context : SourceSem
 
 /-- The existing Tree is extracted by the actual compiler's fuel induction.
 Each child keeps its original compiler result and source type. -/
-theorem tree_of_functions
+theorem tree_of_functions_with_validity
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
     {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
@@ -435,7 +437,9 @@ theorem tree_of_functions
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     (signatures : context.signatures = values.checked.signatures)
-    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context admitted)
+    (fragmentValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context (CompatibleExpressionBuiltins.Syntax source))
+    (declarationValid : CompatibleExpressionInstantiationLaws.DeclarationLaw source context admitted)
     (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt admitted)
     (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
     (profile : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
@@ -450,7 +454,7 @@ theorem tree_of_functions
   | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
   | succ fuel ih =>
     rcases admission.shape id node allowed found with fragment | composition
-    · exact .fragment (CompatibleExpressionBuiltins.tree_of_functions unique declarations signatures closed residual
+    · exact .fragment (CompatibleExpressionBuiltins.tree_of_functions_with_validity unique declarations signatures fragmentValid
         policyFor.fragment native active profile fragmentCoercions fragment found typed accepted)
     have owner : id.occurrence.owner = source.owner := by
       by_cases same : id.occurrence.owner = source.owner
@@ -552,7 +556,7 @@ theorem tree_of_functions
           ih (children child (by simpa [evaluationChildren, form] using member)) childFound childTyped generated)
       have sequence := sequence_of_nodes (certificate := CompatibleExpressionCalls.Entries scope (ids.zip codes)) count nodes
         (fun child code member => ⟨rfl, member⟩)
-      exact .node (entries := ids.zip codes) (.constructor receipt form (admissible.toValid closed residual) sequence) childTrees
+      exact .node (entries := ids.zip codes) (.constructor receipt form (constructorValid id node instantiation ids allowed found form admissible) sequence) childTrees
     | member base name index =>
       obtain ⟨baseType, baseTyped, projection⟩ := member_source_types unique found form (coercions id node allowed found) typed
       obtain ⟨baseNode, contains, sourceType⟩ := baseTyped.stored_type
@@ -601,7 +605,7 @@ theorem tree_of_functions
             RecursiveNamedCallSelectionCertificates.selected coverage (order id callee arguments instantiation node allowed found form) selected
           subst instantiation
           obtain ⟨argumentsTyped, sourceType, calleeNode, name, calleeFound, calleeForm, calleeRequirements, calleeCoercions, valid⟩ :=
-            named_source_types sourceTypes member unique found form metadata.coercions closed residual typed
+            named_source_types sourceTypes member unique found form metadata.coercions (declarationValid id node callee arguments header.instantiation allowed found form) typed
           obtain ⟨count, nodes, projected, childTrees⟩ := compiled_children unique argumentsTyped argumentsAccepted
             (fun child member node code childFound childTyped generated =>
               ih (children child (by simpa [evaluationChildren, form] using member)) childFound childTyped generated)
@@ -665,6 +669,40 @@ theorem tree_of_functions
           simp only [owner, ne_eq, not_false_eq_true, ↓reduceIte] at accepted
           cases accepted
     | literal | integerLiteral | reference | lambda | proxy => simp [compositionForm, form] at composition
+
+/-- Compatibility with the former false residual scope. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {context : SourceSemantics.Context} {admitted : ExpressionId → Prop}
+    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (sourceTypes : SourceTypes headers context)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (signatures : context.signatures = values.checked.signatures)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt admitted)
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (profile : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (fragmentCoercions : ∀ id node, CompatibleExpressionBuiltins.Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    (coercions : ∀ id node, admitted id → source.lookupExpression? id = some node → node.coercions = [])
+    {fuel : Nat} {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered) :
+    Expressions headers compilation readFuel source context compilation.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_functions_with_validity (policy := policy) (body := body) (readFuel := readFuel) (source := source)
+    (scope := scope) (reasonAt := reasonAt) (context := context) (admitted := admitted) (admission := admission)
+    (coverage := coverage) (sourceTypes := sourceTypes) (order := order) (unique := unique)
+    (declarations := declarations) (signatures := signatures)
+    (constructorValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (fragmentValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (declarationValid := CompatibleExpressionInstantiationLaws.DeclarationLaw.of_closed closed residual)
+    (policyFor := policyFor) (native := native) (active := active) (profile := profile)
+    (fragmentCoercions := fragmentCoercions) (coercions := coercions) (fuel := fuel) (id := id) (node := node)
+    (lowered := lowered) (allowed := allowed) (found := found) (typed := typed) (accepted := accepted)
 
 private theorem ordinary_general {source : TypedSource} {locals : SourceCoreLocalPolymorphism.Catalog}
     {owner : SourceSpecialization.SpecializationKey} (ordinary : CompatibleExpressionBuiltins.Ordinary source locals owner) :
@@ -777,7 +815,7 @@ private theorem evidence_admitted
 Full inventory/source type/order receipts remain static inputs. The actual
 closed caller and ordinary occurrence metadata discharge the special hook;
 local specialization and qualified method callers are outside this entry. -/
-theorem tree_of_contextual
+theorem tree_of_contextual_with_validity
     {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
     {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
     {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
@@ -795,7 +833,9 @@ theorem tree_of_contextual
     (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
     (callerClosed : caller.assumptions = [])
     (unique : NodeOccurrencesUnique source)
-    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext admitted)
+    (fragmentValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (CompatibleExpressionBuiltins.Syntax source))
+    (declarationValid : CompatibleExpressionInstantiationLaws.DeclarationLaw source sourceContext admitted)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
     (sourceSignatures : sourceContext.signatures = values.checked.signatures)
     (allowed : admitted id) (found : source.lookupExpression? id = some node)
@@ -812,7 +852,7 @@ theorem tree_of_contextual
     rw [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at accepted
     dsimp only at accepted
     simp only [callerSelected, Except.mapError, bind, Except.bind, pure, Except.pure] at accepted
-    refine tree_of_functions admission coverage sourceTypes order unique declarations sourceSignatures closed residual
+    refine tree_of_functions_with_validity admission coverage sourceTypes order unique declarations sourceSignatures constructorValid fragmentValid declarationValid
       ?_ native [] rfl ordinary.fragment.coercions ordinary.coercions allowed found typed accepted
     refine ⟨⟨?_, ?_, lowerPolicy, leafPolicy⟩, ?_, ?_⟩
     · intro childId childTree child budget
@@ -854,5 +894,49 @@ theorem tree_of_contextual
         representation.expressions.readExpression viewed childId) = _
       rw [contextualSource_admitted checkedProgram compilation.plan locals compilation.owner admission ordinary allowed childFound]
       simp only [bind, Except.bind, readPolicy]
+
+/-- Compatibility with the former false residual scope. -/
+theorem tree_of_contextual
+    {checkedProgram : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
+    {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
+    {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {native : SourceCoreGeneralFunctions.CallableContext}
+    {skipInitializer : Option ExpressionId} {fuel readFuel : Nat}
+    {source : TypedSource} {scope : Scope} {id : ExpressionId} {node : ExpressionNode}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    {sourceContext : SourceSemantics.Context} {admitted : ExpressionId → Prop}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (admission : Admission source admitted) (coverage : Coverage headers compilation)
+    (sourceTypes : SourceTypes headers sourceContext)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (ordinary : Ordinary source locals compilation.owner admitted)
+    (callerSelected : SourceCompilationPlan.exactSpecialization compilation.plan compilation.owner = .ok caller)
+    (callerClosed : caller.assumptions = [])
+    (unique : NodeOccurrencesUnique source)
+    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (sourceSignatures : sourceContext.signatures = values.checked.signatures)
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    (readPolicy : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerPolicy : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression checkedProgram representation signatures locals parents assignments
+      diagnostics compilation (some native) none skipInitializer fuel source scope id reasonAt = .ok lowered) :
+    Expressions headers compilation readFuel source sourceContext compilation.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_contextual_with_validity (checkedProgram := checkedProgram) (representation := representation)
+    (signatures := signatures) (locals := locals) (parents := parents) (assignments := assignments)
+    (diagnostics := diagnostics) (native := native) (skipInitializer := skipInitializer) (fuel := fuel)
+    (readFuel := readFuel) (source := source) (scope := scope) (id := id) (node := node) (reasonAt := reasonAt)
+    (lowered := lowered) (sourceContext := sourceContext) (admitted := admitted) (caller := caller)
+    (admission := admission) (coverage := coverage) (sourceTypes := sourceTypes) (order := order)
+    (ordinary := ordinary) (callerSelected := callerSelected) (callerClosed := callerClosed) (unique := unique)
+    (constructorValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (fragmentValid := CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    (declarationValid := CompatibleExpressionInstantiationLaws.DeclarationLaw.of_closed closed residual)
+    (declarations := declarations) (sourceSignatures := sourceSignatures) (allowed := allowed) (found := found)
+    (typed := typed) (readPolicy := readPolicy) (lowerPolicy := lowerPolicy) (leafPolicy := leafPolicy)
+    (accepted := accepted)
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates
