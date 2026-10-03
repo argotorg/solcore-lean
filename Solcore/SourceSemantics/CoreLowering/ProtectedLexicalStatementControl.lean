@@ -99,9 +99,9 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} 
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry}
   (transport : ProtectedExpressionMeaning.Transport entry)
 
-def Preserves (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def PreservesFor (validity : SourceSemantics.Context → Prop) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -125,9 +125,14 @@ def Preserves (mode : Bool) {scope : Scope} (statements : List StatementId) (exp
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
-def Reflects (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def Preserves (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  PreservesFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (scope := scope) mode statements expected type code
+
+def ReflectsFor (validity : SourceSemantics.Context → Prop) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -151,9 +156,14 @@ def Reflects (mode : Bool) {scope : Scope} (statements : List StatementId) (expe
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
-def HeadPreserves {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def Reflects (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ReflectsFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (scope := scope) mode statements expected type code
+
+def HeadPreservesFor (validity : SourceSemantics.Context → Prop) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -175,9 +185,14 @@ def HeadPreserves {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) 
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def HeadReflects {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreserves {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  HeadPreservesFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (scope := scope) id expected type code
+
+def HeadReflectsFor (validity : SourceSemantics.Context → Prop) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -200,12 +215,17 @@ def HeadReflects {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
+def HeadReflects {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  HeadReflectsFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (scope := scope) id expected type code
+
 include unique in
-theorem block_preserves {scope : Scope} {id : StatementId} {node : StatementNode}
+theorem block_preserves_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {id : StatementId} {node : StatementNode}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-    (inner : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
-    HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
+    (inner : PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
+    HeadPreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   cases trace with
@@ -222,11 +242,20 @@ theorem block_preserves {scope : Scope} {id : StatementId} {node : StatementNode
     exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
       evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
-theorem block_reflects {scope : Scope} {id : StatementId} {node : StatementNode}
+include unique in
+theorem block_preserves {scope : Scope} {id : StatementId} {node : StatementNode}
     {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-    (inner : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
-    HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
+    (inner : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
+    HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
+  exact block_preserves_for (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found form inner
+
+theorem block_reflects_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+    (inner : ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
+    HeadReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨innerContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
@@ -237,14 +266,22 @@ theorem block_reflects {scope : Scope} {id : StatementId} {node : StatementNode}
   | control trace => exact .control (.block (lookupStatement?_sound found) form trace)
   | fault failed => exact .fault (.block (lookupStatement?_sound found) form failed)
 
+theorem block_reflects {scope : Scope} {id : StatementId} {node : StatementNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+    (inner : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) false statements expected type code) :
+    HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type code := by
+  exact block_reflects_for (functions := functions) (program := program) (evidence := evidence)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found form inner
+
 include unique transport in
-theorem sequence_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem sequence_preserves_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
-    (remaining : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
-    Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    (first : HeadPreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (remaining : PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
+    PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   have go {middleContext : SourceSemantics.Context} {next : Dynamic.Environment} {middle : Dynamic.Heap}
@@ -306,14 +343,25 @@ theorem sequence_preserves {scope : Scope} {mode : Bool} {id : StatementId} {nod
           _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
     · exact go headTrace (by cases mode <;> exact .fault tailTrace)
 
-include transport in
-theorem sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+include unique transport in
+theorem sequence_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
-    (remaining : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
-    Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    (first : HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (remaining : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
+    Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_preserves_for (functions := functions) (program := program) (evidence := evidence) (unique := unique) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found notTail first remaining
+
+include transport in
+theorem sequence_reflects_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (remaining : ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
+    ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   rw [LoopRenaming.sequence] at evaluated
@@ -352,11 +400,22 @@ theorem sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node
       .fault matched, middleHeaps, maps, worlds, frame, metadata,
       _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
+include transport in
+theorem sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (remaining : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode rest expected type body) :
+    Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_reflects_for (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found notTail first remaining
+
 variable {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
 include transport in
-theorem conditional_preserves (unique : NodeOccurrencesUnique source)
-    (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem conditional_preserves_for (validity : SourceSemantics.Context → Prop) (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ context, validity context →
       ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
@@ -364,11 +423,11 @@ theorem conditional_preserves (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
     (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
-    (thenCorrect : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (thenCorrect : PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) false thenBody expected type thenCode)
-    (elseCorrect : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (elseCorrect : PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) false (elseBody.getD []) expected type elseCode) :
-    HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadPreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -391,7 +450,7 @@ theorem conditional_preserves (unique : NodeOccurrencesUnique source)
       obtain ⟨actualBoolean, sourceEq, coreEq⟩ := bool_fields payload
       cases sourceEq
       subst coreEq
-      have branchCorrect : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      have branchCorrect : PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
           (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
         cases boolean <;> assumption
       obtain ⟨value, finalStore, finalMap, finalWorld, branchEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
@@ -434,8 +493,27 @@ theorem conditional_preserves (unique : NodeOccurrencesUnique source)
     · exact ⟨rfl, (by intro next impossible; cases impossible), selected conditionTrace (.fault failed)⟩
 
 include transport in
-theorem conditional_reflects
-    (expressionReflects : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem conditional_preserves (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      ProtectedExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  exact conditional_preserves_for (functions := functions) (program := program) (evidence := evidence) (unique := unique) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) expressionPreserves found form conditionFound _conditionType conditionTree thenCorrect elseCorrect
+
+include transport in
+theorem conditional_reflects_for (validity : SourceSemantics.Context → Prop)
+    (expressionReflects : ∀ context, validity context →
       ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
@@ -443,11 +521,11 @@ theorem conditional_reflects
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
     (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
-    (thenCorrect : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (thenCorrect : ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) false thenBody expected type thenCode)
-    (elseCorrect : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (elseCorrect : ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) false (elseBody.getD []) expected type elseCode) :
-    HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -473,7 +551,7 @@ theorem conditional_reflects
       subst sourceEq
       subst coreEq
 
-      have branchCorrect : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      have branchCorrect : ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
           (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
         cases boolean <;> assumption
       obtain ⟨_, sized⟩ := evaluation_has_size evaluated
@@ -493,15 +571,33 @@ theorem conditional_reflects
         restore_rep represented environment, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds,
         frame.trans lastFrame, metadata.trans lastMetadata⟩
 
+include transport in
+theorem conditional_reflects
+    (expressionReflects : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  exact conditional_reflects_for (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) expressionReflects found form conditionFound _conditionType conditionTree thenCorrect elseCorrect
 
 include unique in
-theorem sequence_stopped_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem sequence_stopped_preserves_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (first : HeadPreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
     (stops : ReachableStatementContinuations.StatementTerminates source id) :
-    Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    PreservesFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   cases source_view trace with
@@ -533,13 +629,24 @@ theorem sequence_stopped_preserves {scope : Scope} {mode : Bool} {id : Statement
           _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
     · cases stops headTrace
 
-theorem sequence_stopped_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+include unique in
+theorem sequence_stopped_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (first : HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
     (stops : ReachableStatementContinuations.StatementTerminates source id) :
-    Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_stopped_preserves_for (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found notTail first stops
+
+theorem sequence_stopped_reflects_for (validity : SourceSemantics.Context → Prop) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    ReflectsFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨wholeSize, original⟩ := evaluation_has_size evaluated
@@ -563,5 +670,14 @@ theorem sequence_stopped_reflects {scope : Scope} {mode : Bool} {id : StatementI
       .fault matched, middleHeaps, maps, worlds, frame, metadata,
       _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
+theorem sequence_stopped_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_stopped_reflects_for (functions := functions) (program := program) (evidence := evidence)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) found notTail first stops
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatements

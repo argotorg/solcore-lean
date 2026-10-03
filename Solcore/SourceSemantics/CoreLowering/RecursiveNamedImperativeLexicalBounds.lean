@@ -16,6 +16,21 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   {entry : ProtectedExpressionMeaning.Entry} {scope : Scope} {mode : Bool}
   {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr} {size : Nat}
 
+theorem preserves_at_for (validity : SourceSemantics.Context → Prop)
+    (correct : RecursiveNamedLexicalContracts.PreservesAtFor (validity := validity) functions program evidence
+      (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+       (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode statements expected type code) :
+    RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) functions program evidence
+      (administrative := administrative) (entry := entry) (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size mode statements expected type code := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata, lexical⟩ :=
+    correct valid environments heaps locals agrees actualTyped reference read unmapped installed trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, FlowRep.of_lexical represented,
+    finalHeaps, maps, worlds, preserved, metadata, lexical⟩
+
 theorem preserves_at
     (correct : RecursiveNamedLexicalContracts.PreservesAt functions program evidence
       (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
@@ -24,11 +39,22 @@ theorem preserves_at
       (administrative := administrative) (entry := entry) (source := source) (context := context)
       (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout)
       (globals := globals) (scope := scope) size mode statements expected type code := by
-  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
-    environments heaps locals agrees actualTyped reference read unmapped installed trace
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata, lexical⟩ :=
-    correct valid environments heaps locals agrees actualTyped reference read unmapped installed trace
-  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, FlowRep.of_lexical represented,
+  exact preserves_at_for (functions := functions) (program := program) (evidence := evidence)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) correct
+
+theorem reflects_at_for (validity : SourceSemantics.Context → Prop)
+    (correct : RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity) functions program evidence
+      (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+       (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode statements expected type code) :
+    RecursiveNamedLoopContracts.ReflectsAtFor (validity := validity) functions program evidence
+      (administrative := administrative) (entry := entry) (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size mode statements expected type code := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preserved, metadata, lexical⟩ :=
+    correct valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, FlowRep.of_lexical represented,
     finalHeaps, maps, worlds, preserved, metadata, lexical⟩
 
 theorem reflects_at
@@ -39,11 +65,7 @@ theorem reflects_at
       (administrative := administrative) (entry := entry) (source := source) (context := context)
       (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout)
       (globals := globals) (scope := scope) size mode statements expected type code := by
-  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
-    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preserved, metadata, lexical⟩ :=
-    correct valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, FlowRep.of_lexical represented,
-    finalHeaps, maps, worlds, preserved, metadata, lexical⟩
+  exact reflects_at_for (functions := functions) (program := program) (evidence := evidence)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) correct
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBounds

@@ -21,9 +21,9 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} 
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry}
   (transport : ProtectedExpressionMeaning.Transport entry)
 
-def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def PreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -47,9 +47,14 @@ def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List St
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
-def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  PreservesAtFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) mode statements expected type code
+
+def ReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -73,9 +78,14 @@ def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List Sta
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
-def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ReflectsAtFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) mode statements expected type code
+
+def HeadPreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -97,9 +107,14 @@ def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : 
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  HeadPreservesAtFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
+
+def HeadReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -121,5 +136,10 @@ def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : T
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
+
+def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  HeadReflectsAtFor (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalContracts

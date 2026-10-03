@@ -22,15 +22,15 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} 
 
 
 include unique in
-theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem block_preserves_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-    (inner : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence
-      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+    (inner : ∀ child, child ≤ budget → PreservesAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
-    HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context)
-      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadPreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type code := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -52,15 +52,29 @@ theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
       evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
-theorem block_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+include unique in
+theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-    (inner : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence
+    (inner : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence
       (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
-    HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
+    HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context)
       (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type code := by
+  exact block_preserves_at_for (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded found form inner
+
+theorem block_reflects_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
+    {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+    (inner : ∀ child, child ≤ budget → ReflectsAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
+    HeadReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type code := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -72,14 +86,27 @@ theorem block_reflects_at (budget size : Nat) (bounded : size ≤ budget)
   | control trace => exact .control (.block (lookupStatement?_sound found) form trace)
   | fault failed => exact .fault (.block (lookupStatement?_sound found) form failed)
 
+theorem block_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+    (inner : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+      (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
+    HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type code := by
+  exact block_reflects_at_for (functions := functions) (program := program) (evidence := evidence)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded found form inner
+
 include unique transport in
-theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem sequence_preserves_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : ∀ child, child ≤ budget → HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
-    (remaining : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
-    PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    (first : ∀ child, child ≤ budget → HeadPreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (remaining : ∀ child, child ≤ budget → PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
+    PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   have go {headSize tailSize : Nat} {middleContext : SourceSemantics.Context} {next : Dynamic.Environment} {middle : Dynamic.Heap}
@@ -138,20 +165,31 @@ theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {s
         .fault matched, finalHeaps, maps, worlds, frame, metadata,
         _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
+include unique transport in
+theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ∀ child, child ≤ budget → HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (remaining : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
+    PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_preserves_at_for (functions := functions) (program := program) (evidence := evidence) (unique := unique) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded found notTail first remaining
+
 include transport in
-theorem sequence_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+theorem sequence_reflects_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : ∀ child, child ≤ budget → HeadReflectsAt (entry := entry) functions program evidence
-      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+    (first : ∀ child, child ≤ budget → HeadReflectsAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
-    (remaining : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence
-      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+    (remaining : ∀ child, child ≤ budget → ReflectsAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
-    ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
-      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -195,11 +233,29 @@ theorem sequence_reflects_at (budget size : Nat) (bounded : size ≤ budget)
       .fault matched, middleHeaps, maps, worlds, frame, metadata,
       _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
+include transport in
+theorem sequence_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ∀ child, child ≤ budget → HeadReflectsAt (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+      (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (remaining : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+      (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
+    ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  exact sequence_reflects_at_for (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded found notTail first remaining
+
 variable {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
 include transport in
-theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
-    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem conditional_preserves_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, validity context →
       RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
@@ -207,11 +263,11 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
     (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
-    (thenCorrect : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (thenCorrect : ∀ child, child ≤ budget → PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false thenBody expected type thenCode)
-    (elseCorrect : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (elseCorrect : ∀ child, child ≤ budget → PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false (elseBody.getD []) expected type elseCode) :
-    HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadPreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -234,7 +290,7 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨actualBoolean, sourceEq, coreEq⟩ := bool_fields payload
       cases sourceEq
       subst coreEq
-      have branchCorrect : PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      have branchCorrect : PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
           bodySize (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
         cases boolean <;> first | exact thenCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded)) | exact elseCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded))
       obtain ⟨value, finalStore, finalMap, finalWorld, branchEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
@@ -275,8 +331,27 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     exact ⟨rfl, restored environment _, selected conditionTrace branchTrace conditionSmaller bodySmaller⟩
 
 include transport in
-theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (expressionReflects : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : ∀ child, child ≤ budget → PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  exact conditional_preserves_at_for (functions := functions) (program := program) (evidence := evidence) (unique := unique) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded expressionPreserves found form conditionFound _conditionType conditionTree thenCorrect elseCorrect
+
+include transport in
+theorem conditional_reflects_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
+    (expressionReflects : ∀ child, child ≤ budget → ∀ context, validity context →
       RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
@@ -284,11 +359,11 @@ theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
     (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
-    (thenCorrect : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (thenCorrect : ∀ child, child ≤ budget → ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false thenBody expected type thenCode)
-    (elseCorrect : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (elseCorrect : ∀ child, child ≤ budget → ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false (elseBody.getD []) expected type elseCode) :
-    HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -319,8 +394,8 @@ theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
         cases boolean with
         | false => exact evaluated.choose_false conditionEval.sound
         | true => exact evaluated.choose_true conditionEval.sound
-      have branchCorrect : ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
-          (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      have branchCorrect : ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context)
+          (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
           branchSize (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
         cases boolean <;> first
           | exact thenCorrect branchSize (Nat.le_of_lt (Nat.lt_of_lt_of_le branchSmaller bounded))
@@ -339,5 +414,23 @@ theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
         restore_rep represented environment, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds,
         frame.trans lastFrame, metadata.trans lastMetadata⟩
 
+include transport in
+theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    (expressionReflects : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : ∀ child, child ≤ budget → ReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  exact conditional_reflects_at_for (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) budget size bounded expressionReflects found form conditionFound _conditionType conditionTree thenCorrect elseCorrect
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalControlBounds

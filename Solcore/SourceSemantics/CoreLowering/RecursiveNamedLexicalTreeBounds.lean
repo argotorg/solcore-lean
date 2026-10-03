@@ -17,7 +17,7 @@ open RecursiveNamedLoopContracts (ExecutesAt)
 open ProtectedLexicalStatements (return_unit_view nil_executes)
 
 section StoppedControl
-open RecursiveNamedLexicalContracts (PreservesAt ReflectsAt HeadPreservesAt HeadReflectsAt)
+open RecursiveNamedLexicalContracts (PreservesAtFor ReflectsAtFor HeadPreservesAtFor HeadReflectsAtFor)
 variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext}
   {source : TypedSource} {context : SourceSemantics.Context} {solved : List SolvedRequirement}
   {ambient : AmbientDefinitions values.checked.catalog.definitions}
@@ -28,13 +28,13 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} 
 
 
 include unique in
-private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+private theorem sequence_stopped_preserves_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : ∀ child, child ≤ budget → HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (first : ∀ child, child ≤ budget → HeadPreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
     (stops : ReachableStatementContinuations.StatementTerminates source id) :
-    PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   have view := RecursiveNamedStatementSourceBounds.cons_inv unique (lookupStatement?_sound found)
@@ -63,18 +63,17 @@ private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : siz
         .fault matched, finalHeaps, maps, worlds, frame, metadata,
         _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
-
-private theorem sequence_stopped_reflects_at (budget size : Nat) (bounded : size ≤ budget)
+private theorem sequence_stopped_reflects_at_for (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : ∀ child, child ≤ budget → HeadReflectsAt (entry := entry) functions program evidence
-      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+    (first : ∀ child, child ≤ budget → HeadReflectsAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
     (stops : ReachableStatementContinuations.StatementTerminates source id) :
-    ReflectsAt (entry := entry) functions program evidence (source := source) (context := context)
-      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -118,14 +117,15 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (bindings : ProtectedExpressionMeaning.Binds entry)
 
 include definitions registered transport bindings in
-theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
-    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem preserves_at_for (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context nextContext binder}, validity context → BinderExtends source.owner context binder nextContext → validity nextContext) (budget size : Nat) (bounded : size ≤ budget)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, validity context →
       RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressions
       context scope mode statements expected type code)
-    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (contextValid : validity context)
     (unique : NodeOccurrencesUnique source)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
@@ -195,7 +195,7 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
       allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
         environments heaps locals agrees actualTyped reference read allocated
     obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, maps, worlds, finalFrame, metadata, lexical⟩ :=
-      ih _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (valid_extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+      ih _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
           (Dynamic.HeapMetadataExtend.of_allocation allocated))) tailTrace
@@ -224,7 +224,7 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
           allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
             (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated
         obtain ⟨result, finalStore, finalMap, finalWorld, completed, related, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, lexical⟩ :=
-          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) (valid_extend contextValid extended)
+          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) (extend contextValid extended)
             nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
               (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
                 (List.getElem?_eq_some_iff.mp frameRead).1).1
@@ -267,53 +267,90 @@ theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
         exact LocalSequence.discard_success _ first second
 
   | block found form inner remaining innerIH remainingIH =>
-    exact RecursiveNamedLexicalControlBounds.sequence_preserves_at
+    exact RecursiveNamedLexicalControlBounds.sequence_preserves_at_for (validity := validity)
       (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => RecursiveNamedLexicalControlBounds.block_preserves_at
+      (fun child within => RecursiveNamedLexicalControlBounds.block_preserves_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
         (globals := globals) (unique := unique) budget child within found form innerIH) remainingIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
-    exact RecursiveNamedLexicalControlBounds.sequence_preserves_at
+    exact RecursiveNamedLexicalControlBounds.sequence_preserves_at_for (validity := validity)
       (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => RecursiveNamedLexicalControlBounds.conditional_preserves_at
+      (fun child within => RecursiveNamedLexicalControlBounds.conditional_preserves_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (transport := transport)
         (frameLayout := frame) (globals := globals) budget child within unique expressionPreserves
         found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
   | terminalBlock exactUnique found form inner stops issued innerIH =>
-    exact sequence_stopped_preserves_at
+    exact sequence_stopped_preserves_at_for (validity := validity)
       (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := exactUnique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => RecursiveNamedLexicalControlBounds.block_preserves_at
+      (fun child within => RecursiveNamedLexicalControlBounds.block_preserves_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
         (globals := globals) (unique := exactUnique) budget child within found form innerIH)
       (GenericLexicalStatements.block_terminates exactUnique found form stops)
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
   | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
-    exact sequence_stopped_preserves_at
+    exact sequence_stopped_preserves_at_for (validity := validity)
       (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := exactUnique) budget size bounded found (by intro expression; simp [form])
-      (fun child within => RecursiveNamedLexicalControlBounds.conditional_preserves_at
+      (fun child within => RecursiveNamedLexicalControlBounds.conditional_preserves_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (transport := transport)
         (frameLayout := frame) (globals := globals) budget child within exactUnique expressionPreserves
         found form conditionFound conditionType conditionTree thenIH elseIH)
       (GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops)
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
-
 include definitions registered transport bindings in
-theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (expressionReflects : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
-      RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+theorem preserves_at (budget size : Nat) (bounded : size ≤ budget)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source expressions
       context scope mode statements expected type code)
     (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (unique : NodeOccurrencesUnique source)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    {outcome : Dynamic.ControlOutcome} {resultContext : SourceSemantics.Context}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical)
+    (trace : ExecutesAt size mode program context evidence source environment before statements resultContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact preserves_at_for functions definitions registered program evidence transport bindings
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (fun valid extended => valid_extend valid extended)
+    budget size bounded expressionPreserves tree contextValid unique environments heaps locals agrees actualTyped reference read unmapped installed trace
+
+include definitions registered transport bindings in
+theorem reflects_at_for (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context nextContext binder}, validity context → BinderExtends source.owner context binder nextContext → validity nextContext) (budget size : Nat) (bounded : size ≤ budget)
+    (expressionReflects : ∀ child, child ≤ budget → ∀ context, validity context →
+      RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressions
+      context scope mode statements expected type code)
+    (contextValid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value}
@@ -404,7 +441,7 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
         environments heaps locals agrees actualTyped reference read Dynamic.Heap.Allocates.append
     obtain ⟨tailSize, smaller, continuation⟩ := evaluated.let_body allocationEval
     obtain ⟨resultContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, finalFrame, metadata, lexical⟩ :=
-      ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (valid_extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+      ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
           (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) continuation
@@ -435,7 +472,7 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
         obtain ⟨branchSize, branchSmaller, branchEval⟩ := evaluated.bind_success initialEval.sound
         obtain ⟨tailSize, smaller, tailEval⟩ := branchEval.let_body allocationEval
         obtain ⟨resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, lexical⟩ :=
-          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le (Nat.lt_trans smaller branchSmaller) bounded)) (valid_extend contextValid extended)
+          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le (Nat.lt_trans smaller branchSmaller) bounded)) (extend contextValid extended)
             nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
               (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
                 (List.getElem?_eq_some_iff.mp frameRead).1).1
@@ -480,8 +517,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
           related, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
           firstFrame.trans preservation, firstMetadata.trans metadata, lexical⟩
   | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerIH remainingIH =>
-    have innerBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-        (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+    have innerBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+        (entry := entry) functions program evidence (source := source) (context := context)
         (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
         child (scope := scope) false statements expected type innerCode := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -490,8 +527,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
         innerIH child within valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
-    have tailBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-        (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+    have tailBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+        (entry := entry) functions program evidence (source := source) (context := context)
         (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
         child (scope := scope) mode rest expected type body := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -501,10 +538,10 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
     obtain ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩ :=
-      RecursiveNamedLexicalControlBounds.sequence_reflects_at
+      RecursiveNamedLexicalControlBounds.sequence_reflects_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (transport := transport)
         (frameLayout := frame) (globals := globals) budget size bounded found (by intro expression; simp [form])
-        (fun child within => RecursiveNamedLexicalControlBounds.block_reflects_at
+        (fun child within => RecursiveNamedLexicalControlBounds.block_reflects_at_for (validity := validity)
           (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
           (globals := globals) budget child within found form innerBound) tailBound
         contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
@@ -512,7 +549,7 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
   | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
     have branchBound {statements : List StatementId} {branch : Expr}
-        (meaning : ∀ child, child ≤ budget → ∀ (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+        (meaning : ∀ child, child ≤ budget → ∀ (valid : validity context)
           {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
           {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
           {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value},
@@ -530,8 +567,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
             LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧ AdministrativePreserved mapping store finalMap finalStore ∧
             Dynamic.HeapMetadataExtend before after ∧ LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
               context scope environment finalContext after) :
-        ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-          (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+        ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+          (entry := entry) functions program evidence (source := source) (context := context)
           (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
           child (scope := scope) false statements expected type branch := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -540,8 +577,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
         meaning child within valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
-    have tailBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-        (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+    have tailBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+        (entry := entry) functions program evidence (source := source) (context := context)
         (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
         child (scope := scope) mode rest expected type body := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -551,10 +588,10 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
     obtain ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩ :=
-      RecursiveNamedLexicalControlBounds.sequence_reflects_at
+      RecursiveNamedLexicalControlBounds.sequence_reflects_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence) (transport := transport)
         (frameLayout := frame) (globals := globals) budget size bounded found (by intro expression; simp [form])
-        (fun child within => RecursiveNamedLexicalControlBounds.conditional_reflects_at
+        (fun child within => RecursiveNamedLexicalControlBounds.conditional_reflects_at_for (validity := validity)
           (functions := functions) (program := program) (evidence := evidence) (transport := transport)
           (frameLayout := frame) (globals := globals) budget child within expressionReflects found form conditionFound conditionType conditionTree
           (branchBound thenIH) (branchBound elseIH)) tailBound
@@ -563,8 +600,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
 
   | @terminalBlock context scope mode id node statements rest expected type innerCode body exactUnique found form inner stops issued innerIH =>
-    have innerBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-        (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+    have innerBound : ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+        (entry := entry) functions program evidence (source := source) (context := context)
         (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
         child (scope := scope) false statements expected type innerCode := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -574,10 +611,10 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
     obtain ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩ :=
-      sequence_stopped_reflects_at
+      sequence_stopped_reflects_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence)
         (frameLayout := frame) (globals := globals) budget size bounded found (by intro expression; simp [form])
-        (fun child within => RecursiveNamedLexicalControlBounds.block_reflects_at
+        (fun child within => RecursiveNamedLexicalControlBounds.block_reflects_at_for (validity := validity)
           (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
           (globals := globals) budget child within found form innerBound)
         (GenericLexicalStatements.block_terminates exactUnique found form stops)
@@ -587,7 +624,7 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
 
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
     have branchBound {statements : List StatementId} {branch : Expr}
-        (meaning : ∀ child, child ≤ budget → ∀ (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+        (meaning : ∀ child, child ≤ budget → ∀ (valid : validity context)
           {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
           {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
           {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value},
@@ -605,8 +642,8 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
             LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧ AdministrativePreserved mapping store finalMap finalStore ∧
             Dynamic.HeapMetadataExtend before after ∧ LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
               context scope environment finalContext after) :
-        ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAt
-          (entry := entry) functions program evidence (source := source) (context := context) (solved := solved)
+        ∀ child, child ≤ budget → RecursiveNamedLexicalContracts.ReflectsAtFor (validity := validity)
+          (entry := entry) functions program evidence (source := source) (context := context)
           (registry := registry) (faults := faults) (frameLayout := frame) (globals := globals)
           child (scope := scope) false statements expected type branch := by
       intro child within valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
@@ -616,10 +653,10 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨sourceSize, sized⟩ := ExecutesAt.has_size trace
       exact ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, sized, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
     obtain ⟨sourceSize, resultContext, outcome, after, finalMap, finalWorld, trace, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩ :=
-      sequence_stopped_reflects_at
+      sequence_stopped_reflects_at_for (validity := validity)
         (functions := functions) (program := program) (evidence := evidence)
         (frameLayout := frame) (globals := globals) budget size bounded found (by intro expression; simp [form])
-        (fun child within => RecursiveNamedLexicalControlBounds.conditional_reflects_at
+        (fun child within => RecursiveNamedLexicalControlBounds.conditional_reflects_at_for (validity := validity)
           (functions := functions) (program := program) (evidence := evidence) (transport := transport)
           (frameLayout := frame) (globals := globals) budget child within expressionReflects found form conditionFound conditionType conditionTree
           (branchBound thenIH) (branchBound elseIH))
@@ -627,5 +664,40 @@ theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
         contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
     exact ⟨resultContext, outcome, after, finalMap, finalWorld, trace.sound,
       related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
+
+include definitions registered transport bindings in
+theorem reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    (expressionReflects : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source expressions
+      context scope mode statements expected type code)
+    (contextValid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame} {value : Value}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical)
+    (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) :
+    ∃ sourceSize resultContext outcome after finalMap finalWorld,
+      ExecutesAt sourceSize mode program context evidence source environment before statements resultContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment resultContext after := by
+  exact reflects_at_for functions definitions registered program evidence transport bindings
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) (fun valid extended => valid_extend valid extended)
+    budget size bounded expressionReflects tree contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
