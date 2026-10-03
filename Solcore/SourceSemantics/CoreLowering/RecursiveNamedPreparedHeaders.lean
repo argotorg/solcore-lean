@@ -183,14 +183,14 @@ structure HeaderAt {values : SourceCoreCompatibleValues.Context} (instantiation 
   bodyTyped : ∃ facts, BodyHasType header.function.source header.context header.function.resultType facts
   projection : compiled.compatible.checked.catalog.project header.function.resultType = .ok header.output
 
-private theorem header_of_frame {values : SourceCoreCompatibleValues.Context}
+private theorem header_of_frame_with_evidence {values : SourceCoreCompatibleValues.Context}
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
       (Context.ofSignatures compiled.sourceProgram.signatures) row.parameterSubstitution)
     {instantiation : DeclarationInstantiation}
     (frame : NamedCalls.SourceFrame (Program.ofChecked compiled.sourceProgram) instantiation
       (RecursiveNamedSpecializationBodyFacts.bodyInstance compiled.sourceProgram row) prepared.view)
-    (closed : row.assumptions = []) (ordinaryReturn : row.function.returnComptime = false)
+    (ordinaryReturn : row.function.returnComptime = false)
     (ordinaryParameters : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false)
     (target : SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation =
       .ok prepared.named.signature.key) :
@@ -210,12 +210,11 @@ private theorem header_of_frame {values : SourceCoreCompatibleValues.Context}
   have ordinary : ∀ binder, binder ∈ prepared.view.parameters → binder.comptime = false := by
     simpa only [RecursiveNamedPublicSpecializationMeaning.Prepared.view,
       RecursiveNamedPreparedSourceFrames.view, prepared.same] using ordinaryParameters
-  let header := Header.of_source_frame
+  let header := Header.of_dictionary_frame
     (values := values)
     (function := prepared.view) (instantiation := instantiation)
     (sourceBody := RecursiveNamedSpecializationBodyFacts.bodyInstance compiled.sourceProgram row)
     (frame := frame) (named := prepared.named) (agreement := prepared.agreement)
-    (closed := by simpa only [prepared.same] using closed)
     (ordinaryReturn := by simpa only [prepared.same] using ordinaryReturn)
     (ordinaryParameters := ordinary) (target := target)
     (context := context) (types := types) (bindings := prepared.named.inputs)
@@ -243,8 +242,38 @@ private theorem header_of_frame {values : SourceCoreCompatibleValues.Context}
     rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl,
     prepared.compilation.bodyCompiled, ⟨facts, bodyTyped⟩, (outputs prepared).2⟩
 
+private theorem header_of_frame {values : SourceCoreCompatibleValues.Context}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures compiled.sourceProgram.signatures) row.parameterSubstitution)
+    {instantiation : DeclarationInstantiation}
+    (frame : NamedCalls.SourceFrame (Program.ofChecked compiled.sourceProgram) instantiation
+      (RecursiveNamedSpecializationBodyFacts.bodyInstance compiled.sourceProgram row) prepared.view)
+    (closed : row.assumptions = []) (ordinaryReturn : row.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation =
+      .ok prepared.named.signature.key) :
+    ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
+      (Program.ofChecked compiled.sourceProgram), HeaderAt prepared instantiation header :=
+  let _ := closed
+  header_of_frame_with_evidence prepared wellFormed range frame ordinaryReturn ordinaryParameters target
+
 /-- Canonical source metadata and the actual second pass supply a Header.
 Complete inventory membership and runtime authority are separate obligations. -/
+theorem canonical_header_with_evidence {values : SourceCoreCompatibleValues.Context}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures compiled.sourceProgram.signatures) row.parameterSubstitution)
+    (ordinaryReturn : row.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan
+      (CallableNamedMetadata.instantiation row) = .ok prepared.named.signature.key) :
+    ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
+      (Program.ofChecked compiled.sourceProgram), HeaderAt prepared (CallableNamedMetadata.instantiation row) header :=
+  header_of_frame_with_evidence prepared wellFormed range (prepared.source_frame wellFormed range)
+    ordinaryReturn ordinaryParameters target
+
+
 theorem canonical_header {values : SourceCoreCompatibleValues.Context}
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
@@ -255,11 +284,23 @@ theorem canonical_header {values : SourceCoreCompatibleValues.Context}
       (CallableNamedMetadata.instantiation row) = .ok prepared.named.signature.key) :
     ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
       (Program.ofChecked compiled.sourceProgram), HeaderAt prepared (CallableNamedMetadata.instantiation row) header :=
-  header_of_frame prepared wellFormed range (prepared.source_frame wellFormed range)
-    closed ordinaryReturn ordinaryParameters target
-
+  let _ := closed
+  canonical_header_with_evidence prepared wellFormed range ordinaryReturn ordinaryParameters target
 /-- Retained metadata keeps its reversed full substitution order; it uses the
 same source body and compilation through the same common Header constructor. -/
+theorem retained_header_with_evidence {values : SourceCoreCompatibleValues.Context}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures compiled.sourceProgram.signatures) row.parameterSubstitution)
+    (ordinaryReturn : row.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan
+      (CallableNamedCanonicalOrder.retainedInstantiation row) = .ok prepared.named.signature.key) :
+    ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
+      (Program.ofChecked compiled.sourceProgram), HeaderAt prepared (CallableNamedCanonicalOrder.retainedInstantiation row) header :=
+  header_of_frame_with_evidence prepared wellFormed range (prepared.retained_frame wellFormed range)
+    ordinaryReturn ordinaryParameters target
+
 theorem retained_header {values : SourceCoreCompatibleValues.Context}
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
@@ -270,13 +311,36 @@ theorem retained_header {values : SourceCoreCompatibleValues.Context}
       (CallableNamedCanonicalOrder.retainedInstantiation row) = .ok prepared.named.signature.key) :
     ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
       (Program.ofChecked compiled.sourceProgram), HeaderAt prepared (CallableNamedCanonicalOrder.retainedInstantiation row) header :=
-  header_of_frame prepared wellFormed range (prepared.retained_frame wellFormed range)
-    closed ordinaryReturn ordinaryParameters target
+  let _ := closed
+  retained_header_with_evidence prepared wellFormed range ordinaryReturn ordinaryParameters target
 
 end Prepared
 
 /-- The public compiler's retained original worklist row supplies the complete
 preparation witness. No dictionary-bearing row is silently made ordinary. -/
+theorem of_public_compile_with_evidence {program : CheckedProgram} {seeds : List SourceCompiler.Seed}
+    {options : SourceCompiler.Options} {compiled : SourceCompiler.Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {row : SourceSpecialization.SpecializedFunction}
+    {values : SourceCoreCompatibleValues.Context}
+    (accepted : SourceCompiler.compileChecked program seeds options = .ok compiled)
+    (issued : RecursiveNamedPreparedStageContracts.PublicRecipe compiled recipe)
+    (member : row ∈ recipe.compiled.validationPlan.specializations)
+    (wellFormed : ProgramWellFormed (Program.ofChecked recipe.compiled.sourceProgram))
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures recipe.compiled.sourceProgram.signatures) row.parameterSubstitution)
+    (ordinaryReturn : row.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey recipe.compiled.indexed.base.plan
+      (CallableNamedMetadata.instantiation row) = .ok row.key) :
+    ∃ (prepared : Prepared recipe.compiled row)
+      (header : Header recipe.compiled.indexed.ancestry values recipe.compiled.indexed.layouts.definitions
+        (Program.ofChecked recipe.compiled.sourceProgram)),
+      Prepared.HeaderAt prepared (CallableNamedMetadata.instantiation row) header := by
+  obtain ⟨prepared⟩ := RecursiveNamedPublicSpecializationMeaning.of_public_compile accepted issued member
+  obtain ⟨header, aligned⟩ := Prepared.canonical_header_with_evidence prepared wellFormed range ordinaryReturn ordinaryParameters
+    (target.trans (congrArg Except.ok (Prepared.outputs prepared).1.symm))
+  exact ⟨prepared, header, aligned⟩
+
 theorem of_public_compile {program : CheckedProgram} {seeds : List SourceCompiler.Seed}
     {options : SourceCompiler.Options} {compiled : SourceCompiler.Compiled}
     {recipe : SourceCoreIndexedSession.Recipe} {row : SourceSpecialization.SpecializedFunction}
@@ -294,10 +358,8 @@ theorem of_public_compile {program : CheckedProgram} {seeds : List SourceCompile
     ∃ (prepared : Prepared recipe.compiled row)
       (header : Header recipe.compiled.indexed.ancestry values recipe.compiled.indexed.layouts.definitions
         (Program.ofChecked recipe.compiled.sourceProgram)),
-      Prepared.HeaderAt prepared (CallableNamedMetadata.instantiation row) header := by
-  obtain ⟨prepared⟩ := RecursiveNamedPublicSpecializationMeaning.of_public_compile accepted issued member
-  obtain ⟨header, aligned⟩ := Prepared.canonical_header prepared wellFormed range closed ordinaryReturn ordinaryParameters
-    (target.trans (congrArg Except.ok (Prepared.outputs prepared).1.symm))
-  exact ⟨prepared, header, aligned⟩
+      Prepared.HeaderAt prepared (CallableNamedMetadata.instantiation row) header :=
+  let _ := closed
+  of_public_compile_with_evidence accepted issued member wellFormed range ordinaryReturn ordinaryParameters target
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders

@@ -36,14 +36,13 @@ private def rebuild (header : Header prepared values definitions program)
     (programTyped : ProgramWellFormed program)
     (sameLedger : header.function.context.solvedRequirements = header.solved) :
     Header prepared values definitions program :=
-  Header.of_source_frame
+  Header.of_dictionary_frame
     (function := header.function)
     (instantiation := header.instantiation)
     (sourceBody := header.sourceBody)
     (frame := header.frame)
     (named := header.named)
     (agreement := header.agreement)
-    (closed := header.closed)
     (ordinaryReturn := header.ordinaryReturn)
     (ordinaryParameters := header.ordinaryParameters)
     (target := header.target)

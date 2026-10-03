@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCertificateNativeTyping
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogNativeContexts
 
@@ -53,23 +54,8 @@ theorem named_native {source : TypedSource} {sourceContext : SourceSemantics.Con
     (head : RecursiveNamedCatalog.Head headers compilation source sourceContext children scope id lowered)
     (typed : ∀ child code, children scope child code →
       NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) code) :
-    NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
-  cases head with
-  | @named callee arguments body node calleeNode name codes expression member metadata sourceType form calleeFound calleeForm
-      calleeRequirements calleeCoercions valid predicates evidence arity emission selectedSlot sequence nativeTypes =>
-    have packed := packed_native sequence typed
-    have equation := emission.equation
-    have resultWF := project_wellFormed metadata.projected
-    refine ⟨resultWF, ?_⟩
-    rw [equation.1, selectedSlot]
-    rw [← body.resultType]
-    apply SourceCoreCalls.call_hasType compilation.internalReason
-    · rw [equation.2.1]; exact packed.1
-    · rw [body.resultType]; exact resultWF
-    · have found := slots body member
-      simpa [SourceCoreLocalCell.coreContext, List.getElem?_append, List.length_map,
-        Nat.add_assoc] using found
-    · rw [equation.2.1]; exact packed.2
+    NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered :=
+  RecursiveNamedCallEvidenceHeads.native (evidence := []) slots (.ordinary head) typed
 
 variable {readFuel : Nat} {source : TypedSource} {context : SourceSemantics.Context}
   {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
@@ -78,8 +64,8 @@ variable {readFuel : Nat} {source : TypedSource} {context : SourceSemantics.Cont
   {administrative : Core.Context} (slots : Slots headers compilation administrative)
 
 include shaped complete slots in
-theorem tree_native
-    (tree : Expressions headers compilation readFuel source context solved reasonAt scope id lowered) :
+theorem tree_native_with (callerEvidence : Option Dynamic.EvidenceEnvironment)
+    (tree : CompatibleExpressionCalls.Tree (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context) readFuel values source context solved reasonAt scope id lowered) :
     NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
   induction tree with
   | fragment child => exact builtins_native administrative shaped complete child
@@ -100,8 +86,17 @@ theorem tree_native
         (by rw [← childType]; exact (children _ _ child).2)⟩
     | index header _ _ _ first second => exact index_native header (children _ _ first) (children _ _ second) (reasonAt _)
     | builtin head => exact BuiltinCallNativeTyping.Head.native head children
-    | call head => exact named_native slots head children
+    | call head =>
+      cases callerEvidence with
+      | none => exact named_native slots head children
+      | some evidence => exact RecursiveNamedCallEvidenceHeads.native slots head children
     | tuple _ sequence => exact packed_native sequence children
+
+include shaped complete slots in
+theorem tree_native
+    (tree : Expressions headers compilation readFuel source context solved reasonAt scope id lowered) :
+    NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered :=
+  tree_native_with shaped complete slots none tree
 
 include shaped complete slots in
 theorem tree_native_at {definitions : DataEnvironment}
@@ -120,5 +115,22 @@ theorem tree_supported
     NativeExpressionContextSupport.supported lowered.expression (scope.length + administrative.length) = true := by
   simpa only [List.length_append, SourceCoreLocalCell.coreContext, List.length_map] using
     NativeExpressionContextSupport.of_typing (tree_native shaped complete slots tree).2
+
+include shaped complete slots in
+theorem tree_native_with_at (callerEvidence : Option Dynamic.EvidenceEnvironment) {definitions : DataEnvironment}
+    (extension : values.checked.catalog.definitions.Extends definitions)
+    (tree : CompatibleExpressionCalls.Tree (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context)
+      readFuel values source context solved reasonAt scope id lowered) :
+    NativeTyping definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
+  obtain ⟨wellFormed, typed⟩ := tree_native_with shaped complete slots callerEvidence tree
+  exact ⟨wellFormed.extend_definitions extension, typed.extend_definitions extension⟩
+
+include shaped complete slots in
+theorem tree_supported_with (callerEvidence : Option Dynamic.EvidenceEnvironment)
+    (tree : CompatibleExpressionCalls.Tree (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context)
+      readFuel values source context solved reasonAt scope id lowered) :
+    NativeExpressionContextSupport.supported lowered.expression (scope.length + administrative.length) = true := by
+  simpa only [List.length_append, SourceCoreLocalCell.coreContext, List.length_map] using
+    NativeExpressionContextSupport.of_typing (tree_native_with shaped complete slots callerEvidence tree).2
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionNativeTyping

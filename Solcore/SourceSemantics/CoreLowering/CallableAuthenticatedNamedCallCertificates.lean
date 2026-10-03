@@ -465,4 +465,14 @@ theorem tree_of_contextual
       | error error => rfl
       | ok result => cases result <;> simp only [childForm]
 
+/-- The full runtime admission family retains the actual caller dictionary.
+The earlier syntax entry remains the restricted empty-callee interface. -/
+abbrev tree_of_contextual_with_evidence :=
+  @RecursiveNamedExpressionCompilerCertificates.tree_of_contextual_at_runtime_evidence
+
+/-- Actual prepared rows supply the full selected dictionary to that same
+single traversal. Header assembly and source conditions remain static inputs. -/
+abbrev tree_of_contextual_prepared :=
+  @RecursiveNamedExpressionCompilerCertificates.tree_of_contextual_prepared
+
 end Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallCertificates

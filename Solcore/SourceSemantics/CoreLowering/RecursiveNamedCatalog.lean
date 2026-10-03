@@ -19,7 +19,6 @@ structure Header {checked : Checked} {base : Base checked}
   frame : NamedCalls.SourceFrame program instantiation sourceBody function
   named : SourceCoreGeneralFunctions.Function
   agreement : CompatibleNamedBody.NamedAgreement named function
-  closed : named.specialized.assumptions = []
   ordinaryReturn : named.specialized.function.returnComptime = false
   ordinaryParameters : ∀ binder, binder ∈ function.parameters → binder.comptime = false
   target : SourceCompilationPlan.exactInstantiationKey base.plan instantiation = .ok named.signature.key
@@ -72,6 +71,105 @@ abbrev Inventory {checked : Checked} {base : Base checked}
 
 /-- Construct a header from the complete actual static receipts and the
 runtime validity of its actual source context. -/
+abbrev Header.of_dictionary_body {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : ValuesContext}
+    {definitions : DataEnvironment} {program : Program}
+    (function : Dynamic.Closure)
+    (instantiation : DeclarationInstantiation)
+    (sourceBody : Dynamic.BodyInstance)
+    (frame : NamedCalls.SourceFrame program instantiation sourceBody function)
+    (named : SourceCoreGeneralFunctions.Function)
+    (agreement : CompatibleNamedBody.NamedAgreement named function)
+    (ordinaryReturn : named.specialized.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ function.parameters → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey base.plan instantiation = .ok named.signature.key)
+    (context : SourceSemantics.Context)
+    (types : List TypeSystem.Ty)
+    (bindings : List Binding)
+    (parameters : function.parameters = bindings.map Prod.fst)
+    (inputs : function.source.inputs = bindings.map Prod.fst)
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
+    (solved : List SolvedRequirement)
+    (reasonAt : ExpressionId → Word)
+    (readFuel : Nat)
+    (output : Ty)
+    (policy : SourceCoreLoops.Policy)
+    (fuel : Nat)
+    (fellThrough : Word)
+    (escaped : Word)
+    (body : Expr)
+    (parameterCode : Expr)
+    (code : Expr)
+    (layouts : SourceCoreAllocationLayouts.Prepared)
+    (owner : SourceSpecialization.SpecializationKey)
+    (active : TypeSystem.Substitution)
+    (globals : Nat)
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (acceptedPrefix : SourceCoreSourceCells.bindParameters
+    (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame globals
+      (layouts.allocatorAt owner active onError)) function.source [] bindings output
+    SourceCoreFunctions.argumentProjection body = .ok parameterCode)
+    (hook : SourceCoreCallableIndexedAncestry.namedBody prepared named parameterCode = .ok code)
+    (definitions_eq : layouts.definitions = definitions)
+    (registered : prepared.layout.frame.Registered definitions)
+    (valid : CompatibleRuntimeContextValidity.Valid solved context function.evidence)
+    (unique : NodeOccurrencesUnique function.source)
+    (parameterType : named.signature.parameterType = SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd))
+    (resultType : named.signature.resultType = output)
+    (representation : SourceCoreGeneralFunctions.Representation)
+    (compiledFuel : Nat)
+    (compiled : SourceCoreCompatibleMarkedFunctions.Compilation base representation compiledFuel)
+    (slot : Nat)
+    (selected : base.functions[slot]? = some named)
+    (cached : compiled.closures[slot]? = some (.lambda named.signature.parameterType
+    (LanguageResult.resultType named.signature.resultType) code)) :
+    Header prepared values definitions program :=
+  { function := function
+    instantiation := instantiation
+    sourceBody := sourceBody
+    frame := frame
+    named := named
+    agreement := agreement
+    ordinaryReturn := ordinaryReturn
+    ordinaryParameters := ordinaryParameters
+    target := target
+    context := context
+    types := types
+    bindings := bindings
+    parameters := parameters
+    inputs := inputs
+    extended := extended
+    solved := solved
+    reasonAt := reasonAt
+    readFuel := readFuel
+    output := output
+    policy := policy
+    fuel := fuel
+    fellThrough := fellThrough
+    escaped := escaped
+    body := body
+    parameterCode := parameterCode
+    code := code
+    layouts := layouts
+    owner := owner
+    active := active
+    globals := globals
+    onError := onError
+    acceptedPrefix := acceptedPrefix
+    hook := hook
+    definitions_eq := definitions_eq
+    registered := registered
+    valid := valid
+    unique := unique
+    parameterType := parameterType
+    resultType := resultType
+    representation := representation
+    compiledFuel := compiledFuel
+    compiled := compiled
+    slot := slot
+    selected := selected
+    cached := cached }
+
 abbrev Header.of_runtime_body {checked : Checked} {base : Base checked}
     {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : ValuesContext}
     {definitions : DataEnvironment} {program : Program}
@@ -126,55 +224,157 @@ abbrev Header.of_runtime_body {checked : Checked} {base : Base checked}
     (cached : compiled.closures[slot]? = some (.lambda named.signature.parameterType
     (LanguageResult.resultType named.signature.resultType) code)) :
     Header prepared values definitions program :=
-  { function := function
-    instantiation := instantiation
-    sourceBody := sourceBody
-    frame := frame
-    named := named
-    agreement := agreement
-    closed := closed
-    ordinaryReturn := ordinaryReturn
-    ordinaryParameters := ordinaryParameters
-    target := target
-    context := context
-    types := types
-    bindings := bindings
-    parameters := parameters
-    inputs := inputs
-    extended := extended
-    solved := solved
-    reasonAt := reasonAt
-    readFuel := readFuel
-    output := output
-    policy := policy
-    fuel := fuel
-    fellThrough := fellThrough
-    escaped := escaped
-    body := body
-    parameterCode := parameterCode
-    code := code
-    layouts := layouts
-    owner := owner
-    active := active
-    globals := globals
-    onError := onError
-    acceptedPrefix := acceptedPrefix
-    hook := hook
-    definitions_eq := definitions_eq
-    registered := registered
-    valid := valid
-    unique := unique
-    parameterType := parameterType
-    resultType := resultType
-    representation := representation
-    compiledFuel := compiledFuel
-    compiled := compiled
-    slot := slot
-    selected := selected
-    cached := cached }
+  let _ := closed
+  Header.of_dictionary_body
+    (function := function)
+    (instantiation := instantiation)
+    (sourceBody := sourceBody)
+    (frame := frame)
+    (named := named)
+    (agreement := agreement)
+    (ordinaryReturn := ordinaryReturn)
+    (ordinaryParameters := ordinaryParameters)
+    (target := target)
+    (context := context)
+    (types := types)
+    (bindings := bindings)
+    (parameters := parameters)
+    (inputs := inputs)
+    (extended := extended)
+    (solved := solved)
+    (reasonAt := reasonAt)
+    (readFuel := readFuel)
+    (output := output)
+    (policy := policy)
+    (fuel := fuel)
+    (fellThrough := fellThrough)
+    (escaped := escaped)
+    (body := body)
+    (parameterCode := parameterCode)
+    (code := code)
+    (layouts := layouts)
+    (owner := owner)
+    (active := active)
+    (globals := globals)
+    (onError := onError)
+    (acceptedPrefix := acceptedPrefix)
+    (hook := hook)
+    (definitions_eq := definitions_eq)
+    (registered := registered)
+    (valid := valid)
+    (unique := unique)
+    (parameterType := parameterType)
+    (resultType := resultType)
+    (representation := representation)
+    (compiledFuel := compiledFuel)
+    (compiled := compiled)
+    (slot := slot)
+    (selected := selected)
+    (cached := cached)
 
 /-- Independent source typing supplies runtime ledger validity and the
 actual SourceFrame supplies coverage, including retained unused rows. -/
+def Header.of_dictionary_frame {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : ValuesContext}
+    {definitions : DataEnvironment} {program : Program}
+    (function : Dynamic.Closure)
+    (instantiation : DeclarationInstantiation)
+    (sourceBody : Dynamic.BodyInstance)
+    (frame : NamedCalls.SourceFrame program instantiation sourceBody function)
+    (named : SourceCoreGeneralFunctions.Function)
+    (agreement : CompatibleNamedBody.NamedAgreement named function)
+    (ordinaryReturn : named.specialized.function.returnComptime = false)
+    (ordinaryParameters : ∀ binder, binder ∈ function.parameters → binder.comptime = false)
+    (target : SourceCompilationPlan.exactInstantiationKey base.plan instantiation = .ok named.signature.key)
+    (context : SourceSemantics.Context)
+    (types : List TypeSystem.Ty)
+    (bindings : List Binding)
+    (parameters : function.parameters = bindings.map Prod.fst)
+    (inputs : function.source.inputs = bindings.map Prod.fst)
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
+    (solved : List SolvedRequirement)
+    (reasonAt : ExpressionId → Word)
+    (readFuel : Nat)
+    (output : Ty)
+    (policy : SourceCoreLoops.Policy)
+    (fuel : Nat)
+    (fellThrough : Word)
+    (escaped : Word)
+    (body : Expr)
+    (parameterCode : Expr)
+    (code : Expr)
+    (layouts : SourceCoreAllocationLayouts.Prepared)
+    (owner : SourceSpecialization.SpecializationKey)
+    (active : TypeSystem.Substitution)
+    (globals : Nat)
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    (acceptedPrefix : SourceCoreSourceCells.bindParameters
+    (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame globals
+      (layouts.allocatorAt owner active onError)) function.source [] bindings output
+    SourceCoreFunctions.argumentProjection body = .ok parameterCode)
+    (hook : SourceCoreCallableIndexedAncestry.namedBody prepared named parameterCode = .ok code)
+    (definitions_eq : layouts.definitions = definitions)
+    (registered : prepared.layout.frame.Registered definitions)
+    (unique : NodeOccurrencesUnique function.source)
+    (parameterType : named.signature.parameterType = SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd))
+    (resultType : named.signature.resultType = output)
+    (representation : SourceCoreGeneralFunctions.Representation)
+    (compiledFuel : Nat)
+    (compiled : SourceCoreCompatibleMarkedFunctions.Compilation base representation compiledFuel)
+    (slot : Nat)
+    (selected : base.functions[slot]? = some named)
+    (cached : compiled.closures[slot]? = some (.lambda named.signature.parameterType
+    (LanguageResult.resultType named.signature.resultType) code))
+    (programTyped : ProgramWellFormed program)
+    (sameLedger : function.context.solvedRequirements = solved) :
+    Header prepared values definitions program :=
+  Header.of_dictionary_body
+    (function := function)
+    (instantiation := instantiation)
+    (sourceBody := sourceBody)
+    (frame := frame)
+    (named := named)
+    (agreement := agreement)
+    (ordinaryReturn := ordinaryReturn)
+    (ordinaryParameters := ordinaryParameters)
+    (target := target)
+    (context := context)
+    (types := types)
+    (bindings := bindings)
+    (parameters := parameters)
+    (inputs := inputs)
+    (extended := extended)
+    (solved := solved)
+    (reasonAt := reasonAt)
+    (readFuel := readFuel)
+    (output := output)
+    (policy := policy)
+    (fuel := fuel)
+    (fellThrough := fellThrough)
+    (escaped := escaped)
+    (body := body)
+    (parameterCode := parameterCode)
+    (code := code)
+    (layouts := layouts)
+    (owner := owner)
+    (active := active)
+    (globals := globals)
+    (onError := onError)
+    (acceptedPrefix := acceptedPrefix)
+    (hook := hook)
+    (definitions_eq := definitions_eq)
+    (registered := registered)
+    (unique := unique)
+    (parameterType := parameterType)
+    (resultType := resultType)
+    (representation := representation)
+    (compiledFuel := compiledFuel)
+    (compiled := compiled)
+    (slot := slot)
+    (selected := selected)
+    (cached := cached)
+    (valid := CompatibleRuntimeContextValidity.of_frame frame extended programTyped sameLedger)
+
 def Header.of_source_frame {checked : Checked} {base : Base checked}
     {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : ValuesContext}
     {definitions : DataEnvironment} {program : Program}
@@ -230,14 +430,14 @@ def Header.of_source_frame {checked : Checked} {base : Base checked}
     (programTyped : ProgramWellFormed program)
     (sameLedger : function.context.solvedRequirements = solved) :
     Header prepared values definitions program :=
-  Header.of_runtime_body
+  let _ := closed
+  Header.of_dictionary_frame
     (function := function)
     (instantiation := instantiation)
     (sourceBody := sourceBody)
     (frame := frame)
     (named := named)
     (agreement := agreement)
-    (closed := closed)
     (ordinaryReturn := ordinaryReturn)
     (ordinaryParameters := ordinaryParameters)
     (target := target)
@@ -276,7 +476,8 @@ def Header.of_source_frame {checked : Checked} {base : Base checked}
     (slot := slot)
     (selected := selected)
     (cached := cached)
-    (valid := CompatibleRuntimeContextValidity.of_frame frame extended programTyped sameLedger)
+    (programTyped := programTyped)
+    (sameLedger := sameLedger)
 
 /-- Forget the old body profile while retaining every actual compilation and
 source selection receipt. -/
@@ -338,6 +539,23 @@ theorem Header.of_body_slot {checked : Checked} {base : Base checked}
     {definitions : DataEnvironment} {program : Program}
     (body : BuiltinNamedCalls.Body prepared values definitions program) :
     (Header.of_body body).slot = body.slot := rfl
+
+/-- Empty legacy invocation evidence forces empty source predicates through the
+actual SourceFrame coverage; general headers retain their full dictionary. -/
+theorem Header.predicates_of_empty {checked : Checked} {base : Base checked}
+    {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : ValuesContext}
+    {definitions : DataEnvironment} {program : Program}
+    (header : Header prepared values definitions program)
+    (empty : header.function.evidence = []) : header.instantiation.predicates = [] := by
+  have assumptions : header.sourceBody.context.assumptions = header.instantiation.predicates := by
+    cases header.frame.instantiated with
+    | intro _ _ _ _ _ _ _ contextEq => rw [contextEq]; rfl
+  have supplies := header.frame.covers.2
+  rw [empty] at supplies
+  apply List.eq_nil_iff_forall_not_mem.mpr
+  intro predicate member
+  obtain ⟨evidence, found⟩ := supplies predicate (assumptions.symm ▸ member)
+  cases found
 
 /-- A real cached row includes its signature, code and ordered slot. -/
 theorem Header.cached_code {checked : Checked} {base : Base checked}

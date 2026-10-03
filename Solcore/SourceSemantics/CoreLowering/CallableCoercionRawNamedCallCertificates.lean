@@ -35,37 +35,24 @@ structure Reached (header : Header prepared values ambient.definitions program) 
   slot : receipt.native.index = header.slot
   occurrenceOrder : instantiation.parameterSubstitution.map Prod.fst =
     (receipt.selection.specialized.parameterSubstitution.map Prod.fst).reverse
+  emptyPredicates : instantiation.predicates = []
   headerOrder : header.instantiation.parameterSubstitution.map Prod.fst =
     (header.named.specialized.parameterSubstitution.map Prod.fst).reverse
 
+/-- Restrict the full selected record with the legacy empty-predicate fact. -/
+theorem Reached.selected (reached : Reached receipt (headers := headers) header) :
+    RecursiveNamedCallEvidenceHeads.Selected receipt (headers := headers) header :=
+  ⟨reached.member, reached.plan, reached.specialized, reached.signature, reached.slot,
+    reached.occurrenceOrder, reached.headerOrder⟩
+
 theorem Reached.metadata (reached : Reached receipt (headers := headers) header) :
-    instantiation = header.instantiation := by
-  have present : (receipt.native.signature, receipt.native.index) ∈
-      compilation.globals.zipIdx.filter (fun row => decide (row.1.key = receipt.selection.key)) := by
-    rw [receipt.native.global]
-    simp
-  have key : receipt.native.signature.key = receipt.selection.key :=
-    of_decide_eq_true (List.mem_filter.mp present).2
-  have target : SourceCompilationPlan.exactInstantiationKey compilation.plan header.instantiation =
-      .ok receipt.selection.key := by
-    rw [reached.plan, ← key, reached.signature]
-    exact header.target
-  have matched := CallableNamedMetadata.matches_of_exact target receipt.selection.selected
-  have first := receipt.selection.metadata.retained_canonical reached.occurrenceOrder
-  have second := matched.retained_canonical (by simpa only [reached.specialized] using reached.headerOrder)
-  exact first.trans second.symm
+    instantiation = header.instantiation := reached.selected receipt |>.metadata receipt
 
 theorem Reached.predicates (reached : Reached receipt (headers := headers) header) :
-    instantiation.predicates = [] := by
-  have matched := receipt.selection.metadata.predicates
-  rw [reached.specialized] at matched
-  exact matched.symm.trans header.closed
+    instantiation.predicates = [] := reached.emptyPredicates
 
 theorem Reached.arity (reached : Reached receipt (headers := headers) header) :
-    header.function.parameters.length = arguments.length := by
-  have inputs : receipt.selection.specialized.function.typedBody.inputs = header.function.parameters := by
-    rw [reached.specialized, ← header.agreement.source, header.inputs, ← header.parameters]
-  simpa only [inputs] using receipt.arity.symm
+    header.function.parameters.length = arguments.length := reached.selected receipt |>.arity receipt
 
 /-- Independent original typing determines the raw return type and source
 callee fields before the output coercion path. It does not run the source. -/

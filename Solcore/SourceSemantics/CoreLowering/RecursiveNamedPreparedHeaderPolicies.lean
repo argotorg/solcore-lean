@@ -129,6 +129,73 @@ variable {headers : Inventory compiled.indexed.ancestry (.initial compiled.compa
 /-- Materialize the actual compiler's static policy fields. Expression admission,
 source Syntax and hidden-source freshness stay explicit. The returned match
 certificate uses final definitions; actual native child contexts are unchanged. -/
+def inputs_with (authenticated : Bool)
+    (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source (invalidOperand prepared))
+    (hidden : GenericImperativeMatch.MatchHiddenFresh header.function.source)
+    (expressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+      sourceContext.signatures = compiled.compatible.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext → expressionSyntax id →
+      header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
+        (program := Program.ofChecked compiled.sourceProgram) (if authenticated then some header.function.evidence else none) headers compilation header.readFuel header.function.source sourceContext header.solved header.reasonAt scope id lowered)
+    (assignmentExpressions : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+      sourceContext.signatures = compiled.compatible.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext →
+      expressionSyntax id → ∀ node, header.function.source.lookupExpression? id = some node →
+      ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+        RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
+        (program := Program.ofChecked compiled.sourceProgram) (if authenticated then some header.function.evidence else none) headers compilation header.readFuel header.function.source sourceContext header.solved header.reasonAt scope id lowered ∧
+        HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+          (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions)
+    (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax header.context
+      (.statements true header.function.body) header.function.resultType) :
+    RecursiveNamedCatalogRuntimeProfileFactory.InputsWith
+      (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram)
+      authenticated tracked diagnosticPolicy headers header compilation expressionSyntax administrative where
+  matchCompilation := ambientMatch prepared
+  invalidProjection := invalidProjection prepared
+  invalidOperand := invalidOperand prepared
+  invalidUnary := invalidUnary prepared
+  missingDefault := missingDefault prepared
+  factory := factory
+  matchPolicy := header_match prepared atHeader
+  matchValues := rfl
+  matchDefinitions := rfl
+  matchAllocator := match_allocator prepared atHeader
+  matchLedger := atHeader.solved.symm
+  matchChildStatic := GenericImperativeMatch.MatchChildStatic.of_hidden
+    (matchCompilation := ambientMatch prepared) (definitions := compiled.indexed.layouts.definitions)
+    (administrative := administrative)
+    (certificates := fun context => RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
+      (program := Program.ofChecked compiled.sourceProgram)
+      (if authenticated then some header.function.evidence else none) headers compilation header.readFuel header.function.source context header.solved header.reasonAt) hidden
+  readPolicy := header_read prepared atHeader
+  binderPolicy := header_binder prepared atHeader
+  allocationPolicy := header_allocator prepared atHeader
+  expressions := expressions
+  assignments := by rw [atHeader.policy]; exact assignments prepared
+  unaryPolicy := by rw [atHeader.policy]; exact unary prepared
+  assignmentExpressions := assignmentExpressions
+  syntaxTree := syntaxTree
+  sourceSignatures := header_signatures (header := header)
+  declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
+    (program := Program.ofChecked compiled.sourceProgram) header
+  projection := atHeader.projection
+  accepted := atHeader.accepted
+
 def inputs
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source (invalidOperand prepared))
     (hidden : GenericImperativeMatch.MatchHiddenFresh header.function.source)
@@ -160,41 +227,8 @@ def inputs
       (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (program := Program.ofChecked compiled.sourceProgram)
-      tracked diagnosticPolicy headers header compilation expressionSyntax administrative where
-  matchCompilation := ambientMatch prepared
-  invalidProjection := invalidProjection prepared
-  invalidOperand := invalidOperand prepared
-  invalidUnary := invalidUnary prepared
-  missingDefault := missingDefault prepared
-  factory := factory
-  matchPolicy := header_match prepared atHeader
-  matchValues := rfl
-  matchDefinitions := rfl
-  matchAllocator := match_allocator prepared atHeader
-  matchLedger := atHeader.solved.symm
-  matchChildStatic := GenericImperativeMatch.MatchChildStatic.of_hidden
-    (matchCompilation := ambientMatch prepared) (definitions := compiled.indexed.layouts.definitions)
-    (administrative := administrative)
-    (certificates := fun context => RecursiveNamedExpressionCompilerCertificates.RuntimeExpressions
-      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
-      (program := Program.ofChecked compiled.sourceProgram)
-      headers compilation header.readFuel header.function.source context header.solved header.reasonAt) hidden
-  readPolicy := header_read prepared atHeader
-  binderPolicy := header_binder prepared atHeader
-  allocationPolicy := header_allocator prepared atHeader
-  expressions := expressions
-  assignments := by rw [atHeader.policy]; exact assignments prepared
-  unaryPolicy := by rw [atHeader.policy]; exact unary prepared
-  assignmentExpressions := assignmentExpressions
-  syntaxTree := syntaxTree
-  sourceSignatures := header_signatures (header := header)
-  declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
-    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-    (values := .initial compiled.compatible.checked) (prepared := compiled.indexed.ancestry)
-    (program := Program.ofChecked compiled.sourceProgram) header
-  projection := atHeader.projection
-  accepted := atHeader.accepted
+      tracked diagnosticPolicy headers header compilation expressionSyntax administrative :=
+  inputs_with prepared atHeader false factory hidden expressions assignmentExpressions syntaxTree
 
 end Prepared
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies

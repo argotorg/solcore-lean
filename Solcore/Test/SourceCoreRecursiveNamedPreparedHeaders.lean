@@ -87,13 +87,13 @@ theorem full_parameter_order :
   rw [aligned.bindings]
 
 include prepared in
-theorem constrained_not_header (constrained : row.assumptions ≠ []) :
+theorem constrained_not_empty_header (constrained : row.assumptions ≠ []) :
     ¬ ∃ header : Header compiled.indexed.ancestry values compiled.indexed.layouts.definitions
       (Program.ofChecked compiled.sourceProgram),
-      RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header := by
-  rintro ⟨header, aligned⟩
+      RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header ∧
+        header.named.specialized.assumptions = [] := by
+  rintro ⟨header, aligned, closed⟩
   apply constrained
-  have closed := header.closed
   rw [aligned.named, prepared.same] at closed
   exact closed
 
