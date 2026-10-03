@@ -374,6 +374,9 @@ import Solcore.Test.SourceCoreRecursiveNamedForRuntimeBounds
 import Solcore.Test.SourceCoreCompatibleEncodedDataTyping
 import Solcore.Test.SourceCoreRecursiveNamedPublicDataInputs
 import Solcore.Test.SourceCoreRecursiveNamedImperativeRuntimeBounds
+import Solcore.Test.SourceCoreRecursiveNamedRuntimeHeaders
+import Solcore.Test.SourceCoreRecursiveNamedPreparedStageContracts
+import Solcore.Test.SourceCoreRecursiveNamedCatalogRuntimeMutualMeaning
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2896,6 +2899,8 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedForRuntimeBounds.run
   SourceCoreRecursiveNamedPublicDataInputs.run
   SourceCoreRecursiveNamedImperativeRuntimeBounds.run
+  SourceCoreRecursiveNamedPreparedStageContracts.run
+  SourceCoreRecursiveNamedCatalogRuntimeMutualMeaning.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
