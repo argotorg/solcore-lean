@@ -126,9 +126,9 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (reflection : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source certificate faults entry)
 
-def LoopPreservesAt (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def LoopPreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome}
@@ -151,9 +151,17 @@ def LoopPreservesAt (size : Nat) {scope : Scope} (condition : ExpressionId) (pos
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
 
-def LoopReflectsAt (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def LoopPreservesAt (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  LoopPreservesAtFor (entry := entry) (source := source) (context := context)
+    (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals)
+    (administrative := administrative) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    size (scope := scope) condition post statements expected type code
+
+def LoopReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -175,6 +183,14 @@ def LoopReflectsAt (size : Nat) {scope : Scope} (condition : ExpressionId) (post
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
+
+def LoopReflectsAt (size : Nat) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  LoopReflectsAtFor (entry := entry) (source := source) (context := context)
+    (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals)
+    (administrative := administrative) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    size (scope := scope) condition post statements expected type code
 
 theorem post_computation_size {size : Nat} {actual : Environment} {before bodyStore after : Store}
     {type : Ty} {location : Location} {body post : Expr} {reason : Word} {value : Value}

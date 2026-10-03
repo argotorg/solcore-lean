@@ -14,6 +14,127 @@ open TypedImperativeFor (Progress postValues SourceLoop)
 open CompatibleExpressionPrimitives (bool_fields)
 open ProtectedWhile.Body (Reflects)
 open RecursiveNamedForContracts (Below)
+theorem iterations_success_bounded_for (validity : SourceSemantics.Context → Prop)
+    {program : Program} {size : Nat} {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {condition : ExpressionId} {post : List ForItemForm} {statements : List StatementId} {outcome : Dynamic.ControlOutcome}
+    (trace : SourceExecutionSize.ForLoopExecutes program size context evidence source environment before condition post statements finalContext outcome after) :
+    ∀ (budget : Nat), size ≤ budget →
+    ∀ {entry : ProtectedExpressionMeaning.Entry} {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {scope : Scope}
+      {ambient : AmbientDefinitions values.checked.catalog.definitions} {functions : FunctionModel values.checked.catalog ambient}
+      {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+      {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
+      {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source certificate faults entry) →
+      ProtectedExpressionMeaning.Transport entry →
+      certificate scope condition ⟨.bool, conditionCode⟩ →
+      source.lookupExpression? condition = some node →
+      validity context → NodeOccurrencesUnique source →
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      Below budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+        (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        (scope := scope) size false statements expected type code) →
+      Below budget (fun size => RecursiveNamedForContracts.PostPreservesAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode) →
+      State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason mapping world before store →
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates (Core.LoopExecution.entryEnvironment type location actual) store
+          (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason) value finalStore ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  induction size using Nat.strongRecOn generalizing context finalContext evidence source environment before after condition post statements outcome with
+  | ind size ih =>
+    intro budget bounded entry certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      meaning transport conditionTree found valid unique agrees reference correct postCorrect state
+    cases trace with
+    | done conditionEvaluation =>
+      obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases represented with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        exact ⟨_, nextStore, nextMap, nextWorld, Core.LoopExecution.condition_false evaluated, .fallthrough environment, progress⟩
+    | nextFallthrough conditionEvaluation bodyEvaluation postEvaluation next =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | fallthrough _ =>
+          have bodyTotal := conditionProgress.trans bodyProgress
+          obtain ⟨postStore, postMap, postWorld, postEval, postProgress⟩ := (postCorrect _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) false postEvaluation
+          have progress := bodyTotal.trans postProgress
+          have nextState := state.advance transport progress
+          obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
+            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect nextState
+          exact ⟨result, finalStore, finalMap, finalWorld,
+            ForLoop.body_fallthrough conditionEval bodyEval
+              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
+              nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
+    | nextContinue conditionEvaluation bodyEvaluation postEvaluation next =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | continuing _ =>
+          have bodyTotal := conditionProgress.trans bodyProgress
+          obtain ⟨postStore, postMap, postWorld, postEval, postProgress⟩ := (postCorrect _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) true postEvaluation
+          have progress := bodyTotal.trans postProgress
+          have nextState := state.advance transport progress
+          obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
+            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect nextState
+          exact ⟨result, finalStore, finalMap, finalWorld,
+            ForLoop.body_continuing conditionEval bodyEval
+              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
+              nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
+    | breaks conditionEvaluation bodyEvaluation =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | breaking _ =>
+          exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_breaking conditionEval bodyEval, .fallthrough environment, conditionProgress.trans bodyProgress⟩
+    | returns conditionEvaluation bodyEvaluation =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | returned payload =>
+          exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_returned conditionEval bodyEval, .returned payload, conditionProgress.trans bodyProgress⟩
+
 theorem iterations_success_bounded
     {program : Program} {size : Nat} {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
@@ -49,31 +170,130 @@ theorem iterations_success_bounded
           (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason) value finalStore ∧
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
-  induction size using Nat.strongRecOn generalizing context finalContext evidence source environment before after condition post statements outcome with
-  | ind size ih =>
-    intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+  intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
       contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
       meaning transport conditionTree found valid unique agrees reference correct postCorrect state
+  exact iterations_success_bounded_for (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    trace budget bounded meaning transport conditionTree found valid unique agrees reference correct postCorrect state
+
+theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Prop)
+    {program : Program} {size : Nat} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {condition : ExpressionId} {post : List ForItemForm} {statements : List StatementId} {reason : Dynamic.SemanticFault}
+    (trace : SourceExecutionSize.ForLoopFaults program size context evidence source environment before condition post statements reason after) :
+    ∀ (budget : Nat), size ≤ budget →
+    ∀ {entry : ProtectedExpressionMeaning.Entry} {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {scope : Scope}
+      {ambient : AmbientDefinitions values.checked.catalog.definitions} {functions : FunctionModel values.checked.catalog ambient}
+      {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+      {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
+      {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {faults : FunctionCalls.FaultRep},
+      Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source certificate faults entry) →
+      ProtectedExpressionMeaning.Transport entry →
+      certificate scope condition ⟨.bool, conditionCode⟩ →
+      source.lookupExpression? condition = some node →
+      validity context → NodeOccurrencesUnique source →
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      Below budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+        (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        (scope := scope) size false statements expected type code) →
+      Below budget (fun size => RecursiveNamedForContracts.PostPreservesAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode) →
+      Below budget (fun size => RecursiveNamedForContracts.PostFaultsAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry) (faults := faults)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode) →
+      State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason mapping world before store →
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates (Core.LoopExecution.entryEnvironment type location actual) store
+          (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason) value finalStore ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  induction size using Nat.strongRecOn generalizing context evidence source environment before after condition post statements reason with
+  | ind size ih =>
+    intro budget bounded entry certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+      contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
+      meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
     cases trace with
-    | done conditionEvaluation =>
+    | condition conditionFault =>
       obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.fault conditionFault)
+      cases represented with
+      | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, Core.LoopExecution.condition_failure evaluated, .fault matched, progress⟩
+    | conditionType conditionEvaluation notBoolean runtimeType =>
+      obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
       cases represented with
       | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        exact ⟨_, nextStore, nextMap, nextWorld, Core.LoopExecution.condition_false evaluated, .fallthrough environment, progress⟩
-    | nextFallthrough conditionEvaluation bodyEvaluation postEvaluation next =>
+        obtain ⟨boolean, rfl, _⟩ := bool_fields payload
+        exact False.elim (notBoolean trivial)
+    | body conditionEvaluation bodyFault =>
       obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
       cases conditionRelated with
       | value payload =>
         obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
         cases sameSource
         subst sameCore
         obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.fault bodyFault)
+        cases bodyRelated with
+        | fault matched => exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_failure conditionEval bodyEval, .fault matched, conditionProgress.trans bodyProgress⟩
+    | postFallthrough conditionEvaluation bodyEvaluation postEvaluation =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | fallthrough _ =>
+          have bodyTotal := conditionProgress.trans bodyProgress
+          obtain ⟨token, postStore, postMap, postWorld, postEval, matched, postProgress⟩ :=
+            (postFailed _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) false postEvaluation
+          exact ⟨_, postStore, postMap, postWorld,
+            ForLoop.body_fallthrough_post_fault conditionEval bodyEval
+              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval),
+            .fault matched, bodyTotal.trans postProgress⟩
+    | postContinue conditionEvaluation bodyEvaluation postEvaluation =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+        cases bodyRelated with
+        | continuing _ =>
+          have bodyTotal := conditionProgress.trans bodyProgress
+          obtain ⟨token, postStore, postMap, postWorld, postEval, matched, postProgress⟩ :=
+            (postFailed _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) true postEvaluation
+          exact ⟨_, postStore, postMap, postWorld,
+            ForLoop.body_continuing_post_fault conditionEval bodyEval
+              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval),
+            .fault matched, bodyTotal.trans postProgress⟩
+    | nextFallthrough conditionEvaluation bodyEvaluation postEvaluation next =>
+      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+      cases conditionRelated with
+      | value payload =>
+        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+        cases sameSource
+        subst sameCore
+        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
         cases bodyRelated with
         | fallthrough _ =>
           have bodyTotal := conditionProgress.trans bodyProgress
@@ -81,21 +301,21 @@ theorem iterations_success_bounded
           have progress := bodyTotal.trans postProgress
           have nextState := state.advance transport progress
           obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
-            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect nextState
+            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed nextState
           exact ⟨result, finalStore, finalMap, finalWorld,
             ForLoop.body_fallthrough conditionEval bodyEval
               (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
               nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
     | nextContinue conditionEvaluation bodyEvaluation postEvaluation next =>
       obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
+        condition_preserves_at_for functions program evidence validity (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
       cases conditionRelated with
       | value payload =>
         obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
         cases sameSource
         subst sameCore
         obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
+          body_preserves_at_for functions program evidence validity (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
         cases bodyRelated with
         | continuing _ =>
           have bodyTotal := conditionProgress.trans bodyProgress
@@ -103,37 +323,11 @@ theorem iterations_success_bounded
           have progress := bodyTotal.trans postProgress
           have nextState := state.advance transport progress
           obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
-            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect nextState
+            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed nextState
           exact ⟨result, finalStore, finalMap, finalWorld,
             ForLoop.body_continuing conditionEval bodyEval
               (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
               nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
-    | breaks conditionEvaluation bodyEvaluation =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | breaking _ =>
-          exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_breaking conditionEval bodyEval, .fallthrough environment, conditionProgress.trans bodyProgress⟩
-    | returns conditionEvaluation bodyEvaluation =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | returned payload =>
-          exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_returned conditionEval bodyEval, .returned payload, conditionProgress.trans bodyProgress⟩
 
 theorem iterations_fault_bounded
     {program : Program} {size : Nat} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -175,118 +369,11 @@ theorem iterations_fault_bounded
           (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason) value finalStore ∧
         FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
         Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
-  induction size using Nat.strongRecOn generalizing context evidence source environment before after condition post statements reason with
-  | ind size ih =>
-    intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+  intro budget bounded entry certificate values scope solved ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
       contextLocation location expected type conditionCode code postCode selfReason mapping world store node faults
       meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
-    cases trace with
-    | condition conditionFault =>
-      obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.fault conditionFault)
-      cases represented with
-      | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, Core.LoopExecution.condition_failure evaluated, .fault matched, progress⟩
-    | conditionType conditionEvaluation notBoolean runtimeType =>
-      obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases represented with
-      | value payload =>
-        obtain ⟨boolean, rfl, _⟩ := bool_fields payload
-        exact False.elim (notBoolean trivial)
-    | body conditionEvaluation bodyFault =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.fault bodyFault)
-        cases bodyRelated with
-        | fault matched => exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_failure conditionEval bodyEval, .fault matched, conditionProgress.trans bodyProgress⟩
-    | postFallthrough conditionEvaluation bodyEvaluation postEvaluation =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | fallthrough _ =>
-          have bodyTotal := conditionProgress.trans bodyProgress
-          obtain ⟨token, postStore, postMap, postWorld, postEval, matched, postProgress⟩ :=
-            (postFailed _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) false postEvaluation
-          exact ⟨_, postStore, postMap, postWorld,
-            ForLoop.body_fallthrough_post_fault conditionEval bodyEval
-              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval),
-            .fault matched, bodyTotal.trans postProgress⟩
-    | postContinue conditionEvaluation bodyEvaluation postEvaluation =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | continuing _ =>
-          have bodyTotal := conditionProgress.trans bodyProgress
-          obtain ⟨token, postStore, postMap, postWorld, postEval, matched, postProgress⟩ :=
-            (postFailed _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) true postEvaluation
-          exact ⟨_, postStore, postMap, postWorld,
-            ForLoop.body_continuing_post_fault conditionEval bodyEval
-              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval),
-            .fault matched, bodyTotal.trans postProgress⟩
-    | nextFallthrough conditionEvaluation bodyEvaluation postEvaluation next =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | fallthrough _ =>
-          have bodyTotal := conditionProgress.trans bodyProgress
-          obtain ⟨postStore, postMap, postWorld, postEval, postProgress⟩ := (postCorrect _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) false postEvaluation
-          have progress := bodyTotal.trans postProgress
-          have nextState := state.advance transport progress
-          obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
-            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed nextState
-          exact ⟨result, finalStore, finalMap, finalWorld,
-            ForLoop.body_fallthrough conditionEval bodyEval
-              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
-              nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
-    | nextContinue conditionEvaluation bodyEvaluation postEvaluation next =>
-      obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress⟩ :=
-        condition_preserves_at functions program evidence (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found valid unique agrees state (.value conditionEvaluation)
-      cases conditionRelated with
-      | value payload =>
-        obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-        cases sameSource
-        subst sameCore
-        obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress⟩ :=
-          body_preserves_at functions program evidence (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference (state.advance transport conditionProgress) (.control bodyEvaluation)
-        cases bodyRelated with
-        | continuing _ =>
-          have bodyTotal := conditionProgress.trans bodyProgress
-          obtain ⟨postStore, postMap, postWorld, postEval, postProgress⟩ := (postCorrect _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) (state.advance transport bodyTotal) true postEvaluation
-          have progress := bodyTotal.trans postProgress
-          have nextState := state.advance transport progress
-          obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress⟩ :=
-            ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded) meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed nextState
-          exact ⟨result, finalStore, finalMap, finalWorld,
-            ForLoop.body_continuing conditionEval bodyEval
-              (by simpa only [postValues, Bool.false_eq_true, ↓reduceIte, List.append_assoc, Core.LoopExecution.entryEnvironment, List.cons_append, List.nil_append] using postEval)
-              nextState.1.selfRead nativeTrace, related, progress.trans finalProgress⟩
+  exact iterations_fault_bounded_for (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    trace budget bounded meaning transport conditionTree found valid unique agrees reference correct postCorrect postFailed state
 
 section BoundedReflection
 variable {entry : ProtectedExpressionMeaning.Entry} {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
@@ -305,15 +392,15 @@ variable {entry : ProtectedExpressionMeaning.Entry} {certificate : GenericExpres
   (transport : ProtectedExpressionMeaning.Transport entry)
 
 include reflection transport in
-theorem iterations_reflect_bounded {condition : ExpressionId} {node : ExpressionNode}
+theorem iterations_reflect_bounded_for (validity : SourceSemantics.Context → Prop) {condition : ExpressionId} {node : ExpressionNode}
     {post : List ForItemForm} {statements : List StatementId} {expected : TypeSystem.Ty}
     (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
-    (correct : Below budget (fun size => ProtectedWhile.Body.ReflectsAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
-      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+    (correct : Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) size false statements expected type code))
     (postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostReflectsAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
       (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
@@ -337,7 +424,7 @@ theorem iterations_reflect_bounded {condition : ExpressionId} {node : Expression
     intro bounded mapping world before store finalStore value state evaluation
     obtain ⟨conditionSize, conditionStore, conditionValue, conditionSmaller, conditionEval⟩ := evaluation.bind_computation
     obtain ⟨conditionSourceSize, conditionOutcome, conditionHeap, conditionMap, conditionWorld, conditionTrace, conditionRelated, conditionProgress⟩ :=
-      condition_reflects_at functions program evidence (reflection _ (Nat.lt_of_lt_of_le conditionSmaller bounded)) conditionTree found valid agrees state conditionEval
+      condition_reflects_at_for functions program evidence validity (reflection _ (Nat.lt_of_lt_of_le conditionSmaller bounded)) conditionTree found valid agrees state conditionEval
     cases conditionRelated with
     | fault matched =>
       cases conditionTrace with
@@ -358,7 +445,7 @@ theorem iterations_reflect_bounded {condition : ExpressionId} {node : Expression
           obtain ⟨branchSize, branchSmaller, branch⟩ := evaluation.loop_true_branch conditionEval.sound
           obtain ⟨bodySize, bodyStore, bodyValue, bodySmaller, bodyEval⟩ := branch.bind_computation
           obtain ⟨bodySourceSize, bodyContext, bodyOutcome, bodyHeap, bodyMap, bodyWorld, bodyTrace, bodyRelated, bodyProgress⟩ :=
-            body_reflects_at functions program evidence
+            body_reflects_at_for functions program evidence validity
               (correct _ (Nat.lt_of_lt_of_le bodySmaller (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded))) valid agrees reference (state.advance transport conditionProgress) bodyEval
           have progress := conditionProgress.trans bodyProgress
           cases bodyRelated with
@@ -419,6 +506,37 @@ theorem iterations_reflect_bounded {condition : ExpressionId} {node : Expression
                 obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
                   (ForLoop.body_continuing_post_fault conditionEval.sound bodyEval.sound postEval.sound)
                 exact ⟨_, _, postHeap, postMap, postWorld, .fault (.postContinue conditionTrace bodyTrace postTrace), .fault matched, progress.trans postProgress⟩
+
+include reflection transport in
+theorem iterations_reflect_bounded {condition : ExpressionId} {node : ExpressionNode}
+    {post : List ForItemForm} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (found : source.lookupExpression? condition = some node)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (correct : Below budget (fun size => ProtectedWhile.Body.ReflectsAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostReflectsAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+      (contextLocation := contextLocation) (location := location) (type := type)
+      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) faults post postCode))
+    (bodyCannotFault : ∀ {before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ∀ (size : Nat), size ≤ budget → ∀ {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store finalStore : Store} {value : Value},
+      State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason mapping world before store →
+      EvaluationSize size (Core.LoopExecution.entryEnvironment type location actual) store
+        (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason) value finalStore →
+      ∃ sourceSize outcome after finalMap finalWorld,
+        RecursiveNamedForContracts.ForOutcome program sourceSize context evidence source environment before condition post statements outcome after ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  apply iterations_reflect_bounded_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
 
 end BoundedReflection
 theorem iterations_success

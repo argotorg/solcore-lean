@@ -22,9 +22,9 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (reflection : ProtectedExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source certificate faults entry)
 
-def LoopPreserves {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def LoopPreservesFor (validity : SourceSemantics.Context → Prop) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome}
@@ -47,9 +47,17 @@ def LoopPreserves {scope : Scope} (condition : ExpressionId) (post : List ForIte
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
 
-def LoopReflects {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def LoopPreserves {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  LoopPreservesFor (entry := entry) (source := source) (context := context)
+    (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals)
+    (administrative := administrative) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (scope := scope) condition post statements expected type code
+
+def LoopReflectsFor (validity : SourceSemantics.Context → Prop) {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -72,7 +80,100 @@ def LoopReflects {scope : Scope} (condition : ExpressionId) (post : List ForItem
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
 
+def LoopReflects {scope : Scope} (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  LoopReflectsFor (entry := entry) (source := source) (context := context)
+    (registry := registry) (faults := faults) (frameLayout := frameLayout) (globals := globals)
+    (administrative := administrative) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (scope := scope) condition post statements expected type code
+
 variable {scope : Scope} {type : Ty} {conditionCode code postCode : Expr} {selfReason : Word}
+
+include transport in
+theorem loop_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (meaningB : Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry)) {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (unique : NodeOccurrencesUnique source)
+    (correct : Below budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (postPreserves : ∀ {actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
+      {ξ : Renaming} {contextLocation location : Location},
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      validity context →
+      Below budget (fun size => RecursiveNamedForContracts.PostPreservesAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode))
+    (postFaults : ∀ {actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
+      {ξ : Renaming} {contextLocation location : Location},
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      validity context →
+      Below budget (fun size => RecursiveNamedForContracts.PostFaultsAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) (faults := faults) post postCode)) :
+    ∀ size, size ≤ budget → RecursiveNamedForContracts.LoopPreservesAtFor (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  intro size bounded valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
+  have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
+      environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason
+      mapping (installedWorld world type) before
+      (installedStore store type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason actual) :=
+    ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
+      installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
+  have postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostPreservesAt size functions program evidence (entry := entry)
+      (source := source) (context := context) (scope := scope) (registry := registry)
+      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+      (contextLocation := contextLocation) (location := store.length) (type := type)
+      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode) :=
+    postPreserves agrees reference valid
+  have postFailed : Below budget (fun size => RecursiveNamedForContracts.PostFaultsAt size functions program evidence (entry := entry)
+      (source := source) (context := context) (scope := scope) (registry := registry)
+      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+      (contextLocation := contextLocation) (location := store.length) (type := type)
+      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) (faults := faults) post postCode) :=
+    postFaults agrees reference valid
+  cases trace with
+  | control sourceTrace =>
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
+      iterations_success_bounded_for validity sourceTrace budget bounded meaningB transport conditionTree conditionFound valid unique agrees reference correct postCorrect protectedState
+    exact ⟨value, finalStore, finalMap, finalWorld,
+      by
+        rw [LoopRenaming.iterate]
+        apply LocalLoop.iterate_evaluates
+        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
+      represented, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      (protectedState.advance transport progress).2⟩
+  | fault failed =>
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
+      iterations_fault_bounded_for validity failed budget bounded meaningB transport conditionTree conditionFound valid unique agrees reference correct postCorrect postFailed protectedState
+    exact ⟨value, finalStore, finalMap, finalWorld,
+      by
+        rw [LoopRenaming.iterate]
+        apply LocalLoop.iterate_evaluates
+        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
+      represented, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      (protectedState.advance transport progress).2⟩
 
 include transport in
 theorem loop_preserves_bounded (budget : Nat)
@@ -110,8 +211,40 @@ theorem loop_preserves_bounded (budget : Nat)
     ∀ size, size ≤ budget → RecursiveNamedForContracts.LoopPreservesAt (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
-  intro size bounded valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
-    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  apply loop_preserves_bounded_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
+
+include transport in
+theorem loop_reflects_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (reflectionB : Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry))
+    {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (correct : Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False)
+    (postReflects : ∀ {actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
+      {ξ : Renaming} {contextLocation location : Location},
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      validity context →
+      Below budget (fun size => RecursiveNamedForContracts.PostReflectsAt size functions program evidence (entry := entry) (source := source) (context := context) (scope := scope) (registry := registry)
+        (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
+        (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
+        (contextLocation := contextLocation) (location := location) (type := type)
+        (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) faults post postCode)) :
+    ∀ size, size ≤ budget → RecursiveNamedForContracts.LoopReflectsAtFor (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  intro size bounded valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
   have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
       environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason
@@ -119,46 +252,22 @@ theorem loop_preserves_bounded (budget : Nat)
       (installedStore store type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason actual) :=
     ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
       installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
-  have postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostPreservesAt size functions program evidence (entry := entry)
+  have postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostReflectsAt size functions program evidence (entry := entry)
       (source := source) (context := context) (scope := scope) (registry := registry)
       (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
       (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
       (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) post postCode) :=
-    postPreserves agrees reference valid
-  have postFailed : Below budget (fun size => RecursiveNamedForContracts.PostFaultsAt size functions program evidence (entry := entry)
-      (source := source) (context := context) (scope := scope) (registry := registry)
-      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
-      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
-      (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) (faults := faults) post postCode) :=
-    postFaults agrees reference valid
-  cases trace with
-  | control sourceTrace =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_success_bounded sourceTrace budget bounded meaningB transport conditionTree conditionFound valid unique agrees reference correct postCorrect protectedState
-    exact ⟨value, finalStore, finalMap, finalWorld,
-      by
-        rw [LoopRenaming.iterate]
-        apply LocalLoop.iterate_evaluates
-        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
-      represented, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      (protectedState.advance transport progress).2⟩
-  | fault failed =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_fault_bounded failed budget bounded meaningB transport conditionTree conditionFound valid unique agrees reference correct postCorrect postFailed protectedState
-    exact ⟨value, finalStore, finalMap, finalWorld,
-      by
-        rw [LoopRenaming.iterate]
-        apply LocalLoop.iterate_evaluates
-        exact LocalLoop.invoke_success _ _ (.var rfl) state.selfRead nativeTrace,
-      represented, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      (protectedState.advance transport progress).2⟩
-
+      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) faults post postCode) :=
+    postReflects agrees reference valid
+  rw [LoopRenaming.iterate] at evaluated
+  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress⟩ :=
+    iterations_reflect_bounded_for functions program evidence reflectionB transport validity conditionTree conditionFound valid agrees reference correct
+      postCorrect bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState nativeEntry
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
+    (installedProgress.trans progress).1, (installedProgress.trans progress).2.1,
+    (installedProgress.trans progress).2.2.1, (installedProgress.trans progress).2.2.2.1,
+    (installedProgress.trans progress).2.2.2.2, (protectedState.advance transport progress).2⟩
 include transport in
 theorem loop_reflects_bounded (budget : Nat)
     (reflectionB : Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -187,31 +296,10 @@ theorem loop_reflects_bounded (budget : Nat)
     ∀ size, size ≤ budget → RecursiveNamedForContracts.LoopReflectsAt (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
-  intro size bounded valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
-    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
-  have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
-      environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason
-      mapping (installedWorld world type) before
-      (installedStore store type (conditionCode.rename ξ) (code.rename ξ) (postCode.rename ξ) selfReason actual) :=
-    ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
-      installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
-  have postCorrect : Below budget (fun size => RecursiveNamedForContracts.PostReflectsAt size functions program evidence (entry := entry)
-      (source := source) (context := context) (scope := scope) (registry := registry)
-      (frameLayout := frameLayout) (administrative := administrative) (actualContext := actualContext)
-      (environment := environment) (canonical := canonical) (actual := actual) (ξ := ξ)
-      (contextLocation := contextLocation) (location := store.length) (type := type)
-      (conditionCode := conditionCode.rename ξ) (body := code.rename ξ) (selfReason := selfReason) faults post postCode) :=
-    postReflects agrees reference valid
-  rw [LoopRenaming.iterate] at evaluated
-  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress⟩ :=
-    iterations_reflect_bounded functions program evidence reflectionB transport conditionTree conditionFound valid agrees reference correct
-      postCorrect bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState nativeEntry
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
-    (installedProgress.trans progress).1, (installedProgress.trans progress).2.1,
-    (installedProgress.trans progress).2.2.1, (installedProgress.trans progress).2.2.2.1,
-    (installedProgress.trans progress).2.2.2.2, (protectedState.advance transport progress).2⟩
+  apply loop_reflects_bounded_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
+
 include transport meaning in
 theorem loop_preserves {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}

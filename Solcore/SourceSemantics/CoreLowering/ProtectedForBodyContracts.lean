@@ -170,12 +170,12 @@ variable (functions) (extension : SourceCoreRawMetadata.Extends values.registry 
     program context evidence source certificate faults entry)
 
 
-theorem condition_preserves_at {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
+theorem condition_preserves_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
     (meaningAt : RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)
     (tree : certificate scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
-    (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (_unique : NodeOccurrencesUnique source)
+    (_valid : validity context) (_unique : NodeOccurrencesUnique source)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
       contextLocation location type (conditionCode.rename ξ) body postCode selfReason mapping world before store)
@@ -199,12 +199,33 @@ theorem condition_preserves_at {size : Nat} {condition : ExpressionId} {node : E
 
 
 
-theorem condition_reflects_at {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
+theorem condition_preserves_at {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
+    (meaningAt : RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry)
+    (tree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (found : source.lookupExpression? condition = some node)
+    (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence) (_unique : NodeOccurrencesUnique source)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type (conditionCode.rename ξ) body postCode selfReason mapping world before store)
+    {outcome : Dynamic.ExpressionOutcome}
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment before condition outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (Core.LoopExecution.entryEnvironment type location actual) store
+        (Core.LoopExecution.conditionCode (conditionCode.rename ξ)) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld node.type .bool faults outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  apply condition_preserves_at_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
+
+theorem condition_reflects_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
     (reflectionAt : RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)
     (tree : certificate scope condition ⟨.bool, conditionCode⟩)
     (found : source.lookupExpression? condition = some node)
-    (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (_valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
       contextLocation location type (conditionCode.rename ξ) body postCode selfReason mapping world before store)
@@ -227,11 +248,32 @@ theorem condition_reflects_at {size : Nat} {condition : ExpressionId} {node : Ex
 
 
 
-theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
-    (correct : ProtectedWhile.Body.PreservesAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
-      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+theorem condition_reflects_at {size : Nat} {condition : ExpressionId} {node : ExpressionNode}
+    (reflectionAt : RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry)
+    (tree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (found : source.lookupExpression? condition = some node)
+    (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type (conditionCode.rename ξ) body postCode selfReason mapping world before store)
+    {value : Value} {finalStore : Store}
+    (evaluated : EvaluationSize size (Core.LoopExecution.entryEnvironment type location actual) store
+      (Core.LoopExecution.conditionCode (conditionCode.rename ξ)) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment before condition outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld node.type .bool faults outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  apply condition_reflects_at_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
+
+theorem body_preserves_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
+    (correct : RecursiveNamedLoopContracts.PreservesAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) size false statements expected type code)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
@@ -255,11 +297,31 @@ theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected
     represented, heaps, maps, worlds, frame, metadata⟩
 
 
-theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
-    (correct : ProtectedWhile.Body.ReflectsAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
+    (correct : ProtectedWhile.Body.PreservesAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) size false statements expected type code)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode (code.rename ξ) postCode selfReason mapping world before store)
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (trace : RecursiveNamedLoopContracts.ExecutesAt size false program context evidence source environment before statements finalContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (Core.LoopExecution.bodyEnvironment type location actual) store
+        (Core.LoopExecution.bodyCode (code.rename ξ)) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  apply body_preserves_at_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
+
+theorem body_reflects_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
+    (correct : RecursiveNamedLoopContracts.ReflectsAtFor functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (validity := validity) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code)
+    (valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
@@ -280,6 +342,26 @@ theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected 
       (.cons .bool (.cons .unit (.cons (.cellRef state.1.selfTyped) state.1.actualTyped))) reference read state.1.contextUnmapped state.2
       (by simpa only [GenericExpressionMeaning.rename_prefix, Core.LoopExecution.bodyCode, Core.LoopExecution.bodyEnvironment, Core.LoopExecution.entryEnvironment] using evaluated)
   exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, heaps, maps, worlds, frame, metadata⟩
+
+theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty} {code : Expr}
+    (correct : ProtectedWhile.Body.ReflectsAt functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode (code.rename ξ) postCode selfReason mapping world before store)
+    {value : Value} {finalStore : Store}
+    (evaluated : EvaluationSize size (Core.LoopExecution.bodyEnvironment type location actual) store
+      (Core.LoopExecution.bodyCode (code.rename ξ)) value finalStore) :
+    ∃ sourceSize finalContext outcome after finalMap finalWorld,
+      RecursiveNamedLoopContracts.ExecutesAt sourceSize false program context evidence source environment before statements finalContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore := by
+  apply body_reflects_at_for (functions := functions)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+  all_goals assumption
 
 include meaning in
 theorem condition_preserves {condition : ExpressionId} {node : ExpressionNode}
