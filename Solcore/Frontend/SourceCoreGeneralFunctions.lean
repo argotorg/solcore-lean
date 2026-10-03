@@ -394,4 +394,78 @@ def prepareWithCatalog (program : CheckedProgram) (plan : Plan) (checked : Check
       SourceCoreGeneralEntry.prepareValidated plan checked fuel (fun _ request =>
         assemble globals functions closures diagnostics request) true
 
+private theorem input_bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {value : β}
+    (accepted : (action >>= next) = .ok value) :
+    ∃ input, action = .ok input ∧ next input = .ok value := by
+  cases action with
+  | error error => cases accepted
+  | ok input => exact ⟨input, rfl, accepted⟩
+
+private theorem input_mapError_ok {α ε δ : Type} {action : Except ε α} {f : ε → δ} {value : α}
+    (accepted : action.mapError f = .ok value) : action = .ok value := by
+  cases action <;> cases accepted <;> rfl
+
+private theorem prepareInputs_receipt {representation : Representation} {source : TypedSource}
+    {scope : SourceCoreBasic.Scope} {binders : List TypedBinder} {inputs : List (TypedBinder × Core.Ty)}
+    (accepted : prepareInputs representation source scope binders = .ok inputs) :
+    inputs.map Prod.fst = binders ∧
+      ∀ index binding, inputs[index]? = some binding →
+        representation.expressions.lowerBinder source
+          ((inputs.take index).reverse.map (fun entry => (entry.1.id, entry.2)) ++ scope) binding.1 =
+            .ok binding.2 := by
+  induction binders generalizing scope inputs with
+  | nil =>
+    simp only [prepareInputs, pure, Except.pure, Except.ok.injEq] at accepted
+    subst inputs
+    exact ⟨rfl, by simp⟩
+  | cons binder binders ih =>
+    rw [prepareInputs] at accepted
+    obtain ⟨type, projected, accepted⟩ := input_bind_ok accepted
+    obtain ⟨remaining, generated, accepted⟩ := input_bind_ok accepted
+    cases accepted
+    obtain ⟨same, preceding⟩ := ih generated
+    refine ⟨by simp [same], ?_⟩
+    intro index binding found
+    cases index with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+      cases found
+      simpa using input_mapError_ok projected
+    | succ index =>
+      have next := preceding index binding (by simpa using found)
+      simpa [List.take_succ_cons, List.reverse_cons, List.map_append, List.append_assoc] using next
+
+/-- Actual function preparation keeps each binder and its original position.
+Each native type was returned by the real binder compiler with precisely the
+previously prepared prefix in scope. No packed-parameter equality is inferred. -/
+theorem prepareFunctionWithRepresentation_inputs
+    {program : CheckedProgram} {representation : Representation}
+    {specialized : SourceSpecialization.SpecializedFunction} {named : Function}
+    (accepted : prepareFunctionWithRepresentation program representation specialized = .ok named) :
+    named.specialized = specialized ∧
+      named.inputs.map Prod.fst = specialized.function.typedBody.inputs ∧
+      ∀ index binding, named.inputs[index]? = some binding →
+        representation.expressions.lowerBinder specialized.function.typedBody
+          ((named.inputs.take index).reverse.map (fun entry => (entry.1.id, entry.2))) binding.1 =
+            .ok binding.2 := by
+  unfold prepareFunctionWithRepresentation at accepted
+  obtain ⟨discarded, _, accepted⟩ := input_bind_ok accepted
+  cases discarded
+  by_cases staged : (specialized.function.returnComptime && !representation.allowStaged) = true
+  · simp [staged, throw, bind, Except.bind] at accepted
+  · simp only [staged] at accepted
+    cases shape : specialized.function.type <;>
+      simp only [shape, pure, Except.pure, throw, throwThe, MonadExceptOf.throw, bind, Except.bind] at accepted <;>
+      try contradiction
+    rename_i parameter result
+    by_cases mismatch : result ≠ specialized.function.inferredBodyType
+    · simp [mismatch] at accepted
+    · simp only [mismatch, ↓reduceIte] at accepted
+      obtain ⟨parameterType, _, accepted⟩ := input_bind_ok accepted
+      obtain ⟨resultType, _, accepted⟩ := input_bind_ok accepted
+      obtain ⟨inputs, prepared, accepted⟩ := input_bind_ok accepted
+      cases accepted
+      obtain ⟨same, preceding⟩ := prepareInputs_receipt prepared
+      exact ⟨rfl, same, by simpa using preceding⟩
+
 end Solcore.Frontend.SourceCoreGeneralFunctions
