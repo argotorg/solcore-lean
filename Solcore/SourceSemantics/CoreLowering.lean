@@ -562,6 +562,13 @@ import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramOutcomeMeaning
 import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramCallMeaning
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralRuntime
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMatchProfiles
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootArguments
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
