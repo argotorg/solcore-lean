@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedDataExpressionHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBuiltinHeadBounds
@@ -27,6 +28,7 @@ variable {checked : Checked} {base : Base checked}
   {source : TypedSource} {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
   {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word} {fuel : Nat}
   (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  {literals : GenericExpressionMeaning.Certificate}
   (unique : NodeOccurrencesUnique source)
   (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
   {faults : FunctionCalls.FaultRep}
@@ -111,6 +113,40 @@ theorem head_reflects_at (budget size : Nat) (within : size ≤ budget)
     exact RecursiveNamedExpressionHeadBounds.reflects_at functions budget size within
       (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
 
+include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
+/-- Structural induction closes every expression child of the same Tree. The
+remaining catalog-body Below family is the explicit mutual-induction boundary. -/
+theorem preserves_at_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults)
+    (budget size : Nat) (within : size ≤ budget)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCatalog.Head headers compilation source context)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites generalizing size with
+  | fragment child childSites =>
+    intro root found
+    exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
+      (ProtectedExpressionMeaning.preserves_of_typed _
+        (CompatibleExpressionBuiltins.preserves_with_literals functions extension faithful functionLeaves functionTypes
+          program evidence unique uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
+  | @node id lowered entries head children childSites ih =>
+    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Entries scope entries) faults
+        (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
+      intro child childWithin current expression code certified
+      obtain ⟨rfl, member⟩ := certified
+      exact ih expression code member child childWithin
+    intro root found
+    exact head_preserves_at functions extension faithful functionLeaves functionTypes evidence unique owners missing
+      budget size within meaning bodies head found
+
 include extension faithful functionLeaves functionTypes valid unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
@@ -123,14 +159,52 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
         fuel values source context solved reasonAt) faults
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
   intro scope id lowered tree
-  induction tree generalizing size with
-  | fragment child =>
-    exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
-      (ProtectedExpressionMeaning.preserves_of_typed _
-        (CompatibleExpressionBuiltins.preserves functions extension faithful functionLeaves functionTypes
-          program evidence valid unique uninitialized missing)) size child
-  | @node id lowered entries head children ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
+  exact preserves_at_with_literals functions extension faithful functionLeaves functionTypes evidence unique owners uninitialized missing
+    (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) budget size within bodies
+    ⟨tree, tree.literalSites⟩
+
+include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
+/-- Structural induction closes every expression child of the same Tree. The
+remaining catalog-body Below family is the explicit mutual-induction boundary. -/
+theorem preserves_at_runtime
+    (sameLedger : context.solvedRequirements = solved)
+    (runtime : RuntimeRequirementLedgerValid context)
+    (budget size : Nat) (within : size ≤ budget)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCatalog.Head headers compilation source context)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt)
+        (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate solved source id code)) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  preserves_at_with_literals functions extension faithful functionLeaves functionTypes evidence unique owners uninitialized missing
+    (CompatibleExpressionLiteralRuntime.preserves functions program context evidence sameLedger runtime unique faults) budget size within bodies
+
+include extension faithful functionLeaves functionTypes uninitialized missing in
+/-- Reflection uses the same structural Tree, with original native bounds and
+independent source costs. No source body trace is an input. -/
+theorem reflects_at_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults)
+    (budget size : Nat) (within : size ≤ budget)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCatalog.Head headers compilation source context)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites generalizing size with
+  | fragment child childSites =>
+    intro root found
+    exact RecursiveNamedBoundedContracts.reflects_at_of_unbounded
+      (ProtectedExpressionMeaning.reflects_of_typed _
+        (CompatibleExpressionBuiltins.reflects_with_literals functions extension faithful functionLeaves functionTypes
+          program evidence uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
+  | @node id lowered entries head children childSites ih =>
+    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
         (CompatibleExpressionCalls.Entries scope entries) faults
         (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
@@ -138,7 +212,7 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
       obtain ⟨rfl, member⟩ := certified
       exact ih expression code member child childWithin
     intro root found
-    exact head_preserves_at functions extension faithful functionLeaves functionTypes evidence unique owners missing
+    exact head_reflects_at functions extension faithful functionLeaves functionTypes evidence missing
       budget size within meaning bodies head found
 
 include extension faithful functionLeaves functionTypes valid uninitialized missing in
@@ -153,22 +227,26 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
         fuel values source context solved reasonAt) faults
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
   intro scope id lowered tree
-  induction tree generalizing size with
-  | fragment child =>
-    exact RecursiveNamedBoundedContracts.reflects_at_of_unbounded
-      (ProtectedExpressionMeaning.reflects_of_typed _
-        (CompatibleExpressionBuiltins.reflects functions extension faithful functionLeaves functionTypes
-          program evidence valid uninitialized missing)) size child
-  | @node id lowered entries head children ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
-        (CompatibleExpressionCalls.Entries scope entries) faults
-        (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-      intro child childWithin current expression code certified
-      obtain ⟨rfl, member⟩ := certified
-      exact ih expression code member child childWithin
-    intro root found
-    exact head_reflects_at functions extension faithful functionLeaves functionTypes evidence missing
-      budget size within meaning bodies head found
+  exact reflects_at_with_literals functions extension faithful functionLeaves functionTypes evidence uninitialized missing
+    (CompatibleExpressionLiterals.reflects functions program context evidence valid source faults) budget size within bodies
+    ⟨tree, tree.literalSites⟩
+
+include extension faithful functionLeaves functionTypes uninitialized missing in
+/-- Reflection uses the same structural Tree, with original native bounds and
+independent source costs. No source body trace is an input. -/
+theorem reflects_at_runtime
+    (sameLedger : context.solvedRequirements = solved)
+    (runtime : RuntimeRequirementLedgerValid context)
+    (budget size : Nat) (within : size ≤ budget)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCatalog.Head headers compilation source context)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt)
+        (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate solved source id code)) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  reflects_at_with_literals functions extension faithful functionLeaves functionTypes evidence uninitialized missing
+    (CompatibleExpressionLiteralRuntime.reflects functions program context evidence sameLedger runtime source faults) budget size within bodies
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBounds

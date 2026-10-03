@@ -14,6 +14,132 @@ open CompatibleExpressionIndices CoreProof
 open GenericExpressionMeaning (agree_prefix rename_prefix)
 open DataPatternValues
 
+variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word} {scope : Scope}
+
+/-- Static support for exactly the literal children of this existing tree. -/
+inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
+    {id : ExpressionId} → {lowered : SourceCoreBasic.LoweredExpr} →
+    Tree fuel values source context solved reasonAt scope id lowered → Prop where
+  | proxy {id lowered} (receipt : CompatibleExpressionProxies.Certificate values source scope id lowered)
+      :
+      LiteralSites literals (Tree.proxy (scope := scope) receipt)
+  | fragment {id lowered}
+      (child : CompatibleExpressionGeneral.Tree fuel values source context solved reasonAt scope id lowered)
+      (childSites : CompatibleExpressionGeneral.Tree.LiteralSites literals child) :
+      LiteralSites literals (Tree.fragment (scope := scope) child)
+  | group {id node inner innerNode lowered}
+      (metadata : Metadata values.checked source id node lowered.type)
+      (form : node.form = .group inner) (innerFound : source.lookupExpression? inner = some innerNode)
+      (sourceType : node.type = innerNode.type)
+      (child : Tree fuel values source context solved reasonAt scope inner lowered)
+      (childSites : Tree.LiteralSites literals child) :
+      LiteralSites literals (Tree.group (scope := scope) metadata form innerFound sourceType child)
+  | pair {id node left right leftNode rightNode first second}
+      (metadata : Metadata values.checked source id node (.product first.type second.type))
+      (form : node.form = .tuple [left, right])
+      (leftFound : source.lookupExpression? left = some leftNode) (rightFound : source.lookupExpression? right = some rightNode)
+      (sourceType : node.type = .product leftNode.type rightNode.type)
+      (firstTree : Tree fuel values source context solved reasonAt scope left first)
+      (secondTree : Tree fuel values source context solved reasonAt scope right second)
+      (firstTreeSites : Tree.LiteralSites literals firstTree) (secondTreeSites : Tree.LiteralSites literals secondTree) :
+      LiteralSites literals (Tree.pair (scope := scope) metadata form leftFound rightFound sourceType firstTree secondTree)
+  | unary {id node operand childNode operator operandType resultType core childCode}
+      (metadata : Metadata values.checked source id node core.resultType)
+      (form : node.form = .unary operator operand)
+      (found : source.lookupExpression? operand = some childNode)
+      (inputType : childNode.type = operandType) (outputType : node.type = resultType)
+      (profile : UnaryProfile operator operandType resultType core)
+      (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩)
+      (childSites : Tree.LiteralSites literals child) :
+      LiteralSites literals (Tree.unary (scope := scope) metadata form found inputType outputType profile child)
+  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+      (metadata : Metadata values.checked source id node (mode.resultType operator))
+      (form : node.form = .binary left operator right)
+      (leftFound : source.lookupExpression? left = some leftNode)
+      (rightFound : source.lookupExpression? right = some rightNode)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (outputType : node.type = resultType)
+      (profile : BinaryProfile operator operandType resultType mode)
+      (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
+      (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩)
+      (firstSites : Tree.LiteralSites literals first) (secondSites : Tree.LiteralSites literals second) :
+      LiteralSites literals (Tree.binary (scope := scope) metadata form leftFound rightFound leftType rightType outputType profile first second)
+  | conditional {id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      (metadata : Metadata values.checked source id node type)
+      (form : node.form = .conditional condition thenId elseId)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (thenFound : source.lookupExpression? thenId = some thenNode)
+      (elseFound : source.lookupExpression? elseId = some elseNode)
+      (conditionType : conditionNode.type = .bool)
+      (thenType : thenNode.type = node.type) (elseType : elseNode.type = node.type)
+      (conditionTree : Tree fuel values source context solved reasonAt scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree fuel values source context solved reasonAt scope thenId ⟨type, thenCode⟩)
+      (elseTree : Tree fuel values source context solved reasonAt scope elseId ⟨type, elseCode⟩)
+      (conditionTreeSites : Tree.LiteralSites literals conditionTree) (thenTreeSites : Tree.LiteralSites literals thenTree) (elseTreeSites : Tree.LiteralSites literals elseTree) :
+      LiteralSites literals (Tree.conditional (scope := scope) metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+  | constructor {id node instantiation ids tag header codes}
+      (receipt : CompatibleExpressionConstructors.Header values source id node instantiation tag header codes)
+      (form : node.form = .constructor instantiation ids)
+      (valid : SourceSemantics.DataConstructorInstantiation.Valid context instantiation)
+      (count : ids.length = instantiation.payloadTypes.length)
+      (nodes : CompatibleExpressionConstructors.Nodes source ids instantiation.payloadTypes codes)
+      (children : ∀ child code, (child, code) ∈ ids.zip codes →
+        Tree fuel values source context solved reasonAt scope child code)
+      (childrenSites : ∀ child code (member : (child, code) ∈ ids.zip codes),
+        Tree.LiteralSites literals (children child code member)) :
+      LiteralSites literals (Tree.constructor (scope := scope) receipt form valid count nodes children)
+  | member {id node base baseNode name index identity branches result child}
+      (metadata : Metadata values.checked source id node result)
+      (baseMetadata : Metadata values.checked source base baseNode child.type)
+      (form : node.form = .member base name index)
+      (layout : CompatibleExpressionMembers.Layout values.checked (.occurrence id.occurrence) baseNode.type node.type index identity branches result)
+      (childTree : Tree fuel values source context solved reasonAt scope base child)
+      (childTreeSites : Tree.LiteralSites literals childTree) :
+      LiteralSites literals (Tree.member (scope := scope) metadata baseMetadata form layout childTree)
+  | index {id node base key baseNode keyNode layout comparison first second}
+      (header : CompatibleExpressionIndices.Header values source id base node baseNode layout comparison first second)
+      (keyFound : source.lookupExpression? key = some keyNode)
+      (form : node.form = .index base key)
+      (sourceType : baseNode.type = .mapping keyNode.type node.type)
+      (firstTree : Tree fuel values source context solved reasonAt scope base first)
+      (secondTree : Tree fuel values source context solved reasonAt scope key second)
+      (firstTreeSites : Tree.LiteralSites literals firstTree) (secondTreeSites : Tree.LiteralSites literals secondTree) :
+      LiteralSites literals (Tree.index (scope := scope) header keyFound form sourceType firstTree secondTree)
+  | builtin {id callee arguments function node codes identity contract unknown}
+      (metadata : Metadata values.checked source id node (SourceCoreInteger.builtinResult function))
+      (form : node.form = .call callee arguments (.builtinFunction function))
+      (sourceType : node.type = function.returnType)
+      (count : arguments.length = function.parameterTypes.length)
+      (nodes : CompatibleExpressionConstructors.Nodes source arguments function.parameterTypes codes)
+      (nativeTypes : codes.map (·.type) = CompatibleBuiltinMeaning.argumentTypes function)
+      (children : ∀ child code, (child, code) ∈ arguments.zip codes →
+        Tree fuel values source context solved reasonAt scope child code)
+      (childrenSites : ∀ child code (member : (child, code) ∈ arguments.zip codes),
+        Tree.LiteralSites literals (children child code member)) :
+      LiteralSites literals (Tree.builtin (scope := scope) (identity := identity) (contract := contract) (unknown := unknown) metadata form sourceType count nodes nativeTypes children)
+
+def Tree.WithLiterals (literals : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun current id lowered => ∃ tree : Tree fuel values source context solved reasonAt current id lowered,
+    tree.LiteralSites literals
+
+/-- The original ordinary tree supplies its own leaf membership. -/
+theorem Tree.literalSites {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree fuel values source context solved reasonAt scope id lowered) :
+    tree.LiteralSites (fun _ id code => CompatibleExpressionLiterals.Certificate solved source id code) := by
+  induction tree with
+  | proxy receipt => exact .proxy receipt
+  | fragment child => exact .fragment child child.literalSites
+  | group metadata form innerFound sourceType child childIH => exact .group metadata form innerFound sourceType child childIH
+  | pair metadata form leftFound rightFound sourceType firstTree secondTree firstTreeIH secondTreeIH => exact .pair metadata form leftFound rightFound sourceType firstTree secondTree firstTreeIH secondTreeIH
+  | unary metadata form found inputType outputType profile child childIH => exact .unary metadata form found inputType outputType profile child childIH
+  | binary metadata form leftFound rightFound leftType rightType outputType profile first second firstIH secondIH => exact .binary metadata form leftFound rightFound leftType rightType outputType profile first second firstIH secondIH
+  | conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeIH thenTreeIH elseTreeIH => exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeIH thenTreeIH elseTreeIH
+  | constructor receipt form valid count nodes children childrenIH => exact .constructor receipt form valid count nodes children childrenIH
+  | member metadata baseMetadata form layout childTree childTreeIH => exact .member metadata baseMetadata form layout childTree childTreeIH
+  | index header keyFound form sourceType firstTree secondTree firstTreeIH secondTreeIH => exact .index header keyFound form sourceType firstTree secondTree firstTreeIH secondTreeIH
+  | builtin metadata form sourceType count nodes nativeTypes children childrenIH => exact .builtin metadata form sourceType count nodes nativeTypes children childrenIH
+
 private def Entries (scope : Scope) (entries : List (ExpressionId × SourceCoreBasic.LoweredExpr)) :
     GenericExpressionMeaning.Certificate := fun current id code => current = scope ∧ (id, code) ∈ entries
 
@@ -54,22 +180,26 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (functionTypes : FunctionRuntimeViews functions)
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  {literals : GenericExpressionMeaning.Certificate}
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
   (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
-include extension faithful functionLeaves functionTypes valid unique uninitialized missing in
-theorem preserves :
+include extension faithful functionLeaves functionTypes unique uninitialized missing in
+theorem preserves_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
     TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
-  intro scope id lowered tree
-  induction tree with
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
   | proxy receipt => exact CompatibleExpressionProxies.preserves functions extension program context evidence unique faults receipt
-  | fragment child =>
-    exact CompatibleExpressionGeneral.preserves functions extension faithful functionLeaves functionTypes
-      program evidence valid unique uninitialized missing child
-  | @group id node inner innerNode lowered metadata form innerFound sourceType child ih =>
+  | fragment child childSites =>
+    exact CompatibleExpressionGeneral.preserves_with_literals functions extension faithful functionLeaves functionTypes
+      program evidence unique uninitialized missing literalMeaning ⟨child, childSites⟩
+  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(inner, lowered)]) faults := by
       intro childScope childId childCode entry
@@ -80,7 +210,7 @@ theorem preserves :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     exact CompatibleExpressionTypedCompositions.Head.preserves functions program evidence unique meaning (.group metadata form innerFound sourceType (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped trace
-  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree leftIH rightIH =>
+  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(left, first), (right, second)]) faults := by
       intro childScope childId childCode entry
@@ -92,7 +222,7 @@ theorem preserves :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     exact CompatibleExpressionTypedCompositions.Head.preserves functions program evidence unique meaning (.pair metadata form leftFound rightFound sourceType (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped trace
-  | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child ih =>
+  | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child childSites ih =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(operand, ⟨core.operandType, childCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -103,7 +233,7 @@ theorem preserves :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     exact CompatibleExpressionTypedCompositions.Head.preserves functions program evidence unique meaning (.unary (childCode := childCode) metadata form childFound inputType outputType profile (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped trace
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile firstTree secondTree leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile firstTree secondTree firstSites secondSites leftIH rightIH =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(left, ⟨mode.operandType operator, leftCode⟩), (right, ⟨mode.operandType operator, rightCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -115,7 +245,7 @@ theorem preserves :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     exact CompatibleExpressionTypedCompositions.Head.preserves functions program evidence unique meaning (.binary (leftCode := leftCode) (rightCode := rightCode) metadata form leftFound rightFound leftType rightType outputType profile (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped trace
-  | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionIH thenIH elseIH =>
+  | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeSites thenTreeSites elseTreeSites conditionIH thenIH elseIH =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(condition, ⟨.bool, conditionCode⟩), (thenId, ⟨type, thenCode⟩), (elseId, ⟨type, elseCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -128,7 +258,7 @@ theorem preserves :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     exact CompatibleExpressionTypedCompositions.Head.preserves functions program evidence unique meaning (.conditional (conditionCode := conditionCode) (thenCode := thenCode) (elseCode := elseCode) metadata form conditionFound thenFound elseFound conditionType thenType elseType (⟨rfl, by simp⟩) (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped trace
-  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children ih =>
+  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children childrenSites ih =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
     subst root
@@ -156,7 +286,7 @@ theorem preserves :
       exact ⟨_, finalStore, finalMap, finalWorld, by rw [CompatibleExpressionConstructors.construct_rename]; exact CompatibleExpressionConstructors.construct_failure tag header evaluated,
         .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
 
-  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree ih =>
+  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -197,7 +327,7 @@ theorem preserves :
         cases shape
         exact False.elim (missing_excludes missing selected)
 
-  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree firstIH secondIH =>
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree firstTreeSites secondTreeSites firstIH secondIH =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (header.metadata.found.symm.trans found)
@@ -244,7 +374,7 @@ theorem preserves :
             apply SourceCoreCompatibleDataExpressions.index_completed layout (reasonAt id) firstEval secondEval
             simpa only [CompatibleMapping.Transport.expression_weaken] using lookup
 
-  | @builtin id callee arguments function node codes identity contract unknown metadata form sourceType count nodes nativeTypes children ih =>
+  | @builtin id callee arguments function node codes identity contract unknown metadata form sourceType count nodes nativeTypes children childrenSites ih =>
     have meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Children scope arguments codes) faults := by
       intro current child code entry
@@ -257,17 +387,28 @@ theorem preserves :
       (.contracted (identity := identity) (contract := contract) (unknown := unknown) metadata form sourceType sequence nativeTypes) found
 
 
-include extension faithful functionLeaves functionTypes valid uninitialized missing in
-theorem reflects :
-    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include extension faithful functionLeaves functionTypes valid unique uninitialized missing in
+theorem preserves :
+    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree fuel values source context solved reasonAt) faults := by
   intro scope id lowered tree
-  induction tree with
+  exact preserves_with_literals functions extension faithful functionLeaves functionTypes program evidence unique uninitialized missing
+    (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) ⟨tree, tree.literalSites⟩
+
+include extension faithful functionLeaves functionTypes uninitialized missing in
+theorem reflects_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
   | proxy receipt => exact CompatibleExpressionProxies.reflects functions extension program context evidence faults receipt
-  | fragment child =>
-    exact CompatibleExpressionGeneral.reflects functions extension faithful functionLeaves functionTypes
-      program evidence valid uninitialized missing child
-  | @group id node inner innerNode lowered metadata form innerFound sourceType child ih =>
+  | fragment child childSites =>
+    exact CompatibleExpressionGeneral.reflects_with_literals functions extension faithful functionLeaves functionTypes
+      program evidence uninitialized missing literalMeaning ⟨child, childSites⟩
+  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(inner, lowered)]) faults := by
       intro childScope childId childCode entry
@@ -278,7 +419,7 @@ theorem reflects :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     exact CompatibleExpressionTypedCompositions.Head.reflects functions program evidence meaning (.group metadata form innerFound sourceType (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped evaluated
-  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree leftIH rightIH =>
+  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(left, first), (right, second)]) faults := by
       intro childScope childId childCode entry
@@ -290,7 +431,7 @@ theorem reflects :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     exact CompatibleExpressionTypedCompositions.Head.reflects functions program evidence meaning (.pair metadata form leftFound rightFound sourceType (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped evaluated
-  | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child ih =>
+  | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child childSites ih =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(operand, ⟨core.operandType, childCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -301,7 +442,7 @@ theorem reflects :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     exact CompatibleExpressionTypedCompositions.Head.reflects functions program evidence meaning (.unary (childCode := childCode) metadata form childFound inputType outputType profile (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped evaluated
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile firstTree secondTree leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile firstTree secondTree firstSites secondSites leftIH rightIH =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(left, ⟨mode.operandType operator, leftCode⟩), (right, ⟨mode.operandType operator, rightCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -313,7 +454,7 @@ theorem reflects :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     exact CompatibleExpressionTypedCompositions.Head.reflects functions program evidence meaning (.binary (leftCode := leftCode) (rightCode := rightCode) metadata form leftFound rightFound leftType rightType outputType profile (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped evaluated
-  | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionIH thenIH elseIH =>
+  | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree conditionTreeSites thenTreeSites elseTreeSites conditionIH thenIH elseIH =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Entries scope [(condition, ⟨.bool, conditionCode⟩), (thenId, ⟨type, thenCode⟩), (elseId, ⟨type, elseCode⟩)]) faults := by
       intro childScope childId childCode entry
@@ -326,7 +467,7 @@ theorem reflects :
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     exact CompatibleExpressionTypedCompositions.Head.reflects functions program evidence meaning (.conditional (conditionCode := conditionCode) (thenCode := thenCode) (elseCode := elseCode) metadata form conditionFound thenFound elseFound conditionType thenType elseType (⟨rfl, by simp⟩) (⟨rfl, by simp⟩) (⟨rfl, by simp⟩)) found environments heaps locals agrees actualTyped evaluated
-  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children ih =>
+  | @constructor id node instantiation ids tag header codes receipt form valid count nodes children childrenSites ih =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (receipt.metadata.found.symm.trans found)
     subst root
@@ -361,7 +502,7 @@ theorem reflects :
         exact .value (.constructed (receipt.original.extend extension) (extension.signatures.trans values.registryOwner)
           receipt.selected projected receipt.registered (valuesRep payloads))
 
-  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree ih =>
+  | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -392,7 +533,7 @@ theorem reflects :
           exact ⟨_, after, finalMap, finalWorld, member_intro metadata form (.value childTrace sourceAt), .value related,
             finalHeaps, maps, worlds, frame, heapMetadata⟩
 
-  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree firstIH secondIH =>
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType firstTree secondTree firstTreeSites secondTreeSites firstIH secondIH =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (header.metadata.found.symm.trans found)
@@ -457,7 +598,7 @@ theorem reflects :
                   (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata⟩
 
 
-  | @builtin id callee arguments function node codes identity contract unknown metadata form sourceType count nodes nativeTypes children ih =>
+  | @builtin id callee arguments function node codes identity contract unknown metadata form sourceType count nodes nativeTypes children childrenSites ih =>
     have meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (Children scope arguments codes) faults := by
       intro current child code entry
@@ -468,5 +609,20 @@ theorem reflects :
     intro root found
     exact BuiltinCalls.Typed.Head.reflects functions functionLeaves program evidence  meaning
       (.contracted (identity := identity) (contract := contract) (unknown := unknown) metadata form sourceType sequence nativeTypes) found
+
+include extension faithful functionLeaves functionTypes valid uninitialized missing in
+theorem reflects :
+    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  intro scope id lowered tree
+  exact reflects_with_literals functions extension faithful functionLeaves functionTypes program evidence uninitialized missing
+    (CompatibleExpressionLiterals.reflects functions program context evidence valid source faults) ⟨tree, tree.literalSites⟩
+
+
+/-- Preserve the generated simplification APIs of the former single main. -/
+abbrev preserves._simp_1_1 := @preserves_with_literals._simp_1_3
+abbrev preserves._simp_1_2 := @preserves_with_literals._simp_1_4
+abbrev reflects._simp_1_1 := @reflects_with_literals._simp_1_3
+abbrev reflects._simp_1_2 := @reflects_with_literals._simp_1_4
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltins

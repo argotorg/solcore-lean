@@ -62,4 +62,34 @@ inductive Tree (calls : CallHeads) (fuel : Nat) (values : ValuesContext) (source
         Tree calls fuel values source context solved reasonAt scope child code) :
       Tree calls fuel values source context solved reasonAt scope id lowered
 
+variable {calls : CallHeads} {fuel : Nat} {values : ValuesContext} {source : TypedSource}
+  {context : SourceSemantics.Context} {solved : List SolvedRequirement}
+  {reasonAt : ExpressionId → Word} {scope : Scope}
+
+/-- Support follows the exact builtin fragment or the exact ordered child list.
+It contains no called-body or runtime law. -/
+inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
+    {id : ExpressionId} → {lowered : SourceCoreBasic.LoweredExpr} →
+    Tree calls fuel values source context solved reasonAt scope id lowered → Prop where
+  | fragment {id lowered}
+      (child : CompatibleExpressionBuiltins.Tree fuel values source context solved reasonAt scope id lowered)
+      (sites : child.LiteralSites literals) : LiteralSites literals (.fragment child)
+  | node {id lowered entries}
+      (head : Head calls values source context reasonAt (Entries scope entries) scope id lowered)
+      (children : ∀ child code, (child, code) ∈ entries →
+        Tree calls fuel values source context solved reasonAt scope child code)
+      (sites : ∀ child code (member : (child, code) ∈ entries), LiteralSites literals (children child code member)) :
+      LiteralSites literals (.node head children)
+
+def Tree.WithLiterals (literals : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun current id lowered => ∃ tree : Tree calls fuel values source context solved reasonAt current id lowered,
+    tree.LiteralSites literals
+
+theorem Tree.literalSites {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Tree calls fuel values source context solved reasonAt scope id lowered) :
+    tree.LiteralSites (fun _ id code => CompatibleExpressionLiterals.Certificate solved source id code) := by
+  induction tree with
+  | fragment child => exact .fragment child child.literalSites
+  | node head children ih => exact .node head children ih
+
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCalls
