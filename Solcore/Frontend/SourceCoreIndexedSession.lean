@@ -1348,3 +1348,73 @@ theorem Recipe.prepare_roots {compiled : SourceCoreUnifiedCompilation.Compiled} 
           · contradiction
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Successful public startup records the actual selected root and encoder.
+Its native arity is not a claim about independent source representations.
+The checkpoint keeps the same session, request, registry and encoded values. -/
+def Checkpoint.RootStart {artifact : Artifact} (session : Session artifact)
+    (key : Key) (arguments : List Value) (fuel : Nat) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ root : Root artifact.recipe.compiled,
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    root.key = key ∧ root.inputs.length = arguments.length ∧
+    ∃ encoded : Arguments artifact session.world root.types,
+      encodeArguments session.authority session.registry fuel session.values session.owner
+        root.inputs root.types arguments = .ok encoded ∧
+      checkpoint.origin = session ∧ checkpoint.request = root.request ∧
+      checkpoint.world = session.world ∧
+      checkpoint.state = .initial root.body (encoded.native.reverse ++ environment artifact) session.store ∧
+      HEq checkpoint.registry session.registry ∧ checkpoint.values = encoded.values
+
+/-- The public start equation supplies every static receipt and the original
+native initial state; it never invokes an independent source evaluator. -/
+theorem Session.start_root_receipt {artifact : Artifact} (session : Session artifact)
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (accepted : session.start key arguments fuel = .ok checkpoint) :
+    checkpoint.RootStart session key arguments fuel := by
+  unfold Session.start at accepted
+  cases found : artifact.recipe.roots.find? (fun root => decide (root.key = key)) with
+  | none => simp [found, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at accepted
+  | some root =>
+    simp only [found, pure, Except.pure, bind, Except.bind] at accepted
+    obtain ⟨checked, globals, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · rename_i lengths
+      obtain ⟨encoded, encodedEq, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨root, found, by simpa using List.find?_some found, lengths,
+        encoded, encodedEq, rfl, rfl, rfl, rfl, HEq.rfl, rfl⟩
+    · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+
+/-- A proof-only observation of the actual native machine completion. -/
+def Checkpoint.NativeDone {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (fuel : Nat) (value : Core.Value) (store : Core.Store) : Prop :=
+  Core.runStateful fuel checkpoint.state = .done value store
+
+/-- Original checkpoint completion exposes the same root and native prefix
+selected by startup. The encoder's typing is used without source attribution. -/
+theorem Checkpoint.RootStart.native_completed {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {boundaryFuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments boundaryFuel)
+    {fuel : Nat} {value : Core.Value} {store : Core.Store}
+    (completed : checkpoint.NativeDone fuel value store) :
+    ∃ root : Root artifact.recipe.compiled,
+      artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧ root.key = key ∧
+      ∃ native : Core.Environment,
+        Core.RuntimeEnvironmentHasTypes session.world native root.types artifact.program.layouts.definitions ∧
+        Core.runStateful fuel (.initial root.body (native.reverse ++ environment artifact) session.store) = .done value store := by
+  obtain ⟨root, found, keyEq, _, encoded, _, _, _, _, initial, _, _⟩ := receipt
+  exact ⟨root, found, keyEq, encoded.native, encoded.typed, by
+    simpa only [Checkpoint.NativeDone, initial] using completed⟩
+
+/-- Startup reuses the complete original store, including native globals and
+all shared captures; no heap-prefix inference enters this equality. -/
+theorem Checkpoint.RootStart.heap_size {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments fuel) :
+    checkpoint.heapSize = session.heapSize := by
+  obtain ⟨root, _, _, _, encoded, _, _, _, _, initial, _, _⟩ := receipt
+  simp only [Checkpoint.heapSize, Session.heapSize, initial, Core.State.initial]
+
+end Solcore.Frontend.SourceCoreIndexedSession
