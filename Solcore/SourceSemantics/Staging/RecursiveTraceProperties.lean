@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.Staging.RecursiveTrace
 
 /-! Origin and prefix properties of the recursive staged profile. Every
 propagated stage failure is backed by an actual rejected guard at the retained
-source occurrence, including failures escaping a selected closure body. -/
+source occurrence, including failures escaping a selected closure body or an ordered primitive operand.
+Short-circuited operands contribute no trace and therefore cannot introduce a failure. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive

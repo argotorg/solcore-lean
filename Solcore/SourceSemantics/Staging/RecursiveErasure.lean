@@ -184,6 +184,33 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact fault_occurrence occurrence (.tuple rfl (.tail a (.head b)))
+  case unary occurrence child applies ih =>
+    exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
+  case unaryOperandFault occurrence child ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.unaryOperand (owned := []) rfl ih)
+  case unaryInvalid occurrence child invalid ih =>
+    exact fault_occurrence occurrence (.unaryApply (owned := []) rfl ih (.primitive invalid))
+  case binaryLeftFault occurrence first ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.binaryLeft (owned := []) rfl ih)
+  case binaryLeftInvalid occurrence first invalid ih =>
+    exact fault_occurrence occurrence (.binaryLeftOperand (owned := []) rfl ih invalid)
+  case binaryShortCircuit occurrence first circuit ih =>
+    exact value_occurrence occurrence (.binaryShortCircuit (owned := []) rfl ih circuit rfl)
+  case binaryRightFault occurrence first continues second a b =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.binaryRight (owned := []) rfl a continues b)
+  case binary occurrence first continues second applies a b =>
+    exact value_occurrence occurrence (.binaryEvaluateRight (owned := []) rfl a continues b (.primitive applies))
+  case binaryInvalid occurrence first continues second invalid a b =>
+    exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.primitive invalid))
   case conditional occurrence test branch a b =>
     rename_i truth outcome
     cases outcome with

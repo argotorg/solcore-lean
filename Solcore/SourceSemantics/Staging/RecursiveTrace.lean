@@ -4,11 +4,11 @@ import Solcore.SourceSemantics.Staging.RecursiveScope
 uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
-The initial profile covers atomic forms, groups, binary tuples, conditionals,
+The initial profile covers atomic forms, groups, binary tuples, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, discard, and returns. It deliberately has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
-coercion paths, assignments, and loops require later recursive rules. These
+evidence-selected operator methods, coercion paths, assignments, and loops require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
@@ -65,6 +65,57 @@ mutual
         (first : Expression program registry scope context environment before left (.value value) middle)
         (second : Expression program registry scope context environment middle right (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
+    | unary {scope context environment before after id operator operand input output}
+        (occurrence : Occurrence scope id (.unary operator operand))
+        (child : Expression program registry scope context environment before operand (.value input) after)
+        (applies : UnaryPrimitiveApplies operator input output) :
+        Expression program registry scope context environment before id (.value output) after
+    | unaryOperandFault {scope context environment before after id operator operand failure}
+        (occurrence : Occurrence scope id (.unary operator operand))
+        (child : Expression program registry scope context environment before operand (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | unaryInvalid {scope context environment before after id operator operand input}
+        (occurrence : Occurrence scope id (.unary operator operand))
+        (child : Expression program registry scope context environment before operand (.value input) after)
+        (invalid : UnaryPrimitiveOperandInvalid operator input) :
+        Expression program registry scope context environment before id
+          (.fault (.semantic (.invalidUnaryOperand operator))) after
+    | binaryLeftFault {scope context environment before after id left operator right failure}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | binaryLeftInvalid {scope context environment before after id left operator right input}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value input) after)
+        (invalid : BinaryLeftOperandInvalid operator input) :
+        Expression program registry scope context environment before id
+          (.fault (.semantic (.invalidBinaryOperands operator))) after
+    | binaryShortCircuit {scope context environment before after id left operator right input output}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value input) after)
+        (circuit : ShortCircuits operator input output) :
+        Expression program registry scope context environment before id (.value output) after
+    | binaryRightFault {scope context environment before middle after id left operator right input failure}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value input) middle)
+        (continues : EvaluatesRightOperand operator input)
+        (second : Expression program registry scope context environment middle right (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | binary {scope context environment before middle after id left operator right a b output}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value a) middle)
+        (continues : EvaluatesRightOperand operator a)
+        (second : Expression program registry scope context environment middle right (.value b) after)
+        (applies : BinaryPrimitiveApplies operator a b output) :
+        Expression program registry scope context environment before id (.value output) after
+    | binaryInvalid {scope context environment before middle after id left operator right a b}
+        (occurrence : Occurrence scope id (.binary left operator right))
+        (first : Expression program registry scope context environment before left (.value a) middle)
+        (continues : EvaluatesRightOperand operator a)
+        (second : Expression program registry scope context environment middle right (.value b) after)
+        (invalid : BinaryPrimitiveOperandsInvalid operator a b) :
+        Expression program registry scope context environment before id
+          (.fault (.semantic (.invalidBinaryOperands operator))) after
     | conditional {scope context environment before middle after id condition yes no truth outcome}
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
