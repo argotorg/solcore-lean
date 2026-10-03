@@ -569,6 +569,18 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralRuntime
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMatchProfiles
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootArguments
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionGeneralRuntimeExtraction
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootSourceSignature
+import Solcore.SourceSemantics.CoreLowering.CompatiblePatternLiteralRuntime
+import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
+
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedStatementSyntaxFacts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeMatchSyntaxFactory
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
+import Solcore.SourceSemantics.CoreLowering.CompatiblePatternRuntime
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

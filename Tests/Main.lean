@@ -353,6 +353,16 @@ import Solcore.Test.SourceCoreRecursiveNamedCatalogMatchMeaning
 import Solcore.Test.SourceCoreTypedDefaultMatchContinuations
 import Solcore.Test.SourceCoreRecursiveNamedPublicRootArguments
 import Solcore.Test.SourceCoreRecursiveNamedMatchProgramMeaning
+import Solcore.Test.SourceCoreRecursiveNamedPublicRootMeaning
+import Solcore.Test.SourceCorePublicRootStartReceipt
+import Solcore.Test.SourceCoreCompatibleGeneralRuntimeExtraction
+import Solcore.Test.SourceCoreRecursiveNamedPublicStartMeaning
+import Solcore.Test.SourceCoreRecursiveNamedPublicRootSourceSignature
+import Solcore.Test.SourceCoreCompatiblePatternLiteralRuntime
+import Solcore.Test.SourceCoreCompatibleRuntimeContextValidity
+import Solcore.Test.SourceCoreRecursiveNamedImperativeMatchSyntax
+import Solcore.Test.SourceCoreRecursiveNamedExpressionRuntimeBounds
+import Solcore.Test.SourceCoreCompatiblePatternRuntime
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2862,6 +2872,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedCatalogMatchMeaning.run
   SourceCoreTypedDefaultMatchContinuations.run
   SourceCoreRecursiveNamedPublicRootArguments.run
+  SourceCoreCompatibleGeneralRuntimeExtraction.run
+  SourceCoreCompatiblePatternLiteralRuntime.run
+  SourceCoreRecursiveNamedImperativeMatchSyntax.run
+  SourceCoreCompatiblePatternRuntime.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
