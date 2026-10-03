@@ -526,6 +526,13 @@ import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
 import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
 
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallAdmission
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionInstantiationLaws
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedResidualExpressionFactory
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallScalarArguments
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceSignatureFacts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSelectedExpressionFactory
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
