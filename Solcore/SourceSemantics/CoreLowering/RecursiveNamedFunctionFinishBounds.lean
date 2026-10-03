@@ -67,12 +67,12 @@ private theorem emitted : code = CompatibleStatements.finish type flow fellThrou
   exact Except.ok.inj accepted.symm
 
 include accepted generated tree projection unique escapedFault transport in
-theorem preserves_at_match (size : Nat)
-    (meaning : RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program function.evidence
-      (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+theorem preserves_at_with (validity : SourceSemantics.Context → Prop) (size : Nat)
+    (meaning : RecursiveNamedLoopContracts.PreservesAtFor (entry := entry) functions program function.evidence validity
+      (source := function.source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       size (scope := scope) true function.body function.resultType type flow)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    (valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
@@ -111,13 +111,13 @@ theorem preserves_at_match (size : Nat)
     transport.extend installed maps worlds frame metadata⟩
 
 include accepted generated tree projection unique escapedFault transport in
-theorem reflects_at_match (budget size : Nat) (within : size ≤ budget)
+theorem reflects_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (within : size ≤ budget)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
-      RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program function.evidence
-        (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+      RecursiveNamedLoopContracts.ReflectsAtFor (entry := entry) functions program function.evidence validity
+        (source := function.source) (context := context) (registry := registry) (faults := faults)
         (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
         child (scope := scope) true function.body function.resultType type flow))
-    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    (valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
@@ -176,6 +176,76 @@ theorem reflects_at_match (budget size : Nat) (within : size ≤ budget)
   obtain ⟨outcome, bodyTrace, represented, exit⟩ := sourceResult
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, represented, finalHeaps, maps, worlds, frame, metadata,
     ⟨finalContext, control, trace.sound, exit, lexical⟩, transport.extend installed maps worlds frame metadata⟩
+
+
+include accepted generated tree projection unique escapedFault transport in
+theorem preserves_at_match (size : Nat)
+    (meaning : RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program function.evidence
+      (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      size (scope := scope) true function.body function.resultType type flow)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (installed : entry scope mapping world before store canonical)
+    (trace : BodyTrace program size function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧ entry scope finalMap finalWorld after finalStore canonical := by
+  exact preserves_at_with functions program accepted generated tree projection unique escapedFault transport
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    size meaning valid environments heaps locals agrees typed reference read unmapped installed trace
+
+include accepted generated tree projection unique escapedFault transport in
+theorem reflects_at_match (budget size : Nat) (within : size ≤ budget)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
+      RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program function.evidence
+        (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+        (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        child (scope := scope) true function.body function.resultType type flow))
+    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (installed : entry scope mapping world before store canonical)
+    (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      BodyTrace program sourceSize function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧ entry scope finalMap finalWorld after finalStore canonical := by
+  exact reflects_at_with functions program accepted generated tree projection unique escapedFault transport
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    budget size within meaning valid environments heaps locals agrees typed reference read unmapped installed evaluated
 
 
 end Match
