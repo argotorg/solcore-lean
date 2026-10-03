@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceContextFacts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogNativeContexts
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForCertificates
 
@@ -59,6 +60,57 @@ variable {locations : Locations} {functions : FunctionModel values.checked.catal
 /-- Actual cached output typing and a checked support bound remove the whole
 body/native-loop typing premise at this entry. All static child/source and
 remaining diagnostic obligations are visible in this interface. -/
+theorem extract_with_residual (residualMode : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
+    (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source invalidOperand)
+    (readPolicy : header.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      header.policy.lowerBinder header.function.source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked header.function.source scope binder)
+    (allocationPolicy : header.policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame header.globals
+      (header.layouts.allocatorAt header.owner header.active header.onError)))
+    (expressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
+      sourceContext.signatures = values.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext → expressionSyntax id →
+      header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered)
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy header.policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy header.policy values invalidProjection invalidUnary missingDefault)
+    (assignmentExpressions : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext →
+      expressionSyntax id → ∀ node, header.function.source.lookupExpression? id = some node →
+      ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+        (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered ∧
+        HasType (SourceCoreLocalCell.coreContext scope ++ (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) lowered.expression
+          (LanguageResult.resultType lowered.type) ambient.definitions)
+    (syntaxTree : GenericImperativeFor.Syntax header.function.source expressionSyntax header.context
+      (.statements true header.function.body) header.function.resultType)
+    (closed : header.context.typeVariables = []) (residual : header.context.residualTypeVariables = residualMode)
+    (sourceSignatures : header.context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations header.function.source (bodyScope header) header.context)
+    (projection : values.checked.catalog.project header.function.resultType = .ok header.output)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+      (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
+    {suffix : Core.Context}
+    (cachedTyped : HasType (base.globals.map (·.referenceType) ++ .cell prepared.layout.frame.type :: suffix)
+      (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code)
+      header.named.signature.functionType ambient.definitions)
+    (support : supported (.lambda header.named.signature.parameterType
+      (LanguageResult.resultType header.named.signature.resultType) header.code) (base.globals.length + 1) = true)
+    (complete : Complete headers) (globals : header.globals = base.globals.length)
+    (entry : BodyState headers locations 0 functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost) :
+    Nonempty (Receipt diagnosticPolicy headers header compilation expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
+  have typed := canonical_cached complete globals cachedTyped support entry
+  obtain ⟨flow, generated, extracted, _⟩ := GenericImperativeFor.extraction_of_typed_body_with_residual residualMode diagnosticPolicy factory
+    readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy header.unique assignmentExpressions
+    syntaxTree closed residual sourceSignatures declarations projection accepted typed
+  exact ⟨⟨accepted, projection, flow, generated, extracted⟩⟩
+
+/-- Compatibility entry for the former closed residual scope. -/
 theorem extract (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source invalidOperand)
     (readPolicy : header.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
@@ -103,11 +155,67 @@ theorem extract (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
       administrative actualContext actual ξ frameLocation current ghost) :
     Nonempty (Receipt diagnosticPolicy headers header compilation expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
-  have typed := canonical_cached complete globals cachedTyped support entry
-  obtain ⟨flow, generated, extracted, _⟩ := GenericImperativeFor.extraction_of_typed_body diagnosticPolicy factory
-    readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy header.unique assignmentExpressions
-    syntaxTree closed residual sourceSignatures declarations projection accepted typed
-  exact ⟨⟨accepted, projection, flow, generated, extracted⟩⟩
+  exact extract_with_residual false (diagnosticPolicy := diagnosticPolicy) (tracked := tracked) (factory := factory)
+    (readPolicy := readPolicy) (binderPolicy := binderPolicy) (allocationPolicy := allocationPolicy)
+    (expressions := expressions) (assignments := assignments) (unaryPolicy := unaryPolicy)
+    (assignmentExpressions := assignmentExpressions) (syntaxTree := syntaxTree) (closed := closed)
+    (residual := residual) (sourceSignatures := sourceSignatures) (declarations := declarations)
+    (projection := projection) (accepted := accepted) (suffix := suffix) (cachedTyped := cachedTyped)
+    (support := support) (complete := complete) (globals := globals) (entry := entry)
+
+/-- Use the real source declaration context; its residual flag is derived
+from structural instantiation and the actual monomorphic parameters. -/
+theorem extract_source (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
+    (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source invalidOperand)
+    (readPolicy : header.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      header.policy.lowerBinder header.function.source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked header.function.source scope binder)
+    (allocationPolicy : header.policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame header.globals
+      (header.layouts.allocatorAt header.owner header.active header.onError)))
+    (expressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+      sourceContext.signatures = values.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext → expressionSyntax id →
+      header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered)
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy header.policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy header.policy values invalidProjection invalidUnary missingDefault)
+    (assignmentExpressions : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext →
+      expressionSyntax id → ∀ node, header.function.source.lookupExpression? id = some node →
+      ExpressionHasType header.function.source sourceContext id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+        (fun context => Expressions headers compilation header.readFuel header.function.source context header.solved header.reasonAt) sourceContext scope id lowered ∧
+        HasType (SourceCoreLocalCell.coreContext scope ++ (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) lowered.expression
+          (LanguageResult.resultType lowered.type) ambient.definitions)
+    (syntaxTree : GenericImperativeFor.Syntax header.function.source expressionSyntax header.context
+      (.statements true header.function.body) header.function.resultType)
+    (sourceSignatures : header.context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations header.function.source (bodyScope header) header.context)
+    (projection : values.checked.catalog.project header.function.resultType = .ok header.output)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+      (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
+    {suffix : Core.Context}
+    (cachedTyped : HasType (base.globals.map (·.referenceType) ++ .cell prepared.layout.frame.type :: suffix)
+      (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code)
+      header.named.signature.functionType ambient.definitions)
+    (support : supported (.lambda header.named.signature.parameterType
+      (LanguageResult.resultType header.named.signature.resultType) header.code) (base.globals.length + 1) = true)
+    (complete : Complete headers) (globals : header.globals = base.globals.length)
+    (entry : BodyState headers locations 0 functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost) :
+    Nonempty (Receipt diagnosticPolicy headers header compilation expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
+  exact extract_with_residual true (diagnosticPolicy := diagnosticPolicy) (tracked := tracked) (factory := factory)
+    (readPolicy := readPolicy) (binderPolicy := binderPolicy) (allocationPolicy := allocationPolicy)
+    (expressions := expressions) (assignments := assignments) (unaryPolicy := unaryPolicy)
+    (assignmentExpressions := assignmentExpressions) (syntaxTree := syntaxTree)
+    (closed := RecursiveNamedSourceContextFacts.header_typeVariables header)
+    (residual := RecursiveNamedSourceContextFacts.header_residual header) (sourceSignatures := sourceSignatures)
+    (declarations := declarations) (projection := projection) (accepted := accepted) (suffix := suffix)
+    (cachedTyped := cachedTyped) (support := support) (complete := complete) (globals := globals) (entry := entry)
 
 /-- A state-indexed returned receipt plus its own residual interpretation is
 exactly the static provider consumed by mutual body induction. There is no

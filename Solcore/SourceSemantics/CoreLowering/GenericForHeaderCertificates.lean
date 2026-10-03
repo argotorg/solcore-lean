@@ -34,7 +34,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 /-- The static expression receipt is shared with ordinary assignment heads.
 Neither it nor the continuation extractor assumes a child evaluation. -/
-theorem extraction_of_lowerForItems {tracked : Bool} {diagnosticPolicy : AssignmentDiagnosticPolicy}
+theorem extraction_of_lowerForItems_with_residual (residualMode : Bool) {tracked : Bool} {diagnosticPolicy : AssignmentDiagnosticPolicy}
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand)
     (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
       policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
@@ -44,7 +44,7 @@ theorem extraction_of_lowerForItems {tracked : Bool} {diagnosticPolicy : Assignm
     (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
     (unique : NodeOccurrencesUnique source)
     (expressions : ∀ sourceContext scope fuel id lowered,
-      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
       sourceContext.signatures = values.checked.signatures →
       CompatibleExpressionReads.ScopeDeclarations source scope sourceContext →
       expressionSyntax id → ∀ node, source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
@@ -54,13 +54,13 @@ theorem extraction_of_lowerForItems {tracked : Bool} {diagnosticPolicy : Assignm
           (LanguageResult.resultType lowered.type) definitions)
     {next : Scope → Except SourceCoreBasic.Error Expr}
     (nextCertificate : ∀ context scope code,
-      context.typeVariables = [] → context.residualTypeVariables = false →
+      context.typeVariables = [] → context.residualTypeVariables = residualMode →
       context.signatures = values.checked.signatures →
       CompatibleExpressionReads.ScopeDeclarations source scope context →
       next scope = .ok code → continuation context scope code)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm}
     (syntaxTree : Syntax source expressionSyntax context items)
-    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = residualMode)
     (sourceSignatures : context.signatures = values.checked.signatures)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {fuel : Nat} {code : Expr} {nativeType : Ty}
@@ -150,6 +150,86 @@ theorem extraction_of_lowerForItems {tracked : Bool} {diagnosticPolicy : Assignm
       exact ⟨.bitNot head (Classical.choice (ih closed residual sourceSignatures declarations generatedBody
         (TypedImperative.Native.execute_continuation nativeTyped) origin.tail))⟩
 
+/-- Compatibility entry for the former closed residual scope. -/
+theorem extraction_of_lowerForItems {tracked : Bool} {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
+    (unique : NodeOccurrencesUnique source)
+    (expressions : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope sourceContext →
+      expressionSyntax id → ∀ node, source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+        certificates sourceContext scope id lowered ∧
+        HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+          (LanguageResult.resultType lowered.type) definitions)
+    {next : Scope → Except SourceCoreBasic.Error Expr}
+    (nextCertificate : ∀ context scope code,
+      context.typeVariables = [] → context.residualTypeVariables = false →
+      context.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope context →
+      next scope = .ok code → continuation context scope code)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm}
+    (syntaxTree : Syntax source expressionSyntax context items)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {code : Expr} {nativeType : Ty}
+    (accepted : SourceCoreLoops.lowerForItems policy parentSite fuel source scope items type reasonAt next = .ok code)
+    (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions)
+    (origin : AssignmentDiagnosticOrigins.HeaderOriginFor tracked source parentSite items) :
+    Nonempty (DiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source certificates definitions administrative type continuation
+      context scope items code) := by
+  exact extraction_of_lowerForItems_with_residual false (tracked := tracked) (diagnosticPolicy := diagnosticPolicy)
+    (factory := factory) (binderPolicy := binderPolicy) (allocationPolicy := allocationPolicy)
+    (assignments := assignments) (unaryPolicy := unaryPolicy) (unique := unique) (expressions := expressions)
+    (next := next) (nextCertificate := nextCertificate) (context := context) (scope := scope) (items := items)
+    (syntaxTree := syntaxTree) (closed := closed) (residual := residual) (sourceSignatures := sourceSignatures)
+    (declarations := declarations) (fuel := fuel) (code := code) (nativeType := nativeType) (accepted := accepted)
+    (nativeTyped := nativeTyped) (origin := origin)
+
+theorem tree_of_lowerForItems_with_residual (residualMode : Bool)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
+    (unique : NodeOccurrencesUnique source)
+    (expressions : ∀ sourceContext scope fuel id lowered,
+      sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
+      sourceContext.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope sourceContext →
+      expressionSyntax id → ∀ node, source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+        certificates sourceContext scope id lowered ∧
+        HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+          (LanguageResult.resultType lowered.type) definitions)
+    {next : Scope → Except SourceCoreBasic.Error Expr}
+    (nextCertificate : ∀ context scope code,
+      context.typeVariables = [] → context.residualTypeVariables = residualMode →
+      context.signatures = values.checked.signatures →
+      CompatibleExpressionReads.ScopeDeclarations source scope context →
+      next scope = .ok code → continuation context scope code)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm}
+    (syntaxTree : Syntax source expressionSyntax context items)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = residualMode)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {code : Expr} {nativeType : Ty}
+    (accepted : SourceCoreLoops.lowerForItems policy parentSite fuel source scope items type reasonAt next = .ok code)
+    (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
+    Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
+      context scope items code := by
+  exact (Classical.choice (extraction_of_lowerForItems_with_residual residualMode (AssignmentDiagnosticOrigins.Factory.unchanged .unconditional source invalidOperand) binderPolicy allocationPolicy assignments unaryPolicy unique expressions nextCertificate syntaxTree closed residual sourceSignatures declarations accepted nativeTyped True.intro)).tree
+
+/-- Compatibility entry for the former closed residual scope. -/
 theorem tree_of_lowerForItems
     (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
       policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
@@ -183,6 +263,11 @@ theorem tree_of_lowerForItems
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
     Tree layouts owner active frame globals onError values source certificates definitions administrative type continuation
       context scope items code := by
-  exact (Classical.choice (extraction_of_lowerForItems (AssignmentDiagnosticOrigins.Factory.unchanged .unconditional source invalidOperand) binderPolicy allocationPolicy assignments unaryPolicy unique expressions nextCertificate syntaxTree closed residual sourceSignatures declarations accepted nativeTyped True.intro)).tree
+  exact tree_of_lowerForItems_with_residual false (binderPolicy := binderPolicy) (allocationPolicy := allocationPolicy)
+    (assignments := assignments) (unaryPolicy := unaryPolicy) (unique := unique) (expressions := expressions)
+    (next := next) (nextCertificate := nextCertificate) (context := context) (scope := scope) (items := items)
+    (syntaxTree := syntaxTree) (closed := closed) (residual := residual) (sourceSignatures := sourceSignatures)
+    (declarations := declarations) (fuel := fuel) (code := code) (nativeType := nativeType) (accepted := accepted)
+    (nativeTyped := nativeTyped)
 
 end Solcore.SourceSemantics.CoreLowering.GenericForHeader

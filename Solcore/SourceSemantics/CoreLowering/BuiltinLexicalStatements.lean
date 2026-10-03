@@ -45,13 +45,13 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 /-- Arbitrarily mixed ordinary lets are extracted from the real
 compiler, including each actual marker/snapshot allocator receipt. -/
-theorem tree_of_flow
+theorem tree_of_flow_with_residual (residualMode : Bool)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
     (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
       policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
     (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
       (layouts.allocatorAt owner active onError)))
-    (extractExpressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+    (extractExpressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
       sourceContext.signatures = values.checked.signatures →
       ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations source scope sourceContext → expressionSyntax id →
       source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
@@ -59,7 +59,7 @@ theorem tree_of_flow
       certificates sourceContext scope id lowered)
     {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId} {expected : TypeSystem.Ty}
     (syntaxTree : Syntax source expressionSyntax context mode statements expected)
-    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = residualMode)
     (sourceSignatures : context.signatures = values.checked.signatures)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {fuel : Nat} {type : Ty} {code : Expr} {selfReason : Word}
@@ -244,7 +244,66 @@ theorem tree_of_flow
           (extractExpressions context closed residual sourceSignatures declarations conditionSyntax conditionFound typed generatedCondition)
           (thenIH closed residual sourceSignatures declarations projection generatedThen) (elseIH closed residual sourceSignatures declarations projection generatedElse) (restIH closed residual sourceSignatures declarations projection generatedBody)
 
+/-- Compatibility entry for the former closed residual scope. -/
+theorem tree_of_flow
+    (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (extractExpressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = false →
+      sourceContext.signatures = values.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations source scope sourceContext → expressionSyntax id →
+      source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+      certificates sourceContext scope id lowered)
+    {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source expressionSyntax context mode statements expected)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = false)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {type : Ty} {code : Expr} {selfReason : Word}
+    (projection : values.checked.catalog.project expected = .ok type)
+    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt mode selfReason = .ok code) :
+    Tree layouts owner active frame globals onError values source certificates
+      context scope mode statements expected type code := by
+  exact tree_of_flow_with_residual false (readPolicy := readPolicy) (binderPolicy := binderPolicy)
+    (allocationPolicy := allocationPolicy) (extractExpressions := extractExpressions) (context := context)
+    (scope := scope) (mode := mode) (statements := statements) (expected := expected) (syntaxTree := syntaxTree)
+    (closed := closed) (residual := residual) (sourceSignatures := sourceSignatures) (declarations := declarations)
+    (fuel := fuel) (type := type) (code := code) (selfReason := selfReason) (projection := projection)
+    (accepted := accepted)
+
 /-- The complete production body wrapper keeps the extracted binding spine. -/
+theorem tree_of_body_with_residual (residualMode : Bool)
+    (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked source scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (extractExpressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = residualMode →
+      sourceContext.signatures = values.checked.signatures →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations source scope sourceContext → expressionSyntax id →
+      source.lookupExpression? id = some node → ExpressionHasType source sourceContext id node.type →
+      policy.lowerExpression fuel source scope id reasonAt = .ok lowered →
+      certificates sourceContext scope id lowered)
+    {context : SourceSemantics.Context} {scope : Scope} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (syntaxTree : Syntax source expressionSyntax context true statements expected)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = residualMode)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {fuel : Nat} {type : Ty} {code : Expr} {fellThrough escaped : Word}
+    (projection : values.checked.catalog.project expected = .ok type)
+    (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel source scope statements type reasonAt fellThrough escaped = .ok code) :
+    ∃ flow, code = CompatibleStatements.finish type flow fellThrough escaped ∧
+      Tree layouts owner active frame globals onError values source certificates
+        context scope true statements expected type flow := by
+  unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
+  obtain ⟨flow, generated, same⟩ := bind_ok accepted
+  cases same
+  exact ⟨flow, rfl, tree_of_flow_with_residual residualMode readPolicy binderPolicy allocationPolicy extractExpressions syntaxTree closed residual sourceSignatures declarations projection generated⟩
+
+/-- Compatibility entry for the former closed residual scope. -/
 theorem tree_of_body
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
     (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
@@ -268,10 +327,12 @@ theorem tree_of_body
     ∃ flow, code = CompatibleStatements.finish type flow fellThrough escaped ∧
       Tree layouts owner active frame globals onError values source certificates
         context scope true statements expected type flow := by
-  unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
-  obtain ⟨flow, generated, same⟩ := bind_ok accepted
-  cases same
-  exact ⟨flow, rfl, tree_of_flow readPolicy binderPolicy allocationPolicy extractExpressions syntaxTree closed residual sourceSignatures declarations projection generated⟩
+  exact tree_of_body_with_residual false (readPolicy := readPolicy) (binderPolicy := binderPolicy)
+    (allocationPolicy := allocationPolicy) (extractExpressions := extractExpressions) (context := context)
+    (scope := scope) (statements := statements) (expected := expected) (syntaxTree := syntaxTree) (closed := closed)
+    (residual := residual) (sourceSignatures := sourceSignatures) (declarations := declarations) (fuel := fuel)
+    (type := type) (code := code) (fellThrough := fellThrough) (escaped := escaped) (projection := projection)
+    (accepted := accepted)
 
 end Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements
 
