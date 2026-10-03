@@ -116,6 +116,18 @@ theorem Tree.fallthrough_at {context : SourceSemantics.Context} {scope : Scope}
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerIH =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
+    · cases GenericLexicalStatements.block_terminates exactUnique found form stops head
+    · cases terminal
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType typed thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
+    · cases GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops head
+    · cases terminal
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot =>
     trivial
 

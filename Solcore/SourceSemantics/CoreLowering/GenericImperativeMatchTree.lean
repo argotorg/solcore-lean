@@ -180,6 +180,27 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
 
+  | terminalBlock {context mode id node statements rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = expected)
+      (inner : Syntax source expressionSyntax context (.statements false statements) expected)
+      (stops : GenericLexicalStatements.Stopped source statements) :
+      Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
+  | terminalIf {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (sourceType : node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : Syntax source expressionSyntax context (.statements false thenBody) expected)
+      (elseSyntax : Syntax source expressionSyntax context (.statements false elseBody) expected)
+      (thenStops : GenericLexicalStatements.Stopped source thenBody)
+      (elseStops : GenericLexicalStatements.Stopped source elseBody) :
+      Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
     (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
     (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
@@ -377,6 +398,27 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
         context scope (.statements mode rest) expected type body) :
       Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
         context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type matched body)
+
+  | terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type innerCode)
+      (stops : GenericLexicalStatements.Stopped source statements)
+      (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+        (LocalLoop.sequence type innerCode suffix)
+  | terminalIf {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false thenBody) expected type thenCode)
+      (elseTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false elseBody) expected type elseCode)
+      (thenStops : GenericLexicalStatements.Stopped source thenBody) (elseStops : GenericLexicalStatements.Stopped source elseBody)
+      (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
+        (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) suffix)
 
 namespace Tree
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -590,6 +632,33 @@ inductive ErrorsFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry : 
       (remainingErrors : ErrorsFor diagnosticPolicy registry faults remaining) :
       ErrorsFor diagnosticPolicy registry faults (.matchWith found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation
         sameValues sameDefinitions allocator requests receipt ordinary children remaining)
+
+  | terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} {form : node.form = .block statements}
+      {inner : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false statements) expected type innerCode}
+      {stops : GenericLexicalStatements.Stopped source statements}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      (innerErrors : ErrorsFor diagnosticPolicy registry faults inner) :
+      ErrorsFor diagnosticPolicy registry faults (.terminalBlock unique found form inner stops issued)
+  | terminalIf {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} {form : node.form = .ifThen condition thenBody (some elseBody)}
+      {conditionFound : source.lookupExpression? condition = some conditionNode}
+      {conditionType : conditionNode.type = .bool}
+      {conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩}
+      {thenTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false thenBody) expected type thenCode}
+      {elseTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false elseBody) expected type elseCode}
+      {thenStops : GenericLexicalStatements.Stopped source thenBody}
+      {elseStops : GenericLexicalStatements.Stopped source elseBody}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      (thenErrors : ErrorsFor diagnosticPolicy registry faults thenTree)
+      (elseErrors : ErrorsFor diagnosticPolicy registry faults elseTree) :
+      ErrorsFor diagnosticPolicy registry faults
+        (.terminalIf unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued)
 
 /-- The original receipt selects unconditional assignment diagnostics. -/
 abbrev Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -891,6 +960,11 @@ theorem ErrorsFor.reachable {diagnosticPolicy : AssignmentDiagnosticPolicy}
     exact @ErrorsFor.initializerBitNot layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative .reachable registry faults context scope assignment rest body condition post statements expected type head remaining ih_remainingErrors headErrors
   | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining childErrors remainingErrors ih_childErrors ih_remainingErrors =>
     exact @ErrorsFor.matchWith layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative .reachable registry faults context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining ih_childErrors ih_remainingErrors
+
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix unique found form inner stops issued innerErrors innerIH =>
+    exact .terminalBlock (unique := unique) (found := found) (form := form) (stops := stops) (issued := issued) innerIH
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
+    exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenIH elseIH
 
 end Tree
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeMatch

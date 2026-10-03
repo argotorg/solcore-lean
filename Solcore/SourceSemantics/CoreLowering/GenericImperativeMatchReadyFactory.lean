@@ -271,6 +271,36 @@ inductive SiteLedgersFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (solved
       (remainingErrorsLedger : SiteLedgersFor diagnosticPolicy solved registry faults remainingErrors) :
       SiteLedgersFor diagnosticPolicy solved registry faults (@ErrorsFor.matchWith layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative diagnosticPolicy registry faults context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining childErrors remainingErrors)
 
+  | terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} {form : node.form = .block statements}
+      {inner : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false statements) expected type innerCode}
+      {stops : GenericLexicalStatements.Stopped source statements}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      {innerErrors : ErrorsFor diagnosticPolicy registry faults inner}
+      (innerLedger : SiteLedgersFor diagnosticPolicy solved registry faults innerErrors) :
+      SiteLedgersFor diagnosticPolicy solved registry faults (ErrorsFor.terminalBlock (unique := unique) (found := found) (form := form) (stops := stops) (issued := issued) innerErrors)
+  | terminalIf {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} {form : node.form = .ifThen condition thenBody (some elseBody)}
+      {conditionFound : source.lookupExpression? condition = some conditionNode}
+      {conditionType : conditionNode.type = .bool}
+      {conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩}
+      {thenTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false thenBody) expected type thenCode}
+      {elseTree : Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements false elseBody) expected type elseCode}
+      {thenStops : GenericLexicalStatements.Stopped source thenBody}
+      {elseStops : GenericLexicalStatements.Stopped source elseBody}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      {thenErrors : ErrorsFor diagnosticPolicy registry faults thenTree}
+      {elseErrors : ErrorsFor diagnosticPolicy registry faults elseTree}
+      (thenLedger : SiteLedgersFor diagnosticPolicy solved registry faults thenErrors)
+      (elseLedger : SiteLedgersFor diagnosticPolicy solved registry faults elseErrors) :
+      SiteLedgersFor diagnosticPolicy solved registry faults
+        (ErrorsFor.terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenErrors elseErrors)
+
 /-- Original ledger receipt at the unconditional diagnostic specialization. -/
 abbrev SiteLedgers (solved : List SolvedRequirement)
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -635,6 +665,13 @@ theorem SiteLedgersFor.ready {diagnosticPolicy : AssignmentDiagnosticPolicy} {so
   | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining childErrors remainingErrors sameLedger childLedgers remainingErrorsLedger childErrorsIH remainingErrorsIH =>
     intro valid signatures
     exact @ReadyFor.matchWith layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative diagnosticPolicy registry faults context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining (CompatibleMatchContextFactory.of_context valid signatures sameValues sameLedger) (fun request member childContext related => childErrorsIH request member childContext related (CompatibleMatchContextFactory.scoped_context related valid) (related.closed_fields.1.trans signatures)) (remainingErrorsIH valid signatures)
+
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix unique found form inner stops issued innerErrors innerLedger innerIH =>
+    intro valid signatures
+    exact .terminalBlock (unique := unique) (found := found) (form := form) (stops := stops) (issued := issued) (innerIH valid signatures)
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenLedger elseLedger thenIH elseIH =>
+    intro valid signatures
+    exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) (thenIH valid signatures) (elseIH valid signatures)
 
 theorem SiteLedgers.ready {solved : List SolvedRequirement}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
