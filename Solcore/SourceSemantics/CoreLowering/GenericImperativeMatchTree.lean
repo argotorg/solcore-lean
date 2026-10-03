@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForPost
 import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.GenericMatchChildren
@@ -199,6 +200,25 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (elseSyntax : Syntax source expressionSyntax context (.statements false elseBody) expected)
       (thenStops : GenericLexicalStatements.Stopped source thenBody)
       (elseStops : GenericLexicalStatements.Stopped source elseBody) :
+      Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
+  | terminalMatch {context mode id node resolution scrutineeNode rest expected control caseFacts}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (sourceType : node.type = .unit ∨ node.type = expected)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type)
+      (scrutineeSyntax : expressionSyntax resolution.scrutinee)
+      (casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts)
+      (defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts)
+      (hiddenOrdinary : source.inputs.any (fun input => decide (input.id = resolution.hiddenScrutinee)) = false)
+      (armsOrdinary : ∀ arm ∈ resolution.cases, ∀ binder ∈ arm.pattern.binderIds,
+        source.inputs.any (fun input => decide (input.id = binder)) = false)
+      (children : ∀ request childContext,
+        GenericMatchChildren.ContextFor source context scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        Syntax source expressionSyntax childContext (.statements false request.statements) expected)
+      (stops : ReachableMatchContinuations.DefaultStopped source id resolution) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
@@ -419,6 +439,31 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
       (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
       Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type
         (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) suffix)
+
+  | terminalMatch {context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type)
+      (casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts)
+      (defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts)
+      (compilation : SourceCoreCompatibleDataMatches.Context)
+      (sameValues : compilation.values = values) (sameDefinitions : compilation.definitions = definitions)
+      (allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+        (layouts.allocatorAt owner active onError)))
+      (requests : List GenericMatchChildren.Request)
+      (receipt : CompatibleMatchCertificates.Certificate compilation source scope id resolution type selfReason
+        (certificates context) (GenericMatchChildren.Occurs requests) matched)
+      (ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt)
+      (children : ∀ request, request ∈ requests → ∀ childContext,
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+          childContext request.scope (.statements false request.statements) expected type request.code)
+      (stops : ReachableMatchContinuations.DefaultStopped source id resolution)
+      (issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type matched suffix)
 
 namespace Tree
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -659,6 +704,33 @@ inductive ErrorsFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry : 
       (elseErrors : ErrorsFor diagnosticPolicy registry faults elseTree) :
       ErrorsFor diagnosticPolicy registry faults
         (.terminalIf unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued)
+
+  | terminalMatch {context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} (form : node.form = .matchWith resolution)
+      {scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode}
+      {scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type}
+      {casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts}
+      {defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts}
+      {compilation : SourceCoreCompatibleDataMatches.Context}
+      {sameValues : compilation.values = values} (sameDefinitions : compilation.definitions = definitions)
+      {allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+        (layouts.allocatorAt owner active onError))}
+      {requests : List GenericMatchChildren.Request}
+      {receipt : CompatibleMatchCertificates.Certificate compilation source scope id resolution type selfReason
+        (certificates context) (GenericMatchChildren.Occurs requests) matched}
+      {ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt}
+      {children : ∀ request, request ∈ requests → ∀ childContext,
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+          childContext request.scope (.statements false request.statements) expected type request.code}
+      {stops : ReachableMatchContinuations.DefaultStopped source id resolution}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      (childErrors : ∀ request member childContext valid, ErrorsFor diagnosticPolicy registry faults (children request member childContext valid))
+      :
+      ErrorsFor diagnosticPolicy registry faults (.terminalMatch unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation
+        sameValues sameDefinitions allocator requests receipt ordinary children stops issued)
 
 /-- The original receipt selects unconditional assignment diagnostics. -/
 abbrev Errors (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -965,6 +1037,9 @@ theorem ErrorsFor.reachable {diagnosticPolicy : AssignmentDiagnosticPolicy}
     exact .terminalBlock (unique := unique) (found := found) (form := form) (stops := stops) (issued := issued) innerIH
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
     exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenIH elseIH
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childErrors childrenIH =>
+    exact @ErrorsFor.terminalMatch layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative .reachable registry faults context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childrenIH
 
 end Tree
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeMatch

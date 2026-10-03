@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
 import Solcore.SourceSemantics.CoreLowering.ForSourceInduction
 import Solcore.SourceSemantics.CoreLowering.ForSourceViews
@@ -277,6 +278,36 @@ theorem Tree.control_shapeAt {context : SourceSemantics.Context} {scope : Scope}
       cases boolean with
       | false => exact (elseIH branchTrace).restore environment
       | true => exact (thenIH branchTrace).restore environment
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts
+      exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator
+      requests receipt ordinary children stops issued childIH =>
+    intro program actualContext finalContext evidence environment before after outcome executed
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops head
+    · apply match_control_shape unique contains form _ _ head
+      · intro arm member
+        cases receipt with
+        | @matchWith certificateNode statementType childNode payload scrutinee nativeArms fallback branches code
+            read allowed sourceForm requirements hiddenOwned hiddenFresh scrutineeOwned childFound projection
+            expression sameType armCertificates fallbackCertificate branchCertificates hiddenCompiled =>
+          have sameNode : childNode = scrutineeNode := Option.some.inj (childFound.symm.trans scrutineeFound)
+          subst childNode
+          obtain ⟨request, childContext, retained, sameBody, selectedContext⟩ := arm_request armCertificates casesTyped member
+          have shape : ControlShapeAt source (.statements false request.statements) :=
+            childIH request retained childContext selectedContext
+          rw [← sameBody]
+          exact @shape
+      · intro statements selected
+        cases receipt with
+        | matchWith read allowed sourceForm requirements hiddenOwned hiddenFresh scrutineeOwned childFound projection
+            expression sameType armCertificates fallbackCertificate branchCertificates hiddenCompiled =>
+          rw [selected] at fallbackCertificate
+          cases fallbackCertificate with
+          | some certified =>
+            exact childIH ⟨_, statements, _⟩ certified context (.default selected rfl)
+
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot => trivial
 
 theorem Tree.control_shape {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}

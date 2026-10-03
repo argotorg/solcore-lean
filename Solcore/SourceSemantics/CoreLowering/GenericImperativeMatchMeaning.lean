@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeWhileComposition
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeWhileReflection
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
@@ -261,6 +262,34 @@ inductive ReadyFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (registry : S
       (elseErrors : ReadyFor diagnosticPolicy registry faults elseTree) :
       ReadyFor diagnosticPolicy registry faults
         (.terminalIf unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued)
+
+  | terminalMatch {context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node} (form : node.form = .matchWith resolution)
+      {scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode}
+      {scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type}
+      {casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts}
+      {defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts}
+      {compilation : SourceCoreCompatibleDataMatches.Context}
+      {sameValues : compilation.values = values} (sameDefinitions : compilation.definitions = definitions)
+      {allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+        (layouts.allocatorAt owner active onError))}
+      {requests : List GenericMatchChildren.Request}
+      {receipt : CompatibleMatchCertificates.Certificate compilation source scope id resolution type selfReason
+        (certificates context) (GenericMatchChildren.Occurs requests) matched}
+      {ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt}
+      {children : ∀ request, request ∈ requests → ∀ childContext,
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+          childContext request.scope (.statements false request.statements) expected type request.code}
+      {stops : ReachableMatchContinuations.DefaultStopped source id resolution}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      (patternContext : CompatiblePatternLeaves.ContextValid compilation context)
+      (childErrors : ∀ request member childContext valid, ReadyFor diagnosticPolicy registry faults (children request member childContext valid))
+      :
+      ReadyFor diagnosticPolicy registry faults (.terminalMatch unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation
+        sameValues sameDefinitions allocator requests receipt ordinary children stops issued)
 
 /-- The original receipt selects unconditional assignment diagnostics. -/
 abbrev Ready (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -570,6 +599,9 @@ theorem ReadyFor.reachable {diagnosticPolicy : AssignmentDiagnosticPolicy}
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
     exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenIH elseIH
 
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued patternContext childErrors childrenIH =>
+    exact @ReadyFor.terminalMatch layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative .reachable registry faults context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued patternContext childrenIH
+
 /-- Discarding pattern-context receipts recovers the original diagnostics tree. -/
 theorem ReadyFor.errors {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     {context scope position expected type code}
@@ -604,6 +636,9 @@ theorem ReadyFor.errors {diagnosticPolicy : AssignmentDiagnosticPolicy} {registr
     exact .terminalBlock (unique := unique) (found := found) (form := form) (stops := stops) (issued := issued) innerIH
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
     exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenIH elseIH
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued patternContext childErrors childrenIH =>
+    exact @ErrorsFor.terminalMatch layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative diagnosticPolicy registry faults context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childrenIH
 
 theorem Ready.errors {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     {context scope position expected type code}
@@ -1004,6 +1039,16 @@ theorem Tree.preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (un
         patternContext catalogValid scrutineeFound casesTyped defaultTyped unique (meaning context) childrenIH)
       remainingIH
 
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued patternContext childErrors childrenIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    exact sequence_stopped_preserves exactUnique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
+      (globals := globals) found (by intro expression; simp [form])
+      (head_preserves onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped unique (meaning context) childrenIH)
+      (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
+
 include definitions registered extension meaning faithful observations catalogValid in
 theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
@@ -1230,6 +1275,16 @@ theorem Tree.reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (fun
       (head_reflects onError allocator functions definitions registered extension receipt ordinary
         patternContext catalogValid scrutineeFound casesTyped defaultTyped  (reflection context) childrenIH)
       remainingIH
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued patternContext childErrors childrenIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    exact sequence_stopped_reflects exactUnique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame)
+      (globals := globals) found (by intro expression; simp [form])
+      (head_reflects onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped (reflection context) childrenIH)
+      (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
 
 include definitions registered extension meaning reflection faithful observations catalogValid in
 theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)

@@ -301,6 +301,37 @@ inductive SiteLedgersFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (solved
       SiteLedgersFor diagnosticPolicy solved registry faults
         (ErrorsFor.terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) thenErrors elseErrors)
 
+  | terminalMatch
+      {context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts}
+      {unique : NodeOccurrencesUnique source}
+      {found : source.lookupStatement? id = some node}
+      (form : node.form = .matchWith resolution)
+      {scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode}
+      {scrutineeTyped : ExpressionHasType source context resolution.scrutinee scrutineeNode.type}
+      {casesTyped : MatchCasesHaveType source control context scrutineeNode.type resolution.cases caseFacts}
+      {defaultTyped : ∀ statements, resolution.defaultBody = some statements →
+        ∃ finalContext facts, StatementsHaveType source control context statements finalContext facts}
+      {compilation : SourceCoreCompatibleDataMatches.Context}
+      {sameValues : compilation.values = values}
+      (sameDefinitions : compilation.definitions = definitions)
+      {allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+        (layouts.allocatorAt owner active onError))}
+      {requests : List GenericMatchChildren.Request}
+      {receipt : CompatibleMatchCertificates.Certificate compilation source scope id resolution type selfReason
+        (certificates context) (GenericMatchChildren.Occurs requests) matched}
+      {ordinary : CompatibleMatchSelectionPrefix.Ordinary receipt}
+      {children : ∀ request, request ∈ requests → ∀ childContext,
+        GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+        Tree layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+          childContext request.scope (.statements false request.statements) expected type request.code}
+      {stops : ReachableMatchContinuations.DefaultStopped source id resolution}
+      {issued : GenericLexicalStatements.IssuedSuffix source scope mode rest type suffix}
+      {childErrors : ∀ request member childContext valid, ErrorsFor diagnosticPolicy registry faults (children request member childContext valid)}
+      (sameLedger : compilation.solvedRequirements = solved)
+      (childLedgers : ∀ request member childContext related, SiteLedgersFor diagnosticPolicy solved registry faults (childErrors request member childContext related))
+      :
+      SiteLedgersFor diagnosticPolicy solved registry faults (@ErrorsFor.terminalMatch layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative diagnosticPolicy registry faults context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childErrors)
+
 /-- Original ledger receipt at the unconditional diagnostic specialization. -/
 abbrev SiteLedgers (solved : List SolvedRequirement)
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -672,6 +703,13 @@ theorem SiteLedgersFor.ready {diagnosticPolicy : AssignmentDiagnosticPolicy} {so
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix unique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenLedger elseLedger thenIH elseIH =>
     intro valid signatures
     exact .terminalIf (unique := unique) (found := found) (form := form) (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree) (thenStops := thenStops) (elseStops := elseStops) (issued := issued) (thenIH valid signatures) (elseIH valid signatures)
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childErrors sameLedger childLedgers childrenIH =>
+    intro valid signatures
+    exact @ReadyFor.terminalMatch layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative diagnosticPolicy registry faults context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued
+      (CompatibleMatchContextFactory.of_context valid signatures sameValues sameLedger)
+      (fun request member childContext related => childrenIH request member childContext related
+        (CompatibleMatchContextFactory.scoped_context related valid) (related.closed_fields.1.trans signatures))
 
 theorem SiteLedgers.ready {solved : List SolvedRequirement}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}

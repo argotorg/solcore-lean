@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 
 /-! The source function result annotation is fixed by actual successful
@@ -128,6 +129,13 @@ theorem Tree.fallthrough_at {context : SourceSemantics.Context} {scope : Scope}
       ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
     · cases GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops head
     · cases terminal
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued childIH =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
+    · cases ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops head
+    · cases terminal
+
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot =>
     trivial
 

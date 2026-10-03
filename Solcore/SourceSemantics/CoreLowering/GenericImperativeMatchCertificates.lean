@@ -584,6 +584,60 @@ theorem extraction_of_typed_position_with_residual (residualMode : Bool) (diagno
       · exact Classical.choice (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped)
 
 
+  | @terminalMatch context mode id node resolution scrutineeNode rest expected control caseFacts
+      exactUnique found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped
+      hiddenOrdinary armsOrdinary children stops childIH =>
+    simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((unary_read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form, matchPolicy] at accepted
+      obtain ⟨matched, generatedMatch, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨matchedType, matchedTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨requests, receipt, _, generatedChildren⟩ := CompatibleMatchNativeReceipts.finite_typed_of_lower
+        onError matchAllocator matchDefinitions (expressionCertificate := certificates context)
+        (fun childFuel lowered generated => expressions context closed residual sourceSignatures declarations
+          scrutineeSyntax scrutineeFound scrutineeTyped generated) generatedMatch matchedTyped
+      let descendants : ∀ request, request ∈ requests → ∀ childContext,
+          GenericMatchChildren.ScopedContextFor source context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
+          ExtractionFor diagnosticPolicy layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative matchCompilation.solvedRequirements
+            childContext request.scope (.statements false request.statements) expected type request.code :=
+        fun request member childContext selectedContext => Classical.choice (by
+          obtain ⟨⟨childFuel, generated⟩, childTyped⟩ := generatedChildren request member
+          have childDeclarations :=
+            matchChildStatic scrutineeFound declarations receipt matchedTyped request member childContext selectedContext
+          obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := GenericMatchChildren.ScopedContextFor.closed_fields selectedContext
+          exact childIH request childContext selectedContext.forget (sameVariables.trans closed) (sameResidual.trans residual)
+            (sameSignatures.trans sourceSignatures) childDeclarations projection generated childTyped)
+      have issued := GenericLexicalStatements.IssuedSuffix.of_accepted generatedBody
+      let ordinary := CompatibleMatchSelectionPrefix.ordinary_of_source_ids receipt hiddenOrdinary armsOrdinary
+      refine ⟨⟨.terminalMatch exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped matchCompilation
+        matchValues matchDefinitions matchAllocator requests receipt ordinary
+        (fun request member childContext related => (descendants request member childContext related).tree) stops issued,
+        (fun registry faults => ∀ request member childContext related,
+          (descendants request member childContext related).diagnostics registry faults), ?_⟩⟩
+      intro registry faults supplied
+      let childErrors := fun request member childContext related =>
+        ((descendants request member childContext related).materialize registry faults
+          (supplied request member childContext related)).1
+      let childLedgers := fun request member childContext related =>
+        ((descendants request member childContext related).materialize registry faults
+          (supplied request member childContext related)).2
+      exact ⟨.terminalMatch (unique := exactUnique) (found := found) (scrutineeFound := scrutineeFound)
+          (scrutineeTyped := scrutineeTyped) (casesTyped := casesTyped) (defaultTyped := defaultTyped)
+          (sameValues := matchValues) (allocator := matchAllocator) (receipt := receipt) (ordinary := ordinary)
+          (stops := stops) (issued := issued) form matchDefinitions childErrors,
+        .terminalMatch (unique := exactUnique) (found := found) (scrutineeFound := scrutineeFound)
+          (scrutineeTyped := scrutineeTyped) (casesTyped := casesTyped) (defaultTyped := defaultTyped)
+          (sameValues := matchValues) (allocator := matchAllocator) (receipt := receipt) (ordinary := ordinary)
+          (stops := stops) (issued := issued) form matchDefinitions rfl childLedgers⟩
+
 /-- Compatibility entry for the original closed residual context. -/
 theorem extraction_of_typed_position_with_diagnostics (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand)
