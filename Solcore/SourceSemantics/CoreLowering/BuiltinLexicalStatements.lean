@@ -244,6 +244,47 @@ theorem tree_of_flow_with_residual (residualMode : Bool)
           (extractExpressions context closed residual sourceSignatures declarations conditionSyntax conditionFound typed generatedCondition)
           (thenIH closed residual sourceSignatures declarations projection generatedThen) (elseIH closed residual sourceSignatures declarations projection generatedElse) (restIH closed residual sourceSignatures declarations projection generatedBody)
 
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨innerCode, generatedInner, accepted⟩ := bind_ok accepted
+      obtain ⟨suffix, generatedSuffix, accepted⟩ := bind_ok accepted
+      cases accepted
+      exact .terminalBlock exactUnique found form
+        (innerIH closed residual sourceSignatures declarations projection generatedInner) stops
+        (IssuedSuffix.of_accepted generatedSuffix)
+  | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨conditionCode, generatedCondition, accepted⟩ := bind_ok accepted
+      obtain ⟨checked, checkedCondition, accepted⟩ := bind_ok accepted
+      cases checked
+      have sameType := ensure_same checkedCondition
+      rcases conditionCode with ⟨native, code⟩
+      dsimp only at sameType
+      subst native
+      obtain ⟨thenCode, generatedThen, accepted⟩ := bind_ok accepted
+      obtain ⟨elseCode, generatedElse, accepted⟩ := bind_ok accepted
+      obtain ⟨suffix, generatedSuffix, accepted⟩ := bind_ok accepted
+      cases accepted
+      exact .terminalIf exactUnique found form conditionFound conditionType
+        (extractExpressions context closed residual sourceSignatures declarations conditionSyntax conditionFound typed generatedCondition)
+        (thenIH closed residual sourceSignatures declarations projection generatedThen)
+        (elseIH closed residual sourceSignatures declarations projection generatedElse)
+        thenStops elseStops (IssuedSuffix.of_accepted generatedSuffix)
+
 /-- Compatibility entry for the former closed residual scope. -/
 theorem tree_of_flow
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)

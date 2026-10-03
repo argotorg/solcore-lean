@@ -78,6 +78,19 @@ theorem lexical_fallthrough {context : SourceSemantics.Context} {scope : SourceC
     · exact restIH tail
     · cases terminal
 
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
+    · cases GenericLexicalStatements.block_terminates exactUnique found form stops head
+    · cases terminal
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    intro program actualContext finalContext evidence environment nextEnvironment before after executed
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨_, terminal⟩
+    · cases GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops head
+    · cases terminal
+
 theorem assignment_fallthrough {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {mode : Bool} {statements : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : ProtectedLexicalAssignments.Tree layouts owner active frame globals onError values source expressions
@@ -87,37 +100,37 @@ theorem assignment_fallthrough {context : SourceSemantics.Context} {scope : Sour
   | lexical fragment => exact lexical_fallthrough fragment unique
   | @uninitialized context nextContext scope mode id node binder rest expected type code payload found form mono extended ordinary projected allocation annotation same tail ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @initialized context nextContext scope mode id node binder initializer initializerNode lowered code rest expected type found form mono extended ordinary initialFound sourceType initial allocation annotation same tail ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type code found form guard expressionFound value remaining ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (TypedScopedStatements.not_tail form guard) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (TypedScopedStatements.not_tail form guard) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @block context scope mode id node statements rest expected type innerCode code found form inner remaining innerIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal
   | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode code found form conditionFound conditionType typed thenTree elseTree remaining thenIH elseIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal
   | @assignment context scope mode id node assignment operator rhs rest expected type body found form head errors remaining ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
@@ -131,57 +144,57 @@ theorem loop_fallthrough {context : SourceSemantics.Context} {scope : SourceCore
   | lexical fragment => exact assignment_fallthrough fragment unique
   | @uninitialized context nextContext scope mode id node binder rest expected type code payload found form mono extended ordinary projected allocation annotation same tail ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @initialized context nextContext scope mode id node binder initializer initializerNode lowered code rest expected type found form mono extended ordinary initialFound sourceType initial allocation annotation same tail ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type code found form guard expressionFound value remaining ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (TypedScopedStatements.not_tail form guard) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (TypedScopedStatements.not_tail form guard) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @block context scope mode id node statements rest expected type innerCode code found form inner remaining innerIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal
   | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode code found form conditionFound conditionType typed thenTree elseTree remaining thenIH elseIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal
   | @assignment context scope mode id node assignment operator rhs rest expected type body found form head errors remaining ih =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact ih tail
     · cases terminal
   | @breaking context scope mode id node rest expected type found form =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, head, tail⟩ | ⟨_, terminal⟩
     · obtain ⟨_, impossible, _⟩ := ScalarStatementViews.breaking unique (lookupStatement?_sound found) form head
       cases impossible
     · cases terminal
   | @continuing context scope mode id node rest expected type found form =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, head, tail⟩ | ⟨_, terminal⟩
     · obtain ⟨_, impossible, _⟩ := ScalarStatementViews.continuing unique (lookupStatement?_sound found) form head
       cases impossible
     · cases terminal
   | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode code reason found form conditionFound conditionType typed loopBody nativeTyped remaining innerIH restIH =>
     intro program actualContext finalContext evidence environment nextEnvironment before after executed
-    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨_, terminal⟩
     · exact restIH tail
     · cases terminal

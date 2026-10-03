@@ -11,6 +11,17 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSourceTyping
 open Frontend SourceInference
 open CallableLambdaViewEdits CallableLambdaBodyReachability
 
+private theorem statement_identity {source view : TypedSource} (metadata : LambdaMetadataViews.MetadataView source view) :
+    GenericLexicalStatements.StatementSourceIdentity source view := by
+  refine ⟨metadata.owner, metadata.inputs, metadata.roots, ?_⟩
+  intro id
+  cases found : source.lookupStatement? id with
+  | some node => exact (metadata.symm.statement found).symm
+  | none =>
+    cases viewed : view.lookupStatement? id with
+    | none => rfl
+    | some node => have impossible := metadata.statement viewed; rw [found] at impossible; cases impossible
+
 private def BodyFree : ExpressionForm → Prop
   | .lambda _ _ _ => False
   | .call _ _ (.declaration _) => False
@@ -697,6 +708,23 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
       (elseIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member])))
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member)))
+
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    exact .terminalBlock (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form sourceType
+      (innerIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (stops.transport (statement_identity edited.metadata))
+  | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
+    have child : Reaches source roots (.expression condition) :=
+      .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
+    obtain ⟨certified, typing⟩ := builtins edited avoids unique conditionSyntax child
+    exact .terminalIf (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form sourceType
+      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType (typing _ _ typed) certified
+      (thenIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (elseIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (thenStops.transport (statement_identity edited.metadata)) (elseStops.transport (statement_identity edited.metadata))
 
 include edited avoids unique in
 theorem lexical_syntax_original {context : Context} {mode : Bool} {statements : List StatementId}

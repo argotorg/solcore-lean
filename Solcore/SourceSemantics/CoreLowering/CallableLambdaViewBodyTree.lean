@@ -13,6 +13,17 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBodyTree
 open Frontend SourceInference Core
 open CallableLambdaViewEdits CallableLambdaBodyReachability GenericLexicalStatements
 
+private theorem statement_identity {source view : TypedSource} (metadata : LambdaMetadataViews.MetadataView source view) :
+    GenericLexicalStatements.StatementSourceIdentity source view := by
+  refine ⟨metadata.owner, metadata.inputs, metadata.roots, ?_⟩
+  intro id
+  cases found : source.lookupStatement? id with
+  | some node => exact (metadata.symm.statement found).symm
+  | none =>
+    cases viewed : view.lookupStatement? id with
+    | none => rfl
+    | some node => have impossible := metadata.statement viewed; rw [found] at impossible; cases impossible
+
 /-- Transport one actual finite statement certificate. The child interface is
 static and restricted to the body's reached expression occurrences. -/
 theorem transport {layouts : SourceCoreAllocationLayouts.Prepared}
@@ -93,6 +104,24 @@ theorem transport {layouts : SourceCoreAllocationLayouts.Prepared}
       (elseIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member])))
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member)))
+
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerIH =>
+    exact .terminalBlock (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
+      (innerIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (stops.transport (statement_identity edited.metadata)) (issued.transport (statement_identity edited.metadata))
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    have child : Reaches source roots (.expression condition) :=
+      .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
+    exact .terminalIf (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
+      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType
+      (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree)
+      (thenIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (elseIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member])))
+      (thenStops.transport (statement_identity edited.metadata)) (elseStops.transport (statement_identity edited.metadata))
+      (issued.transport (statement_identity edited.metadata))
 
 /-- The body list itself supplies every statement root. -/
 theorem body {layouts : SourceCoreAllocationLayouts.Prepared}

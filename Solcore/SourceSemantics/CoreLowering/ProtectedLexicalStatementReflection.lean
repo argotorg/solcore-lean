@@ -215,4 +215,15 @@ theorem Tree.reflects
       (conditional_reflects transport expressionReflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact sequence_stopped_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (block_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form innerIH)
+      (GenericLexicalStatements.block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact sequence_stopped_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (conditional_reflects transport expressionReflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+
 end Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatements

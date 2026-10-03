@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlAllocation
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuations
 
 /-! A single lexical statement algebra parameterized by static expression
 certificates. Context changes are kept at each binding; scoped control restores
@@ -13,6 +14,59 @@ abbrev ValuesContext := SourceCoreCompatibleValues.Context
 abbrev absentRequest := TypedLexicalControl.absentRequest
 abbrev initializedRequest := TypedLexicalControl.initializedRequest
 abbrev sequence := TypedLexicalControl.sequence
+
+/-- The source which issued a stopped suffix remains separate from a local
+metadata view. Statement lookups and binding provenance are unchanged. -/
+structure StatementSourceIdentity (origin source : TypedSource) : Prop where
+  owner : origin.owner = source.owner
+  inputs : origin.inputs = source.inputs
+  roots : origin.roots = source.roots
+  lookup : ∀ id, origin.lookupStatement? id = source.lookupStatement? id
+
+theorem StatementSourceIdentity.refl (source : TypedSource) : StatementSourceIdentity source source :=
+  ⟨rfl, rfl, rfl, fun _ => rfl⟩
+
+theorem StatementSourceIdentity.trans {origin middle source : TypedSource}
+    (first : StatementSourceIdentity origin middle) (second : StatementSourceIdentity middle source) :
+    StatementSourceIdentity origin source :=
+  ⟨first.owner.trans second.owner, first.inputs.trans second.inputs, first.roots.trans second.roots,
+    fun id => (first.lookup id).trans (second.lookup id)⟩
+
+/-- Static stopping retains the original source and its independent control
+summary. Prefix typing stays at its original source context. -/
+def Stopped (source : TypedSource) (statements : List StatementId) : Prop :=
+  ∃ origin summary, StatementSourceIdentity origin source ∧
+    ReachableStatementContinuations.StoppingStatements origin statements summary
+
+theorem Stopped.of_source {source : TypedSource} {statements : List StatementId} {summary : ControlSummary}
+    (stops : ReachableStatementContinuations.StoppingStatements source statements summary) : Stopped source statements :=
+  ⟨source, summary, .refl source, stops⟩
+
+theorem Stopped.transport {origin source : TypedSource} {statements : List StatementId}
+    (identity : StatementSourceIdentity origin source) (stops : Stopped origin statements) : Stopped source statements := by
+  obtain ⟨issuing, summary, original, stopped⟩ := stops
+  exact ⟨issuing, summary, original.trans identity, stopped⟩
+
+/-- The dead code is the actual compiler suffix at its original issuing source.
+A view transports provenance only; it does not assert callback reacceptance. -/
+def IssuedSuffix (source : TypedSource) (scope : Scope) (mode : Bool) (statements : List StatementId)
+    (type : Ty) (code : Expr) : Prop :=
+  ∃ origin policy fuel reasonAt escaped, StatementSourceIdentity origin source ∧
+    ReachableStatementContinuations.Issued policy fuel origin scope statements type reasonAt mode escaped code
+
+theorem IssuedSuffix.of_accepted {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : Scope} {mode : Bool} {statements : List StatementId} {type : Ty} {code : Expr}
+    {reasonAt : ExpressionId → Word} {escaped : Word}
+    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt mode escaped = .ok code) :
+    IssuedSuffix source scope mode statements type code :=
+  ⟨source, policy, fuel, reasonAt, escaped, .refl source, ⟨accepted⟩⟩
+
+theorem IssuedSuffix.transport {origin source : TypedSource} {scope : Scope} {mode : Bool}
+    {statements : List StatementId} {type : Ty} {code : Expr}
+    (identity : StatementSourceIdentity origin source) (issued : IssuedSuffix origin scope mode statements type code) :
+    IssuedSuffix source scope mode statements type code := by
+  obtain ⟨issuing, policy, fuel, reasonAt, escaped, original, accepted⟩ := issued
+  exact ⟨issuing, policy, fuel, reasonAt, escaped, original.trans identity, accepted⟩
 
 inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Prop) :
     SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop where
@@ -76,6 +130,25 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (thenSyntax : Syntax source expressionSyntax context false thenBody expected)
       (elseSyntax : Syntax source expressionSyntax context false (elseBody.getD []) expected)
       (remaining : Syntax source expressionSyntax context mode rest expected) : Syntax source expressionSyntax context mode (id :: rest) expected
+
+  | terminalBlock {context mode id node statements rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (sourceType : node.type = expected)
+      (inner : Syntax source expressionSyntax context false statements expected)
+      (stops : Stopped source statements) : Syntax source expressionSyntax context mode (id :: rest) expected
+  | terminalIf {context mode id node condition conditionNode thenBody elseBody rest expected}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (sourceType : node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (typed : ExpressionHasType source context condition conditionNode.type)
+      (conditionSyntax : expressionSyntax condition)
+      (thenSyntax : Syntax source expressionSyntax context false thenBody expected)
+      (elseSyntax : Syntax source expressionSyntax context false elseBody expected)
+      (thenStops : Stopped source thenBody) (elseStops : Stopped source elseBody) :
+      Syntax source expressionSyntax context mode (id :: rest) expected
 
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
@@ -158,6 +231,27 @@ inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
       (remaining : Tree layouts owner active frame globals onError values source expressions context scope mode rest expected type body) :
       Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
         (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) body)
+
+  | terminalBlock {context scope mode id node statements rest expected type innerCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : Tree layouts owner active frame globals onError values source expressions context scope false statements expected type innerCode)
+      (stops : Stopped source statements)
+      (issued : IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type innerCode suffix)
+  | terminalIf {context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix}
+      (unique : NodeOccurrencesUnique source)
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody (some elseBody))
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Tree layouts owner active frame globals onError values source expressions context scope false thenBody expected type thenCode)
+      (elseTree : Tree layouts owner active frame globals onError values source expressions context scope false elseBody expected type elseCode)
+      (thenStops : Stopped source thenBody) (elseStops : Stopped source elseBody)
+      (issued : IssuedSuffix source scope mode rest type suffix) :
+      Tree layouts owner active frame globals onError values source expressions context scope mode (id :: rest) expected type
+        (LocalLoop.sequence type (LocalLoop.conditional type conditionCode thenCode elseCode) suffix)
 
 
 /-- The existing reached-context relation is shared by all profiles. -/

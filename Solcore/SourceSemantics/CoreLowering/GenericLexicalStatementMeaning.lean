@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericLexicalStatementTree
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalControlMeaning
+import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuationMeaning
 
 /-! Generic lexical composition consumes expression meaning only inside this
 module. Concrete profiles supply it from their static expression trees; the
@@ -15,6 +16,91 @@ open TypedLexicalControl (LexicalResult source_view_absent source_view_initializ
   Preserves Reflects HeadPreserves HeadReflects block_preserves block_reflects sequence_preserves sequence_reflects
   restore_rep restored selected_intro)
 open CompatibleExpressionPrimitives (bool_fields)
+
+private theorem stopped_restore_terminal {outcome : Dynamic.ControlOutcome}
+    (outer : Dynamic.Environment) (terminal : Dynamic.TerminalControl outcome) :
+    Dynamic.TerminalControl (Dynamic.restoreControl outer outcome) := by
+  cases terminal with
+  | returned value => exact .returned value
+  | breaking _ => exact .breaking outer
+  | continuing _ => exact .continuing outer
+  | fault reason => exact .fault reason
+
+theorem Stopped.list_terminates {origin source : TypedSource} {statements : List StatementId} {summary : ControlSummary}
+    (unique : NodeOccurrencesUnique source) (identity : StatementSourceIdentity origin source)
+    (stops : ReachableStatementContinuations.StoppingStatements origin statements summary) :
+    ReachableStatementContinuations.ListTerminates source statements := by
+  refine @ReachableStatementContinuations.StoppingStatements.rec origin
+    (fun id _ _ => ReachableStatementContinuations.StatementTerminates source id)
+    (fun statements _ _ => ReachableStatementContinuations.ListTerminates source statements)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.returnUnit unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .returned .unit
+  · intro _ _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, value, same, _⟩ := ScalarStatementViews.returnValue unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .returned value
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.breaking unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .breaking _
+  · intro _ _ found form
+    intro _ _ _ _ _ _ _ _ trace
+    obtain ⟨_, same, _⟩ := ScalarStatementViews.continuing unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ .continuing _
+  · intro _ _ _ _ found form _ bodyIH
+    intro _ _ _ _ environment _ _ _ trace
+    obtain ⟨_, _, _, same, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    exact same ▸ stopped_restore_terminal environment (bodyIH false body)
+  · intro _ _ _ _ _ _ _ found form _ _ leftIH rightIH
+    intro _ _ _ _ environment _ _ _ trace
+    obtain ⟨_, boolean, _, _, _, _, same, body⟩ :=
+        ScalarStatementViews.ifThen unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
+    cases boolean with
+    | false => exact same ▸ stopped_restore_terminal environment (rightIH false body)
+    | true => exact same ▸ stopped_restore_terminal environment (leftIH false body)
+  · intro _ _ _ head headIH
+    intro _ _ _ _ _ _ _ _ mode trace
+    obtain ⟨_, found, notTail⟩ := head.not_tail
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound ((identity.lookup _).symm.trans found))
+        (by intro _ _; exact notTail) trace with ⟨_, _, _, first, _⟩ | ⟨_, terminal⟩
+    · cases headIH first
+    · exact terminal
+  · intro _ _ _ _ _ _ _ _ found _ tail tailIH
+    intro _ _ _ _ _ _ _ _ mode trace
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound ((identity.lookup _).symm.trans found))
+        (by intro _ empty; exact False.elim (tail.nonempty empty)) trace with ⟨_, _, _, _, rest⟩ | ⟨_, terminal⟩
+    · exact tailIH mode rest
+    · exact terminal
+
+/-- A terminal head retains its own complete execution; no suffix trace is
+required or extracted. This also covers a nonempty, compiled dead suffix. -/
+theorem Stopped.terminates {source : TypedSource} {statements : List StatementId}
+    (unique : NodeOccurrencesUnique source) (stopped : Stopped source statements) :
+    ReachableStatementContinuations.ListTerminates source statements := by
+  obtain ⟨origin, summary, identity, stops⟩ := stopped
+  exact Stopped.list_terminates unique identity stops
+
+theorem block_terminates {source : TypedSource} {id : StatementId} {node : StatementNode} {statements : List StatementId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .block statements) (stops : Stopped source statements) :
+    ReachableStatementContinuations.StatementTerminates source id := by
+  intro program context finalContext evidence environment before after outcome trace
+  obtain ⟨_, _, _, same, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound found) form trace
+  exact same ▸ stopped_restore_terminal environment (stops.terminates unique false body)
+
+theorem conditional_terminates {source : TypedSource} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {left right : List StatementId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .ifThen condition left (some right)) (leftStops : Stopped source left) (rightStops : Stopped source right) :
+    ReachableStatementContinuations.StatementTerminates source id := by
+  intro program context finalContext evidence environment before after outcome trace
+  obtain ⟨_, boolean, _, _, _, _, same, body⟩ := ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form trace
+  cases boolean with
+  | false => exact same ▸ stopped_restore_terminal environment (rightStops.terminates unique false body)
+  | true => exact same ▸ stopped_restore_terminal environment (leftStops.terminates unique false body)
 
 inductive ControlShape (mode : Bool) (expected : TypeSystem.Ty) : Dynamic.ControlOutcome → Prop where
   | fallthrough (environment : Dynamic.Environment) (allowed : mode = false ∨ expected = .unit) :
@@ -105,6 +191,21 @@ theorem syntax_control_shape {source : TypedSource} {expressionSyntax : Expressi
       cases boolean with
       | false => exact restored_terminal (elseIH branchTrace) terminal
       | true => exact restored_terminal (thenIH branchTrace) terminal
+
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases block_terminates exactUnique found form stops head
+    · obtain ⟨_, _, _, rfl, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound found) form head
+      exact restored_terminal (innerIH body) terminal
+  | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases conditional_terminates exactUnique found form thenStops elseStops head
+    · obtain ⟨_, boolean, _, _, _, _, rfl, body⟩ := ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form head
+      cases boolean with
+      | false => exact restored_terminal (elseIH body) terminal
+      | true => exact restored_terminal (thenIH body) terminal
 
 /-- The actual function-mode source fallthrough fixes the raw result annotation.
 The separate original projection receipt subsequently fixes its native type. -/
@@ -358,6 +459,85 @@ theorem conditional_reflects
         restore_rep represented environment, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds,
         frame.trans lastFrame, metadata.trans lastMetadata⟩
 
+section StoppedControl
+variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext}
+  {source : TypedSource} {context : SourceSemantics.Context} {solved : List SolvedRequirement}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment) (unique : NodeOccurrencesUnique source)
+  {faults : FunctionCalls.FaultRep}
+
+include unique in
+private theorem stopped_sequence_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadPreserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Preserves functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped trace
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) executed with
+      ⟨_, _, _, headTrace, tailTrace⟩ | ⟨headTrace, terminal⟩
+    · cases stops headTrace
+    · obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped (.control headTrace)
+      cases represented with
+      | fallthrough _ => cases terminal
+      | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
+          .returned payload, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) failed with
+      ⟨rfl, headTrace⟩ | ⟨_, _, _, headTrace, tailTrace⟩
+    · obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped (.fault headTrace)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · cases stops headTrace
+
+private theorem stopped_sequence_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Reflects functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped evaluated
+  obtain ⟨wholeSize, original⟩ := evaluation_has_size evaluated
+  rw [LoopRenaming.sequence] at evaluated original
+  obtain ⟨headSize, middleStore, headValue, headSmaller, headSized⟩ := original.bind_computation
+  have headEval := headSized.sound
+  obtain ⟨outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+    first valid environments heaps locals agrees actualTyped reference read unmapped headEval
+  cases represented with
+  | fallthrough next =>
+    cases headTrace with
+    | control headTrace => cases stops headTrace
+  | returned payload =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_returned _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.returned _),
+      .returned payload, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault matched =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_failure _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.fault _),
+      .fault matched, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+
+end StoppedControl
+
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -514,6 +694,17 @@ theorem Tree.preserves
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
     exact sequence_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
       (conditional_preserves unique expressionPreserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact stopped_sequence_preserves functions program evidence exactUnique found (by intro expression; simp [form])
+      (block_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) found form innerIH)
+      (block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped trace
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact stopped_sequence_preserves functions program evidence exactUnique found (by intro expression; simp [form])
+      (conditional_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) (expressionPreserves := expressionPreserves) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (conditional_terminates exactUnique found form thenStops elseStops)
       contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
 include definitions registered in
@@ -700,5 +891,16 @@ theorem Tree.reflects
       (conditional_reflects expressionReflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
       contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
+
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact stopped_sequence_reflects functions program evidence found (by intro expression; simp [form])
+      (block_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form innerIH)
+      (block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact stopped_sequence_reflects functions program evidence found (by intro expression; simp [form])
+      (conditional_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (expressionReflects := expressionReflects) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (conditional_terminates exactUnique found form thenStops elseStops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
 end Solcore.SourceSemantics.CoreLowering.GenericLexicalStatements

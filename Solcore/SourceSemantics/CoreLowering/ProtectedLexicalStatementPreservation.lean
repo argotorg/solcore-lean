@@ -178,4 +178,15 @@ theorem Tree.preserves
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    exact sequence_stopped_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) found (by intro expression; simp [form])
+      (block_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) found form innerIH)
+      (GenericLexicalStatements.block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    exact sequence_stopped_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := exactUnique) found (by intro expression; simp [form])
+      (conditional_preserves transport exactUnique expressionPreserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH)
+      (GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
+
 end Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatements

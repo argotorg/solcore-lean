@@ -494,4 +494,74 @@ theorem conditional_reflects
         frame.trans lastFrame, metadata.trans lastMetadata⟩
 
 
+include unique in
+theorem sequence_stopped_preserves {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadPreserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Preserves (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) executed with
+      ⟨_, _, _, headTrace, tailTrace⟩ | ⟨headTrace, terminal⟩
+    · cases stops headTrace
+    · obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped installed (.control headTrace)
+      cases represented with
+      | fallthrough _ => cases terminal
+      | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
+          .returned payload, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) failed with
+      ⟨rfl, headTrace⟩ | ⟨_, _, _, headTrace, tailTrace⟩
+    · obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped installed (.fault headTrace)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · cases stops headTrace
+
+theorem sequence_stopped_reflects {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : HeadReflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Reflects (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world administrative actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  obtain ⟨wholeSize, original⟩ := evaluation_has_size evaluated
+  rw [LoopRenaming.sequence] at evaluated original
+  obtain ⟨headSize, middleStore, headValue, headSmaller, headSized⟩ := original.bind_computation
+  have headEval := headSized.sound
+  obtain ⟨outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+    first valid environments heaps locals agrees actualTyped reference read unmapped installed headEval
+  cases represented with
+  | fallthrough next =>
+    cases headTrace with
+    | control headTrace => cases stops headTrace
+  | returned payload =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_returned _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.returned _),
+      .returned payload, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault matched =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_failure _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalControl.terminal_outcome program evidence found notTail headTrace (.fault _),
+      .fault matched, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+
+
 end Solcore.SourceSemantics.CoreLowering.ProtectedLexicalStatements

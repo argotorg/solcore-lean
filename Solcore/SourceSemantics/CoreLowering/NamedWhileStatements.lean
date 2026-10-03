@@ -93,6 +93,21 @@ private theorem lexical_control_shape
       | false => exact (elseIH branchTrace).restore environment
       | true => exact (thenIH branchTrace).restore environment
 
+  | terminalBlock exactUnique found form inner stops issued innerIH =>
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases GenericLexicalStatements.block_terminates exactUnique found form stops head
+    · obtain ⟨_, _, _, rfl, body⟩ := ScalarStatementViews.block unique (lookupStatement?_sound found) form head
+      exact (innerIH body).restore environment
+  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    rcases ScalarStatementViews.cons_view _ unique (lookupStatement?_sound found) (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops head
+    · obtain ⟨_, boolean, _, _, _, _, rfl, body⟩ := ScalarStatementViews.ifThen unique (lookupStatement?_sound found) form head
+      cases boolean with
+      | false => exact (elseIH body).restore environment
+      | true => exact (thenIH body).restore environment
+
 /-- Successful source control cannot stand for the separate fault judgment.
 This is a structural inversion of the actual static body Tree. -/
 theorem body_control_shape
@@ -107,35 +122,35 @@ theorem body_control_shape
   | lexical fragment => exact lexical_control_shape fragment unique executed
   | @uninitialized context nextContext scope mode id node binder rest expected type code payload found form mono extended ordinary projected allocation annotation same tail ih =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
     · exact ih tail
     · obtain ⟨_, _, rfl, _⟩ := ScalarStatementViews.letUninitialized unique contains form head
       cases terminal
   | @initialized context nextContext scope mode id node binder initializer initializerNode lowered code rest expected type found form mono extended ordinary initialFound sourceType initial allocation annotation same tail ih =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
     · exact ih tail
     · obtain ⟨_, _, _, _, rfl, _, _⟩ := ScalarStatementViews.letInitialized unique contains form mono head
       cases terminal
   | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type code found form guard expressionFound value remaining ih =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (TypedScopedStatements.not_tail form guard) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (TypedScopedStatements.not_tail form guard) executed with
       ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
     · exact ih tail
     · obtain ⟨_, rfl, _, _⟩ := ScalarStatementViews.expression unique contains form head
       cases terminal
   | @block context scope mode id node statements rest expected type innerCode code found form inner remaining innerIH restIH =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
     · exact restIH tail
     · obtain ⟨_, _, innerOutcome, rfl, innerTrace⟩ := ScalarStatementViews.block unique contains form head
       exact (innerIH innerTrace).restore environment
   | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode code found form conditionFound conditionType typed thenTree elseTree remaining thenIH elseIH restIH =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨head, terminal⟩
     · exact restIH tail
     · obtain ⟨_, boolean, _, _, innerOutcome, _, rfl, branchTrace⟩ := ScalarStatementViews.ifThen unique contains form head
@@ -144,7 +159,7 @@ theorem body_control_shape
       | true => exact (thenIH branchTrace).restore environment
   | @assignment context scope mode id node assignment operator rhs rest expected type body found form head errors remaining ih =>
     have contains := lookupStatement?_sound found
-    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+    rcases ScalarStatementViews.cons_view _ unique contains (by intro _ _ expression; simp [form]) executed with
       ⟨_, _, _, _, tail⟩ | ⟨first, terminal⟩
     · exact ih tail
     · obtain ⟨_, rfl, _⟩ := ScalarStatementViews.assignValue unique contains form first
