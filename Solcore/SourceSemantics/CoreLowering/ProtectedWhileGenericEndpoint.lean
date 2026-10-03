@@ -71,9 +71,9 @@ def HeadReflects {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (
       entry scope finalMap finalWorld after finalStore canonical
 
 
-def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -96,9 +96,18 @@ def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : 
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
 
-def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  HeadPreservesAtFor functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+    (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope)
+    size id expected type code
+
+
+def HeadReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -122,6 +131,14 @@ def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : T
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical
 
+def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  HeadReflectsAtFor functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+    (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope)
+    size id expected type code
+
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedWhile
 
@@ -142,6 +159,54 @@ variable {certificate : GenericExpressionMeaning.Certificate} {values : ValuesCo
     program context evidence source certificate faults entry)
 
 include transport in
+theorem while_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (meaningB : Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry)) {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.whileLoop type conditionCode code selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (unique : NodeOccurrencesUnique source)
+    (correct : Below budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code)) :
+    ∀ size, size ≤ budget → HeadPreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
+  intro size bounded valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
+  have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
+      environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) selfReason
+      mapping (TypedLexicalWhile.installedWorld world type) before
+      (TypedLexicalWhile.installedStore store type (conditionCode.rename ξ) (code.rename ξ) (LocalLoop.fallthrough type) selfReason actual) :=
+    ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
+      installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
+  cases trace with
+  | control sourceTrace =>
+    obtain ⟨rfl, child, _, innerOutcome, rfl, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_control unique (lookupStatement?_sound found) form sourceTrace
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
+      iterations_success_bounded_for (validity := validity) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) transport meaningB conditionTree conditionFound valid unique agrees reference correct protectedState
+    exact ⟨rfl, restored environment innerOutcome, value, finalStore, finalMap, finalWorld,
+      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
+      restore_rep represented environment, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      (protectedState.advance transport progress).2⟩
+  | fault failed =>
+    obtain ⟨child, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_fault unique (lookupStatement?_sound found) form failed
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
+      iterations_fault_bounded_for (validity := validity) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) transport meaningB conditionTree conditionFound valid unique agrees reference correct protectedState
+    exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
+      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
+      represented, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      (protectedState.advance transport progress).2⟩
+
+include transport in
 theorem while_preserves_bounded (budget : Nat)
     (meaningB : Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults entry)) {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
@@ -158,8 +223,31 @@ theorem while_preserves_bounded (budget : Nat)
     ∀ size, size ≤ budget → HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
-  intro size bounded valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
-    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  exact while_preserves_bounded_for
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    functions program evidence transport budget meaningB found form conditionFound conditionTree typed unique correct
+
+
+include transport in
+theorem while_reflects_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (reflectionB : Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry)) {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.whileLoop type conditionCode code selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (correct : Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAtFor (validity := validity) functions program evidence (entry := entry) (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ∀ size, size ≤ budget → HeadReflectsAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
+  intro size bounded valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
   have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
       environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) selfReason
@@ -167,28 +255,21 @@ theorem while_preserves_bounded (budget : Nat)
       (TypedLexicalWhile.installedStore store type (conditionCode.rename ξ) (code.rename ξ) (LocalLoop.fallthrough type) selfReason actual) :=
     ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
       installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
-  cases trace with
-  | control sourceTrace =>
-    obtain ⟨rfl, child, _, innerOutcome, rfl, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_control unique (lookupStatement?_sound found) form sourceTrace
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_success_bounded sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) transport meaningB conditionTree conditionFound valid unique agrees reference correct protectedState
-    exact ⟨rfl, restored environment innerOutcome, value, finalStore, finalMap, finalWorld,
-      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
-      restore_rep represented environment, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      (protectedState.advance transport progress).2⟩
-  | fault failed =>
-    obtain ⟨child, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_fault unique (lookupStatement?_sound found) form failed
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress⟩ :=
-      iterations_fault_bounded sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) transport meaningB conditionTree conditionFound valid unique agrees reference correct protectedState
-    exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
-      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
-      represented, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      (protectedState.advance transport progress).2⟩
-
+  rw [LoopRenaming.whileLoop] at evaluated
+  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress⟩ :=
+    iterations_reflect_bounded_for (validity := validity) functions program evidence transport reflectionB conditionTree conditionFound valid agrees reference correct
+      bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState nativeEntry
+  have statementTrace : RecursiveNamedLoopContracts.StatementOutcome program (SourceExecutionSize.stepSize [sourceSize])
+      context evidence source environment before id context (Dynamic.restoreControl environment outcome) after := by
+    cases trace with
+    | control sourceLoop => exact .control (.whileLoop (lookupStatement?_sound found) form sourceLoop)
+    | fault sourceLoop => exact .fault (.whileIteration (lookupStatement?_sound found) form sourceLoop)
+  exact ⟨SourceExecutionSize.stepSize [sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
+    statementTrace, restored environment outcome, restore_rep represented environment, (installedProgress.trans progress).1,
+    (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+    (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+    (protectedState.advance transport progress).2⟩
 
 include transport in
 theorem while_reflects_bounded (budget : Nat)
@@ -208,30 +289,10 @@ theorem while_reflects_bounded (budget : Nat)
     ∀ size, size ≤ budget → HeadReflectsAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
       (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
       (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
-  intro size bounded valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
-    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  obtain ⟨state, installedProgress⟩ := initial_state functions environments heaps locals agrees actualTyped read unmapped typed
-  have protectedState : State entry values registry functions context scope administrative actualContext frameLayout
-      environment canonical actual contextLocation store.length type (conditionCode.rename ξ) (code.rename ξ) selfReason
-      mapping (TypedLexicalWhile.installedWorld world type) before
-      (TypedLexicalWhile.installedStore store type (conditionCode.rename ξ) (code.rename ξ) (LocalLoop.fallthrough type) selfReason actual) :=
-    ⟨state, transport.extend installed installedProgress.2.1 installedProgress.2.2.1
-      installedProgress.2.2.2.1 installedProgress.2.2.2.2⟩
-  rw [LoopRenaming.whileLoop] at evaluated
-  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress⟩ :=
-    iterations_reflect_bounded functions program evidence transport reflectionB conditionTree conditionFound valid agrees reference correct
-      bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState nativeEntry
-  have statementTrace : RecursiveNamedLoopContracts.StatementOutcome program (SourceExecutionSize.stepSize [sourceSize])
-      context evidence source environment before id context (Dynamic.restoreControl environment outcome) after := by
-    cases trace with
-    | control sourceLoop => exact .control (.whileLoop (lookupStatement?_sound found) form sourceLoop)
-    | fault sourceLoop => exact .fault (.whileIteration (lookupStatement?_sound found) form sourceLoop)
-  exact ⟨SourceExecutionSize.stepSize [sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
-    statementTrace, restored environment outcome, restore_rep represented environment, (installedProgress.trans progress).1,
-    (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-    (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-    (protectedState.advance transport progress).2⟩
+  exact while_reflects_bounded_for
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    functions program evidence transport budget reflectionB found form conditionFound conditionTree typed correct bodyCannotFault
+
 
 include transport meaning in
 theorem while_preserves {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}

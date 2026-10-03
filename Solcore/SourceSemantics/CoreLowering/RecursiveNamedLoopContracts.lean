@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBoundedContracts
+import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
 import Solcore.SourceSemantics.CoreLowering.ProtectedWhileBodyEdges
 
 /-! Pointwise five-way statement and while contracts retain independent source
@@ -133,9 +134,9 @@ variable {values : ValuesContext} {source : TypedSource} {context : SourceSemant
   {ξ : Renaming} {contextLocation location : Location} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
   {scope : Scope} {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
 
-def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def PreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -159,9 +160,17 @@ def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List St
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
-def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+/-- The ordinary contract is the same validity specialization. -/
+def PreservesAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  PreservesAtFor functions program evidence (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+      (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope)
+      size mode statements expected type code
+
+def ReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -185,4 +194,12 @@ def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List Sta
       LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after
 
+
+/-- The ordinary contract is the same validity specialization. -/
+def ReflectsAt (size : Nat) (mode : Bool) {scope : Scope} (statements : List StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+    : Prop :=
+  ReflectsAtFor functions program evidence (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+      (entry := entry) (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope)
+      size mode statements expected type code
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts

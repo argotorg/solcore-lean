@@ -209,12 +209,12 @@ theorem condition_reflects_at {size : Nat}
 include transport in
 /-- The body contract is an internal composition interface. Recursive statement
 induction supplies it for the current child, including control transfers. -/
-theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
-    (correct : PreservesAt functions program evidence
+theorem body_preserves_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (correct : RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) functions program evidence
       (administrative := administrative) (entry := entry) (source := source) (context := context)
-      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout)
+      (registry := registry) (faults := faults) (frameLayout := frameLayout)
       (globals := globals) (scope := scope) size false statements expected type code)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
@@ -246,15 +246,40 @@ theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected
       Core.LoopExecution.bodyEnvironment, Core.LoopExecution.entryEnvironment] using evaluated,
     represented, progress, state.advance transport progress, lexical⟩
 
+
 include transport in
-/-- A completed body reconstructs its independent source trace and reached
-lexical context while retaining the original outer installed entry. -/
-theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
-    (correct : ReflectsAt functions program evidence
+theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (correct : PreservesAt functions program evidence
       (administrative := administrative) (entry := entry) (source := source) (context := context)
       (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout)
       (globals := globals) (scope := scope) size false statements expected type code)
     (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode (code.rename ξ) selfReason mapping world before store)
+    {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (trace : RecursiveNamedLoopContracts.ExecutesAt size false program context evidence source environment before statements finalContext outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (Core.LoopExecution.bodyEnvironment type location actual) store
+        (Core.LoopExecution.bodyCode (code.rename ξ)) value finalStore ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode (code.rename ξ) selfReason finalMap finalWorld after finalStore ∧
+      TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment finalContext after := by
+  exact body_preserves_at_for (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    functions program evidence transport correct valid agrees reference state trace
+include transport in
+/-- A completed body reconstructs its independent source trace and reached
+lexical context while retaining the original outer installed entry. -/
+theorem body_reflects_at_for (validity : SourceSemantics.Context → Prop) {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (correct : RecursiveNamedLoopContracts.ReflectsAtFor (validity := validity) functions program evidence
+      (administrative := administrative) (entry := entry) (source := source) (context := context)
+      (registry := registry) (faults := faults) (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size false statements expected type code)
+    (valid : validity context)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
     (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
@@ -285,6 +310,31 @@ theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected 
     ⟨heaps, maps, worlds, preserved, metadata⟩
   exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace,
     represented, progress, state.advance transport progress, lexical⟩
+
+include transport in
+theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
+    (correct : ReflectsAt functions program evidence
+      (administrative := administrative) (entry := entry) (source := source) (context := context)
+      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size false statements expected type code)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (state : State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode (code.rename ξ) selfReason mapping world before store)
+    {value : Value} {finalStore : Store}
+    (evaluated : EvaluationSize size (Core.LoopExecution.bodyEnvironment type location actual) store
+      (Core.LoopExecution.bodyCode (code.rename ξ)) value finalStore) :
+    ∃ sourceSize finalContext outcome after finalMap finalWorld,
+      RecursiveNamedLoopContracts.ExecutesAt sourceSize false program context evidence source environment before statements finalContext outcome after ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode (code.rename ξ) selfReason finalMap finalWorld after finalStore ∧
+      TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
+        context scope environment finalContext after := by
+  exact body_reflects_at_for (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    functions program evidence transport correct valid agrees reference state evaluated
 include transport in
 theorem body_preserves {statements : List StatementId} {expected : TypeSystem.Ty}
     (correct : Preserves functions program evidence
