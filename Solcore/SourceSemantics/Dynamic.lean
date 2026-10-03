@@ -17,6 +17,7 @@ import Solcore.SourceSemantics.Dynamic.PatternCompletenessProperties
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.WholeLanguagePreservation
 import Solcore.SourceSemantics.Dynamic.Program
+import Solcore.SourceSemantics.Dynamic.ProgramOutcome
 
 /-!
 # Declarative source dynamics

@@ -558,6 +558,10 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchPrefixContracts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramEntrySource
 
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramOutcomeMeaning
+import Solcore.SourceSemantics.CoreLowering.NumericLiteralEvidenceReceipts
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
