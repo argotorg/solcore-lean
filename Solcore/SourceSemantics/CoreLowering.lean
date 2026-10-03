@@ -584,6 +584,9 @@ import Solcore.SourceSemantics.CoreLowering.CompatiblePatternRuntime
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeSelection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeMatchProfiles
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleInputs
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeHead
+import Solcore.SourceSemantics.CoreLowering.CompatibleEncodedDataTyping
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDataInputs
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
