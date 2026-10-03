@@ -74,6 +74,40 @@ private theorem reference_typed {definitions : DataEnvironment} {world : StoreTy
   subst value
   cases related with | cellRef typed => exact typed
 
+/-- The actual entry retains the supplied function relation in every allocated
+cell and argument. Static body receipts may therefore travel in that relation
+without being recovered from a weaker heap after the prefix. -/
+structure EntryFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    (captured : Captures prepared mapping world scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (history : History code)
+    (inputs : Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
+    (registry : SourceCoreRawMetadata.Registry) (arguments : List Dynamic.Value) (nativeArguments : List Value)
+    (before : Dynamic.Heap) (store : Store) (location : Location) (current : NativeFrame) (currentGhost : GhostFrame) where private mk ::
+  next : NativeFrame
+  nextHistory : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table next
+    (.lambda code.descriptor.id history.ghost) (some history.metadata)
+  actual : Environment
+  actualContext : Core.Context
+  embedding : Renaming
+  entry : CallableIndexedLambdaViewPrefix.Entry prepared.ancestry.layout.frame prepared.base.globals.length location next values
+    functions registry function inputs.context scope code.receipt.loweredParameters arguments before
+    (store.set location (encode prepared.ancestry.layout.frame next)) mapping world captured.administrative
+    actualContext actual embedding code.receipt.allocatedBody code.receipt.body
+  wrap : ∀ {result bodyStore}, Evaluates entry.actualBody entry.store (code.receipt.body.rename entry.embedding) result bodyStore →
+    Evaluates (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
+      store (code.body.rename captured.embedding.lift.lift) result (bodyStore.set location (encode prepared.ancestry.layout.frame current))
+  unwrap : ∀ {result finalStore},
+    Evaluates (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
+      store (code.body.rename captured.embedding.lift.lift) result finalStore →
+    ∃ bodyStore, Evaluates entry.actualBody entry.store (code.receipt.body.rename entry.embedding) result bodyStore ∧
+      finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current)
+  unmapped : location ∉ mapping
+  referenceTyped : world[location]? = some prepared.ancestry.layout.frame.type
+  currentHistory : Current prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost
+  currentRead : store.read? location = some (encode prepared.ancestry.layout.frame current)
+
 structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
@@ -105,27 +139,43 @@ structure Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
   currentHistory : Current prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost
   currentRead : store.read? location = some (encode prepared.ancestry.layout.frame current)
 
+/-- The legacy receipt is the exact specialization of the generic entry. This
+adapter keeps its original function relation and does not strengthen a heap. -/
+def Entry.toFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    {captured : Captures prepared mapping world scope function.captured capturedActual}
+    {code : Code prepared function scope captured.administrative} {history : History code}
+    {inputs : Context code} {profile : values.checked.catalog.callableContracts = true}
+    {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    {before : Dynamic.Heap} {store : Store} {location : Location} {current : NativeFrame} {currentGhost : GhostFrame}
+    (entry : Entry captured code history inputs profile registry arguments nativeArguments before store location current currentGhost) :
+    EntryFor captured code history inputs (model prepared profile) registry arguments nativeArguments before store location current currentGhost :=
+  ⟨entry.next, entry.nextHistory, entry.actual, entry.actualContext, entry.embedding,
+    entry.entry, entry.wrap, entry.unwrap, entry.unmapped, entry.referenceTyped,
+    entry.currentHistory, entry.currentRead⟩
+
 /-- Every native prefix step is derived from its actual compiler receipt.
 The caller token and lexical token have independent carried histories. -/
-theorem entry_exists {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
     (captured : Captures prepared mapping world scope function.captured capturedActual)
     (code : Code prepared function scope captured.administrative) (history : History code)
-    (inputs : Context code) (profile : values.checked.catalog.callableContracts = true)
+    (inputs : Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
     {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
-    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       mapping world code.receipt.loweredParameters arguments nativeArguments)
     {before : Dynamic.Heap} {store : Store} {location : Location}
     {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
-    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry (model prepared profile) mapping world before store)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
     (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
     (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
     (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
     (unmapped : location ∉ mapping)
     (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
-    Nonempty (Entry captured code history inputs profile registry arguments nativeArguments before store location current currentGhost) := by
+    Nonempty (EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost) := by
   let layout := prepared.ancestry.layout.frame
   let argument := DataPatternValues.packValues nativeArguments
   let saved := encode layout current
@@ -151,7 +201,7 @@ theorem entry_exists {values : SourceCoreCompatibleValues.Context} {prepared : P
         (.cons (encode_runtime_typed world registered history.native) captured.typed)))
   obtain ⟨manifest, manifestTyped, manifestAgreement⟩ := CallableIndexedLambdaManifest.agreement
     captured.represented actualLayout descriptor fields code.receipt.allocatedBody (store.set location (encode layout next))
-  obtain ⟨entry⟩ := CallableIndexedLambdaViewPrefix.entry_of_accepted (model prepared profile) code.allocationError
+  obtain ⟨entry⟩ := CallableIndexedLambdaViewPrefix.entry_of_accepted functions code.allocationError
     code.viewOfSource (prefix_accepted code) (parameters code) inputs.kinds inputs.extended rfl registered represented
     captured.represented installedHeaps locals (GenericExpressionMeaning.agree_prefix actualLayout manifest)
     (.cons manifestTyped actualTyped) (inputs.referenceIndex ▸ reference) installedCurrent.read unmapped
@@ -198,5 +248,32 @@ theorem entry_exists {values : SourceCoreCompatibleValues.Context} {prepared : P
     obtain ⟨rfl, rfl⟩ := evaluation_deterministic nextEval nextEvaluation
     rw [body_rename] at bodyEval
     exact ⟨bodyStore, agreement.unwrap bodyEval, finalEq⟩
+
+/-- Every native prefix step is derived from its actual compiler receipt.
+The caller token and lexical token have independent carried histories. -/
+theorem entry_exists {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    (captured : Captures prepared mapping world scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (history : History code)
+    (inputs : Context code) (profile : values.checked.catalog.callableContracts = true)
+    {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
+      mapping world code.receipt.loweredParameters arguments nativeArguments)
+    {before : Dynamic.Heap} {store : Store} {location : Location}
+    {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry (model prepared profile) mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+    (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+    (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
+    (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
+    (unmapped : location ∉ mapping)
+    (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
+    Nonempty (Entry captured code history inputs profile registry arguments nativeArguments before store location current currentGhost) := by
+  obtain ⟨entry⟩ := entry_exists_for captured code history inputs (model prepared profile)
+    represented heaps locals reference read currentCarried unmapped allowed
+  exact ⟨⟨entry.next, entry.nextHistory, entry.actual, entry.actualContext,
+    entry.embedding, entry.entry, entry.wrap, entry.unwrap, entry.unmapped,
+    entry.referenceTyped, entry.currentHistory, entry.currentRead⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
