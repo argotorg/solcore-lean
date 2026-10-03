@@ -199,11 +199,13 @@ structure PolicyFor (policy : SourceCoreFunctions.Policy) (context : SourceCoreF
 
 /-- Actual successful lowering and independent source typing supply every
 child certificate. No semantic child assumption is part of this extraction. -/
-theorem tree_of_functions
+theorem tree_of_functions_with_literals
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
     {sourceContext : SourceSemantics.Context}
+    (literals : GenericExpressionMeaning.Certificate)
+    (literalFactory : CompatibleExpressionProducts.LiteralFactory policy body context values source scope reasonAt literals)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
     (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
@@ -213,10 +215,11 @@ theorem tree_of_functions
     (typed : ExpressionHasType source sourceContext id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
-    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+    Tree.WithLiterals (fuel := readFuel) (values := values) (source := source)
+      (context := sourceContext) (solved := context.solvedRequirements) (reasonAt := reasonAt) literals scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
   | primitive syntaxTree =>
-    refine .primitive (CompatibleExpressionPrimitives.tree_of_functions unique declarations ?_ ?_ syntaxTree found typed accepted)
+    refine (fun ⟨tree, sites⟩ => ⟨_, Tree.LiteralSites.primitive tree sites⟩) (CompatibleExpressionPrimitives.tree_of_functions_with_literals literals literalFactory unique declarations ?_ ?_ syntaxTree found typed accepted)
     · exact ⟨fun id child => policyFor.special id (.primitive child),
         fun id child => policyFor.read id (.primitive child), policyFor.lower, policyFor.leaf⟩
     · exact fun id node child => coercions id node (.primitive child)
@@ -233,13 +236,13 @@ theorem tree_of_functions
         obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (form.symm.trans otherForm)
         obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
           unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
-        have childTree := ih childFound childTyped generated
+        obtain ⟨childTree, childTreeSites⟩ := ih childFound childTyped generated
         have chosen := unary_selected profile (childTree.projected childFound)
         rw [chosen] at metadata inputChecked ⊢
         obtain ⟨childType, childCode⟩ := compiled
         dsimp only at inputChecked childTree ⊢
         subst childType
-        exact .unary metadata form childFound rfl rfl profile childTree
+        exact ⟨_, .unary metadata form childFound rfl rfl profile childTree childTreeSites⟩
       | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
   | binary originalFound form leftSyntax rightSyntax leftIH rightIH =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -255,15 +258,15 @@ theorem tree_of_functions
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
         obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
           binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
-        have firstTree := leftIH leftFound leftTyped firstGenerated
-        have secondTree := rightIH rightFound rightTyped secondGenerated
+        obtain ⟨firstTree, firstTreeSites⟩ := leftIH leftFound leftTyped firstGenerated
+        obtain ⟨secondTree, secondTreeSites⟩ := rightIH rightFound rightTyped secondGenerated
         have chosen := binary_selected profile (firstTree.projected leftFound)
         rw [chosen] at metadata leftChecked rightChecked ⊢
         obtain ⟨firstType, leftCode⟩ := first
         obtain ⟨secondType, rightCode⟩ := second
         dsimp only at leftChecked rightChecked firstTree secondTree ⊢
         subst firstType secondType
-        exact .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree
+        exact ⟨_, .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree firstTreeSites secondTreeSites⟩
       | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
   | group originalFound form child ih =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -279,7 +282,8 @@ theorem tree_of_functions
         subst_vars
         obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ :=
           CompatibleExpressionProducts.group_source_types unique originalFound form metadata.coercions typed
-        exact .group metadata form innerFound sourceType (ih innerFound childTyped generated)
+        obtain ⟨acceptedChild1, acceptedChild1Sites⟩ := ih innerFound childTyped generated
+        exact ⟨_, .group metadata form innerFound sourceType acceptedChild1 acceptedChild1Sites⟩
       | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
   | pair originalFound form leftSyntax rightSyntax leftIH rightIH =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -297,8 +301,10 @@ theorem tree_of_functions
         obtain ⟨rfl, rfl⟩ := same
         obtain ⟨leftNode, rightNode, leftFound, rightFound, sourceType, leftTyped, rightTyped⟩ :=
           CompatibleExpressionProducts.pair_source_types unique originalFound form metadata.coercions typed
-        exact .pair metadata form leftFound rightFound sourceType
-          (leftIH leftFound leftTyped firstGenerated) (rightIH rightFound rightTyped secondGenerated)
+        obtain ⟨acceptedChild2, acceptedChild2Sites⟩ := leftIH leftFound leftTyped firstGenerated
+        obtain ⟨acceptedChild3, acceptedChild3Sites⟩ := rightIH rightFound rightTyped secondGenerated
+        exact ⟨_, .pair metadata form leftFound rightFound sourceType
+          acceptedChild2 acceptedChild3 acceptedChild2Sites acceptedChild3Sites⟩
       | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | group otherForm _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
 
   | conditional originalFound form conditionSyntax thenSyntax elseSyntax conditionIH thenIH elseIH =>
@@ -315,9 +321,32 @@ theorem tree_of_functions
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (form.symm.trans otherForm)
         obtain ⟨conditionNode, thenNode, elseNode, conditionFound, thenFound, elseFound, conditionType, thenType, elseType,
           conditionTyped, thenTyped, elseTyped⟩ := conditional_source_types unique originalFound form metadata.coercions typed
-        exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType
-          (conditionIH conditionFound conditionTyped conditionGenerated)
-          (thenIH thenFound thenTyped thenGenerated) (elseIH elseFound elseTyped elseGenerated)
+        obtain ⟨acceptedChild4, acceptedChild4Sites⟩ := conditionIH conditionFound conditionTyped conditionGenerated
+        obtain ⟨acceptedChild5, acceptedChild5Sites⟩ := thenIH thenFound thenTyped thenGenerated
+        obtain ⟨acceptedChild6, acceptedChild6Sites⟩ := elseIH elseFound elseTyped elseGenerated
+        exact ⟨_, .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType
+          acceptedChild4
+          acceptedChild5 acceptedChild6 acceptedChild4Sites acceptedChild5Sites acceptedChild6Sites⟩
       | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ => simp [form] at otherForm
+
+/-- Original tree-only API, projected from the single supported extraction. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact (tree_of_functions_with_literals
+    (fun _ id lowered => CompatibleExpressionLiterals.Certificate context.solvedRequirements source id lowered)
+    CompatibleExpressionProducts.LiteralFactory.ordinary unique declarations policyFor coercions syntaxTree found typed accepted).choose
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionals

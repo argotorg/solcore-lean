@@ -137,14 +137,40 @@ structure PolicyFor (policy : SourceCoreFunctions.Policy) (context : SourceCoreF
   lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
   leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
 
-/-- Actual successful compilation extracts the complete finite tree. The
+/- Actual successful compilation extracts the complete finite tree. The
 source typing proof supplies raw group/product shape and ordinary local scheme
 agreement; successful native projection is not used as a substitute. -/
-theorem tree_of_functions
+/-- Static extraction at the exact accepted atomic compiler action. No runtime
+law or assumption about unrelated source occurrences is a field. -/
+def LiteralFactory (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
+    (context : SourceCoreFunctions.Context) (values : ValuesContext) (source : TypedSource)
+    (scope : Scope) (reasonAt : ExpressionId → Word)
+    (literals : GenericExpressionMeaning.Certificate) : Prop :=
+  ∀ {id node fuel lowered}, source.lookupExpression? id = some node →
+    CompatibleExpressionLiterals.Atomic node.form → (node.form = .tuple [] → node.type = .unit) →
+    (∀ child budget, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower context child budget source scope id reasonAt) = .ok none) →
+    policy.readExpression source id = SourceCoreCompatibleDataExpressions.readExpression values.checked source id →
+    policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values →
+    SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered →
+    CompatibleExpressionLiterals.Certificate context.solvedRequirements source id lowered ∧ literals scope id lowered
+
+/-- The former ordinary extractor supplies both copies of the same leaf receipt. -/
+theorem LiteralFactory.ordinary {policy body context values source scope reasonAt} :
+    LiteralFactory policy body context values source scope reasonAt
+      (fun _ id lowered => CompatibleExpressionLiterals.Certificate context.solvedRequirements source id lowered) := by
+  intro id node fuel lowered found atomic unitType special readPolicy leafPolicy accepted
+  have receipt := CompatibleExpressionLiterals.of_functions found atomic unitType special readPolicy leafPolicy accepted
+  exact ⟨receipt, receipt⟩
+
+theorem tree_of_functions_with_literals
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
     {sourceContext : SourceSemantics.Context}
+    (literals : GenericExpressionMeaning.Certificate)
+    (literalFactory : CompatibleExpressionProducts.LiteralFactory policy body context values source scope reasonAt literals)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
     (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
@@ -154,14 +180,16 @@ theorem tree_of_functions
     (typed : ExpressionHasType source sourceContext id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
-    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+    Tree.WithLiterals (fuel := readFuel) (values := values) (source := source)
+      (context := sourceContext) (solved := context.solvedRequirements) (reasonAt := reasonAt) literals scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
   | literal originalFound atomic =>
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
-    exact .literal (CompatibleExpressionLiterals.of_functions originalFound atomic
+    obtain ⟨receipt, leaf⟩ := literalFactory originalFound atomic
       (unit_source_type unique originalFound (coercions _ _ (.literal originalFound atomic) originalFound) typed)
-      (policyFor.special _ (.literal originalFound atomic)) (policyFor.read _ (.literal originalFound atomic)) policyFor.leaf accepted)
+      (policyFor.special _ (.literal originalFound atomic)) (policyFor.read _ (.literal originalFound atomic)) policyFor.leaf accepted
+    exact ⟨_, .literal receipt leaf⟩
   | read originalFound form =>
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
@@ -173,7 +201,7 @@ theorem tree_of_functions
         (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
       cases step with
       | read otherForm read generated =>
-        exact .read (CompatibleExpressionReads.loweredRead_of_accepted generated read unique declarations typed)
+        exact ⟨_, .read (CompatibleExpressionReads.loweredRead_of_accepted generated read unique declarations typed)⟩
       | group otherForm _ _ => simp [form] at otherForm
       | pair otherForm _ _ _ => simp [form] at otherForm
   | group originalFound form child ih =>
@@ -191,7 +219,8 @@ theorem tree_of_functions
         have same := ExpressionForm.group.inj (form.symm.trans otherForm)
         subst_vars
         obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ := group_source_types unique originalFound form metadata.coercions typed
-        exact .group metadata form innerFound sourceType (ih innerFound childTyped generated)
+        obtain ⟨acceptedChild1, acceptedChild1Sites⟩ := ih innerFound childTyped generated
+        exact ⟨_, .group metadata form innerFound sourceType acceptedChild1 acceptedChild1Sites⟩
       | pair otherForm _ _ _ => simp [form] at otherForm
   | pair originalFound form first second leftIH rightIH =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -211,7 +240,29 @@ theorem tree_of_functions
         obtain ⟨rfl, rfl⟩ := same
         obtain ⟨leftNode, rightNode, leftFound, rightFound, sourceType, leftTyped, rightTyped⟩ :=
           pair_source_types unique originalFound form metadata.coercions typed
-        exact .pair metadata form leftFound rightFound sourceType
-          (leftIH leftFound leftTyped generated) (rightIH rightFound rightTyped secondGenerated)
+        obtain ⟨acceptedChild2, acceptedChild2Sites⟩ := leftIH leftFound leftTyped generated
+        obtain ⟨acceptedChild3, acceptedChild3Sites⟩ := rightIH rightFound rightTyped secondGenerated
+        exact ⟨_, .pair metadata form leftFound rightFound sourceType
+          acceptedChild2 acceptedChild3 acceptedChild2Sites acceptedChild3Sites⟩
+
+/-- Original tree-only API, projected from the single supported extraction. -/
+theorem tree_of_functions
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact (tree_of_functions_with_literals
+    (fun _ id lowered => CompatibleExpressionLiterals.Certificate context.solvedRequirements source id lowered)
+    CompatibleExpressionProducts.LiteralFactory.ordinary unique declarations policyFor coercions syntaxTree found typed accepted).choose
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProducts

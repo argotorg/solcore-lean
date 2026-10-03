@@ -65,10 +65,12 @@ theorem member_of_functions
           by simpa only [Nat.min_self] using generated⟩
   · simp [owner, bind, Except.bind] at accepted
 
-theorem tree_of_functions_with_validity
+theorem tree_of_functions_with_literals
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
+    (literals : GenericExpressionMeaning.Certificate)
+    (literalFactory : CompatibleExpressionProducts.LiteralFactory policy body context values source scope reasonAt literals)
     (unique : NodeOccurrencesUnique source)
     (declarations : ScopeDeclarations source scope sourceContext)
     (signatures : sourceContext.signatures = values.checked.signatures)
@@ -79,10 +81,11 @@ theorem tree_of_functions_with_validity
     (found : source.lookupExpression? id = some node) (typed : ExpressionHasType source sourceContext id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
-    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+    Tree.WithLiterals (fuel := readFuel) (values := values) (source := source)
+      (context := sourceContext) (solved := context.solvedRequirements) (reasonAt := reasonAt) literals scope id lowered := by
   induction syntaxTree generalizing node fuel lowered with
   | fragment syntaxTree =>
-    refine .fragment (CompatibleExpressionConstructors.tree_of_functions_with_validity unique declarations (constructorValid.restrict (fun _ child => .fragment child)) ?_ ?_ syntaxTree found typed accepted)
+    refine (fun ⟨tree, sites⟩ => ⟨_, Tree.LiteralSites.fragment tree sites⟩) (CompatibleExpressionConstructors.tree_of_functions_with_literals literals literalFactory unique declarations (constructorValid.restrict (fun _ child => .fragment child)) ?_ ?_ syntaxTree found typed accepted)
     · exact ⟨fun id child => policyFor.special id (.fragment child), fun id child => policyFor.read id (.fragment child), policyFor.lower, policyFor.leaf⟩
     · exact fun id node child => coercions id node (.fragment child)
   | @member id original base name index originalFound form child ih =>
@@ -100,7 +103,28 @@ theorem tree_of_functions_with_validity
         member_of_functions signatures originalFound baseFound form projection
           (policyFor.special _ (.member originalFound form child))
           (policyFor.read _ (.member originalFound form child)) policyFor.leaf accepted
-      exact .member metadata baseMetadata form layout (ih baseFound baseTyped generated)
+      obtain ⟨acceptedChild1, acceptedChild1Sites⟩ := ih baseFound baseTyped generated
+      exact ⟨_, .member metadata baseMetadata form layout acceptedChild1 acceptedChild1Sites⟩
+
+/-- Original tree-only API, projected from the single supported extraction. -/
+theorem tree_of_functions_with_validity
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : ScopeDeclarations source scope sourceContext)
+    (signatures : sourceContext.signatures = values.checked.signatures)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (Syntax source))
+    (policyFor : PolicyFor policy context readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node) (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact (tree_of_functions_with_literals
+    (fun _ id lowered => CompatibleExpressionLiterals.Certificate context.solvedRequirements source id lowered)
+    CompatibleExpressionProducts.LiteralFactory.ordinary unique declarations signatures constructorValid policyFor coercions syntaxTree found typed accepted).choose
 
 /-- Compatibility with the former false residual scope. -/
 theorem tree_of_functions
