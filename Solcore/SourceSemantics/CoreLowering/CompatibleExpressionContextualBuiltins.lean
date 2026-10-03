@@ -77,7 +77,7 @@ private theorem context_bind_accepted {α β ε : Type} {action : Except ε α} 
 
 /-- Recursive data/control trees are extracted from the production
 contextual traversal, at root or full specialized parent context. -/
-theorem tree_of_contextual
+theorem tree_of_contextual_with_validity
     {program : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
     {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
     {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
@@ -89,7 +89,7 @@ theorem tree_of_contextual
     {sourceContext : SourceSemantics.Context}
     (ordinary : Ordinary source locals context.owner)
     (unique : NodeOccurrencesUnique source)
-    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source sourceContext (Syntax source))
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
     (sourceSignatures : sourceContext.signatures = values.checked.signatures)
     (syntaxTree : Syntax source id) (found : source.lookupExpression? id = some node)
@@ -108,7 +108,7 @@ theorem tree_of_contextual
     | some prepared =>
       dsimp only at accepted
       simp only [bind, Except.bind, pure, Except.pure] at accepted
-      refine tree_of_functions unique declarations sourceSignatures closed residual ?_ native prepared.substitution rfl ordinary.coercions syntaxTree found typed accepted
+      refine tree_of_functions_with_validity unique declarations sourceSignatures constructorValid ?_ native prepared.substitution rfl ordinary.coercions syntaxTree found typed accepted
       refine ⟨?_, ?_, lowerPolicy, leafPolicy⟩
       · intro childId childTree child budget
         obtain ⟨childNode, childFound⟩ := fragment_has_node childTree
@@ -132,7 +132,7 @@ theorem tree_of_contextual
     | none =>
       dsimp only at accepted
       obtain ⟨caller, selected, generated⟩ := context_bind_accepted accepted
-      refine tree_of_functions unique declarations sourceSignatures closed residual ?_ native [] rfl ordinary.coercions syntaxTree found typed generated
+      refine tree_of_functions_with_validity unique declarations sourceSignatures constructorValid ?_ native [] rfl ordinary.coercions syntaxTree found typed generated
       refine ⟨?_, ?_, lowerPolicy, leafPolicy⟩
       · intro childId childTree child budget
         obtain ⟨childNode, childFound⟩ := fragment_has_node childTree
@@ -153,5 +153,33 @@ theorem tree_of_contextual
           representation.expressions.readExpression viewed childId) = _
         rw [contextualSource_fragment program context.plan locals context.owner none ordinary childTree]
         simp only [bind, Except.bind, readPolicy]
+
+/-- Compatibility wrapper for the former closed source context. -/
+theorem tree_of_contextual
+    {program : CheckedProgram} {representation : SourceCoreGeneralFunctions.Representation}
+    {signatures : ProgramSignatures} {locals : SourceCoreLocalPolymorphism.Catalog}
+    {parents : List SourceCoreLocalEvidence.Prepared} {assignments : SourceCoreAssignmentFaultSites.Table}
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {context : SourceCoreFunctions.Context}
+    {native : SourceCoreGeneralFunctions.CallableContext} {parent : Option SourceCoreLocalEvidence.Prepared}
+    {skipInitializer : Option ExpressionId} {fuel readFuel : Nat} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {id : ExpressionId} {node : ExpressionNode}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    {sourceContext : SourceSemantics.Context}
+    (ordinary : Ordinary source locals context.owner)
+    (unique : NodeOccurrencesUnique source)
+    (closed : sourceContext.typeVariables = []) (residual : sourceContext.residualTypeVariables = false)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    (sourceSignatures : sourceContext.signatures = values.checked.signatures)
+    (syntaxTree : Syntax source id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    (readPolicy : representation.expressions.readExpression = SourceCoreCompatibleDataExpressions.readExpression values.checked)
+    (lowerPolicy : representation.expressions.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values)
+    (leafPolicy : representation.expressions.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression program representation signatures locals parents assignments
+      diagnostics context (some native) parent skipInitializer fuel source scope id reasonAt = .ok lowered) :
+    Tree readFuel values source sourceContext context.solvedRequirements reasonAt scope id lowered := by
+  exact tree_of_contextual_with_validity ordinary unique
+    (CompatibleExpressionInstantiationLaws.ConstructorLaw.of_closed closed residual)
+    declarations sourceSignatures syntaxTree found typed readPolicy lowerPolicy leafPolicy accepted
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltins
