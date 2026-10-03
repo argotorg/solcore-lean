@@ -119,6 +119,36 @@ private theorem proves {compilation : Compilation} {context : Context} (valid : 
   have member : solved ∈ context.solvedRequirements := by rw [valid.ledger]; exact member
   exact ⟨solved, ⟨member, identifier⟩, same, valid.valid.entriesValid solved member⟩
 
+/-- Only a reached numeric resolution needs an independent requirement proof.
+No source or native execution law is part of this condition. -/
+def NumericRequirements (context : Context) (resolution : MatchPatternResolution) : Prop :=
+  ∀ literal numeric, resolution = .integerLiteral literal numeric →
+    RequirementProves context numeric.requirement numeric.predicate
+
+theorem LiteralCode.constructs_word_with_requirement {context : Context}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    (target : resolution.targetType = .word)
+    (meaning : NumericLiteralDenotes literal resolution.rawValue)
+    (requirement : RequirementProves context resolution.requirement resolution.predicate) :
+    Dynamic.ResolvedIntegerLiteralConstructs context literal resolution (.word (Word.ofNatModulo resolution.rawValue)) := by
+  cases resolution with
+  | mk raw type requirementId =>
+    dsimp at target
+    subst type
+    exact .word meaning requirement
+
+theorem LiteralCode.constructs_integer_with_requirement {context : Context}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    (target : resolution.targetType = .integer)
+    (meaning : NumericLiteralDenotes literal resolution.rawValue)
+    (requirement : RequirementProves context resolution.requirement resolution.predicate) :
+    Dynamic.ResolvedIntegerLiteralConstructs context literal resolution (.integer (Int.ofNat resolution.rawValue)) := by
+  cases resolution with
+  | mk raw type requirementId =>
+    dsimp at target
+    subst type
+    exact .integer meaning requirement
+
 theorem LiteralCode.constructs_word {compilation : Compilation} {context : Context}
     {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
     (valid : ContextValid compilation context) (target : resolution.targetType = .word)
@@ -126,11 +156,9 @@ theorem LiteralCode.constructs_word {compilation : Compilation} {context : Conte
     (requirement : ∃ solved ∈ compilation.solvedRequirements, solved.id = resolution.requirement ∧
       solved.predicate = ProgramSignatures.builtinIntPredicate .word) :
     Dynamic.ResolvedIntegerLiteralConstructs context literal resolution (.word (Word.ofNatModulo resolution.rawValue)) := by
-  cases resolution with
-  | mk raw type requirementId =>
-    dsimp at target
-    subst type
-    exact .word meaning (proves valid requirement)
+  exact LiteralCode.constructs_word_with_requirement target meaning
+    (by simpa only [IntegerLiteralResolution.predicate, target] using proves valid requirement)
+
 
 theorem LiteralCode.constructs_integer {compilation : Compilation} {context : Context}
     {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
@@ -139,11 +167,8 @@ theorem LiteralCode.constructs_integer {compilation : Compilation} {context : Co
     (requirement : ∃ solved ∈ compilation.solvedRequirements, solved.id = resolution.requirement ∧
       solved.predicate = ProgramSignatures.builtinIntPredicate .integer) :
     Dynamic.ResolvedIntegerLiteralConstructs context literal resolution (.integer (Int.ofNat resolution.rawValue)) := by
-  cases resolution with
-  | mk raw type requirementId =>
-    dsimp at target
-    subst type
-    exact .integer meaning (proves valid requirement)
+  exact LiteralCode.constructs_integer_with_requirement target meaning
+    (by simpa only [IntegerLiteralResolution.predicate, target] using proves valid requirement)
 
 
 private theorem projected_word (compilation : Compilation) (source : TypedSource) :
@@ -180,13 +205,34 @@ theorem LeafResolution.excludes {context : Context} {pattern : TypedMatchPattern
           matchPatternResolutionInstructions] at failedMatch matchedMatch <;>
         exact failedMatch.mismatch _ matchedMatch
 
-/-- Every accepted leaf pattern produces its independent source outcome in
-finite Core steps, packs the exact ordered bindings, and preserves the store. -/
-theorem leaf_preserves {compilation : Compilation} {context : Context}
+private theorem ordinary_numeric {compilation : Compilation} {context : Context}
     {source : TypedSource} {scope : Scope} {site : StatementId} {span : Syntax.SourceSpan}
     {expected : TypeSystem.Ty} {pattern : TypedMatchPattern} {compiled : Pattern}
     (certificate : Certificate compilation source scope site span expected pattern compiled)
-    (valid : ContextValid compilation context) (leaf : LeafResolution pattern.resolution)
+    (valid : ContextValid compilation context) : NumericRequirements context pattern.resolution := by
+  intro literal numeric form
+  rcases pattern with ⟨spelling, patternType, resolution, requirements⟩
+  dsimp only at form
+  subst resolution
+  obtain ⟨instructions, root, tree⟩ := certificate.tree
+  obtain ⟨_, instructionsEq, _⟩ := rootInstructions_sound compilation context valid.signatures
+    spelling (.integerLiteral literal numeric) instructions root
+  subst instructions
+  cases tree with
+  | literal projection validated =>
+    have code := literalMatcher_sound compilation site span expected literal numeric _ validated
+    cases code with
+    | word target meaning retained | integer target meaning retained =>
+      simpa only [IntegerLiteralResolution.predicate, target] using proves valid retained
+
+/-- Every accepted leaf pattern produces its independent source outcome in
+finite Core steps, packs the exact ordered bindings, and preserves the store. -/
+theorem leaf_preserves_with_requirements {compilation : Compilation} {context : Context}
+    {source : TypedSource} {scope : Scope} {site : StatementId} {span : Syntax.SourceSpan}
+    {expected : TypeSystem.Ty} {pattern : TypedMatchPattern} {compiled : Pattern}
+    (certificate : Certificate compilation source scope site span expected pattern compiled)
+    (signatures : context.signatures = compilation.signatures)
+    (numeric : NumericRequirements context pattern.resolution) (leaf : LeafResolution pattern.resolution)
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient} {mapping : LocationMap}
     {sourceValue : Dynamic.Value} {value : Value} {world : StoreTyping}
@@ -196,7 +242,7 @@ theorem leaf_preserves {compilation : Compilation} {context : Context}
       Evaluates (value :: environment) store (.apply compiled.matcher (.var 0)) outcome store := by
   rcases pattern with ⟨spelling, patternType, resolution, requirements⟩
   obtain ⟨instructions, root, tree⟩ := certificate.tree
-  obtain ⟨arity, instructionsEq, sourceRep⟩ := rootInstructions_sound compilation context valid.signatures
+  obtain ⟨arity, instructionsEq, sourceRep⟩ := rootInstructions_sound compilation context signatures
     spelling resolution instructions root
   subst instructions
   cases leaf with
@@ -222,7 +268,7 @@ theorem leaf_preserves {compilation : Compilation} {context : Context}
         rw [projected_word] at coreType
         cases coreType
         obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
-        have constructs := LiteralCode.constructs_word valid target meaning retained
+        have constructs := LiteralCode.constructs_word_with_requirement target meaning (numeric _ _ rfl)
         by_cases same : actual = Word.ofNatModulo resolution.rawValue
         · subst actual
           refine ⟨.inRight .unit .unit, .matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, ?_⟩
@@ -239,7 +285,7 @@ theorem leaf_preserves {compilation : Compilation} {context : Context}
         rw [projected_integer] at coreType
         cases coreType
         obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.integer_fields represented
-        have constructs := LiteralCode.constructs_integer valid target meaning retained
+        have constructs := LiteralCode.constructs_integer_with_requirement target meaning (numeric _ _ rfl)
         by_cases same : actual = Int.ofNat resolution.rawValue
         · subst actual
           refine ⟨.inRight .unit .unit, .matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, ?_⟩
@@ -254,6 +300,180 @@ theorem leaf_preserves {compilation : Compilation} {context : Context}
                 simp only [BinaryOp.apply, Option.some.injEq, Value.bool.injEq, beq_eq_false_iff_ne]
                 exact same)) (.inLeft .unit))
 
+
+theorem leaf_preserves {compilation : Compilation} {context : Context}
+    {source : TypedSource} {scope : Scope} {site : StatementId} {span : Syntax.SourceSpan}
+    {expected : TypeSystem.Ty} {pattern : TypedMatchPattern} {compiled : Pattern}
+    (certificate : Certificate compilation source scope site span expected pattern compiled)
+    (valid : ContextValid compilation context) (leaf : LeafResolution pattern.resolution)
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient} {mapping : LocationMap}
+    {sourceValue : Dynamic.Value} {value : Value} {world : StoreTyping}
+    (represented : ValueRep compilation.checked registry functions mapping world expected sourceValue value compiled.type)
+    (environment : Environment) (store : Store) :
+    ∃ outcome, OutcomeRep compilation.checked registry functions mapping world context pattern compiled sourceValue outcome ∧
+      Evaluates (value :: environment) store (.apply compiled.matcher (.var 0)) outcome store :=
+  leaf_preserves_with_requirements certificate valid.signatures (ordinary_numeric certificate valid)
+    leaf represented environment store
+
+
+/-- Preserve the generated public simplifier name of the original sole proof. -/
+abbrev leaf_preserves._simp_1_1 := @leaf_preserves_with_requirements._simp_1_1
+
+private theorem apply_lambda_var {environment : Environment} {store finalStore : Store}
+    {value result : Value} {input output : Ty} {body : Expr}
+    (completed : Evaluates (value :: environment) store (.apply (.lambda input output body) (.var 0)) result finalStore) :
+    Evaluates (value :: value :: environment) store body result finalStore := by
+  cases completed with
+  | apply function argument body =>
+    cases function
+    cases argument with
+    | var found =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+      cases found
+      exact body
+
+private theorem word_matcher_inv {environment : Environment} {store finalStore : Store}
+    {actual expected : Word} {outcome : Value}
+    (completed : Evaluates (.word actual :: environment) store
+      (.ifE (.binary .wordEq (.var 0) (.word expected)) (.inRight .unit .unit) (.inLeft .unit .unit))
+      outcome finalStore) :
+    ((actual = expected ∧ outcome = .inRight .unit .unit) ∨
+      (actual ≠ expected ∧ outcome = .inLeft .unit .unit)) ∧ finalStore = store := by
+  cases completed with
+  | ifTrue condition branch =>
+    cases condition with
+    | binary left right applied =>
+      cases left with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        cases found
+        cases right
+        cases branch with
+        | inRight unit =>
+          cases unit
+          exact ⟨.inl ⟨by simpa [BinaryOp.apply] using applied, rfl⟩, rfl⟩
+  | ifFalse condition branch =>
+    cases condition with
+    | binary left right applied =>
+      cases left with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        cases found
+        cases right
+        cases branch with
+        | inLeft unit =>
+          cases unit
+          exact ⟨.inr ⟨by simpa [BinaryOp.apply] using applied, rfl⟩, rfl⟩
+
+private theorem integer_matcher_inv {environment : Environment} {store finalStore : Store}
+    {actual expected : Int} {outcome : Value}
+    (completed : Evaluates (.integer actual :: environment) store
+      (.ifE (.binary .integerEq (.var 0) (.integer expected)) (.inRight .unit .unit) (.inLeft .unit .unit))
+      outcome finalStore) :
+    ((actual = expected ∧ outcome = .inRight .unit .unit) ∨
+      (actual ≠ expected ∧ outcome = .inLeft .unit .unit)) ∧ finalStore = store := by
+  cases completed with
+  | ifTrue condition branch =>
+    cases condition with
+    | binary left right applied =>
+      cases left with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        cases found
+        cases right
+        cases branch with
+        | inRight unit =>
+          cases unit
+          exact ⟨.inl ⟨by simpa [BinaryOp.apply] using applied, rfl⟩, rfl⟩
+  | ifFalse condition branch =>
+    cases condition with
+    | binary left right applied =>
+      cases left with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        cases found
+        cases right
+        cases branch with
+        | inLeft unit =>
+          cases unit
+          exact ⟨.inr ⟨by simpa [BinaryOp.apply] using applied, rfl⟩, rfl⟩
+
+/-- Reflection consumes only the original native application, comparison and
+sum-tag derivations. It never replays preservation or assumes source execution. -/
+theorem leaf_reflects_with_requirements {compilation : Compilation} {context : Context}
+    {source : TypedSource} {scope : Scope} {site : StatementId} {span : Syntax.SourceSpan}
+    {expected : TypeSystem.Ty} {pattern : TypedMatchPattern} {compiled : Pattern}
+    (certificate : Certificate compilation source scope site span expected pattern compiled)
+    (signatures : context.signatures = compilation.signatures)
+    (numeric : NumericRequirements context pattern.resolution) (leaf : LeafResolution pattern.resolution)
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient} {mapping : LocationMap}
+    {sourceValue : Dynamic.Value} {value : Value} {world : StoreTyping}
+    (represented : ValueRep compilation.checked registry functions mapping world expected sourceValue value compiled.type)
+    {environment : Environment} {store finalStore : Store} {outcome : Value}
+    (completed : Evaluates (value :: environment) store (.apply compiled.matcher (.var 0)) outcome finalStore) :
+    OutcomeRep compilation.checked registry functions mapping world context pattern compiled sourceValue outcome ∧
+      finalStore = store := by
+  rcases pattern with ⟨spelling, patternType, resolution, requirements⟩
+  obtain ⟨instructions, root, tree⟩ := certificate.tree
+  obtain ⟨arity, instructionsEq, sourceRep⟩ := rootInstructions_sound compilation context signatures
+    spelling resolution instructions root
+  subst instructions
+  cases leaf with
+  | wildcard =>
+    cases tree with
+    | wildcard projection =>
+      have body := apply_lambda_var completed
+      cases body with
+      | inRight unit =>
+        cases unit
+        exact ⟨.matched (bindings := []) (values := []) (.intro sourceRep .wildcard) .nil, rfl⟩
+  | binder binder =>
+    cases tree with
+    | binder projection sourceType binderValid =>
+      have body := apply_lambda_var completed
+      cases body with
+      | inRight result =>
+        cases result with
+        | var found =>
+          simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+          cases found
+          exact ⟨.matched (bindings := [(binder, sourceValue)]) (values := [value])
+            (.intro sourceRep .binder) (.cons (sourceType.symm ▸ represented) .nil), rfl⟩
+  | literal literal resolution =>
+    cases tree with
+    | literal projection validated =>
+      have code := literalMatcher_sound compilation site span expected literal resolution _ validated
+      cases code with
+      | word target meaning retained =>
+        have coreType := projection
+        rw [projected_word] at coreType
+        cases coreType
+        obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
+        have constructs := LiteralCode.constructs_word_with_requirement target meaning (numeric _ _ rfl)
+        obtain ⟨result, sameStore⟩ := word_matcher_inv (apply_lambda_var completed)
+        rcases result with ⟨same, rfl⟩ | ⟨different, rfl⟩
+        · subst actual
+          exact ⟨.matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, sameStore⟩
+        · refine ⟨.noMatch (.intro sourceRep ⟨.integerLiteral, ?_⟩), sameStore⟩
+          intro bindings matched
+          cases matched with
+          | integerLiteral construction => exact different (Dynamic.Value.word.inj (construction.functional constructs))
+      | integer target meaning retained =>
+        have coreType := projection
+        rw [projected_integer] at coreType
+        cases coreType
+        obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.integer_fields represented
+        have constructs := LiteralCode.constructs_integer_with_requirement target meaning (numeric _ _ rfl)
+        obtain ⟨result, sameStore⟩ := integer_matcher_inv (apply_lambda_var completed)
+        rcases result with ⟨same, rfl⟩ | ⟨different, rfl⟩
+        · subst actual
+          exact ⟨.matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, sameStore⟩
+        · refine ⟨.noMatch (.intro sourceRep ⟨.integerLiteral, ?_⟩), sameStore⟩
+          intro bindings matched
+          cases matched with
+          | integerLiteral construction => exact different (Dynamic.Value.integer.inj (construction.functional constructs))
 
 /-- Public entry consumes actual compiler success; the structural certificate
 is obtained internally and is never an extra caller obligation. -/
@@ -288,11 +508,11 @@ theorem compilePattern_leaf_reflects (compilation : Compilation) (fuel : Nat)
     {environment : Environment} {store finalStore : Store} {outcome : Value}
     (completed : Evaluates (value :: environment) store (.apply compiled.pattern.matcher (.var 0)) outcome finalStore) :
     OutcomeRep compilation.checked registry functions mapping world context pattern compiled.pattern sourceValue outcome ∧
-      finalStore = store := by
-  obtain ⟨predicted, meaning, evaluated⟩ := compilePattern_leaf_preserves compilation fuel source scope site span
-    expected pattern compiled accepted context valid leaf represented environment store
-  obtain ⟨sameValue, sameStore⟩ := evaluation_deterministic completed evaluated
-  exact ⟨sameValue.symm ▸ meaning, sameStore⟩
+      finalStore = store :=
+  let certificate := certificate_of_compilePattern compilation fuel source scope site span expected pattern compiled accepted
+  leaf_reflects_with_requirements certificate valid.signatures (ordinary_numeric certificate valid)
+    leaf represented completed
+
 
 /-- A supplied independent success fixes exact source binding order. No
 evaluation of the generated matcher is assumed. -/
