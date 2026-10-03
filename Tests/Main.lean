@@ -291,6 +291,9 @@ import Solcore.Test.SourceCoreCallableCoercionPathMeaning
 import Solcore.Test.SourceCoreRecursiveNamedExpressionTreeBounds
 import Solcore.Test.SourceCoreRecursiveNamedProtectedHeaderBounds
 import Solcore.Test.SourceCoreRecursiveNamedLexicalControlBounds
+import Solcore.Test.SourceCoreCallableCoercionMethodEvidenceInvariant
+import Solcore.Test.SourceCoreRecursiveNamedLexicalTreeBounds
+import Solcore.Test.SourceCoreRecursiveNamedFunctionFinishBounds
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2744,6 +2747,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedExpressionTreeBounds.run
   SourceCoreRecursiveNamedProtectedHeaderBounds.run
   SourceCoreRecursiveNamedLexicalControlBounds.run
+  SourceCoreCallableCoercionMethodEvidenceInvariant.run
+  SourceCoreRecursiveNamedLexicalTreeBounds.run
+  SourceCoreRecursiveNamedFunctionFinishBounds.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
