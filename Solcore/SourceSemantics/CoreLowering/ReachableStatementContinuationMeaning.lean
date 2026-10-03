@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ReachableStatementContinuations
 import Solcore.SourceSemantics.CoreLowering.CoreHelperInversion
+import Solcore.SourceSemantics.CoreLowering.DataMatchSourceTrace
 
 /-! Stopped continuations are justified separately in the original source and
 Core relations. Source inversion keeps lexical environments and heaps; native
@@ -20,7 +21,8 @@ theorem StoppingStatement.not_tail {source : TypedSource} {id : StatementId}
       ∀ expression, node.form ≠ .expression expression false := by
   cases stops with
   | returnUnit found form | returnValue found form | breaking found form | continuing found form
-  | block found form _ | conditional found form _ _ => exact ⟨_, found, by simp [form]⟩
+  | block found form _ | conditional found form _ _
+  | matchDefault found form _ _ _ _ _ _ => exact ⟨_, found, by simp [form]⟩
 
 private theorem restore_terminal {outcome : Dynamic.ControlOutcome}
     (outer : Dynamic.Environment) (terminal : Dynamic.TerminalControl outcome) :
@@ -43,13 +45,94 @@ def ListTerminates (source : TypedSource) (statements : List StatementId) : Prop
     ∀ mode, ScalarStatementViews.ListExecutes mode program context evidence source environment before
       statements finalContext outcome after → Dynamic.TerminalControl outcome
 
+
+private theorem typed_cases_length {origin : TypedSource} {control : ControlContext} {context : Context}
+    {type : TypeSystem.Ty} {cases : List TypedMatchCase} {facts : List BodyFacts}
+    (typed : MatchCasesHaveType origin control context type cases facts) : cases.length = facts.length := by
+  apply MatchCasesHaveType.rec (source := origin) (t := typed)
+    (motive_1 := fun _ _ _ _ => True)
+    (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ _ => True)
+    (motive_5 := fun _ _ _ _ => True)
+    (motive_6 := fun _ _ _ _ _ => True)
+    (motive_7 := fun _ _ _ => True)
+    (motive_8 := fun _ _ _ _ _ _ => True)
+    (motive_9 := fun _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ => True)
+    (motive_13 := fun _ _ _ cases facts _ => cases.length = facts.length)
+  all_goals intros; first | exact True.intro | simp_all
+
+private theorem zip_fact_of_mem {cases : List TypedMatchCase} {facts : List BodyFacts} {arm : TypedMatchCase}
+    (same : cases.length = facts.length) (member : arm ∈ cases) :
+    ∃ fact, (arm, fact) ∈ cases.zip facts := by
+  cases cases with
+  | nil => cases member
+  | cons head tail =>
+    cases facts with
+    | nil => simp at same
+    | cons fact rest =>
+      have lengths : tail.length = rest.length := Nat.succ.inj same
+      rcases List.mem_cons.mp member with rfl | member
+      · exact ⟨fact, List.mem_cons_self⟩
+      · obtain ⟨chosen, present⟩ := zip_fact_of_mem lengths member
+        exact ⟨chosen, List.mem_cons_of_mem _ present⟩
+termination_by cases.length
+
+private theorem selected_arm_body {context : Context} {value : Dynamic.Value}
+    {cases : List TypedMatchCase} {fallback : Option (List StatementId)}
+    {body : List StatementId} {bindings : List (TypedBinder × Dynamic.Value)}
+    (selected : Dynamic.MatchCasesSelect context value cases fallback (.arm body bindings)) :
+    ∃ arm ∈ cases, body = arm.body := by
+  cases selected with
+  | head => exact ⟨_, List.mem_cons_self, rfl⟩
+  | tail _ next =>
+    obtain ⟨arm, member, same⟩ := selected_arm_body next
+    exact ⟨arm, List.mem_cons_of_mem _ member, same⟩
+termination_by cases.length
+
+/-- A present default excludes the untyped no-branch result. The original
+selected body consumes only its own recursively established stopping proof. -/
+theorem source_match_terminal {origin source : TypedSource} {id : StatementId} {node : StatementNode}
+    {resolution : MatchResolution} {fallback : List StatementId}
+    {control : ControlContext} {context : Context} {type : TypeSystem.Ty} {caseFacts : List BodyFacts}
+    (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+    (present : resolution.defaultBody = some fallback)
+    (typed : MatchCasesHaveType origin control context type resolution.cases caseFacts)
+    (arms : ∀ arm fact, (arm, fact) ∈ resolution.cases.zip caseFacts → ListTerminates source arm.body)
+    (defaultStops : ListTerminates source fallback) : StatementTerminates source id := by
+  intro program actualContext finalContext evidence environment before after outcome executed
+  obtain ⟨_, trace⟩ := DataMatchSourceTrace.of_outcome unique (lookupStatement?_sound found) form (.control executed)
+  cases trace with
+  | scrutineeFault _ | patternFault _ _ _ _ => exact .fault _
+  | arm _ _ _ selected _ _ body =>
+    obtain ⟨arm, member, same⟩ := selected_arm_body selected
+    cases same
+    obtain ⟨fact, member⟩ := zip_fact_of_mem (typed_cases_length typed) member
+    cases body with
+    | control executed => exact restore_terminal environment (arms arm fact member false executed)
+    | fault _ => exact .fault _
+  | default _ _ _ selected body =>
+    have same := Option.some.inj (selected.defaultBody_eq.symm.trans present)
+    cases same
+    cases body with
+    | control executed => exact restore_terminal environment (defaultStops false executed)
+    | fault _ => exact .fault _
+  | noBranch _ _ _ selected =>
+    have absent := selected.noBranch_defaultBody_eq
+    rw [present] at absent
+    cases absent
+
 theorem source_statement_terminal {source : TypedSource} {id : StatementId} {summary : ControlSummary}
     (unique : NodeOccurrencesUnique source) (stops : StoppingStatement source id summary) :
     StatementTerminates source id := by
   refine @StoppingStatement.rec source
     (fun id _ _ => StatementTerminates source id)
     (fun statements _ _ => ListTerminates source statements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ id summary stops
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ id summary stops
   · intro _ _ found form
     intro _ _ _ _ _ _ _ _ trace
     obtain ⟨_, same, _⟩ := ScalarStatementViews.returnUnit unique (lookupStatement?_sound found) form trace
@@ -77,6 +160,8 @@ theorem source_statement_terminal {source : TypedSource} {id : StatementId} {sum
     cases boolean with
     | false => exact same ▸ restore_terminal environment (rightIH false body)
     | true => exact same ▸ restore_terminal environment (leftIH false body)
+  · intro _ _ _ _ _ _ _ _ _ _ _ found form present casesTyped _ _ _ _ armsIH defaultIH
+    exact source_match_terminal unique found form present casesTyped armsIH defaultIH
   · intro _ _ _ head headIH
     intro _ _ _ _ _ _ _ _ mode trace
     obtain ⟨_, found, notTail⟩ := head.not_tail
@@ -97,7 +182,7 @@ theorem source_statements_terminal {source : TypedSource} {statements : List Sta
   refine @StoppingStatements.rec source
     (fun id _ _ => StatementTerminates source id)
     (fun statements _ _ => ListTerminates source statements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
   · intro _ _ found form
     intro _ _ _ _ _ _ _ _ trace
     obtain ⟨_, same, _⟩ := ScalarStatementViews.returnUnit unique (lookupStatement?_sound found) form trace
@@ -125,6 +210,8 @@ theorem source_statements_terminal {source : TypedSource} {statements : List Sta
     cases boolean with
     | false => exact same ▸ restore_terminal environment (rightIH false body)
     | true => exact same ▸ restore_terminal environment (leftIH false body)
+  · intro _ _ _ _ _ _ _ _ _ _ _ found form present casesTyped _ _ _ _ armsIH defaultIH
+    exact source_match_terminal unique found form present casesTyped armsIH defaultIH
   · intro _ _ _ head headIH
     intro _ _ _ _ _ _ _ _ mode trace
     obtain ⟨_, found, notTail⟩ := head.not_tail

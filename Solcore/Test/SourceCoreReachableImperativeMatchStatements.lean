@@ -63,37 +63,20 @@ theorem original_suffix_transport {origin : TypedSource} {scope : SourceCoreLoca
     (issued : GenericLexicalStatements.IssuedSuffix origin scope mode rest type code) :
     GenericLexicalStatements.IssuedSuffix source scope mode rest type code :=
   issued.transport identity
-/-- A match itself is not authenticated as stopping by the block/if foundation.
-All-returning match heads remain a separate static grammar boundary. -/
-theorem bare_match_has_no_stopping_head {resolution : MatchResolution} {summary : ControlSummary}
-    (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution) :
+/-- No-default exhaustiveness remains typed and pointwise; it does not
+supply the universal stopping certificate used by enclosing block/if heads. -/
+theorem no_default_match_has_no_stopping_head {resolution : MatchResolution} {summary : ControlSummary}
+    (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+    (absent : resolution.defaultBody = none) :
     ¬ ReachableStatementContinuations.StoppingStatement source id summary := by
+  have shape : ∀ actual, source.lookupStatement? id = some actual →
+      actual.form = .matchWith resolution := by
+    intro actual actualFound
+    have same := Option.some.inj (actualFound.symm.trans found)
+    exact same ▸ form
   intro receipt
-  cases receipt with
-  | returnUnit actualFound actualForm =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
-  | returnValue actualFound actualForm =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
-  | breaking actualFound actualForm =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
-  | continuing actualFound actualForm =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
-  | block actualFound actualForm body =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
-  | conditional actualFound actualForm left right =>
-      have same := Option.some.inj (actualFound.symm.trans found)
-      subst node
-      cases form.symm.trans actualForm
+  cases receipt <;> have actualForm := shape _ (by assumption) <;> simp_all
+
 end Syntax
 
 section Extraction

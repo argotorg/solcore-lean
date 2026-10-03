@@ -33,7 +33,7 @@ theorem Stopped.list_terminates {origin source : TypedSource} {statements : List
   refine @ReachableStatementContinuations.StoppingStatements.rec origin
     (fun id _ _ => ReachableStatementContinuations.StatementTerminates source id)
     (fun statements _ _ => ReachableStatementContinuations.ListTerminates source statements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ statements summary stops
   · intro _ _ found form
     intro _ _ _ _ _ _ _ _ trace
     obtain ⟨_, same, _⟩ := ScalarStatementViews.returnUnit unique (lookupStatement?_sound ((identity.lookup _).symm.trans found)) form trace
@@ -61,6 +61,9 @@ theorem Stopped.list_terminates {origin source : TypedSource} {statements : List
     cases boolean with
     | false => exact same ▸ stopped_restore_terminal environment (rightIH false body)
     | true => exact same ▸ stopped_restore_terminal environment (leftIH false body)
+  · intro _ _ _ _ _ _ _ _ _ _ _ found form present casesTyped _ _ _ _ armsIH defaultIH
+    exact ReachableStatementContinuations.source_match_terminal unique
+      ((identity.lookup _).symm.trans found) form present casesTyped armsIH defaultIH
   · intro _ _ _ head headIH
     intro _ _ _ _ _ _ _ _ mode trace
     obtain ⟨_, found, notTail⟩ := head.not_tail

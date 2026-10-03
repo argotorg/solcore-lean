@@ -44,6 +44,20 @@ mutual
         (rightStops : StoppingStatements source right rightSummary) :
         StoppingStatement source id (.branches leftSummary rightSummary)
 
+
+    | matchDefault {id node resolution fallback control context scrutineeType
+        caseFacts defaultFinal defaultFacts summary}
+        (found : source.lookupStatement? id = some node)
+        (form : node.form = .matchWith resolution)
+        (present : resolution.defaultBody = some fallback)
+        (casesTyped : MatchCasesHaveType source control context scrutineeType resolution.cases caseFacts)
+        (defaultTyped : StatementsHaveType source control context fallback defaultFinal defaultFacts)
+        (merged : mergeBodyControls caseFacts (some defaultFacts) = some summary)
+        (arms : ∀ arm fact, (arm, fact) ∈ resolution.cases.zip caseFacts →
+          StoppingStatements source arm.body fact.control)
+        (defaultStops : StoppingStatements source fallback defaultFacts.control) :
+        StoppingStatement source id summary.eraseValue
+
   /-- The stopped suffix may follow ordinary prefixes. Prefix summaries come
   from independent source typing, rather than an arbitrary summary field. -/
   inductive StoppingStatements (source : TypedSource) : List StatementId → ControlSummary → Prop where
@@ -56,6 +70,23 @@ mutual
         StoppingStatements source (id :: rest) (.sequence facts.control summary)
 end
 
+
+private theorem typed_stopped_merge {source : TypedSource} {control : ControlContext} {context : Context}
+    {scrutineeType : TypeSystem.Ty} {cases : List TypedMatchCase} {caseFacts : List BodyFacts}
+    {fallback : BodyFacts}
+    (typed : MatchCasesHaveType source control context scrutineeType cases caseFacts)
+    (arms : ∀ arm fact, (arm, fact) ∈ cases.zip caseFacts → fact.control.fallthrough = none)
+    (defaultStops : fallback.control.fallthrough = none) :
+    ∃ summary, mergeBodyControls caseFacts (some fallback) = some summary ∧ summary.fallthrough = none := by
+  cases typed with
+  | nil => exact ⟨fallback.control, rfl, defaultStops⟩
+  | @cons control context scrutineeType arm cases fact facts head tail =>
+    obtain ⟨rest, merged, stopped⟩ := typed_stopped_merge tail (fun arm fact member => arms arm fact (List.mem_cons_of_mem _ member)) defaultStops
+    have first := arms arm fact List.mem_cons_self
+    exact ⟨fact.control.branches rest, by simp [mergeBodyControls, merged],
+      by simp [ControlSummary.branches, ControlSummary.canFallthrough, first, stopped]⟩
+termination_by cases.length
+
 theorem StoppingStatement.no_fallthrough {source : TypedSource} {id : StatementId}
     {summary : ControlSummary} (stops : StoppingStatement source id summary) :
     summary.fallthrough = none := by
@@ -65,6 +96,11 @@ theorem StoppingStatement.no_fallthrough {source : TypedSource} {id : StatementI
   | block _ _ _ body => simp [ControlSummary.eraseValue, body]
   | conditional _ _ _ _ left right =>
       simp [ControlSummary.branches, ControlSummary.canFallthrough, left, right]
+  | matchDefault _ _ _ casesTyped _ merged _ _ armsIH defaultIH =>
+      obtain ⟨actual, equation, stopped⟩ := typed_stopped_merge casesTyped armsIH defaultIH
+      have same := Option.some.inj (equation.symm.trans merged)
+      cases same
+      simp [ControlSummary.eraseValue, stopped]
   | stop _ head => exact head
   | «prefix» _ _ _ tail => simp [ControlSummary.sequence, tail]
 
@@ -77,6 +113,11 @@ theorem StoppingStatements.no_fallthrough {source : TypedSource} {statements : L
   | block _ _ _ body => simp [ControlSummary.eraseValue, body]
   | conditional _ _ _ _ left right =>
       simp [ControlSummary.branches, ControlSummary.canFallthrough, left, right]
+  | matchDefault _ _ _ casesTyped _ merged _ _ armsIH defaultIH =>
+      obtain ⟨actual, equation, stopped⟩ := typed_stopped_merge casesTyped armsIH defaultIH
+      have same := Option.some.inj (equation.symm.trans merged)
+      cases same
+      simp [ControlSummary.eraseValue, stopped]
   | stop _ head => exact head
   | «prefix» _ _ _ tail => simp [ControlSummary.sequence, tail]
 
