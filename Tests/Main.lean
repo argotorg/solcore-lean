@@ -1760,6 +1760,14 @@ import Solcore.Test.SourceStagedIntegerLocals
 import Solcore.Test.SourceStagedIntegerLocalsTamper
 import Solcore.Test.SourceStagedIntegerCalls
 import Solcore.Test.SourceStagedIntegerCallsTamper
+import Solcore.Test.SourceCoreRecursiveNamedPublicRuntimeFactoryMeaning
+import Solcore.Test.SourceCoreCallableIndexedLambdaEntryBounds
+import Solcore.Test.SourceCoreRecursiveNamedPreparedStageScopes
+import Solcore.Test.SourceCoreRecursiveNamedPreparedHeaders
+import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeBody
+import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeEntry
+import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimePreservation
+import Solcore.Test.SourceRecursiveStageGlobalApplication
 
 set_option autoImplicit false
 
@@ -2905,6 +2913,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedPreparedStageContracts.run
   SourceCoreRecursiveNamedCatalogRuntimeMutualMeaning.run
   SourceCoreRecursiveNamedPublicSpecializationMeaning.run
+  SourceCoreCallableIndexedLambdaRuntimeBody.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
