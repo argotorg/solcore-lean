@@ -1769,6 +1769,15 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeEntry
 import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimePreservation
 import Solcore.Test.SourceRecursiveStageGlobalApplication
 
+import Solcore.Test.SourceCoreRecursiveNamedPreparedHeaderPolicies
+import Solcore.Test.SourceRecursiveStagePrimitiveOperators
+import Solcore.Test.SourceCoreRecursiveNamedTupleExpressions
+import Solcore.Test.SourceCoreCallableIndexedLambdaModelPrefix
+import Solcore.Test.SourceCoreRecursiveNamedPreparedCallEvidence
+import Solcore.Test.SourceCoreCallableIndexedLambdaModelEntryBounds
+import Solcore.Test.SourceCoreCallableIndexedLambdaModelPreservation
+import Solcore.Test.SourceCoreRecursiveStagePrimitiveMeaning
+
 set_option autoImplicit false
 
 open Solcore
@@ -2914,6 +2923,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedCatalogRuntimeMutualMeaning.run
   SourceCoreRecursiveNamedPublicSpecializationMeaning.run
   SourceCoreCallableIndexedLambdaRuntimeBody.run
+  SourceCoreRecursiveNamedPreparedHeaderPolicies.run
+  SourceRecursiveStagePrimitiveOperators.run
+  SourceCoreRecursiveNamedTupleExpressions.run
+  SourceCoreRecursiveNamedPreparedCallEvidence.run
+  SourceCoreRecursiveStagePrimitiveMeaning.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run

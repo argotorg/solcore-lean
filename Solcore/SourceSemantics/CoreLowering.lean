@@ -603,6 +603,13 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeEntry
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimePreservation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStagedCalls
 
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchAmbientLowering
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedTupleHeadBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedCallEvidence
+import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
