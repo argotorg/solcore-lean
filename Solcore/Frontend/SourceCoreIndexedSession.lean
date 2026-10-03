@@ -1418,3 +1418,196 @@ theorem Checkpoint.RootStart.heap_size {artifact : Artifact} {session : Session 
   simp only [Checkpoint.heapSize, Session.heapSize, initial, Core.State.initial]
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Scalar and product inputs need no handle or metadata allocation. This is
+a structural admission predicate; it contains no execution or typing law. -/
+inductive SimplePublic : Value → Prop where
+  | unit : SimplePublic .unit
+  | bool (value : Bool) : SimplePublic (.bool value)
+  | word (value : Core.Word) : SimplePublic (.word value)
+  | integer (value : Int) : SimplePublic (.integer value)
+  | product {left right : Value} :
+      SimplePublic left → SimplePublic right → SimplePublic (.product left right)
+
+/-- The raw type view and native bytes selected by the actual input encoder.
+Source interpretation is supplied separately by the semantic boundary. -/
+inductive SimpleInput : TypeSystem.Ty → Value → Core.Value → Prop where
+  | unit {expected : TypeSystem.Ty}
+      (view : SourceCoreRawMetadata.runtimeType expected = .unit) :
+      SimpleInput expected .unit .unit
+  | bool {expected : TypeSystem.Ty} (value : Bool)
+      (view : SourceCoreRawMetadata.runtimeType expected = .bool) :
+      SimpleInput expected (.bool value) (.bool value)
+  | word {expected : TypeSystem.Ty} (value : Core.Word)
+      (view : SourceCoreRawMetadata.runtimeType expected = .word) :
+      SimpleInput expected (.word value) (.word value)
+  | integer {expected : TypeSystem.Ty} (value : Int)
+      (view : SourceCoreRawMetadata.runtimeType expected = .integer) :
+      SimpleInput expected (.integer value) (.integer value)
+  | product {expected leftType rightType : TypeSystem.Ty} {left right : Value}
+      {first second : Core.Value}
+      (view : SourceCoreRawMetadata.runtimeType expected = .product leftType rightType)
+      (leftInput : SimpleInput leftType left first) (rightInput : SimpleInput rightType right second) :
+      SimpleInput expected (.product left right) (.pair first second)
+
+private theorem simple_mapError_ok {α ε δ : Type} {action : Except ε α}
+    {convert : ε → δ} {value : α} (accepted : action.mapError convert = .ok value) :
+    action = .ok value := by
+  cases action <;> cases accepted
+  rfl
+
+private theorem simple_raw_input {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    {publicValue : Value} (simple : SimplePublic publicValue)
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected : TypeSystem.Ty}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected publicValue = .ok encoded) :
+    SimpleInput expected publicValue encoded.value ∧ encoded.registry = registry := by
+  induction simple generalizing fuel registry expected encoded with
+  | unit =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin =>
+          cases builtin <;> try (solve | cases accepted)
+          cases accepted
+          exact ⟨.unit view, rfl⟩
+  | bool value =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin =>
+          cases builtin <;> try (solve | cases accepted)
+          cases accepted
+          exact ⟨.bool value view, rfl⟩
+  | word value =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin =>
+          cases builtin <;> try (solve | cases accepted)
+          cases accepted
+          exact ⟨.word value view, rfl⟩
+  | integer value =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin =>
+          cases builtin <;> try (solve | cases accepted)
+          cases accepted
+          exact ⟨.integer value view, rfl⟩
+  | product left right first second =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin => cases builtin <;> cases accepted
+      case product leftType rightType =>
+        obtain ⟨a, acceptedA, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨b, acceptedB, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        obtain ⟨relatedA, registryA⟩ := first (simple_mapError_ok acceptedA)
+        obtain ⟨relatedB, registryB⟩ := second (simple_mapError_ok acceptedB)
+        exact ⟨.product view relatedA relatedB, registryB.trans registryA⟩
+
+inductive SimpleInputs : List TypeSystem.Ty → List Value → Core.Environment → Prop where
+  | nil : SimpleInputs [] [] []
+  | cons {expected : TypeSystem.Ty} {value : Value} {native : Core.Value}
+      {types : List TypeSystem.Ty} {values : List Value} {natives : Core.Environment}
+      (head : SimpleInput expected value native) (tail : SimpleInputs types values natives) :
+      SimpleInputs (expected :: types) (value :: values) (native :: natives)
+
+private theorem simple_arguments {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List TypeSystem.Ty} {types : List Core.Ty} {arguments : List Value}
+    {encoded : Arguments artifact world types}
+    (simple : ∀ argument ∈ arguments, SimplePublic argument)
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
+    SimpleInputs sourceTypes arguments encoded.native ∧
+      sourceTypes.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok types := by
+  induction sourceTypes generalizing types arguments values encoded with
+  | nil =>
+    cases types <;> cases arguments <;> try (solve | cases accepted)
+    cases accepted
+    exact ⟨.nil, rfl⟩
+  | cons expected rest ih =>
+    cases types with
+    | nil => cases accepted
+    | cons type types =>
+      cases arguments with
+      | nil => cases accepted
+      | cons argument arguments =>
+        have head := simple argument (by simp)
+        have tail : ∀ value ∈ arguments, SimplePublic value :=
+          fun value member => simple value (List.mem_cons_of_mem _ member)
+        simp only [encodeArguments] at accepted
+        cases projected : artifact.recipe.compiled.compatible.checked.catalog.project expected with
+        | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+        | ok actual =>
+          simp only [projected, bind, Except.bind] at accepted
+          split at accepted
+          · rename_i same
+            subst actual
+            obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+            obtain ⟨validated, _, accepted⟩ := root_factory_bind_ok accepted
+            obtain ⟨encodedTail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+            cases accepted
+            obtain ⟨related, _⟩ := simple_raw_input head rawEq
+            obtain ⟨relatedTail, projectedTail⟩ := ih tail tailEq
+            exact ⟨.cons related relatedTail, by simp [List.mapM_cons, projected, projectedTail, bind, Except.bind]⟩
+          · simp [throw, throwThe] at accepted
+
+/-- This proof-only view fixes the exact prefix chosen by startup. It does not
+expose the private state through an executable accessor. -/
+def Checkpoint.SimpleInputs {artifact : Artifact} (session : Session artifact)
+    (key : Key) (arguments : List Value) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ (root : Root artifact.recipe.compiled) (native : Core.Environment),
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    Solcore.Frontend.SourceCoreIndexedSession.SimpleInputs root.inputs arguments native ∧
+    root.inputs.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok root.types ∧
+    checkpoint.state = .initial root.body (native.reverse ++ environment artifact) session.store
+
+/-- Accepted encoding supplies the raw views and exact bytes for every scalar
+and product argument, in order. No independent source meaning is assumed. -/
+theorem Checkpoint.RootStart.simple_inputs {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments fuel)
+    (simple : ∀ argument ∈ arguments, SimplePublic argument) : checkpoint.SimpleInputs session key arguments := by
+  obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, _⟩ := receipt
+  obtain ⟨related, projected⟩ := simple_arguments simple accepted
+  exact ⟨root, encoded.native, selected, related, projected, initial⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
