@@ -540,6 +540,14 @@ import Solcore.SourceSemantics.CoreLowering.CallableCoercionRawNamedCallBuiltinA
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderParameterProjections
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationBodyFacts
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedRetainedSubstitutionFacts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedSourceFrames
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationValidity
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationStageFacts
+
+import Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallMeaning
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
