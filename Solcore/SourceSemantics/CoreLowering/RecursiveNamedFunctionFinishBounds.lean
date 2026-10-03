@@ -1,13 +1,16 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
-import Solcore.SourceSemantics.CoreLowering.NamedForFunctionFallthrough
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeForControlShape
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchFallthrough
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 import Solcore.SourceSemantics.CoreLowering.TypedLexicalNamedBodyMeaning
 
 /-! The actual function finish consumes the original measured flow. Source
 body and flow witnesses have the same source grade; native finish inversion
 selects a strict original flow child. Reflection constructs its independent
 source grade, retaining the reached lexical exit and protected outer entry.
-The flow meaning is an explicit pointwise premise for catalog mutual induction. -/
+The Match Tree supplies source control shape; the original For entry embeds
+without changing code. Flow meaning remains an explicit pointwise premise for
+catalog mutual induction. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
@@ -32,6 +35,8 @@ theorem trace_flow {program : Program} {size : Nat} {function : Dynamic.Closure}
     · exact ⟨_, _, .control trace, .breaking next⟩
     · exact ⟨_, _, .control trace, .continuing next⟩
 
+section Match
+
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -47,7 +52,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
     type reasonAt fellThrough escaped = .ok code)
   (generated : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel function.source scope function.body
     type reasonAt true escaped = .ok flow)
-  (tree : GenericImperativeFor.Tree layouts owner active frameLayout globals onError values function.source
+  (tree : GenericImperativeMatch.Tree layouts owner active frameLayout globals onError values function.source
     expressionSyntax certificates ambient.definitions administrative context scope
     (.statements true function.body) function.resultType type flow)
   (projection : values.checked.catalog.project function.resultType = .ok type)
@@ -62,7 +67,7 @@ private theorem emitted : code = CompatibleStatements.finish type flow fellThrou
   exact Except.ok.inj accepted.symm
 
 include accepted generated tree projection unique escapedFault transport in
-theorem preserves_at (size : Nat)
+theorem preserves_at_match (size : Nat)
     (meaning : RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program function.evidence
       (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
@@ -96,7 +101,7 @@ theorem preserves_at (size : Nat)
     meaning valid environments heaps locals agrees typed reference read unmapped installed trace
   obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
     cases same
-    exact NamedForFunctionFallthrough.true_fallthrough_unit tree unique trace.sound)
+    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
     projection fellThrough escaped escapedFault represented evaluated
   have evaluated : Evaluates actual store (code.rename ξ) result finalStore := by
     rw [emitted accepted generated, ImperativeFunctionFinish.rename]
@@ -106,7 +111,7 @@ theorem preserves_at (size : Nat)
     transport.extend installed maps worlds frame metadata⟩
 
 include accepted generated tree projection unique escapedFault transport in
-theorem reflects_at (budget size : Nat) (within : size ≤ budget)
+theorem reflects_at_match (budget size : Nat) (within : size ≤ budget)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
       RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program function.evidence
         (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
@@ -143,7 +148,7 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
       environments heaps locals agrees typed reference read unmapped installed flowEval
   obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
     cases same
-    exact NamedForFunctionFallthrough.true_fallthrough_unit tree unique trace.sound)
+    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
     projection fellThrough escaped escapedFault represented flowEval.sound
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound completed
   have sourceResult : ∃ outcome, BodyTrace program sourceSize function context environment before outcome after ∧
@@ -171,5 +176,99 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
   obtain ⟨outcome, bodyTrace, represented, exit⟩ := sourceResult
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, represented, finalHeaps, maps, worlds, frame, metadata,
     ⟨finalContext, control, trace.sound, exit, lexical⟩, transport.extend installed maps worlds frame metadata⟩
+
+
+end Match
+
+/- Original For entry retains the exact emitted code. -/
+variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+  {active : TypeSystem.Substitution} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+  {values : SourceCoreCompatibleValues.Context} {function : Dynamic.Closure}
+  {expressionSyntax : ExpressionId → Prop} {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  (program : Program) {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+  {administrative : Core.Context} {type : Ty} {flow code : Expr}
+  {policy : SourceCoreLoops.Policy} {fuel : Nat} {fellThrough escaped : Word}
+  (accepted : SourceCoreLoops.lowerStatementsWithPolicy policy fuel function.source scope function.body
+    type reasonAt fellThrough escaped = .ok code)
+  (generated : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel function.source scope function.body
+    type reasonAt true escaped = .ok flow)
+  (tree : GenericImperativeFor.Tree layouts owner active frameLayout globals onError values function.source
+    expressionSyntax certificates ambient.definitions administrative context scope
+    (.statements true function.body) function.resultType type flow)
+  (projection : values.checked.catalog.project function.resultType = .ok type)
+  (unique : NodeOccurrencesUnique function.source)
+  {faults : FunctionCalls.FaultRep} (escapedFault : faults .controlEscapedFunction escaped)
+  {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+
+include accepted generated tree projection unique escapedFault transport in
+theorem preserves_at (size : Nat)
+    (meaning : RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program function.evidence
+      (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      size (scope := scope) true function.body function.resultType type flow)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (installed : entry scope mapping world before store canonical)
+    (trace : BodyTrace program size function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧ entry scope finalMap finalWorld after finalStore canonical := by
+  exact preserves_at_match functions program accepted generated (GenericImperativeMatch.Tree.of_for tree)
+    projection unique escapedFault transport size meaning valid environments heaps locals agrees typed reference read unmapped installed trace
+
+include accepted generated tree projection unique escapedFault transport in
+theorem reflects_at (budget size : Nat) (within : size ≤ budget)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
+      RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program function.evidence
+        (source := function.source) (context := context) (registry := registry) (solved := solved) (faults := faults)
+        (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        child (scope := scope) true function.body function.resultType type flow))
+    (valid : CompatibleExpressionLiterals.ContextValid solved context function.evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (installed : entry scope mapping world before store canonical)
+    (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      BodyTrace program sourceSize function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧ entry scope finalMap finalWorld after finalStore canonical := by
+  exact reflects_at_match functions program accepted generated (GenericImperativeMatch.Tree.of_for tree)
+    projection unique escapedFault transport budget size within meaning valid environments heaps locals agrees typed reference read unmapped installed evaluated
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds

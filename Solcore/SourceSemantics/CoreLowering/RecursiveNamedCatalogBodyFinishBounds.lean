@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogInvocationBounds
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfiles
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogMatchProfiles
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
 
 /-! The actual catalog parameter entry supplies the source heap/environment,
@@ -28,11 +28,11 @@ include escapedFault
 
 /-- The same source cost reaches the actual finish. Every administrative and
 frame fact comes from the retained marked parameter entry. -/
-theorem state_preserves_at
+theorem state_preserves_at_match
     {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
     {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
     {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
-    (profile : ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
+    (profile : MatchProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
     (size : Nat)
     (meaning : RecursiveNamedLoopContracts.PreservesAt
@@ -63,17 +63,17 @@ theorem state_preserves_at
     simpa only [List.length_map, List.length_reverse] using entry.reference
   have unmapped : frameLocation ∉ entry.mapping := by
     exact Eq.mp (congrArg (fun location => location ∉ entry.mapping) entry.catalog_frame) entry.catalog.authority.unmapped
-  exact RecursiveNamedFunctionFinishBounds.preserves_at functions program profile.accepted profile.generated profile.tree
+  exact RecursiveNamedFunctionFinishBounds.preserves_at_match functions program profile.accepted profile.generated profile.tree
     profile.projection header.unique escapedFault entry_transport size meaning header.valid
     entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped reference entry.state.read unmapped ⟨entry.catalog⟩ trace
 
 /-- Finish reflection selects its strict child from the original native
 witness. The resulting source cost remains independent. -/
-theorem state_reflects_at
+theorem state_reflects_at_match
     {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
     {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
     {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
-    (profile : ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
+    (profile : MatchProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
     (budget size : Nat) (within : size ≤ budget)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
@@ -105,9 +105,74 @@ theorem state_reflects_at
     simpa only [List.length_map, List.length_reverse] using entry.reference
   have unmapped : frameLocation ∉ entry.mapping := by
     exact Eq.mp (congrArg (fun location => location ∉ entry.mapping) entry.catalog_frame) entry.catalog.authority.unmapped
-  exact RecursiveNamedFunctionFinishBounds.reflects_at functions program profile.accepted profile.generated profile.tree
+  exact RecursiveNamedFunctionFinishBounds.reflects_at_match functions program profile.accepted profile.generated profile.tree
     profile.projection header.unique escapedFault entry_transport budget size within meaning header.valid
     entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped reference entry.state.read unmapped ⟨entry.catalog⟩ completed
+
+theorem state_preserves_at
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
+    (profile : ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
+    (size : Nat)
+    (meaning : RecursiveNamedLoopContracts.PreservesAt
+      (entry := protectedEntry headers locations capturePrefix (capturePrefix + 1)) functions program header.function.evidence
+      (source := header.function.source) (context := header.context) (registry := registry) (solved := header.solved) (faults := faults)
+      (frameLayout := prepared.layout.frame) (globals := header.globals)
+      (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+      size (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      true header.function.body header.function.resultType header.output profile.flow)
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.BodyTrace program size header.function header.context entry.environment entry.heap outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld
+        (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) program header.function
+        header.context (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) entry.environment entry.heap after outcome ∧
+      protectedEntry headers locations capturePrefix (capturePrefix + 1)
+        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) finalMap finalWorld after finalStore entry.canonical := by
+  exact state_preserves_at_match functions escapedFault profile.to_match size meaning entry trace
+
+theorem state_reflects_at
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
+    (profile : ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
+    (budget size : Nat) (within : size ≤ budget)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
+      RecursiveNamedLoopContracts.ReflectsAt
+        (entry := protectedEntry headers locations capturePrefix (capturePrefix + 1)) functions program header.function.evidence
+        (source := header.function.source) (context := header.context) (registry := registry) (solved := header.solved) (faults := faults)
+        (frameLayout := prepared.layout.frame) (globals := header.globals)
+        (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+        child (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+        true header.function.body header.function.resultType header.output profile.flow))
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyTrace program sourceSize header.function header.context entry.environment entry.heap outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld
+        (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) program header.function
+        header.context (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) entry.environment entry.heap after outcome ∧
+      protectedEntry headers locations capturePrefix (capturePrefix + 1)
+        (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) finalMap finalWorld after finalStore entry.canonical := by
+  exact state_reflects_at_match functions escapedFault profile.to_match budget size within meaning entry completed
 
 /-- Each real parameter entry chooses its own static administrative profile;
 no fixed context is cast to an arbitrary typed capture. -/
