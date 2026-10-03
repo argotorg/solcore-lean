@@ -298,6 +298,14 @@ import Solcore.Test.SourceCoreRecursiveNamedImperativeForBounds
 import Solcore.Test.SourceCoreCallableCoercionSelectedInvocation
 import Solcore.Test.SourceCoreRecursiveNamedCatalogBodyFinishBounds
 import Solcore.Test.SourceCoreRecursiveNamedCatalogMutualMeaning
+import Solcore.Test.SourceCoreCallableCoercionSourcePaths
+import Solcore.Test.SourceCoreRecursiveNamedCatalogFiniteCompletion
+import Solcore.Test.SourceCoreRecursiveNamedCatalogNativeContexts
+import Solcore.Test.SourceCoreCallableCoercionExpressions
+import Solcore.Test.SourceCoreRecursiveGlobalInitializationMeaning
+import Solcore.Test.SourceCoreRecursiveNamedStaticExtraction
+import Solcore.Test.SourceCoreRecursiveNamedAssignmentNativeTyping
+import Solcore.Test.SourceCoreRecursiveNamedCatalogInitialization
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2758,6 +2766,14 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreCallableCoercionSelectedInvocation.run
   SourceCoreRecursiveNamedCatalogBodyFinishBounds.run
   SourceCoreRecursiveNamedCatalogMutualMeaning.run
+  SourceCoreCallableCoercionSourcePaths.run
+  SourceCoreRecursiveNamedCatalogFiniteCompletion.run
+  SourceCoreRecursiveNamedCatalogNativeContexts.run
+  SourceCoreCallableCoercionExpressions.run
+  SourceCoreRecursiveGlobalInitializationMeaning.run
+  SourceCoreRecursiveNamedStaticExtraction.run
+  SourceCoreRecursiveNamedAssignmentNativeTyping.run
+  SourceCoreRecursiveNamedCatalogInitialization.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
