@@ -306,6 +306,10 @@ import Solcore.Test.SourceCoreRecursiveGlobalInitializationMeaning
 import Solcore.Test.SourceCoreRecursiveNamedStaticExtraction
 import Solcore.Test.SourceCoreRecursiveNamedAssignmentNativeTyping
 import Solcore.Test.SourceCoreRecursiveNamedCatalogInitialization
+import Solcore.Test.SourceCoreCallableCoercionRawGroups
+import Solcore.Test.SourceCoreRecursiveNamedCachedSupport
+import Solcore.Test.SourceCoreRecursiveNamedPreparedInitialization
+import Solcore.Test.SourceCoreReachableStatementContinuations
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2774,6 +2778,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedStaticExtraction.run
   SourceCoreRecursiveNamedAssignmentNativeTyping.run
   SourceCoreRecursiveNamedCatalogInitialization.run
+  SourceCoreCallableCoercionRawGroups.run
+  SourceCoreRecursiveNamedCachedSupport.run
+  SourceCoreRecursiveNamedPreparedInitialization.run
+  SourceCoreReachableStatementContinuations.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
