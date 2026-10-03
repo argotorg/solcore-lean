@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeHead
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeForPreservation
@@ -17,9 +18,47 @@ open TypedLexicalWhile (Scope ValuesContext FlowRep Restored restored restore_re
 open TypedLexicalControl (LexicalResult selected_intro)
 open CompatibleExpressionPrimitives (bool_fields)
 open RecursiveNamedLoopContracts (ExecutesAt StatementOutcome)
+namespace ContextTransport
+/-- Only the actual source binder extensions transport the chosen context condition. -/
+theorem binders {source : TypedSource} (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context next binder}, validity context →
+      BinderExtends source.owner context binder next → validity next)
+    {context next : SourceSemantics.Context} {binders : List TypedBinder}
+    (valid : validity context) (extended : BindersExtend source.owner context binders next) :
+    validity next := by
+  induction extended with
+  | nil => exact valid
+  | cons head tail ih => exact ih (extend valid head)
+
+/-- The selected arm uses its ordered source binders; the default keeps the parent. -/
+theorem scoped_context {source : TypedSource} (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context next binder}, validity context →
+      BinderExtends source.owner context binder next → validity next)
+    {context next : SourceSemantics.Context} {hiddenIds : List Resolved.LocalId}
+    {scrutineeType : TypeSystem.Ty} {cases : List TypedMatchCase}
+    {fallback : Option (List StatementId)} {request : GenericMatchChildren.Request}
+    (valid : validity context)
+    (related : GenericMatchChildren.ScopedContextFor source context hiddenIds
+      scrutineeType cases fallback request next) : validity next := by
+  cases related with
+  | arm _ _ _ extended _ => exact binders validity extend valid extended
+  | default _ _ => exact valid
+/-- The original source loop returns its initial context. -/
+theorem loop_context {program : Program} {size : Nat} {context finalContext : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {condition : ExpressionId} {post : List ForItemForm}
+    {statements : List StatementId} {outcome : Dynamic.ControlOutcome}
+    (trace : SourceExecutionSize.ForLoopExecutes program size context evidence source environment before
+      condition post statements finalContext outcome after) : finalContext = context := by
+  cases trace <;> rfl
+
+end ContextTransport
+
 namespace Control
 abbrev PreservesAt := @RecursiveNamedLoopContracts.PreservesAt
 abbrev ReflectsAt := @RecursiveNamedLoopContracts.ReflectsAt
+abbrev PreservesAtWith := @RecursiveNamedLoopContracts.PreservesAtFor
+abbrev ReflectsAtWith := @RecursiveNamedLoopContracts.ReflectsAtFor
 variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat} {values : ValuesContext}
   {source : TypedSource} {context : SourceSemantics.Context} {solved : List SolvedRequirement}
   {ambient : AmbientDefinitions values.checked.catalog.definitions}
@@ -27,9 +66,9 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (program : Program) (evidence : Dynamic.EvidenceEnvironment) (unique : NodeOccurrencesUnique source)
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry}
   (transport : ProtectedExpressionMeaning.Transport entry)
-def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAtWith (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -51,9 +90,15 @@ def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : 
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  HeadPreservesAtWith (entry := entry) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
+    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
+    (frameLayout := frameLayout) (globals := globals) (faults := faults)
+
+def HeadReflectsAtWith (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -76,16 +121,22 @@ def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : T
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
+def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  HeadReflectsAtWith (entry := entry) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
+    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
+    (frameLayout := frameLayout) (globals := globals) (faults := faults)
+
 include unique in
-theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+theorem block_preserves_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
-    (inner : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence
-      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+    (inner : ∀ child, child ≤ budget → PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
       (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
-    HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context)
-      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadPreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type code := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -107,14 +158,29 @@ theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
       evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
+include unique in
+theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
+    {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+    (inner : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
+      (frameLayout := frameLayout) (globals := globals) child (scope := scope) false statements expected type code) :
+    HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context)
+      (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type code := by
+  apply block_preserves_at_with (functions := functions) (program := program) (evidence := evidence)
+    (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+  all_goals assumption
+
 include unique transport in
-theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+theorem sequence_preserves_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (first : ∀ child, child ≤ budget → HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
-    (remaining : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
-    PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+    (first : ∀ child, child ≤ budget → HeadPreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (remaining : ∀ child, child ≤ budget → PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
+    PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   have go {headSize tailSize : Nat} {middleContext : SourceSemantics.Context} {next : Dynamic.Environment} {middle : Dynamic.Heap}
@@ -183,14 +249,26 @@ theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {s
 
 variable {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
-include unique in
-private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+include unique transport in
+theorem sequence_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
     (found : source.lookupStatement? id = some node)
     (notTail : ∀ expression, node.form ≠ .expression expression false)
     (first : ∀ child, child ≤ budget → HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
-    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    (remaining : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) mode rest expected type body) :
     PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  apply sequence_preserves_at_with (functions := functions) (program := program) (evidence := evidence)
+    (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+  all_goals assumption
+
+include unique in
+private theorem sequence_stopped_preserves_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ∀ child, child ≤ budget → HeadPreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   have view := RecursiveNamedStatementSourceBounds.cons_inv unique (lookupStatement?_sound found)
@@ -227,9 +305,21 @@ private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : siz
         .fault matched, finalHeaps, maps, worlds, frame, metadata,
         _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
 
+include unique in
+private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ∀ child, child ≤ budget → HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) child (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  apply sequence_stopped_preserves_at_with (functions := functions) (program := program) (evidence := evidence)
+    (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+  all_goals assumption
+
 include transport in
-theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
-    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem conditional_preserves_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, validity context →
       RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
     {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
@@ -237,11 +327,11 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
     (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
     (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
-    (thenCorrect : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (thenCorrect : ∀ child, child ≤ budget → PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false thenBody expected type thenCode)
-    (elseCorrect : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    (elseCorrect : ∀ child, child ≤ budget → PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       child (scope := scope) false (elseBody.getD []) expected type elseCode) :
-    HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+    HeadPreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -264,7 +354,7 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
       obtain ⟨actualBoolean, sourceEq, coreEq⟩ := bool_fields payload
       cases sourceEq
       subst coreEq
-      have branchCorrect : PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      have branchCorrect : PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
           bodySize (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
         cases boolean <;> first | exact thenCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded)) | exact elseCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded))
       obtain ⟨value, finalStore, finalMap, finalWorld, branchEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
@@ -303,6 +393,26 @@ theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget)
       exact False.elim (notBoolean trivial)
   | branch conditionTrace branchTrace conditionSmaller bodySmaller =>
     exact ⟨rfl, restored environment _, selected conditionTrace branchTrace conditionSmaller bodySmaller⟩
+
+include transport in
+theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (expressionPreserves : ∀ child, child ≤ budget → ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (expressions context) faults entry) {scope : Scope} {id : StatementId} {node : StatementNode}
+    {condition : ExpressionId} {conditionNode : ExpressionNode} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} {expected : TypeSystem.Ty} {type : Ty} {conditionCode thenCode elseCode : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
+    (conditionFound : source.lookupExpression? condition = some conditionNode) (_conditionType : conditionNode.type = .bool)
+    (conditionTree : expressions context scope condition ⟨.bool, conditionCode⟩)
+    (thenCorrect : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false thenBody expected type thenCode)
+    (elseCorrect : ∀ child, child ≤ budget → PreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      child (scope := scope) false (elseBody.getD []) expected type elseCode) :
+    HeadPreservesAt (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals)
+      size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
+  apply conditional_preserves_at_with (functions := functions) (program := program) (evidence := evidence)
+    (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+  all_goals assumption
 
 end Control
 
@@ -468,6 +578,7 @@ private theorem continuing_view {program : Program} {context finalContext : Sour
 open GenericImperativeFor (Tree Position)
 open RecursiveNamedBoundedContracts (Below)
 open RecursiveNamedHeaderContracts (AtMost)
+section WithValidity
 variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -485,12 +596,16 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
   {faults : FunctionCalls.FaultRep}
   {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
   (bindings : ProtectedExpressionMeaning.Binds entry)
+  (validity : SourceSemantics.Context → Prop)
+  (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+    validity context → BinderExtends source.owner context binder next → validity next)
+  (runtimeOf : ∀ context, validity context → CompatibleRuntimeContextValidity.Valid solved context evidence)
   (budget : Nat)
-  (meaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+  (meaning : ∀ context, validity context →
     RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (certificates context) faults entry))
-  (reflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+  (reflection : ∀ context, validity context →
     RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
       (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (certificates context) faults entry))
@@ -502,57 +617,58 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
-abbrev PreservingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+
+abbrev PreservingHeaderWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
-    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopPreservesAt functions program evidence size (registry := registry) (source := source)
-      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopPreservesAtFor (validity := validity) functions program evidence size (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry)  (frameLayout := frame)
       (globals := globals) (administrative := administrative) condition post statements expected type code)) context scope items code,
     GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
 
-abbrev ReflectingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+abbrev ReflectingHeaderWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
-    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopReflectsAt functions program evidence size (registry := registry) (source := source)
-      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopReflectsAtFor (validity := validity) functions program evidence size (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry)  (frameLayout := frame)
       (globals := globals) (administrative := administrative) condition post statements expected type code)) context scope items code,
     GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
 
-abbrev PreservesAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+abbrev PreservesAtWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   match position with
-  | .statements mode statements => AtMost budget (fun size => RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (registry := registry) (source := source)
-      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+  | .statements mode statements => AtMost budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults)  (frameLayout := frame)
       (globals := globals) (administrative := administrative) size mode statements expected type code)
-  | .initializers items condition post statements => PreservingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
+  | .initializers items condition post statements => PreservingHeaderWith (validity := validity) (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
-      (onError := onError) (source := source) (solved := solved)
+      (onError := onError) (source := source)
       (administrative := administrative) (registry := registry) (faults := faults)
       context scope items condition post statements expected type code
 
-abbrev ReflectsAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+abbrev ReflectsAtWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
     (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
   match position with
-  | .statements mode statements => Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program evidence (registry := registry) (source := source)
-      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+  | .statements mode statements => Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAtFor (validity := validity) (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults)  (frameLayout := frame)
       (globals := globals) (administrative := administrative) size mode statements expected type code)
-  | .initializers items condition post statements => ReflectingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
+  | .initializers items condition post statements => ReflectingHeaderWith (validity := validity) (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
       (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
-      (onError := onError) (source := source) (solved := solved)
+      (onError := onError) (source := source)
       (administrative := administrative) (registry := registry) (faults := faults)
       context scope items condition post statements expected type code
 
-include definitions registered extension transport bindings meaning faithful observations in
-theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+include definitions registered extension transport bindings meaning faithful observations extend solved in
+theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
-    (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+    (headers : PreservingHeaderWith (validity := validity) (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
-      (source := source) (solved := solved) (administrative := administrative)
+      (source := source)  (administrative := administrative)
       (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
-    Control.HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
-      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+    Control.HeadPreservesAtWith (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
       size (scope := scope) id expected type code := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
@@ -561,10 +677,10 @@ theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : N
   | control executed =>
     obtain ⟨rfl, initialSize, loopSize, loopContext, loopFinalContext, loopEnvironment, initialized, loopOutcome, rfl, initialization, loop, initialSmall, loopSmall⟩ :=
       ForSourceAt.success_at unique (lookupStatement?_sound found) form executed
-    have sameContext : loopFinalContext = loopContext := by cases loop <;> rfl
+    have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
     subst loopFinalContext
     obtain ⟨tail, maps, worlds, frame, metadata, agreement⟩ :=
-      ProtectedForHeader.Tree.preserves_prefix_bounded functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
+      ProtectedForHeader.Tree.preserves_prefix_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
         valid environments heaps locals agrees actualTyped reference read unmapped installed initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress⟩ :=
       tail.certificate _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.installed (.control loop)
@@ -575,13 +691,13 @@ theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : N
     rcases ForSourceAt.fault_at unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
     · obtain ⟨_, _, fault, smaller⟩ := initialFailure
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata⟩ :=
-        ProtectedForHeader.Tree.preserves_fault_reachable_bounded functions definitions registered extension program evidence transport bindings faithful observations budget meaning header errors
+        ProtectedForHeader.Tree.preserves_fault_reachable_bounded_for (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header errors
           valid environments heaps locals agrees actualTyped reference read unmapped installed fault (Nat.le_trans (Nat.le_of_lt smaller) bounded)
       exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
         evaluated, .fault matched, heaps, maps, worlds, frame, metadata⟩
     · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
       obtain ⟨tail, maps, worlds, frame, metadata, agreement⟩ :=
-        ProtectedForHeader.Tree.preserves_prefix_bounded functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
+        ProtectedForHeader.Tree.preserves_prefix_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
           valid environments heaps locals agrees actualTyped reference read unmapped installed initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress⟩ :=
         tail.certificate _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.installed (.fault loop)
@@ -589,8 +705,8 @@ theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : N
         represented, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
         frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2.1⟩
 
-include extension meaning transport bindings definitions registered faithful observations in
-theorem loop_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+include extension meaning transport bindings definitions registered faithful observations extend solved in
+theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
     (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
@@ -599,44 +715,44 @@ theorem loop_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : Nod
     (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
       type (TypedForHeader.Fallthrough type) context scope post postCode)
     (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
-    (correct : Below budget (fun child => RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
-      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+    (correct : Below budget (fun child => RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
       (scope := scope) child false statements expected type code)) :
-    RecursiveNamedForContracts.LoopPreservesAt (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
-      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+    RecursiveNamedForContracts.LoopPreservesAtFor (validity := validity) (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  have result := ProtectedFor.Body.loop_preserves_bounded functions program evidence transport budget (meaning _ valid)
+  have result := ProtectedFor.Body.loop_preserves_bounded_for (validity := validity) functions program evidence transport budget (meaning _ valid)
     conditionFound conditionTree typed unique correct
     (by
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
         child small mapping world before after store finalContext finalEnvironment guarded continued execution
-      exact ProtectedForHeader.post_preserves_bounded functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree
+      exact ProtectedForHeader.post_preserves_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree
         actualValid actualAgrees actualReference guarded continued execution (Nat.le_of_lt small))
     (by
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
         child small mapping world before after store finalContext reason guarded continued execution
-      exact ProtectedForHeader.post_fault_reachable_bounded functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree postErrors
+      exact ProtectedForHeader.post_fault_reachable_bounded_for (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree postErrors
         actualValid actualAgrees actualReference guarded continued execution (Nat.le_of_lt small))
   exact result size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
-variable (meaningMost : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+variable (meaningMost : ∀ context, validity context →
   AtMost budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults entry))
-include definitions registered extension transport bindings meaningMost faithful observations in
-theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+include definitions registered extension transport bindings meaningMost faithful observations extend runtimeOf in
+theorem preservesAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
     (errors : GenericImperativeMatch.Tree.CatalogSites diagnosticPolicy registry faults tree) :
-    PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+    PreservesAtWith (validity := validity) (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
-      (source := source) (solved := solved) (administrative := administrative)
+      (source := source)  (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
-  have meaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+  have meaning : ∀ context, validity context →
       Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
         program context evidence source (certificates context) faults entry) :=
@@ -646,7 +762,7 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩ :=
-      RecursiveNamedLexicalTreeBounds.preserves_at functions definitions registered program evidence transport bindings size size (Nat.le_refl size)
+      RecursiveNamedLexicalTreeBounds.preserves_at_for (validity := validity) (extend := extend) functions definitions registered program evidence transport bindings size size (Nat.le_refl size)
         (fun child within context valid => meaningMost context valid child (Nat.le_trans within bounded))
         body contextValid unique environments heaps locals agrees actualTyped reference read unmapped installed trace
     exact ⟨value, finalStore, finalMap, finalWorld, evaluated, FlowRep.of_lexical related, finalHeaps, maps, worlds, preservation, metadata, lexical⟩
@@ -659,7 +775,7 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
       allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
         environments heaps locals agrees actualTyped reference read allocated
     obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, maps, worlds, finalFrame, metadata, lexical⟩ :=
-      ih _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (valid_extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+      ih _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) (extend contextValid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
           (Dynamic.HeapMetadataExtend.of_allocation allocated))) tailTrace
@@ -690,7 +806,7 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
           allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
             (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated
         obtain ⟨result, finalStore, finalMap, finalWorld, completed, related, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, lexical⟩ :=
-          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) (valid_extend contextValid extended)
+          ih tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) (extend contextValid extended)
             nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
               (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
                 (List.getElem?_eq_some_iff.mp frameRead).1).1
@@ -737,9 +853,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH remainingIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    exact Control.sequence_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => Control.block_preserves_at (functions := functions) (program := program) (evidence := evidence)
+      (fun child within => Control.block_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
         (frameLayout := frame) (globals := globals) (unique := unique) size child within found form
         (fun child within => innerIH child (Nat.le_trans within bounded)))
       (fun child within => remainingIH child (Nat.le_trans within bounded))
@@ -747,9 +863,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenErrors elseErrors remainingErrors thenIH elseIH remainingIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    exact Control.sequence_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => Control.conditional_preserves_at (functions := functions) (program := program) (evidence := evidence)
+      (fun child within => Control.conditional_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
         (transport := transport) (frameLayout := frame) (globals := globals) size child within unique
         (fun child within context valid => meaningMost context valid child (Nat.le_trans within bounded))
         found form conditionFound conditionType conditionTree
@@ -760,9 +876,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @terminalBlock context scope mode id node statements rest expected type innerCode body exactUnique found form inner stops issued innerErrors innerIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    exact Control.sequence_stopped_preserves_at (functions := functions) (program := program) (evidence := evidence)
+    exact Control.sequence_stopped_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => Control.block_preserves_at (functions := functions) (program := program) (evidence := evidence)
+      (fun child within => Control.block_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
         (frameLayout := frame) (globals := globals) (unique := unique) size child within found form
         (fun child within => innerIH child (Nat.le_trans within bounded)))
       (GenericLexicalStatements.block_terminates exactUnique found form stops)
@@ -770,9 +886,9 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    exact Control.sequence_stopped_preserves_at (functions := functions) (program := program) (evidence := evidence)
+    exact Control.sequence_stopped_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => Control.conditional_preserves_at (functions := functions) (program := program) (evidence := evidence)
+      (fun child within => Control.conditional_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
         (transport := transport) (frameLayout := frame) (globals := globals) size child within unique
         (fun child within context valid => meaningMost context valid child (Nat.le_trans within bounded))
         found form conditionFound conditionType conditionTree
@@ -797,14 +913,14 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopTree nativeTyped remaining loopErrors remainingErrors loopIH restIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    apply Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    apply Control.sequence_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
       (remaining := fun child within => restIH child (Nat.le_trans within bounded))
       (first := ?_) contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
     intro child within valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
     obtain ⟨same, restored, value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, _⟩ :=
-      ProtectedWhile.Body.while_preserves_bounded functions program evidence transport budget (meaning _ valid)
+      ProtectedWhile.Body.while_preserves_bounded_for (validity := validity) functions program evidence transport budget (meaning _ valid)
         found form conditionFound conditionTree nativeTyped unique (fun child small => loopIH child (Nat.le_of_lt small)) child (Nat.le_trans within bounded)
         valid environments heaps locals agrees actualTyped reference read unmapped installed trace
     exact ⟨same, restored, value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata⟩
@@ -893,15 +1009,15 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>
     intro size bounded contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped installed trace
-    exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    exact Control.sequence_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) size size (Nat.le_refl size) found (by intro expression; simp [form])
-      (fun child within => header_preserves_at functions definitions registered extension program evidence transport bindings budget meaning faithful observations
+      (fun child within => header_preserves_at_with (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings budget meaning faithful observations
         child (Nat.le_trans within bounded) unique found form
         (by rcases initialIH with ⟨header, errors⟩; exact ⟨header, errors.reachable⟩))
       (fun child within => restIH child (Nat.le_trans within bounded))
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
   | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopTree postTree nativeTyped loopErrors postErrors loopIH =>
-    have completed := fun size bounded => loop_preserves_at functions definitions registered extension program evidence transport bindings budget meaning faithful observations size bounded unique
+    have completed := fun size bounded => loop_preserves_at_with (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings budget meaning faithful observations size bounded unique
       conditionFound conditionTree nativeTyped postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors) (fun child small => loopIH child (Nat.le_of_lt small))
     exact ⟨.nil completed, GenericForHeader.Tree.ErrorsFor.nil (policy := diagnosticPolicy) (next := completed)⟩
   | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
@@ -927,11 +1043,16 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
     dsimp only at sameValues
     subst compiledValues
     intro size bounded
-    exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+    exact Control.sequence_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence) (transport := transport)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within contextValid => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
-        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
-        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)) contextValid)
+      (fun child within contextValid => CompatibleMatchRuntimeHead.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext.signatures catalogValid scrutineeFound casesTyped defaultTyped
+        (patternContext.ledger.symm.trans (runtimeOf context contextValid).ledger)
+        unique budget child within transport bindings (fun _ => meaning context contextValid)
+        (fun request member childContext related child smaller _ =>
+          childrenIH request member childContext related child (Nat.le_of_lt smaller)
+            (ContextTransport.scoped_context validity extend contextValid related))
+        (runtimeOf context contextValid))
       remainingIH
 
   | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalogValid patternContext childErrors childrenIH =>
@@ -939,12 +1060,187 @@ theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (uniqu
     dsimp only at sameValues
     subst compiledValues
     intro size bounded
-    exact Control.sequence_stopped_preserves_at (functions := functions) (program := program) (evidence := evidence)
+    exact Control.sequence_stopped_preserves_at_with (validity := validity) (functions := functions) (program := program) (evidence := evidence)
       (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
-      (fun child within contextValid => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
-        (patternContext.ordinary contextValid) catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
-        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)) contextValid)
+      (fun child within contextValid => CompatibleMatchRuntimeHead.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext.signatures catalogValid scrutineeFound casesTyped defaultTyped
+        (patternContext.ledger.symm.trans (runtimeOf context contextValid).ledger)
+        unique budget child within transport bindings (fun _ => meaning context contextValid)
+        (fun request member childContext related child smaller _ =>
+          childrenIH request member childContext related child (Nat.le_of_lt smaller)
+            (ContextTransport.scoped_context validity extend contextValid related))
+        (runtimeOf context contextValid))
       (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
+
+include definitions registered extension transport bindings meaningMost faithful observations extend runtimeOf in
+theorem preservesAt_for_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    PreservesAtWith (validity := validity) (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source)  (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  exact preservesAt_match_with (validity := validity) (extend := extend) (runtimeOf := runtimeOf) functions definitions registered extension program evidence transport bindings budget faithful observations meaningMost
+    diagnosticPolicy unique (GenericImperativeMatch.Tree.of_for tree) (GenericImperativeMatch.Tree.CatalogSites.of_for errors)
+
+include definitions registered extension transport bindings meaning faithful observations extend runtimeOf in
+/-- A caller with only strictly smaller expression laws can use the same main
+induction at each actual statement size. The empty header remains inclusive
+inside that invocation. -/
+theorem preserves_below_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope (.statements mode statements) expected type code)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    Below budget (fun size => RecursiveNamedLoopContracts.PreservesAtFor (validity := validity) (entry := entry) functions program evidence
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frame) (globals := globals) (administrative := administrative)
+      size (scope := scope) mode statements expected type code) := by
+  intro size smaller
+  exact preservesAt_for_with (validity := validity) (extend := extend) (runtimeOf := runtimeOf) functions definitions registered extension program evidence transport bindings size faithful observations
+    (fun context valid child within => meaning context valid child (Nat.lt_of_le_of_lt within smaller))
+    diagnosticPolicy unique tree errors size (Nat.le_refl size)
+
+end WithValidity
+
+section Ordinary
+variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+  {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+  {values : ValuesContext} {source : TypedSource}
+  {expressionSyntax : ExpressionId → Prop}
+  {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
+  {registry : SourceCoreRawMetadata.Registry}
+
+variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep}
+  {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+  (bindings : ProtectedExpressionMeaning.Binds entry)
+  (budget : Nat)
+  (meaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+    RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (certificates context) faults entry))
+  (reflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+    RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (certificates context) faults entry))
+
+variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+  {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
+  {expected : TypeSystem.Ty} {type : Ty} {code conditionCode postCode : Expr} {selfReason : Word}
+  {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+
+abbrev PreservingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopPreservesAt functions program evidence size (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) condition post statements expected type code)) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+abbrev ReflectingHeaderFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
+    (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+    type (fun context scope code => AtMost budget (fun size => RecursiveNamedForContracts.LoopReflectsAt functions program evidence size (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (entry := entry) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) condition post statements expected type code)) context scope items code,
+    GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree
+
+abbrev PreservesAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => AtMost budget (fun size => RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) size mode statements expected type code)
+  | .initializers items condition post statements => PreservingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
+
+abbrev ReflectsAtFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (position : Position)
+    (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements => Below budget (fun size => RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program evidence (registry := registry) (source := source)
+      (context := context) (scope := scope) (faults := faults) (solved := solved) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) size mode statements expected type code)
+  | .initializers items condition post statements => ReflectingHeaderFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (source := source) (solved := solved)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope items condition post statements expected type code
+
+include definitions registered extension transport bindings meaning faithful observations in
+theorem header_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (headers : PreservingHeaderFor (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope items condition post statements expected type code) :
+    Control.HeadPreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      size (scope := scope) id expected type code := by
+  apply header_preserves_at_with (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+  all_goals assumption
+
+
+include extension meaning transport bindings definitions registered faithful observations in
+theorem loop_preserves_at (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
+    (correct : Below budget (fun child => RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) child false statements expected type code)) :
+    RecursiveNamedForContracts.LoopPreservesAt (entry := entry) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults) (solved := solved) (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  apply loop_preserves_at_with (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+  all_goals assumption
+
+
+variable (meaningMost : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+  AtMost budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+    (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+    program context evidence source (certificates context) faults entry))
+
+include definitions registered extension transport bindings meaningMost faithful observations in
+theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeMatch.Tree.CatalogSites diagnosticPolicy registry faults tree) :
+    PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  apply preservesAt_match_with (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+    (runtimeOf := fun _ valid => CompatibleRuntimeContextValidity.of_ordinary valid)
+  all_goals assumption
+
 
 include definitions registered extension transport bindings meaningMost faithful observations in
 theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
@@ -957,8 +1253,11 @@ theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique 
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
       (registry := registry) (faults := faults) context scope position expected type code := by
-  exact preservesAt_match functions definitions registered extension program evidence transport bindings budget faithful observations meaningMost
-    diagnosticPolicy unique (GenericImperativeMatch.Tree.of_for tree) (GenericImperativeMatch.Tree.CatalogSites.of_for errors)
+  apply preservesAt_for_with (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+    (runtimeOf := fun _ valid => CompatibleRuntimeContextValidity.of_ordinary valid)
+  all_goals assumption
+
 
 include definitions registered extension transport bindings meaning faithful observations in
 /-- A caller with only strictly smaller expression laws can use the same main
@@ -974,9 +1273,11 @@ theorem preserves_below (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique 
       (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved)
       (frameLayout := frame) (globals := globals) (administrative := administrative)
       size (scope := scope) mode statements expected type code) := by
-  intro size smaller
-  exact preservesAt_for functions definitions registered extension program evidence transport bindings size faithful observations
-    (fun context valid child within => meaning context valid child (Nat.lt_of_le_of_lt within smaller))
-    diagnosticPolicy unique tree errors size (Nat.le_refl size)
+  apply preserves_below_with (validity := (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence))
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+    (runtimeOf := fun _ valid => CompatibleRuntimeContextValidity.of_ordinary valid)
+  all_goals assumption
+
+end Ordinary
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeFor
