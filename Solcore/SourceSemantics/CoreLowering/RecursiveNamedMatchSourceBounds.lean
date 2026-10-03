@@ -121,7 +121,7 @@ variable {compilation : SourceCoreCompatibleDataMatches.Context}
   {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry} (budget : Nat)
 
-def ArmPreservesBelow (outerScope : Scope) : Prop :=
+def ArmPreservesBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
   ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
     scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
     Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
@@ -130,48 +130,68 @@ def ArmPreservesBelow (outerScope : Scope) : Prop :=
     ∀ {armContext staticFinal facts},
     BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
     StatementsHaveType source control armContext statements staticFinal facts →
-    ∀ child, child < budget → RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (values := compilation.values)
-      (source := source) (context := armContext) (registry := registry) (solved := solved)
+    ∀ child, child < budget → RecursiveNamedLoopContracts.PreservesAtFor (entry := entry) functions program evidence validity (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) child false statements expected type body
+
+def ArmPreservesBelow (outerScope : Scope) : Prop :=
+  ArmPreservesBelowFor (entry := entry) functions program parent control evidence resolution bodyCertificate expected type budget
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) outerScope
+    (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)
+
+def ArmReflectsBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
+    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {armContext staticFinal facts},
+    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
+    StatementsHaveType source control armContext statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedLoopContracts.ReflectsAtFor (entry := entry) functions program evidence validity (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry)
       (administrative := administrative) (frameLayout := frame) (globals := globals)
       (faults := faults) (scope := finalScope) child false statements expected type body
 
 def ArmReflectsBelow (outerScope : Scope) : Prop :=
-  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+  ArmReflectsBelowFor (entry := entry) functions program parent control evidence resolution bodyCertificate expected type budget
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) outerScope
+    (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)
+
+def DefaultPreservesBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
     scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
-    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
-    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
+    SelectedBody bodyCertificate scope environment heap type (.default statements)
       finalScope finalEnvironment finalHeap body →
-    ∀ {armContext staticFinal facts},
-    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
-    StatementsHaveType source control armContext statements staticFinal facts →
-    ∀ child, child < budget → RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program evidence (values := compilation.values)
-      (source := source) (context := armContext) (registry := registry) (solved := solved)
+    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedLoopContracts.PreservesAtFor (entry := entry) functions program evidence validity (values := compilation.values)
+      (source := source) (context := parent) (registry := registry)
       (administrative := administrative) (frameLayout := frame) (globals := globals)
       (faults := faults) (scope := finalScope) child false statements expected type body
 
 def DefaultPreservesBelow (outerScope : Scope) : Prop :=
+  DefaultPreservesBelowFor (entry := entry) functions program parent control evidence resolution bodyCertificate expected type budget
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) outerScope
+    (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)
+
+def DefaultReflectsBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
   ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
     scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
     Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
     SelectedBody bodyCertificate scope environment heap type (.default statements)
       finalScope finalEnvironment finalHeap body →
     ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
-    ∀ child, child < budget → RecursiveNamedLoopContracts.PreservesAt (entry := entry) functions program evidence (values := compilation.values)
-      (source := source) (context := parent) (registry := registry) (solved := solved)
+    ∀ child, child < budget → RecursiveNamedLoopContracts.ReflectsAtFor (entry := entry) functions program evidence validity (values := compilation.values)
+      (source := source) (context := parent) (registry := registry)
       (administrative := administrative) (frameLayout := frame) (globals := globals)
       (faults := faults) (scope := finalScope) child false statements expected type body
 
 def DefaultReflectsBelow (outerScope : Scope) : Prop :=
-  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
-    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
-    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
-    SelectedBody bodyCertificate scope environment heap type (.default statements)
-      finalScope finalEnvironment finalHeap body →
-    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
-    ∀ child, child < budget → RecursiveNamedLoopContracts.ReflectsAt (entry := entry) functions program evidence (values := compilation.values)
-      (source := source) (context := parent) (registry := registry) (solved := solved)
-      (administrative := administrative) (frameLayout := frame) (globals := globals)
-      (faults := faults) (scope := finalScope) child false statements expected type body
+  DefaultReflectsBelowFor (entry := entry) functions program parent control evidence resolution bodyCertificate expected type budget
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) outerScope
+    (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)
 
 
 namespace Head
@@ -182,9 +202,9 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry}
 
-def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
@@ -206,9 +226,15 @@ def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : 
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
+def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  HeadPreservesAtFor (entry := entry) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
+    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
+    (frameLayout := frameLayout) (globals := globals) (faults := faults)
+
+def HeadReflectsAtFor (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
     : Prop :=
-  ∀ (_valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+  ∀ (_valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
@@ -230,6 +256,12 @@ def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : T
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
+
+def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
+  HeadReflectsAtFor (entry := entry) functions program evidence
+    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
+    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
+    (frameLayout := frameLayout) (globals := globals) (faults := faults)
 
 end Head
 
