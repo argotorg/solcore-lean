@@ -36,14 +36,17 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.reflects_reachable_bounded (budget : Nat)
-    (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem Tree.reflects_reachable_bounded_for
+    (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+      validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
+    (boundedReflection : ∀ context, validity context →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
@@ -59,7 +62,7 @@ theorem Tree.reflects_reachable_bounded (budget : Nat)
     (unmapped : contextLocation ∉ mapping)
     (installed : entry scope mapping world before store canonical)
     {size : Nat} (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) (bounded : size ≤ budget) :
-    RecursiveNamedHeaderContracts.ResultAt size (entry := entry) registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
+    RecursiveNamedHeaderContracts.ResultAtFor validity size (entry := entry) registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
       context environment before items mapping world store value finalStore := by
   induction errors generalizing mapping world actualContext environment canonical actual before store ξ contextLocation native value finalStore size with
   | @nil context scope code next =>
@@ -70,7 +73,7 @@ theorem Tree.reflects_reachable_bounded (budget : Nat)
       allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
         environments heaps locals agrees actualTyped reference read Dynamic.Heap.Allocates.append
     obtain ⟨remainingSize, smaller, remainingEval⟩ := ForHeaderNativeBounds.allocation_body evaluated allocationEval
-    have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+    have reflected := ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
       (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
           (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) remainingEval (Nat.le_trans (Nat.le_of_lt smaller) bounded)
@@ -99,7 +102,7 @@ theorem Tree.reflects_reachable_bounded (budget : Nat)
           allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
             (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead .append
         obtain ⟨remainingSize, smaller, tailEval⟩ := ForHeaderNativeBounds.initialized_body evaluated initialEval.sound allocationEval
-        have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+        have reflected := ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
           (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
             (List.getElem?_eq_some_iff.mp frameRead).1).1
           (bindings.prepend (transport.extend
@@ -161,6 +164,37 @@ theorem Tree.reflects_reachable_bounded (budget : Nat)
         (transport.extend installed maps worlds preservation metadata)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval) (Nat.le_trans (Nat.le_of_lt smaller) bounded)
       exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
+
+include definitions registered extension faithful observations transport bindings in
+theorem Tree.reflects_reachable_bounded (budget : Nat)
+    (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical)
+    {size : Nat} (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) (bounded : size ≤ budget) :
+    RecursiveNamedHeaderContracts.ResultAt size (entry := entry) registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
+      context environment before items mapping world store value finalStore := by
+  apply Tree.reflects_reachable_bounded_for (functions := functions) (tree := tree)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+  all_goals assumption
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
 theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)

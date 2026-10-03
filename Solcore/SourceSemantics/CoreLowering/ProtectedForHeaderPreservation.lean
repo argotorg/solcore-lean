@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderControl
 
-/-! Successful ordinary header prefixes retain their real stopping scope and
+/-! Header prefixes retain their real stopping scope and
 actual installed observations through marked allocations and seven-slot writes.
 The continuation agreement concerns the real reached prefix; its execution is
 not a premise of the static tree. -/
@@ -33,14 +33,17 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves_prefix_bounded (budget : Nat)
-    (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem Tree.preserves_prefix_bounded_for
+    (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+      validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
+    (boundedMeaning : ∀ context, validity context →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment finalEnvironment : Dynamic.Environment} {canonical actual : Environment}
     {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
@@ -55,7 +58,7 @@ theorem Tree.preserves_prefix_bounded (budget : Nat)
     (unmapped : contextLocation ∉ mapping)
     (installed : entry scope mapping world before store canonical)
     {size : Nat} (trace : SourceExecutionSize.ForItemsExecute program size context evidence source environment before items finalContext finalEnvironment after) (bounded : size ≤ budget) :
-    ∃ tail : Tail (entry := entry) registry functions source solved evidence administrative frame globals contextLocation native continuation finalContext finalEnvironment after,
+    ∃ tail : TailFor validity (entry := entry) registry functions source solved evidence administrative frame globals contextLocation native continuation finalContext finalEnvironment after,
       LocationMap.Extends mapping tail.mapping ∧ WorldExtends world tail.world ∧
       AdministrativePreserved mapping store tail.mapping tail.store ∧ Dynamic.HeapMetadataExtend before after ∧
       ContinuationAgreement actual store (code.rename ξ) tail.actual tail.store (tail.code.rename tail.embedding) := by
@@ -73,7 +76,7 @@ theorem Tree.preserves_prefix_bounded (budget : Nat)
           allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
             environments heaps locals agrees actualTyped reference read allocated
         obtain ⟨tail, maps, worlds, lastFrame, metadata, agreement⟩ :=
-          ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+          ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
             (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
             (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
               (Dynamic.HeapMetadataExtend.of_allocation allocated))) rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
@@ -97,7 +100,7 @@ theorem Tree.preserves_prefix_bounded (budget : Nat)
             allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
               (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated
           obtain ⟨tail, finalMaps, finalWorlds, finalFrame, finalMetadata, agreement⟩ :=
-            ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+            ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
               (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
                 (List.getElem?_eq_some_iff.mp frameRead).1).1
               (bindings.prepend (transport.extend
@@ -159,6 +162,38 @@ theorem Tree.preserves_prefix_bounded (budget : Nat)
         exact (prefixAgreement body (LocalLoop.controlType type)).trans (by
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using agreement)
 
+include definitions registered extension faithful observations transport bindings in
+theorem Tree.preserves_prefix_bounded (budget : Nat)
+    (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {context finalContext : SourceSemantics.Context} {scope : Scope}
+    {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment finalEnvironment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical)
+    {size : Nat} (trace : SourceExecutionSize.ForItemsExecute program size context evidence source environment before items finalContext finalEnvironment after) (bounded : size ≤ budget) :
+    ∃ tail : Tail (entry := entry) registry functions source solved evidence administrative frame globals contextLocation native continuation finalContext finalEnvironment after,
+      LocationMap.Extends mapping tail.mapping ∧ WorldExtends world tail.world ∧
+      AdministrativePreserved mapping store tail.mapping tail.store ∧ Dynamic.HeapMetadataExtend before after ∧
+      ContinuationAgreement actual store (code.rename ξ) tail.actual tail.store (tail.code.rename tail.embedding) := by
+  apply Tree.preserves_prefix_bounded_for (functions := functions) (tree := tree)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+  all_goals assumption
+
 include definitions registered extension meaning faithful observations transport bindings in
 theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
@@ -189,14 +224,17 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
     valid environments heaps locals agrees actualTyped reference read unmapped installed sized (Nat.le_refl size)
 
 include definitions registered extension faithful observations transport bindings in
-theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
-    (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+theorem Tree.preserves_fault_reachable_bounded_for
+    (validity : SourceSemantics.Context → Prop)
+    (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+      validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
+    (boundedMeaning : ∀ context, validity context →
       RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
         (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {context finalContext : SourceSemantics.Context} {scope : Scope}
     {items : List ForItemForm} {code : Expr}
     (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
       context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
-    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (valid : validity context)
     {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment}
     {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
@@ -228,7 +266,7 @@ theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
           allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
             environments heaps locals agrees actualTyped reference read allocated
         obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, maps, worlds, lastFrame, metadata⟩ :=
-          ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+          ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
             (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
             (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
               (Dynamic.HeapMetadataExtend.of_allocation allocated))) rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
@@ -262,7 +300,7 @@ theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
             allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
               (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated
           obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata⟩ :=
-            ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+            ih (extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
               (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
                 (List.getElem?_eq_some_iff.mp frameRead).1).1
               (bindings.prepend (transport.extend
@@ -341,6 +379,39 @@ theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
         refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata⟩
         exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
           simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+
+include definitions registered extension faithful observations transport bindings in
+theorem Tree.preserves_fault_reachable_bounded (budget : Nat)
+    (boundedMeaning : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) {context finalContext : SourceSemantics.Context} {scope : Scope}
+    {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical) {reason : Dynamic.SemanticFault}
+    {size : Nat} (trace : SourceExecutionSize.ForItemsFault program size context evidence source environment before items finalContext reason after) (bounded : size ≤ budget) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧
+      faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  apply Tree.preserves_fault_reachable_bounded_for (functions := functions) (tree := tree)
+    (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    (extend := fun valid extended => TypedLexicalControl.valid_extend valid extended)
+  all_goals assumption
 
 include definitions registered extension meaning faithful observations transport bindings in
 theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.Context} {scope : Scope}

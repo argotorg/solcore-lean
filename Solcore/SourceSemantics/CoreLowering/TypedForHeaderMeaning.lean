@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.TypedForHeaderCertificates
 
-/-! Successful ordinary header prefixes retain their real stopping scope and
+/-! Header prefixes retain their real stopping scope and
 all actual captured values. Their continuation agreement neither runs nor
 assumes the syntactic continuation; initializer and post callers decide that. -/
 set_option autoImplicit false
@@ -9,7 +9,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open TypedLexicalControl (allocate_absent allocate_initialized sequence_rename valid_extend)
 open CallableIndexedHistory (NativeFrame)
 
-structure Tail {values : ValuesContext}
+structure TailFor (validity : SourceSemantics.Context → Prop) {values : ValuesContext}
     {ambient : AmbientDefinitions values.checked.catalog.definitions}
     (registry : SourceCoreRawMetadata.Registry) (functions : FunctionModel values.checked.catalog ambient)
     (source : TypedSource) (solved : List SolvedRequirement) (evidence : Dynamic.EvidenceEnvironment)
@@ -27,7 +27,7 @@ structure Tail {values : ValuesContext}
   embedding : Renaming
   store : Store
   certificate : continuation context scope code
-  valid : CompatibleExpressionLiterals.ContextValid solved context evidence
+  valid : validity context
   environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
     mapping world administrative scope environment canonical ambient.definitions
   heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store
@@ -37,6 +37,17 @@ structure Tail {values : ValuesContext}
   reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation)
   read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native)
   unmapped : contextLocation ∉ mapping
+
+abbrev Tail {values : ValuesContext}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions}
+    (registry : SourceCoreRawMetadata.Registry) (functions : FunctionModel values.checked.catalog ambient)
+    (source : TypedSource) (solved : List SolvedRequirement) (evidence : Dynamic.EvidenceEnvironment)
+    (administrative : Core.Context) (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)
+    (contextLocation : Location) (native : NativeFrame)
+    (continuation : SourceSemantics.Context → Scope → Expr → Prop)
+    (context : SourceSemantics.Context) (environment : Dynamic.Environment) (heap : Dynamic.Heap) :=
+  TailFor (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence)
+    registry functions source solved evidence administrative frame globals contextLocation native continuation context environment heap
 
 private theorem extended_eq {owner : Resolved.DeclarationId} {context left right : SourceSemantics.Context}
     {binder : TypedBinder} (first : BinderExtends owner context binder left)

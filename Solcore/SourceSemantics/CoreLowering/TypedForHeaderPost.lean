@@ -19,19 +19,34 @@ variable {values : ValuesContext} {ambient : AmbientDefinitions values.checked.c
   {contextLocation : Location} {native : NativeFrame} {type : Ty}
   {context : SourceSemantics.Context} {environment : Dynamic.Environment} {heap : Dynamic.Heap}
 
-theorem Tail.fallthrough_evaluates
-    (tail : Tail registry functions source solved evidence administrative frame globals contextLocation native
+theorem TailFor.fallthrough_evaluates
+    {validity : SourceSemantics.Context → Prop}
+    (tail : TailFor validity registry functions source solved evidence administrative frame globals contextLocation native
       (Fallthrough type) context environment heap) :
     Evaluates tail.actual tail.store (tail.code.rename tail.embedding) (LocalLoop.fallthroughValue type) tail.store := by
   rw [tail.certificate]
   simpa only [LoopRenaming.fallthrough] using LocalLoop.fallthrough_evaluates type tail.actual tail.store
+
+theorem TailFor.fallthrough_reflects
+    {validity : SourceSemantics.Context → Prop}
+    (tail : TailFor validity registry functions source solved evidence administrative frame globals contextLocation native
+      (Fallthrough type) context environment heap) {value : Value} {store : Store}
+    (evaluated : Evaluates tail.actual tail.store (tail.code.rename tail.embedding) value store) :
+    value = LocalLoop.fallthroughValue type ∧ store = tail.store :=
+  evaluation_deterministic evaluated tail.fallthrough_evaluates
+
+theorem Tail.fallthrough_evaluates
+    (tail : Tail registry functions source solved evidence administrative frame globals contextLocation native
+      (Fallthrough type) context environment heap) :
+    Evaluates tail.actual tail.store (tail.code.rename tail.embedding) (LocalLoop.fallthroughValue type) tail.store :=
+  TailFor.fallthrough_evaluates tail
 
 theorem Tail.fallthrough_reflects
     (tail : Tail registry functions source solved evidence administrative frame globals contextLocation native
       (Fallthrough type) context environment heap) {value : Value} {store : Store}
     (evaluated : Evaluates tail.actual tail.store (tail.code.rename tail.embedding) value store) :
     value = LocalLoop.fallthroughValue type ∧ store = tail.store :=
-  evaluation_deterministic evaluated tail.fallthrough_evaluates
+  TailFor.fallthrough_reflects tail evaluated
 
 end Solcore.SourceSemantics.CoreLowering.TypedForHeader
 
