@@ -323,6 +323,10 @@ import Solcore.Test.SourceCoreReachableLexicalStatements
 import Solcore.Test.SourceCoreRecursiveNamedParameterPackingFacts
 import Solcore.Test.SourceCoreRecursiveNamedPreparedParameterProjections
 import Solcore.Test.SourceCoreCallableCoercionRawNamedCallBuiltinArguments
+import Solcore.Test.SourceCoreRecursiveNamedHeaderParameterProjections
+import Solcore.Test.SourceCoreRecursiveNamedReachedExpressions
+import Solcore.Test.SourceCoreReachableImperativeForStatements
+import Solcore.Test.SourceCoreRecursiveNamedSpecializationBodyFacts
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2807,6 +2811,10 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreReachableLexicalStatements.run
   SourceCoreRecursiveNamedPreparedParameterProjections.run
   SourceCoreCallableCoercionRawNamedCallBuiltinArguments.run
+  SourceCoreRecursiveNamedHeaderParameterProjections.run
+  SourceCoreRecursiveNamedReachedExpressions.run
+  SourceCoreReachableImperativeForStatements.run
+  SourceCoreRecursiveNamedSpecializationBodyFacts.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
