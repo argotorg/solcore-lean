@@ -223,6 +223,62 @@ theorem extraction_of_typed_position_with_residual (residualMode : Bool) (diagno
           (expressions context closed residual sourceSignatures declarations conditionSyntax conditionFound typed generatedCondition)
           (Classical.choice (thenIH closed residual sourceSignatures declarations projection generatedThen thenTyped)) (Classical.choice (elseIH closed residual sourceSignatures declarations projection generatedElse elseTyped)) (Classical.choice (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped))⟩
 
+
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((unary_read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨innerCode, generatedInner, accepted⟩ := bind_ok accepted
+      obtain ⟨suffix, generatedSuffix, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, headTyped⟩, _⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      let child := Classical.choice (innerIH closed residual sourceSignatures declarations projection generatedInner headTyped)
+      let issued := GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix
+      refine ⟨⟨.terminalBlock exactUnique found form child.tree stops issued, child.diagnostics, ?_⟩⟩
+      intro registry faults provided
+      exact .terminalBlock (unique := exactUnique) (found := found) (form := form)
+        (stops := stops) (issued := issued) (child.materialize registry faults provided)
+  | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
+    simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((unary_read_found (readPolicy ▸ read)).symm.trans found)
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨conditionCode, generatedCondition, accepted⟩ := bind_ok accepted
+      obtain ⟨checked, checkedCondition, accepted⟩ := bind_ok accepted
+      cases checked
+      have sameType := unary_ensure_same checkedCondition
+      rcases conditionCode with ⟨native, code⟩
+      dsimp only at sameType
+      subst native
+      obtain ⟨thenCode, generatedThen, accepted⟩ := bind_ok accepted
+      obtain ⟨elseCode, generatedElse, accepted⟩ := bind_ok accepted
+      obtain ⟨suffix, generatedSuffix, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, branchTyped⟩, _⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨⟨_, thenTyped⟩, ⟨_, elseTyped⟩⟩ := TypedLexicalWhile.Native.conditional_children branchTyped
+      let left := Classical.choice (thenIH closed residual sourceSignatures declarations projection generatedThen thenTyped)
+      let right := Classical.choice (elseIH closed residual sourceSignatures declarations projection generatedElse elseTyped)
+      let conditionTree := expressions context closed residual sourceSignatures declarations conditionSyntax conditionFound typed generatedCondition
+      let issued := GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix
+      refine ⟨⟨.terminalIf exactUnique found form conditionFound conditionType conditionTree left.tree right.tree thenStops elseStops issued,
+        (fun registry faults => left.diagnostics registry faults ∧ right.diagnostics registry faults), ?_⟩⟩
+      intro registry faults provided
+      exact .terminalIf (unique := exactUnique) (found := found) (form := form)
+        (conditionFound := conditionFound) (conditionType := conditionType) (conditionTree := conditionTree)
+        (thenStops := thenStops) (elseStops := elseStops) (issued := issued)
+        (left.materialize registry faults provided.1) (right.materialize registry faults provided.2)
+
   | @breaking context mode id node rest expected found form =>
     simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
     cases fuel with

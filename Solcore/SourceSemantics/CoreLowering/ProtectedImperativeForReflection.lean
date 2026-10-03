@@ -43,6 +43,47 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+private theorem sequence_stopped_reflects (_unique : NodeOccurrencesUnique source) {context : SourceSemantics.Context} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ProtectedLoopStatements.Control.HeadReflects (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Reflects (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  obtain ⟨wholeSize, original⟩ := evaluation_has_size evaluated
+  rw [LoopRenaming.sequence] at evaluated original
+  obtain ⟨headSize, middleStore, headValue, headSmaller, headSized⟩ := original.bind_computation
+  have headEval := headSized.sound
+  obtain ⟨outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+    first valid environments heaps locals agrees actualTyped reference read unmapped installed headEval
+  cases represented with
+  | fallthrough next =>
+    cases headTrace with | control headTrace => cases stops headTrace
+  | returned payload =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_returned _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace (.returned _),
+      .returned payload, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault matched =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_failure _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace (.fault _),
+      .fault matched, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+
+  | breaking next =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_transfer _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace (.breaking _),
+      .breaking next, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | continuing next =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LocalLoop.sequence_transfer _ headEval)
+    exact ⟨context, _, middle, middleMap, middleWorld, TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace (.continuing _),
+      .continuing next, middleHeaps, maps, worlds, frame, metadata,
+      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+
+
 include definitions registered extension transport bindings meaning reflection faithful observations in
 theorem header_reflects_reachable (functionTypes : FunctionRuntimeViews functions) (_unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
@@ -263,6 +304,19 @@ theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (function
       environments heaps locals agrees actualTyped reference read unmapped installed evaluated
     exact ProtectedLoopStatements.Control.sequence_reflects transport (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
       (ProtectedLoopStatements.Control.conditional_reflects transport reflection (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+
+  | @terminalBlock context scope mode id node statements rest expected type innerCode body exactUnique found form inner stops issued innerErrors innerIH =>
+    intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+      environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+    exact sequence_stopped_reflects unique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (ProtectedLoopStatements.Control.block_reflects (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form innerIH) (GenericLexicalStatements.block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
+    intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+      environments heaps locals agrees actualTyped reference read unmapped installed evaluated
+    exact sequence_stopped_reflects unique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (ProtectedLoopStatements.Control.conditional_reflects transport reflection (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) (GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops)
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
   | @breaking context scope mode id node rest expected type found form =>

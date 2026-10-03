@@ -124,6 +124,53 @@ abbrev ReflectingHeader (context : SourceSemantics.Context) (scope : Scope) (ite
       (globals := globals) (administrative := administrative) condition post statements expected type code) context scope items code,
     GenericForHeader.Tree.Errors registry faults tree
 
+private theorem sequence_stopped_preserves (unique : NodeOccurrencesUnique source) {context : SourceSemantics.Context} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {head body : Expr}
+    (found : source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (first : ProtectedLoopStatements.Control.HeadPreserves (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) id expected type head)
+    (stops : ReachableStatementContinuations.StatementTerminates source id) :
+    Preserves (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults) (solved := solved) (frameLayout := frameLayout) (globals := globals) (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped installed trace
+  cases source_view trace with
+  | control executed =>
+    rcases ScalarStatementViews.cons_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) executed with
+      ⟨_, _, _, headTrace, tailTrace⟩ | ⟨headTrace, terminal⟩
+    · cases stops headTrace
+    · obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped installed (.control headTrace)
+      cases represented with
+      | fallthrough _ => cases terminal
+      | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
+          .returned payload, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | breaking next => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
+          .breaking next, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+      | continuing next => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
+          .continuing next, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  | fault failed =>
+    rcases ScalarStatementViews.cons_fault_view mode unique (lookupStatement?_sound found) (fun _ _ => notTail) failed with
+      ⟨rfl, headTrace⟩ | ⟨_, _, _, headTrace, tailTrace⟩
+    · obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        first valid environments heaps locals agrees actualTyped reference read unmapped installed (.fault headTrace)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
+          by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
+          .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+    · cases stops headTrace
+
+
 include definitions registered extension transport bindings meaning faithful observations in
 theorem header_preserves_reachable (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
@@ -392,6 +439,20 @@ theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique 
       environments heaps locals agrees actualTyped reference read unmapped installed trace
     exact ProtectedLoopStatements.Control.sequence_preserves transport (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found (by intro expression; simp [form])
       (ProtectedLoopStatements.Control.conditional_preserves transport unique meaning (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) remainingIH
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
+
+
+  | @terminalBlock context scope mode id node statements rest expected type innerCode body exactUnique found form inner stops issued innerErrors innerIH =>
+    intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
+      environments heaps locals agrees actualTyped reference read unmapped installed trace
+    exact sequence_stopped_preserves unique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (ProtectedLoopStatements.Control.block_preserves (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) (unique := unique) found form innerIH) (GenericLexicalStatements.block_terminates exactUnique found form stops)
+      contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
+    intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
+      environments heaps locals agrees actualTyped reference read unmapped installed trace
+    exact sequence_stopped_preserves unique (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found (by intro expression; simp [form])
+      (ProtectedLoopStatements.Control.conditional_preserves transport unique meaning (functions := functions) (program := program) (evidence := evidence) (frameLayout := frame) (globals := globals) found form conditionFound conditionType conditionTree thenIH elseIH) (GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops)
       contextValid environments heaps locals agrees actualTyped reference read unmapped installed trace
 
 

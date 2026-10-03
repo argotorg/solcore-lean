@@ -146,6 +146,24 @@ theorem Tree.control_shapeAt {context : SourceSemantics.Context} {scope : Scope}
       rcases for_control_shape loop with ⟨next, rfl⟩ | ⟨value, rfl⟩
       · exact .fallthrough environment
       · exact .returned value
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerIH =>
+    intro program actualContext finalContext evidence environment before after outcome executed
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases GenericLexicalStatements.block_terminates exactUnique found form stops head
+    · obtain ⟨_, _, innerOutcome, rfl, innerTrace⟩ := ScalarStatementViews.block unique contains form head
+      exact (innerIH innerTrace).restore environment
+  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType typed thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+    intro program actualContext finalContext evidence environment before after outcome executed
+    have contains := lookupStatement?_sound found
+    rcases ScalarStatementViews.cons_view mode unique contains (by intro _ _ expression; simp [form]) executed with
+      ⟨_, _, _, head, _⟩ | ⟨head, terminal⟩
+    · cases GenericLexicalStatements.conditional_terminates exactUnique found form thenStops elseStops head
+    · obtain ⟨_, boolean, _, _, innerOutcome, _, rfl, branchTrace⟩ := ScalarStatementViews.ifThen unique contains form head
+      cases boolean with
+      | false => exact (elseIH branchTrace).restore environment
+      | true => exact (thenIH branchTrace).restore environment
   | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard | initializerAssign | initializerBitNot => trivial
 
 theorem Tree.control_shape {context : SourceSemantics.Context} {scope : Scope} {mode : Bool} {statements : List StatementId}
