@@ -57,7 +57,7 @@ def ProfileFor.to_match
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (certificate : ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults) :
     MatchProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  ⟨⟨header.valid, certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, GenericImperativeMatch.Tree.of_for certificate.tree,
+  ⟨⟨certificate.initialValid, certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, GenericImperativeMatch.Tree.of_for certificate.tree,
     GenericImperativeMatch.Tree.CatalogSites.of_for certificate.errors⟩⟩
 
 def MatchProfileWith.of_extracted
@@ -95,6 +95,7 @@ def MatchProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -110,7 +111,7 @@ def MatchProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
       (.statements true header.function.body) header.function.resultType header.output flow)
     (errors : GenericImperativeMatch.Tree.CatalogSites diagnosticPolicy registry faults tree) :
     MatchProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  ⟨MatchProfileWith.of_extracted header.valid accepted projection generated tree errors⟩
+  ⟨MatchProfileWith.of_extracted initialValid accepted projection generated tree errors⟩
 
 def MatchProfileFor.of_ready {diagnosticPolicy : AssignmentDiagnosticPolicy}
     {headers : Inventory prepared values ambient.definitions program}
@@ -118,6 +119,7 @@ def MatchProfileFor.of_ready {diagnosticPolicy : AssignmentDiagnosticPolicy}
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -134,7 +136,7 @@ def MatchProfileFor.of_ready {diagnosticPolicy : AssignmentDiagnosticPolicy}
     (catalog : SignatureCatalogWellFormed values.checked.signatures)
     (errors : GenericImperativeMatch.Tree.ReadyFor diagnosticPolicy registry faults tree) :
     MatchProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  MatchProfileFor.of_extracted accepted projection generated tree
+  MatchProfileFor.of_extracted initialValid accepted projection generated tree
     (GenericImperativeMatch.Tree.CatalogSites.of_catalog catalog errors)
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalog

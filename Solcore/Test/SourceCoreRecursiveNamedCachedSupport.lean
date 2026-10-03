@@ -95,12 +95,13 @@ theorem actual_extraction (diagnosticPolicy : AssignmentDiagnosticPolicy)
 
 /-- The selected receipt still owns the diagnostic obligations. -/
 theorem actual_profile {diagnosticPolicy : AssignmentDiagnosticPolicy} {faults : FunctionCalls.FaultRep}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (receipt : Receipt diagnosticPolicy headers header compilation expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative))
     (interpreted : receipt.extracted.diagnostics registry faults) :
     Nonempty (ProfileFor diagnosticPolicy headers header compilation header.readFuel expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults) :=
-  ⟨receipt.profile interpreted⟩
+  ⟨receipt.profile initialValid interpreted⟩
 
 /-- Every binding construct lifts the mapping while leaving its own slot fixed. -/
 theorem lambda_bound :

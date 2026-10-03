@@ -473,6 +473,7 @@ def DiagnosticExtraction.catalog_profile {diagnosticPolicy : AssignmentDiagnosti
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -488,6 +489,6 @@ def DiagnosticExtraction.catalog_profile {diagnosticPolicy : AssignmentDiagnosti
       (.statements true header.function.body) header.function.resultType header.output flow)
     (interpreted : extracted.diagnostics registry faults) :
     RecursiveNamedCatalog.ProfileFor diagnosticPolicy headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  RecursiveNamedCatalog.ProfileFor.of_extracted accepted projection generated extracted.tree (extracted.materialize registry faults interpreted)
+  RecursiveNamedCatalog.ProfileFor.of_extracted initialValid accepted projection generated extracted.tree (extracted.materialize registry faults interpreted)
 
 end Solcore.SourceSemantics.CoreLowering.GenericImperativeFor

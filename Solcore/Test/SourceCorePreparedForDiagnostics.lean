@@ -82,6 +82,7 @@ variable {checked : Checked} {base : Base checked}
   {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
   {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
 theorem prepared_catalog_profile {first : Nat} {table : SourceCoreAssignmentFaultSites.Table}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (tablePrepared : SourceCoreAssignmentFaultSites.prepare header.function.source first = .ok table)
     (operandsTyped : AssignmentDiagnosticOrigins.OperandsTyped header.function.source)
     {ledger : List SolvedRequirement} {policyOwner : SourceSpecialization.SpecializationKey}
@@ -124,7 +125,7 @@ theorem prepared_catalog_profile {first : Nat} {table : SourceCoreAssignmentFaul
         Nonempty (RecursiveNamedCatalog.ProfileFor .reachable headers header compilation expressionFuel expressionSyntax administrative registry faults) := by
   obtain ⟨flow, generated, extracted, same⟩ := extraction_of_prepared_policy_body tablePrepared operandsTyped fixedPolicy expressions unique assignmentExpressions syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
   exact ⟨flow, generated, extracted, same, fun registry faults interpreted =>
-    ⟨extracted.catalog_profile accepted projection generated interpreted⟩⟩
+    ⟨extracted.catalog_profile initialValid accepted projection generated interpreted⟩⟩
 end Catalog
 
 open NamedForFunctionBody GeneralHeap ReadOnly CoreProof

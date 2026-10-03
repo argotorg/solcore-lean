@@ -41,11 +41,12 @@ structure Receipt (diagnosticPolicy : AssignmentDiagnosticPolicy)
 /-- Interpret only the predicate of the returned extraction, rather than all
 arbitrary receipts with the same code. -/
 def Receipt.profile
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (receipt : Receipt diagnosticPolicy headers header compilation expressionSyntax administrative)
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (interpreted : receipt.extracted.diagnostics registry faults) :
     ProfileFor diagnosticPolicy headers header compilation header.readFuel expressionSyntax administrative registry faults :=
-  receipt.extracted.catalog_profile receipt.accepted receipt.projection receipt.generated interpreted
+  receipt.extracted.catalog_profile initialValid receipt.accepted receipt.projection receipt.generated interpreted
 
 variable {locations : Locations} {functions : FunctionModel values.checked.catalog ambient}
   {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {before : Dynamic.Heap}
@@ -221,6 +222,7 @@ theorem extract_source (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked 
 exactly the static provider consumed by mutual body induction. There is no
 request for profiles at an unreachable arbitrary administrative context. -/
 def Receipt.provider
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (receipts : ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost},
       BodyState headers locations 0 functions registry header arguments before initialStore initialMap initialWorld
         administrative actualContext actual ξ frameLocation current ghost →
@@ -235,6 +237,6 @@ def Receipt.provider
       administrative actualContext actual ξ frameLocation current ghost) :
     ProfileFor diagnosticPolicy headers header compilation header.readFuel expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults :=
-  (receipts entry).profile (interpreted entry)
+  (receipts entry).profile initialValid (interpreted entry)
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogProfileFactory

@@ -194,6 +194,7 @@ def reachable_catalog_profile
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -209,7 +210,7 @@ def reachable_catalog_profile
       (.statements true header.function.body) header.function.resultType header.output flow)
     (errors : GenericImperativeFor.Tree.ReachableErrors registry faults tree) :
     ProfileFor .reachable headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  ProfileFor.of_extracted accepted projection generated tree errors
+  ProfileFor.of_extracted initialValid accepted projection generated tree errors
 
 /-- The old family keeps its original record; both directions retain its fields. -/
 theorem strict_family_adapter

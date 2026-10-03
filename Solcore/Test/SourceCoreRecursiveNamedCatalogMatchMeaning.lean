@@ -110,7 +110,7 @@ theorem for_without_catalog :
 theorem same_flow : profile.to_match.flow = profile.flow := rfl
 
 theorem same_ready : GenericImperativeMatch.Tree.ReadyFor policy registry faults profile.to_match.tree :=
-  profile.to_match.errors.ready header.valid
+  profile.to_match.errors.ready profile.initialValid
 end StaticCompatibility
 
 private def content : String := String.intercalate "\n" [

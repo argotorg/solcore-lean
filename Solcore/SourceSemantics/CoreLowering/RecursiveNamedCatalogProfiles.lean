@@ -52,6 +52,7 @@ structure Profile (headers : Inventory prepared values ambient.definitions progr
     (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
     (expressionSyntax : ExpressionId → Prop) (administrative : Core.Context)
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) where private mk ::
+  initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence
   accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
     (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
     header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
@@ -75,6 +76,7 @@ structure ProfileFor (diagnosticPolicy : AssignmentDiagnosticPolicy) (headers : 
     (compilation : SourceCoreFunctions.Context) (expressionFuel : Nat)
     (expressionSyntax : ExpressionId → Prop) (administrative : Core.Context)
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) where private mk ::
+  initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence
   accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
     (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
     header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
@@ -101,7 +103,7 @@ def Profile.to_for
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (certificate : Profile headers header compilation expressionFuel expressionSyntax administrative registry faults) :
     ProfileFor .unconditional headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+  ⟨certificate.initialValid, certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
 
 /-- Restore only the original unconditional record, field by field. -/
 def ProfileFor.to_strict
@@ -112,7 +114,7 @@ def ProfileFor.to_strict
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (certificate : ProfileFor .unconditional headers header compilation expressionFuel expressionSyntax administrative registry faults) :
     Profile headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  ⟨certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
+  ⟨certificate.initialValid, certificate.accepted, certificate.projection, certificate.flow, certificate.generated, certificate.emitted, certificate.tree, certificate.errors⟩
 
 def ProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
     {headers : Inventory prepared values ambient.definitions program}
@@ -120,6 +122,7 @@ def ProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -139,15 +142,16 @@ def ProfileFor.of_extracted {diagnosticPolicy : AssignmentDiagnosticPolicy}
     unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
     rw [generated] at accepted
     exact Except.ok.inj accepted.symm
-  exact ⟨accepted, projection, flow, generated, emitted, tree, errors⟩
+  exact ⟨initialValid, accepted, projection, flow, generated, emitted, tree, errors⟩
 
-/-- Backward-compatible unconditional extraction. -/
+/-- Unconditional extraction retains its explicit ordinary source condition. -/
 def Profile.of_extracted
     {headers : Inventory prepared values ambient.definitions program}
     {header : Header prepared values ambient.definitions program}
     {compilation : SourceCoreFunctions.Context} {expressionFuel : Nat}
     {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {flow : Expr}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
       header.output header.reasonAt header.fellThrough header.escaped = .ok header.body)
@@ -163,7 +167,7 @@ def Profile.of_extracted
       (.statements true header.function.body) header.function.resultType header.output flow)
     (errors : GenericImperativeFor.Tree.Errors registry faults tree) :
     Profile headers header compilation expressionFuel expressionSyntax administrative registry faults :=
-  (ProfileFor.of_extracted accepted projection generated tree errors).to_strict
+  (ProfileFor.of_extracted initialValid accepted projection generated tree errors).to_strict
 
 /-- Runtime correspondence is deliberately absent from this family. -/
 def Profiles (headers : Inventory prepared values ambient.definitions program)

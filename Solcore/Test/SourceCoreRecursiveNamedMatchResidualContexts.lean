@@ -80,6 +80,7 @@ theorem actual_header_extraction (diagnosticPolicy : AssignmentDiagnosticPolicy)
 /-- Only the returned receipt's own diagnostics construct its matching Ready. -/
 theorem actual_ready {diagnosticPolicy : AssignmentDiagnosticPolicy} {flow : Expr}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (initialValid : CompatibleExpressionLiterals.ContextValid header.solved header.context header.function.evidence)
     (receipt : ExtractionFor diagnosticPolicy header.layouts header.owner header.active prepared.layout.frame header.globals
       header.onError values header.function.source expressionSyntax certificates ambient.definitions administrative matchCompilation.solvedRequirements
       header.context (RecursiveNamedCatalogNativeContexts.bodyScope header) (.statements true header.function.body)
@@ -88,7 +89,7 @@ theorem actual_ready {diagnosticPolicy : AssignmentDiagnosticPolicy} {flow : Exp
     (sameLedger : matchCompilation.solvedRequirements = header.solved)
     (interpreted : receipt.diagnostics registry faults) : Tree.ReadyFor diagnosticPolicy registry faults receipt.tree := by
   obtain ⟨errors, ledgers⟩ := receipt.materialize registry faults interpreted
-  exact ledgers.ready (by simpa only [sameLedger] using header.valid) sourceSignatures
+  exact ledgers.ready (by simpa only [sameLedger] using initialValid) sourceSignatures
 
 theorem actual_header_context : header.context.typeVariables = [] ∧ header.context.residualTypeVariables = true :=
   RecursiveNamedSourceContextFacts.header_fields header

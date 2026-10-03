@@ -64,7 +64,7 @@ theorem state_preserves_at_match
   have unmapped : frameLocation ∉ entry.mapping := by
     exact Eq.mp (congrArg (fun location => location ∉ entry.mapping) entry.catalog_frame) entry.catalog.authority.unmapped
   exact RecursiveNamedFunctionFinishBounds.preserves_at_match functions program profile.accepted profile.generated profile.tree
-    profile.projection header.unique escapedFault entry_transport size meaning header.valid
+    profile.projection header.unique escapedFault entry_transport size meaning profile.initialValid
     entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped reference entry.state.read unmapped ⟨entry.catalog⟩ trace
 
 /-- Finish reflection selects its strict child from the original native
@@ -106,7 +106,7 @@ theorem state_reflects_at_match
   have unmapped : frameLocation ∉ entry.mapping := by
     exact Eq.mp (congrArg (fun location => location ∉ entry.mapping) entry.catalog_frame) entry.catalog.authority.unmapped
   exact RecursiveNamedFunctionFinishBounds.reflects_at_match functions program profile.accepted profile.generated profile.tree
-    profile.projection header.unique escapedFault entry_transport budget size within meaning header.valid
+    profile.projection header.unique escapedFault entry_transport budget size within meaning profile.initialValid
     entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped reference entry.state.read unmapped ⟨entry.catalog⟩ completed
 
 theorem state_preserves_at
