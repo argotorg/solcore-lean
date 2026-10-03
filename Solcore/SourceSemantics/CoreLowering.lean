@@ -548,6 +548,16 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSpecializationStageFac
 import Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableAuthenticatedNamedCallMeaning
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuations
+import Solcore.SourceSemantics.CoreLowering.ReachableMatchContinuationMeaning
+
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchPrefixContracts
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedProgramEntrySource
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

@@ -333,6 +333,13 @@ import Solcore.Test.SourceCoreRecursiveNamedSpecializationValidity
 import Solcore.Test.SourceCoreRecursiveNamedSpecializationStageFacts
 import Solcore.Test.SourceCoreReachableImperativeMatchStatements
 import Solcore.Test.SourceCoreCallableAuthenticatedNamedCalls
+import Solcore.Test.SourceCoreRecursiveNamedHeaderSourceTyping
+import Solcore.Test.SourceCoreRecursiveNamedMatchResidualContexts
+import Solcore.Test.SourceCoreRecursiveNamedHeaderScopeDeclarations
+import Solcore.Test.SourceCoreReachableMatchContinuations
+import Solcore.Test.SourceCoreRecursiveNamedMatchPrefixBounds
+import Solcore.Test.SourceCoreRecursiveNamedInitialContextValidity
+import Solcore.Test.SourceCoreRecursiveNamedProgramEntrySource
 import Solcore.Test.SourceCoreCompatibleReadNativeTyping
 import Solcore.Test.SourceCoreBuiltinImperativeMatchBody
 import Solcore.Test.SourceCoreRecursiveNamedExpressions
@@ -2827,6 +2834,11 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedSpecializationStageFacts.run
   SourceCoreReachableImperativeMatchStatements.run
   SourceCoreCallableAuthenticatedNamedCalls.run
+  SourceCoreRecursiveNamedMatchResidualContexts.run
+  SourceCoreRecursiveNamedHeaderScopeDeclarations.run
+  SourceCoreReachableMatchContinuations.run
+  SourceCoreRecursiveNamedMatchPrefixBounds.run
+  SourceCoreRecursiveNamedInitialContextValidity.run
   SourceCoreGenericImperativeMatchExtraction.run
   SourceCoreCompatibleReadNativeTyping.run
   SourceCoreBuiltinImperativeMatchBody.run
