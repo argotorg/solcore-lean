@@ -108,8 +108,49 @@ private theorem liftMany_insertion (count cutoff : Nat) :
     congr 1
     omega
 
-/-- The state reached by this completion. These are representation and prefix
-facts, without body execution callbacks or identification with an old Entry. -/
+/-- The actual reached state retains the supplied function model in its full
+heap. Sizes come from the original completion, independently of these fields. -/
+structure PrefixFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {initialMap : LocationMap} {initialWorld : StoreTyping}
+    {capturedActual : Environment}
+    (captured : CallableIndexedLambdaValues.Captures prepared initialMap initialWorld scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (history : History code)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared)) (registry : SourceCoreRawMetadata.Registry)
+    (arguments : List Dynamic.Value) (before : Dynamic.Heap) (initialStore : Store) (location : Location)
+    (current : NativeFrame) where
+  next : NativeFrame
+  nextHistory : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table next
+    (.lambda code.descriptor.id history.ghost) (some history.metadata)
+  environment : Dynamic.Environment
+  heap : Dynamic.Heap
+  canonical : Environment
+  actual : Environment
+  actualContext : Core.Context
+  store : Store
+  mapping : LocationMap
+  world : StoreTyping
+  embedding : Renaming
+  allocation : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap
+  environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+    captured.administrative
+    (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
+    environment canonical prepared.layouts.definitions
+  heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store
+  locals : Dynamic.EnvironmentAgrees heap inputs.context.locals environment
+  maps : LocationMap.Extends initialMap mapping
+  worlds : WorldExtends initialWorld world
+  frame : AdministrativePreserved initialMap (initialStore.set location (encode prepared.ancestry.layout.frame next)) mapping store
+  metadata : Dynamic.HeapMetadataExtend before heap
+  spine : ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
+    canonical = added ++ captured.canonical
+  lookups : EnvironmentsAgree embedding canonical actual
+  actualTyped : RuntimeEnvironmentHasTypes world actual actualContext prepared.layouts.definitions
+  reference : canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + prepared.base.globals.length]? =
+    some (.cellRef prepared.ancestry.layout.frame.type location)
+  read : store.read? location = some (encode prepared.ancestry.layout.frame next)
+  unmapped : location ∉ mapping
+
 structure Prefix {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {initialMap : LocationMap} {initialWorld : StoreTyping}
     {capturedActual : Environment}
@@ -151,19 +192,57 @@ structure Prefix {values : SourceCoreCompatibleValues.Context} {prepared : Prepa
   read : store.read? location = some (encode prepared.ancestry.layout.frame next)
   unmapped : location ∉ mapping
 
-section Entry
+/-- This fieldwise adapter retains the exact legacy function model. It does
+not strengthen a heap or recover a size from an unsized entry. -/
+def Prefix.toFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {initialMap : LocationMap} {initialWorld : StoreTyping}
+    {capturedActual : Environment}
+    {captured : CallableIndexedLambdaValues.Captures prepared initialMap initialWorld scope function.captured capturedActual}
+    {code : Code prepared function scope captured.administrative} {history : History code}
+    {inputs : CallableIndexedLambdaEntryPrefix.Context code}
+    {profile : values.checked.catalog.callableContracts = true} {registry : SourceCoreRawMetadata.Registry}
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store} {location : Location}
+    {current : NativeFrame}
+    (reached : Prefix captured code history inputs profile registry arguments before initialStore location current) :
+    PrefixFor captured code history inputs (model prepared profile) registry arguments before initialStore location current :=
+  ⟨reached.next, reached.nextHistory, reached.environment, reached.heap, reached.canonical, reached.actual,
+    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.allocation,
+    reached.environments, reached.heaps, reached.locals, reached.maps, reached.worlds,
+    reached.frame, reached.metadata, reached.spine, reached.lookups, reached.actualTyped,
+    reached.reference, reached.read, reached.unmapped⟩
+
+/-- Only the exact legacy specialization is converted back. -/
+def PrefixFor.toLegacy {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {initialMap : LocationMap} {initialWorld : StoreTyping}
+    {capturedActual : Environment}
+    {captured : CallableIndexedLambdaValues.Captures prepared initialMap initialWorld scope function.captured capturedActual}
+    {code : Code prepared function scope captured.administrative} {history : History code}
+    {inputs : CallableIndexedLambdaEntryPrefix.Context code}
+    {profile : values.checked.catalog.callableContracts = true} {registry : SourceCoreRawMetadata.Registry}
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store} {location : Location}
+    {current : NativeFrame}
+    (reached : PrefixFor captured code history inputs (model prepared profile) registry arguments before initialStore location current) :
+    Prefix captured code history inputs profile registry arguments before initialStore location current :=
+  ⟨reached.next, reached.nextHistory, reached.environment, reached.heap, reached.canonical, reached.actual,
+    reached.actualContext, reached.store, reached.mapping, reached.world, reached.embedding, reached.allocation,
+    reached.environments, reached.heaps, reached.locals, reached.maps, reached.worlds,
+    reached.frame, reached.metadata, reached.spine, reached.lookups, reached.actualTyped,
+    reached.reference, reached.read, reached.unmapped⟩
+
+
+section GenericEntry
 variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
   {capturedActual : Environment}
   (captured : CallableIndexedLambdaValues.Captures prepared mapping world scope function.captured capturedActual)
   (code : Code prepared function scope captured.administrative) (history : History code)
-  (inputs : CallableIndexedLambdaEntryPrefix.Context code) (profile : values.checked.catalog.callableContracts = true)
+  (inputs : CallableIndexedLambdaEntryPrefix.Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
   {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
-  (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
+  (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     mapping world code.receipt.loweredParameters arguments nativeArguments)
   {before : Dynamic.Heap} {store : Store} {location : Location}
   {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
-  (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry (model prepared profile) mapping world before store)
+  (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
   (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
   (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
@@ -171,14 +250,14 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   (unmapped : location ∉ mapping)
   (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
 
-include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
 /-- Frame and manifest steps are strict even for an empty parameter prefix.
 The final body witness comes only from the supplied original completion. -/
-theorem body_prefix {size : Nat} {result : Value} {finalStore : Store}
+theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
       store (code.body.rename captured.embedding.lift.lift) result finalStore) :
-    ∃ reached : Prefix captured code history inputs profile registry arguments before store location current,
+    ∃ reached : PrefixFor captured code history inputs functions registry arguments before store location current,
       ∃ child bodyStore,
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
@@ -285,10 +364,64 @@ theorem body_prefix {size : Nat} {result : Value} {finalStore : Store}
     finalReference, unchanged.trans installedCurrent.read, finalUnmapped⟩,
     child, bodyStore, Nat.lt_trans (Nat.lt_of_le_of_lt childBound parameterLess) rawLess, bodyEval, restored⟩
 
-include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
 /-- The authenticated payload application adds its original strict body edge.
 The argument and complete captured environment are exactly the stored values;
 stage guards and the enclosing expression head are separate boundaries. -/
+theorem application_prefix_for {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
+        DataPatternValues.packValues nativeArguments]
+      store CallableIndexedLambdaCalls.applyPayload result finalStore) :
+    ∃ reached : PrefixFor captured code history inputs functions registry arguments before store location current,
+      ∃ child bodyStore,
+        child < size ∧ EvaluationSize child reached.actual reached.store
+          (code.receipt.body.rename reached.embedding) result bodyStore ∧
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+  obtain ⟨bodySize, smaller, applied⟩ := completed.apply_body
+    (.second (.first (.var rfl))) (.var rfl)
+  obtain ⟨reached, child, bodyStore, childLess, evaluated, restored⟩ :=
+    body_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed applied
+  exact ⟨reached, child, bodyStore, Nat.lt_trans childLess smaller, evaluated, restored⟩
+
+end GenericEntry
+
+section Entry
+variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
+  {capturedActual : Environment}
+  (captured : CallableIndexedLambdaValues.Captures prepared mapping world scope function.captured capturedActual)
+  (code : Code prepared function scope captured.administrative) (history : History code)
+  (inputs : CallableIndexedLambdaEntryPrefix.Context code) (profile : values.checked.catalog.callableContracts = true)
+  {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+  (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry (model prepared profile))
+    mapping world code.receipt.loweredParameters arguments nativeArguments)
+  {before : Dynamic.Heap} {store : Store} {location : Location}
+  {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
+  (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry (model prepared profile) mapping world before store)
+  (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+  (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+  (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
+  (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
+  (unmapped : location ∉ mapping)
+  (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
+
+include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
+theorem body_prefix {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
+      store (code.body.rename captured.embedding.lift.lift) result finalStore) :
+    ∃ reached : Prefix captured code history inputs profile registry arguments before store location current,
+      ∃ child bodyStore,
+        child < size ∧ EvaluationSize child reached.actual reached.store
+          (code.receipt.body.rename reached.embedding) result bodyStore ∧
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+  obtain ⟨reached, child, bodyStore, smaller, evaluated, restored⟩ :=
+    body_prefix_for captured code history inputs (model prepared profile)
+      represented heaps locals reference read currentCarried unmapped allowed completed
+  exact ⟨reached.toLegacy (profile := profile), child, bodyStore, smaller, evaluated, restored⟩
+
+include captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed in
 theorem application_prefix {size : Nat} {result : Value} {finalStore : Store}
     (completed : EvaluationSize size
       [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
@@ -299,11 +432,10 @@ theorem application_prefix {size : Nat} {result : Value} {finalStore : Store}
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
         finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
-  obtain ⟨bodySize, smaller, applied⟩ := completed.apply_body
-    (.second (.first (.var rfl))) (.var rfl)
-  obtain ⟨reached, child, bodyStore, childLess, evaluated, restored⟩ :=
-    body_prefix captured code history inputs profile represented heaps locals reference read currentCarried unmapped allowed applied
-  exact ⟨reached, child, bodyStore, Nat.lt_trans childLess smaller, evaluated, restored⟩
+  obtain ⟨reached, child, bodyStore, smaller, evaluated, restored⟩ :=
+    application_prefix_for captured code history inputs (model prepared profile)
+      represented heaps locals reference read currentCarried unmapped allowed completed
+  exact ⟨reached.toLegacy (profile := profile), child, bodyStore, smaller, evaluated, restored⟩
 
 end Entry
 
