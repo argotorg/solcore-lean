@@ -3,9 +3,10 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
 
 /-! Independent literal correspondence under arbitrary ambient definitions.
-Numeric requirement validity and a covering evidence environment remain
-explicit source entry conditions. Literal code neither reads nor changes any
-Core environment or heap, including administrative closures in other cells. -/
+The shared proof takes the selected numeric requirement judgments directly.
+The original ordinary-context entry remains an adapter with its full ledger
+and covering dictionary. Literal code preserves every environment and heap,
+including administrative closures in other cells. -/
 set_option autoImplicit false
 set_option linter.unusedSimpArgs false
 namespace Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiterals
@@ -25,6 +26,32 @@ private theorem ContextValid.proves {solved : List SolvedRequirement} {context :
   obtain ⟨entry, member, identifier, predicate⟩ := member
   have present : entry ∈ context.solvedRequirements := by rw [valid.ledger]; exact member
   exact ⟨entry, ⟨present, identifier⟩, predicate, valid.valid.entriesValid entry present⟩
+
+/-- Independent evidence for the numeric form at this occurrence. These are
+requirement judgments, not source or native execution laws. Non-numeric leaves
+have no numeric obligation. -/
+def NumericEvidence (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (node : ExpressionNode) : Prop :=
+  ∀ literal resolution, node.form = .integerLiteral literal resolution →
+    RequirementProves context resolution.requirement resolution.predicate ∧
+    ¬ Dynamic.RequirementUnavailable context evidence resolution.requirement
+
+private theorem ContextValid.numeric {solved : List SolvedRequirement} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} (valid : ContextValid solved context evidence)
+    {node : ExpressionNode} {type code} (literal : Literal solved node type code) :
+    NumericEvidence context evidence node := by
+  intro value resolution form
+  cases literal with
+  | unit other _ _ _ => rw [other] at form; cases form
+  | bool _ other _ _ _ => rw [other] at form; cases form
+  | word _ other _ _ _ _ => rw [other] at form; cases form
+  | resolvedWord other metadata | resolvedInteger other metadata =>
+    have same := other.symm.trans form
+    cases same
+    have proves := valid.proves metadata.solved
+    obtain ⟨closed, produced⟩ := Dynamic.RequirementProves.produces_of_covers valid.covers proves
+    exact ⟨by simpa only [IntegerLiteralResolution.predicate, metadata.targetType] using proves,
+      produced.excludes_unavailable valid.valid.idsUnique⟩
 
 private theorem word_constructs {span : Syntax.SourceSpan} {literal : Syntax.CoreLiteralValue} {value : Word}
     (meaning : WordLiteralDenotes ⟨span, literal⟩ value) : Dynamic.LiteralConstructs literal (.word value) := by
@@ -119,10 +146,10 @@ private theorem Literal.form_unique {solved : List SolvedRequirement} {node : Ex
     cases first with | integerLiteral _ first =>
       cases second with | integerLiteral _ second => exact ⟨first.functional second, rfl⟩
 
-private theorem Literal.excludes_fault {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+private theorem Literal.excludes_fault_with_evidence {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
     (literal : Literal solved node type code)
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
-    (valid : ContextValid solved context evidence)
+    (valid : NumericEvidence context evidence node)
     {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
     (fault : Dynamic.ExpressionFormFaults program context evidence source environment before node.form node.requirements node.coercions reason after) : False := by
   cases literal with
@@ -133,8 +160,15 @@ private theorem Literal.excludes_fault {solved : List SolvedRequirement} {node :
   | resolvedWord form metadata | resolvedInteger form metadata =>
     rw [form] at fault
     cases fault with | integerRequirement _ unavailable =>
-      obtain ⟨_, produced⟩ := Dynamic.RequirementProves.produces_of_covers valid.covers (valid.proves metadata.solved)
-      exact produced.excludes_unavailable valid.valid.idsUnique unavailable
+      exact (valid _ _ form).2 unavailable
+
+private theorem Literal.excludes_fault {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+    (literal : Literal solved node type code)
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    (valid : ContextValid solved context evidence)
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (fault : Dynamic.ExpressionFormFaults program context evidence source environment before node.form node.requirements node.coercions reason after) : False :=
+  literal.excludes_fault_with_evidence (valid.numeric literal) fault
 
 /-- Atomic code is well typed in every ambient definition environment. -/
 theorem Literal.hasType {solved node type code} (literal : Literal solved node type code)
@@ -148,12 +182,12 @@ theorem Literal.hasType {solved node type code} (literal : Literal solved node t
 
 /-- Each static literal constructs a source value and a native value directly.
 The environment renaming and both heaps are arbitrary. -/
-theorem Literal.evaluates {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+theorem Literal.evaluates_with_evidence {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
     (literal : Literal solved node type code)
     {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
-    (valid : ContextValid solved context evidence)
+    (valid : NumericEvidence context evidence node)
     (source : TypedSource) (environment : Dynamic.Environment) (heap : Dynamic.Heap)
     (mapping : LocationMap) (world : StoreTyping) (native : Environment) (store : Store) (ξ : Renaming) :
     ∃ sourceValue coreValue,
@@ -176,7 +210,7 @@ theorem Literal.evaluates {solved : List SolvedRequirement} {node : ExpressionNo
         have targetEq := metadata.targetType
         dsimp only at targetEq
         subst target
-        exact .word metadata.meaning (valid.proves metadata.solved)
+        exact .word metadata.meaning (valid _ _ form).1
     rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
     exact ⟨_, _, .integerLiteral rfl constructs, .word _, .inRight .word⟩
   | @resolvedInteger value resolution validated form metadata =>
@@ -185,25 +219,45 @@ theorem Literal.evaluates {solved : List SolvedRequirement} {node : ExpressionNo
         have targetEq := metadata.targetType
         dsimp only at targetEq
         subst target
-        exact .integer metadata.meaning (valid.proves metadata.solved)
+        exact .integer metadata.meaning (valid _ _ form).1
     rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
     exact ⟨_, _, .integerLiteral rfl constructs, .integer _, .inRight .integer⟩
 
+theorem Literal.evaluates {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
+    (literal : Literal solved node type code)
+    {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (valid : ContextValid solved context evidence)
+    (source : TypedSource) (environment : Dynamic.Environment) (heap : Dynamic.Heap)
+    (mapping : LocationMap) (world : StoreTyping) (native : Environment) (store : Store) (ξ : Renaming) :
+    ∃ sourceValue coreValue,
+      Dynamic.ExpressionFormEvaluates program context evidence source environment heap node.form node.requirements node.coercions sourceValue heap ∧
+      ValueRep checked registry functions mapping world node.type sourceValue coreValue type ∧
+      Evaluates native store (code.rename ξ) (.inRight .word coreValue) store :=
+  literal.evaluates_with_evidence functions program context evidence (valid.numeric literal)
+    source environment heap mapping world native store ξ
+
 /-- Universal literal preservation has no child execution hypothesis. -/
-theorem preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+theorem preserves_with_evidence {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
     {solved : List SolvedRequirement} (program : Program) (context : SourceSemantics.Context)
-    (evidence : Dynamic.EvidenceEnvironment) (valid : ContextValid solved context evidence)
-    {source : TypedSource} (unique : NodeOccurrencesUnique source) (faults : FunctionCalls.FaultRep) :
+    (evidence : Dynamic.EvidenceEnvironment)
+    {certificate : SourceCoreLocalCell.Scope → ExpressionId → SourceCoreBasic.LoweredExpr → Prop}
+    {source : TypedSource}
+    (receipts : ∀ scope id lowered, certificate scope id lowered →
+      ∃ node, source.lookupExpression? id = some node ∧ Literal solved node lowered.type lowered.expression ∧
+        NumericEvidence context evidence node)
+    (unique : NodeOccurrencesUnique source) (faults : FunctionCalls.FaultRep) :
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source (fun _ id lowered => Certificate solved source id lowered) faults := by
+      program context evidence source certificate faults := by
   intro scope id lowered receipt node found mapping world administrative environment canonical actual before store ξ outcome after
     environments heaps locals agrees trace
-  obtain ⟨other, otherFound, literal⟩ := receipt
+  obtain ⟨other, otherFound, literal, valid⟩ := receipts scope id lowered receipt
   have same := Option.some.inj (otherFound.symm.trans found)
   subst other
   obtain ⟨sourceValue, coreValue, raw, represented, evaluated⟩ :=
-    literal.evaluates functions program context evidence valid source environment before mapping world actual store ξ
+    literal.evaluates_with_evidence functions program context evidence valid source environment before mapping world actual store ξ
   have contains := lookupExpression?_sound found
   have result : outcome = .value sourceValue ∧ after = before := by
     cases trace with
@@ -212,27 +266,42 @@ theorem preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : So
       obtain ⟨rfl, rfl⟩ := literal.form_unique actualRaw raw
       exact ⟨rfl, rfl⟩
     | fault fault =>
-      exact False.elim (literal.excludes_fault valid (fault_raw unique contains literal.atomic literal.coercions fault))
+      exact False.elim (literal.excludes_fault_with_evidence valid (fault_raw unique contains literal.atomic literal.coercions fault))
   obtain ⟨rfl, rfl⟩ := result
   exact ⟨coreValue |> Value.inRight .word, store, mapping, world, evaluated, .value represented,
     heaps, .refl _, .refl _, .refl _ _, .refl _⟩
 
-/-- A completed native literal always reconstructs its independent source
-execution, without assuming any source trace beforehand. -/
-theorem reflects {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+theorem preserves {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
     {solved : List SolvedRequirement} (program : Program) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (valid : ContextValid solved context evidence)
-    (source : TypedSource) (faults : FunctionCalls.FaultRep) :
-    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+    {source : TypedSource} (unique : NodeOccurrencesUnique source) (faults : FunctionCalls.FaultRep) :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (fun _ id lowered => Certificate solved source id lowered) faults := by
+  refine preserves_with_evidence (registry := registry) (solved := solved) functions program context evidence (certificate := fun _ id lowered => Certificate solved source id lowered) ?_ unique faults
+  intro scope id lowered receipt
+  obtain ⟨node, found, literal⟩ := receipt
+  exact ⟨node, found, literal, valid.numeric literal⟩
+
+/-- A completed native literal always reconstructs its independent source
+execution, without assuming any source trace beforehand. -/
+theorem reflects_with_evidence {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
+    {solved : List SolvedRequirement} (program : Program) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource)
+    {certificate : SourceCoreLocalCell.Scope → ExpressionId → SourceCoreBasic.LoweredExpr → Prop}
+    (receipts : ∀ scope id lowered, certificate scope id lowered →
+      ∃ node, source.lookupExpression? id = some node ∧ Literal solved node lowered.type lowered.expression ∧
+        NumericEvidence context evidence node) (faults : FunctionCalls.FaultRep) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults := by
   intro scope id lowered receipt node found mapping world administrative environment canonical actual before store ξ value finalStore
     environments heaps locals agrees evaluation
-  obtain ⟨other, otherFound, literal⟩ := receipt
+  obtain ⟨other, otherFound, literal, valid⟩ := receipts scope id lowered receipt
   have same := Option.some.inj (otherFound.symm.trans found)
   subst other
   obtain ⟨sourceValue, coreValue, raw, represented, evaluated⟩ :=
-    literal.evaluates functions program context evidence valid source environment before mapping world actual store ξ
+    literal.evaluates_with_evidence functions program context evidence valid source environment before mapping world actual store ξ
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated evaluation
   have trace : Dynamic.ExpressionEvaluates program context evidence source environment before id sourceValue before := by
     apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound found) raw
@@ -240,5 +309,17 @@ theorem reflects {checked : SourceCoreCompatibleCatalog.Checked} {registry : Sou
     exact .nil
   exact ⟨.value sourceValue, before, mapping, world, .value trace, .value represented,
     heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+
+theorem reflects {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions} (functions : FunctionModel checked.catalog ambient)
+    {solved : List SolvedRequirement} (program : Program) (context : SourceSemantics.Context)
+    (evidence : Dynamic.EvidenceEnvironment) (valid : ContextValid solved context evidence)
+    (source : TypedSource) (faults : FunctionCalls.FaultRep) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (fun _ id lowered => Certificate solved source id lowered) faults := by
+  refine reflects_with_evidence (registry := registry) (solved := solved) functions program context evidence source (certificate := fun _ id lowered => Certificate solved source id lowered) ?_ faults
+  intro scope id lowered receipt
+  obtain ⟨node, found, literal⟩ := receipt
+  exact ⟨node, found, literal, valid.numeric literal⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiterals
