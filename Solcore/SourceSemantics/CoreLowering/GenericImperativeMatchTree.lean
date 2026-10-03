@@ -221,6 +221,15 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (stops : ReachableMatchContinuations.DefaultStopped source id resolution) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
 
+
+  /-- Ordinary scoped control erases its inner value. The retained source
+  annotation may therefore be non-Unit even when execution falls through. -/
+  | scopedBlock {context mode id node statements rest expected}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block statements)
+      (inner : Syntax source expressionSyntax context (.statements false statements) expected)
+      (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) :
+      Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
+
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
     (owner : SourceSpecialization.SpecializationKey) (active : TypeSystem.Substitution)
     (frame : SourceCoreCallableIndexedFrames.Layout) (globals : Nat)

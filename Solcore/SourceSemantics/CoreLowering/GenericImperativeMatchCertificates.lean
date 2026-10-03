@@ -208,7 +208,8 @@ theorem extraction_of_typed_position_with_residual (residualMode : Bool) (diagno
         exact ⟨ExtractionFor.discard found form notTail expressionFound (expressions context closed residual sourceSignatures declarations syntaxValue expressionFound typed generated)
           (Classical.choice (ih closed residual sourceSignatures declarations projection generatedBody tailTyped))⟩
 
-  | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH =>
+  | @block context mode id node statements rest expected found form _ inner remaining innerIH restIH
+  | @scopedBlock context mode id node statements rest expected found form inner remaining innerIH restIH =>
     simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
     cases fuel with
     | zero => cases accepted
