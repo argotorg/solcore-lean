@@ -1,10 +1,12 @@
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeForPreservation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
 
-/-! The existing imperative Tree closes lexical, assignment and loop children
-at one fixed budget. The reached header retains an inclusive loop continuation;
+/-! The existing Match Tree closes lexical, assignment, loop and match children
+at one fixed budget. The original For entry is a static inclusion wrapper. The reached header retains an inclusive loop continuation;
 source and Core sizes are independent and no finite loop proof is duplicated. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeFor
@@ -624,12 +626,12 @@ variable (meaningMost : ∀ context, CompatibleExpressionLiterals.ContextValid s
     (CompatibleAmbientHeap.payloadModel values.checked registry functions)
     program context evidence source (certificates context) faults entry))
 include definitions registered extension transport bindings meaningMost faithful observations in
-theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+theorem preservesAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
-    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+    (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
-    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    (errors : GenericImperativeMatch.Tree.CatalogSites diagnosticPolicy registry faults tree) :
     PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
@@ -919,6 +921,44 @@ theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique 
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
 
+
+  | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining catalogValid patternContext childErrors remainingErrors childrenIH remainingIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    intro size bounded
+    exact Control.sequence_preserves_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+      (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
+      (fun child within => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
+        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)))
+      remainingIH
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalogValid patternContext childErrors childrenIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    intro size bounded
+    exact Control.sequence_stopped_preserves_at (functions := functions) (program := program) (evidence := evidence)
+      (frameLayout := frame) (globals := globals) (unique := unique) budget size bounded found (by intro expression; simp [form])
+      (fun child within => GenericImperativeMatch.head_preserves_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped unique budget child within transport bindings (meaning context)
+        (fun request member childContext valid child smaller => childrenIH request member childContext valid child (Nat.le_of_lt smaller)))
+      (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
+
+include definitions registered extension transport bindings meaningMost faithful observations in
+theorem preservesAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    PreservesAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  exact preservesAt_match functions definitions registered extension program evidence transport bindings budget faithful observations meaningMost
+    diagnosticPolicy unique (GenericImperativeMatch.Tree.of_for tree) (GenericImperativeMatch.Tree.CatalogSites.of_for errors)
 
 include definitions registered extension transport bindings meaning faithful observations in
 /-- A caller with only strictly smaller expression laws can use the same main

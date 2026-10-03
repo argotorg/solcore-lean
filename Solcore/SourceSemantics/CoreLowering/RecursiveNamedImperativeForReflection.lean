@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
 
 /-! Original native children select the bounded reflected head and tail.
+The same Match Tree supplies selected-child entry and catalog receipts.
 Source costs are reconstructed independently, preserving the same lexical
 exit context, typed hidden values and installed caller observations. -/
 set_option autoImplicit false
@@ -342,12 +343,12 @@ private theorem measure_result {program : Program} {context : SourceSemantics.Co
   exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, rest⟩
 
 include definitions registered extension transport bindings reflection faithful observations in
-theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+theorem reflectsAt_match (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
-    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+    (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
       context scope position expected type code)
-    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    (errors : GenericImperativeMatch.Tree.CatalogSites diagnosticPolicy registry faults tree) :
     ReflectsAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
       (frame := frame) (globals := globals) (onError := onError)
       (source := source) (solved := solved) (administrative := administrative)
@@ -612,5 +613,43 @@ theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (function
   | @initializerBitNot context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
     obtain ⟨header, errors⟩ := ih
     exact ⟨.bitNot head header, .bitNot (head := head) errors headErrors⟩
+
+  | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining catalogValid patternContext childErrors remainingErrors childrenIH remainingIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    intro size bounded
+    exact Control.sequence_reflects_at (functions := functions) (program := program) (evidence := evidence) (transport := transport)
+      (frameLayout := frame) (globals := globals) size size (Nat.le_refl size) found (by intro expression; simp [form])
+      (fun child within => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
+        childrenIH)
+      (fun child within => remainingIH child (Nat.lt_of_le_of_lt within bounded))
+
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalogValid patternContext childErrors childrenIH =>
+    rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
+    dsimp only at sameValues
+    subst compiledValues
+    intro size bounded
+    exact Control.sequence_stopped_reflects_at (functions := functions) (program := program) (evidence := evidence)
+      (frameLayout := frame) (globals := globals) size size (Nat.le_refl size) found (by intro expression; simp [form])
+      (fun child within => GenericImperativeMatch.head_reflects_bounded onError allocator functions definitions registered extension receipt ordinary
+        patternContext catalogValid scrutineeFound casesTyped defaultTyped budget child (Nat.le_trans within (Nat.le_of_lt bounded)) transport bindings (reflection context)
+        childrenIH)
+      (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
+
+include definitions registered extension transport bindings reflection faithful observations in
+theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)
+    {context : SourceSemantics.Context} {scope : Scope} {position : Position}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeFor.Tree layouts owner active frame globals onError values source expressionSyntax certificates ambient.definitions administrative
+      context scope position expected type code)
+    (errors : GenericImperativeFor.Tree.ErrorsFor diagnosticPolicy registry faults tree) :
+    ReflectsAtFor (diagnosticPolicy := diagnosticPolicy) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
+      (frame := frame) (globals := globals) (onError := onError)
+      (source := source) (solved := solved) (administrative := administrative)
+      (registry := registry) (faults := faults) context scope position expected type code := by
+  exact reflectsAt_match functions definitions registered extension program evidence transport bindings budget reflection faithful observations
+    diagnosticPolicy functionTypes unique (GenericImperativeMatch.Tree.of_for tree) (GenericImperativeMatch.Tree.CatalogSites.of_for errors)
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeFor
