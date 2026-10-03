@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.ForHeaderNativeBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderPreservation
 
 /-! Completed native headers reconstruct their independent source prefix or
@@ -33,6 +35,133 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+include definitions registered extension faithful observations transport bindings in
+theorem Tree.reflects_reachable_bounded (budget : Nat)
+    (boundedReflection : ∀ context, CompatibleExpressionLiterals.ContextValid solved context evidence →
+      RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) (functionTypes : FunctionRuntimeViews functions)
+    {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
+    (tree : Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative type continuation
+      context scope items code) (errors : GenericForHeader.Tree.ReachableErrors registry faults tree)
+    (valid : CompatibleExpressionLiterals.ContextValid solved context evidence)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (installed : entry scope mapping world before store canonical)
+    {size : Nat} (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) (bounded : size ≤ budget) :
+    RecursiveNamedHeaderContracts.ResultAt size (entry := entry) registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
+      context environment before items mapping world store value finalStore := by
+  induction errors generalizing mapping world actualContext environment canonical actual before store ξ contextLocation native value finalStore size with
+  | @nil context scope code next =>
+    exact .continues ⟨⟨scope, code, mapping, world, canonical, actual, actualContext, ξ, store, next, valid,
+      environments, heaps, locals, agrees, actualTyped, reference, read, unmapped⟩, installed⟩ .nil (.refl _) (.refl _) (.refl _ _) (.refl _) evaluated (Nat.le_refl _)
+  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
+    obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation⟩ :=
+      allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
+        environments heaps locals agrees actualTyped reference read Dynamic.Heap.Allocates.append
+    obtain ⟨remainingSize, smaller, remainingEval⟩ := ForHeaderNativeBounds.allocation_body evaluated allocationEval
+    have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+      (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+        (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
+          (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) remainingEval (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+    exact reflected.prepend (.letUninitialized mono extended .append)
+      (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩)
+      (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩)
+      preservation (.of_allocation Dynamic.Heap.Allocates.append) (Nat.le_of_lt smaller)
+  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary found sourceType child allocation annotation same remaining remainingErrors ih =>
+    rw [sequence_rename] at evaluated
+    have input : ∃ input middle childSize, childSize < size ∧ EvaluationSize childSize actual store (lowered.expression.rename ξ) input middle := by
+      cases evaluated with
+      | caseLeft initial branch | caseRight initial branch => exact ⟨_, _, _, by omega, initial⟩
+    obtain ⟨input, middleStore, initialSize, initialSmaller, initialEval⟩ := input
+    obtain ⟨sourceSize, sourceOutcome, middle, middleMap, middleWorld, initialTrace, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
+      boundedReflection _ valid _ (Nat.lt_of_lt_of_le initialSmaller bounded) child found
+        environments heaps locals agrees actualTyped installed initialEval
+    cases represented with
+    | fault matched =>
+      cases initialTrace with | fault failed =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LanguageResult.bind_failure _ initialEval.sound)
+        exact .fault (.head (.letInitializer mono failed)) rfl matched middleHeaps maps worlds preservation metadata
+    | value payload =>
+      cases initialTrace with | value initialTrace =>
+        have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
+        obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame⟩ :=
+          allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
+            (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead .append
+        obtain ⟨remainingSize, smaller, tailEval⟩ := ForHeaderNativeBounds.initialized_body evaluated initialEval.sound allocationEval
+        have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+          (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+            (List.getElem?_eq_some_iff.mp frameRead).1).1
+          (bindings.prepend (transport.extend
+            (transport.extend installed maps worlds preservation metadata) ⟨_, rfl⟩ ⟨_, rfl⟩ allocationFrame
+            (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) tailEval (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+        exact reflected.prepend (.letInitialized initialTrace mono extended .append)
+          (maps.trans (show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩))
+          (worlds.trans (show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩))
+          (preservation.trans allocationFrame) (metadata.trans (.of_allocation Dynamic.Heap.Allocates.append)) (Nat.le_of_lt smaller)
+  | @discard context scope expression expressionNode rest lowered body found child remaining remainingErrors ih =>
+    rw [LoopRenaming.discard] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft childEvaluation branch =>
+      obtain ⟨sourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata⟩ :=
+        boundedReflection _ valid _ (by omega) child found
+          environments heaps locals agrees actualTyped installed childEvaluation
+      cases represented with | fault matched =>
+        cases trace with | fault failed =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.discard_failure _ childEvaluation.sound)
+          exact .fault (.head (.expression failed)) rfl matched finalHeaps maps worlds preservation metadata
+    | caseRight childEvaluation branch =>
+      obtain ⟨sourceSize, childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
+        boundedReflection _ valid _ (by omega) child found
+          environments heaps locals agrees actualTyped installed childEvaluation
+      cases represented with | @value _ coreValue payload =>
+        cases trace with | value childTrace =>
+          have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (GenericExpressionMeaning.agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken worlds)) reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+            (transport.extend installed maps worlds preservation metadata)
+            (by simpa only [GenericExpressionMeaning.rename_prefix] using branch) (by omega)
+          exact reflected.prepend (.expression childTrace) maps worlds preservation metadata (by omega)
+  | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
+    have assigned := ProtectedAssignmentHeads.Head.reflects_reachable_bounded functions extension program evidence transport faithful observations head
+      environments heaps locals agrees actualTyped installed budget (boundedReflection _ valid) functionTypes headErrors evaluated bounded
+    cases assigned with
+    | fault trace same matched finalHeaps maps worlds preservation metadata _ =>
+      exact .fault (.head (.assignValue trace)) same matched finalHeaps maps worlds preservation metadata
+    | success trace middleHeaps maps worlds preservation metadata count typed nextInstalled smaller remainingEval =>
+      have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+        (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+        ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 nextInstalled
+        (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval) (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+      exact reflected.prepend (.assignValue trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
+
+  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
+    rcases head.reflects_sized functions program evidence observations
+      environments heaps locals agrees actualTyped headErrors evaluated with
+      ⟨sourceSize, reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
+      ⟨sourceSize, updated, middle, written, middleMap, middleWorld, slots, remainingSize, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, smaller, remainingEval⟩
+    · exact .fault (.head (.assignBitNot trace)) rfl matched finalHeaps maps worlds preservation metadata
+    · have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+        (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+        ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+        (transport.extend installed maps worlds preservation metadata)
+        (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval) (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+      exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
+
 include definitions registered extension meaning reflection faithful observations transport bindings in
 theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
     {context : SourceSemantics.Context} {scope : Scope} {items : List ForItemForm} {code : Expr}
@@ -55,106 +184,12 @@ theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
     (installed : entry scope mapping world before store canonical)
     (evaluated : Evaluates actual store (code.rename ξ) value finalStore) :
     Result (entry := entry) registry functions program source solved evidence administrative frame globals contextLocation native type faults continuation
-      context environment before items mapping world store value finalStore := by
-  induction errors generalizing mapping world actualContext environment canonical actual before store ξ contextLocation native value finalStore with
-  | @nil context scope code next =>
-    exact .continues ⟨⟨scope, code, mapping, world, canonical, actual, actualContext, ξ, store, next, valid,
-      environments, heaps, locals, agrees, actualTyped, reference, read, unmapped⟩, installed⟩ .nil (.refl _) (.refl _) (.refl _ _) (.refl _) evaluated
-  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
-    obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation⟩ :=
-      allocate_absent functions definitions registered mono extended ordinary projected allocation annotation same
-        environments heaps locals agrees actualTyped reference read Dynamic.Heap.Allocates.append
-    have remainingEval := (ContinuationAgreement.letE allocationEval).unwrap evaluated
-    have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
-      (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-        (bindings.prepend (transport.extend installed ⟨_, rfl⟩ ⟨_, rfl⟩ preservation
-          (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) remainingEval
-    exact reflected.prepend (.letUninitialized mono extended .append)
-      (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩)
-      (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩)
-      preservation (.of_allocation Dynamic.Heap.Allocates.append)
-  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary found sourceType child allocation annotation same remaining remainingErrors ih =>
-    rw [sequence_rename] at evaluated
-    have input : ∃ input middle, Evaluates actual store (lowered.expression.rename ξ) input middle := by
-      cases evaluated with
-      | caseLeft initial branch | caseRight initial branch => exact ⟨_, _, initial⟩
-    obtain ⟨input, middleStore, initialEval⟩ := input
-    obtain ⟨sourceOutcome, middle, middleMap, middleWorld, initialTrace, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
-      reflection _ valid child found
-        environments heaps locals agrees actualTyped installed initialEval
-    cases represented with
-    | fault matched =>
-      cases initialTrace with | fault failed =>
-        obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated (LanguageResult.bind_failure _ initialEval)
-        exact .fault (.head (.letInitializer mono failed)) rfl matched middleHeaps maps worlds preservation metadata
-    | value payload =>
-      cases initialTrace with | value initialTrace =>
-        have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
-        obtain ⟨captured, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame⟩ :=
-          allocate_initialized functions definitions registered mono extended ordinary allocation annotation same (sourceType ▸ payload)
-            (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead .append
-        have tailEval := (ContinuationAgreement.letE allocationEval).unwrap ((ContinuationAgreement.bind initialEval).unwrap evaluated)
-        have reflected := ih (valid_extend valid extended) nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
-          (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-            (List.getElem?_eq_some_iff.mp frameRead).1).1
-          (bindings.prepend (transport.extend
-            (transport.extend installed maps worlds preservation metadata) ⟨_, rfl⟩ ⟨_, rfl⟩ allocationFrame
-            (Dynamic.HeapMetadataExtend.of_allocation Dynamic.Heap.Allocates.append))) tailEval
-        exact reflected.prepend (.letInitialized initialTrace mono extended .append)
-          (maps.trans (show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩))
-          (worlds.trans (show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩))
-          (preservation.trans allocationFrame) (metadata.trans (.of_allocation Dynamic.Heap.Allocates.append))
-  | @discard context scope expression expressionNode rest lowered body found child remaining remainingErrors ih =>
-    rw [LoopRenaming.discard] at evaluated
-    have complete := evaluated
-    cases evaluated with
-    | caseLeft childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata⟩ :=
-        reflection _ valid child found
-          environments heaps locals agrees actualTyped installed childEvaluation
-      cases represented with | fault matched =>
-        cases trace with | fault failed =>
-          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalSequence.discard_failure _ childEvaluation)
-          exact .fault (.head (.expression failed)) rfl matched finalHeaps maps worlds preservation metadata
-    | caseRight childEvaluation branch =>
-      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, maps, worlds, preservation, metadata⟩ :=
-        reflection _ valid child found
-          environments heaps locals agrees actualTyped installed childEvaluation
-      cases represented with | @value _ coreValue payload =>
-        cases trace with | value childTrace =>
-          have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-            (GenericExpressionMeaning.agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken worlds)) reference
-            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-            (transport.extend installed maps worlds preservation metadata)
-            (by simpa only [GenericExpressionMeaning.rename_prefix] using branch)
-          exact reflected.prepend (.expression childTrace) maps worlds preservation metadata
-  | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
-    rcases ProtectedAssignmentHeads.Head.reflects_reachable functions extension program evidence transport (meaning _ valid) (reflection _ valid) faithful observations head
-      environments heaps locals agrees actualTyped installed functionTypes headErrors evaluated with
-      ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata, _⟩ |
-      ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, nextInstalled, remainingEval⟩
-    · exact .fault (.head (.assignValue trace)) rfl matched finalHeaps maps worlds preservation metadata
-    · have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-        (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
-        ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 nextInstalled
-        (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
-      exact reflected.prepend (.assignValue trace) maps worlds preservation metadata
-
-  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
-    rcases head.reflects functions program evidence observations
-      environments heaps locals agrees actualTyped headErrors evaluated with
-      ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
-      ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, remainingEval⟩
-    · exact .fault (.head (.assignBitNot trace)) rfl matched finalHeaps maps worlds preservation metadata
-    · have reflected := ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-        (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
-        ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-        (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-        (transport.extend installed maps worlds preservation metadata)
-        (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
-      exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata
+      context environment before items mapping world store value finalStore  := by
+  have _legacyMeaning := @meaning
+  obtain ⟨size, sized⟩ := CoreProof.evaluation_has_size evaluated
+  exact (tree.reflects_reachable_bounded functions definitions registered extension program evidence transport bindings faithful observations size
+    (fun context valid => RecursiveNamedBoundedContracts.reflects_below_of_unbounded (reflection context valid) size)
+    functionTypes errors valid environments heaps locals agrees actualTyped reference read unmapped installed sized (Nat.le_refl size)).erase
 
 include definitions registered extension meaning reflection faithful observations transport bindings in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/
