@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.Staging.RecursiveTrace
 
 /-! Origin and prefix properties of the recursive staged profile. Every
 propagated stage failure is backed by an actual rejected guard at the retained
-source occurrence, including failures escaping a selected closure body or an ordered primitive operand.
+source occurrence, including failures escaping a selected closure body, an ordered tuple element,
+or a primitive operand.
 Short-circuited operands contribute no trace and therefore cannot introduce a failure. -/
 
 set_option autoImplicit false
@@ -49,6 +50,10 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case tupleFault occurrence children ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -76,6 +81,10 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case tupleFault occurrence children ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -103,6 +112,10 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case tupleFault occurrence children ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -131,6 +144,10 @@ theorem Statements.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
+    case tupleFault occurrence children ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)

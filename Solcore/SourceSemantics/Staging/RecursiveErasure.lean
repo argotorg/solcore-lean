@@ -184,6 +184,13 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact fault_occurrence occurrence (.tuple rfl (.tail a (.head b)))
+  case tupleValue occurrence children pack ih =>
+    exact value_occurrence occurrence (.tuple rfl ih pack)
+  case tupleFault occurrence children ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.tuple rfl ih)
   case unary occurrence child applies ih =>
     exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
   case unaryOperandFault occurrence child ih =>

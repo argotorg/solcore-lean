@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Staging.RecursiveScope
 uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
-The initial profile covers atomic forms, groups, binary tuples, uncoerced primitive unary/binary operators, conditionals,
+The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, discard, and returns. It deliberately has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
@@ -64,6 +64,15 @@ mutual
         (occurrence : Occurrence scope id (.tuple [left, right]))
         (first : Expression program registry scope context environment before left (.value value) middle)
         (second : Expression program registry scope context environment middle right (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | tupleValue {scope context environment before after id elements values packed}
+        (occurrence : Occurrence scope id (.tuple elements))
+        (children : Expressions program registry scope context environment before elements (.values values) after)
+        (pack : ValuesPack values packed) :
+        Expression program registry scope context environment before id (.value packed) after
+    | tupleFault {scope context environment before after id elements failure}
+        (occurrence : Occurrence scope id (.tuple elements))
+        (children : Expressions program registry scope context environment before elements (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
     | unary {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))

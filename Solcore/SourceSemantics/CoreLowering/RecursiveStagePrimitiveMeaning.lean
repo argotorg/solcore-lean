@@ -685,6 +685,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
   induction free generalizing before after with
   | atomic found atomic =>
     cases trace with
+    | tupleFault owned children =>
+      have same := occurrence_form unique found owned
+      rw [same] at atomic
+      cases atomic
+      cases children
     | group owned child =>
       have same := occurrence_form unique found owned
       rw [same] at atomic
@@ -735,6 +740,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases atomic
   | group found form child ih =>
     cases trace with
+    | tupleFault owned children =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | group owned child =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -786,6 +795,16 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | pair found form first second firstIH secondIH =>
     cases trace with
+    | tupleFault owned children =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+      cases children with
+      | headFault failed => exact firstIH failed
+      | tailFault first rest =>
+        cases rest with
+        | headFault failed => exact secondIH failed
+        | tailFault second impossible => cases impossible
     | group owned child =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -838,6 +857,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | unary found form child ih =>
     cases trace with
+    | tupleFault owned children =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | group owned child =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -889,6 +912,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | binary found form first second firstIH secondIH =>
     cases trace with
+    | tupleFault owned children =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | group owned child =>
       have same := occurrence_form unique found owned
       rw [form] at same
