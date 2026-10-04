@@ -620,6 +620,8 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveStageMappingTupleMeaning
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSourceMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientStageOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodCatalogEntries
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedStageOrigins
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that

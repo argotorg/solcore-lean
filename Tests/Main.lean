@@ -1795,6 +1795,9 @@ import Solcore.Test.SourceCoreRecursiveStageMappingTupleMeaning
 import Solcore.Test.SourceCoreRecursiveStageAmbientGuards
 import Solcore.Test.SourceCoreCallablePreparedOperatorSourceMeaning
 import Solcore.Test.SourceCoreCallableIndexedLambdaStaticBodySupport
+import Solcore.Test.SourceCoreCallablePreparedMethodCatalogEntries
+import Solcore.Test.SourceCoreCallableIndexedStageOrigins
+import Solcore.Test.SourceCoreCallableMethodBodyTraceBounds
 
 set_option autoImplicit false
 
