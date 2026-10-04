@@ -635,6 +635,16 @@ import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewNamedRuntimeCertif
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNamedRuntimeBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodCatalogHookMeaning
 
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodOriginMeaning
+import Solcore.SourceSemantics.CoreLowering.SourceStagedClosedEvaluationMeaning
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedFormationEntries
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedRuntimeCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedRuntimeBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSourceHookMeaning
+import Solcore.SourceSemantics.CoreLowering.SourceStagedIntegerStatementsMeaning
+import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
