@@ -316,6 +316,77 @@ variable {checked : Checked} {base : Base checked}
 include parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook actualTyped in
 /-- Shared native frame envelope. Its parameter continuation is supplied only by the concrete legacy or runtime body proof. -/
+theorem hook_preserves_with_spine
+    (Trace : Dynamic.Environment → Dynamic.Heap → Dynamic.ExpressionOutcome → Dynamic.Heap → Prop)
+    (prefixMeaning : ∀ (origin : Word) (index : Int) (metadata : MetadataState),
+      prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin →
+      Carries prepared.graph.inputs prepared.graph.table (.state index) (.named origin) (some metadata) →
+      ∀ {prefixContext : Core.Context} {prefixActual : Environment} {embedding : Renaming}
+      (entry : TypedMixedNamedParameters.Entry prepared.layout.frame allocationGlobals location (.state index)
+        values functions registry function context bindings arguments before
+        (store.set location (encode prepared.layout.frame (.state index))) mapping world
+        administrative prefixContext prefixActual embedding parameterCode body)
+      (added : Environment), added.length = bindings.length →
+      entry.canonical = added ++ DataPatternValues.packValues nativeArguments :: canonical →
+      ∀ {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap},
+      Trace entry.environment entry.heap outcome after →
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates prefixActual (store.set location (encode prepared.layout.frame (.state index)))
+          (parameterCode.rename embedding) value finalStore ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld function.resultType output faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping (store.set location (encode prepared.layout.frame (.state index))) finalMap finalStore ∧
+        Dynamic.HeapMetadataExtend before after ∧
+        TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld
+          (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) :: administrative) program function context
+          (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) entry.environment entry.heap after outcome)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+    (allocated : Dynamic.BindersAllocate [] before function.parameters arguments environment bound)
+    (trace : Trace environment bound outcome after) :
+    ∃ origin index metadata value finalStore finalMap finalWorld,
+      prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
+      Carries prepared.graph.inputs prepared.graph.table (.state index) (.named origin) (some metadata) ∧
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld
+        (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) :: administrative) program function context
+        (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) environment bound after outcome := by
+  obtain ⟨origin, index, metadata, owned, history, emitted⟩ := CallableIndexedFormation.namedBody_history prepared acceptedHook
+  have renamed : code.rename ξ = SourceCoreCallableIndexedFrames.withFrame
+      (.var (ξ (base.globals.length + 1)))
+      (SourceCoreCallableIndexedDispatch.literal prepared.layout.frame (.state index)) (parameterCode.rename ξ) := by
+    rw [emitted, withFrame_rename, Expr.rename, CallableIndexedRenaming.literal]
+  obtain ⟨installedHeaps, installedCaller⟩ := CallableIndexedBodyFrames.install registered heaps unmapped typed caller (.stable history)
+  obtain ⟨entry, added, prefixLength, spine⟩ := TypedMixedNamedParameters.entry_of_accepted_with_spine functions onError acceptedPrefix parameters inputs extended definitions registered represented
+    environments installedHeaps initialLocals (agree_prefix actualLayout (encode prepared.layout.frame current))
+    (RuntimeEnvironmentHasTypes.cons .unit
+      (.cons (SourceCoreCallableIndexedFrames.encode_runtime_typed world registered current) actualTyped))
+    canonicalReference installedCaller.read unmapped
+  obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.allocation allocated
+  rw [← sameEnvironment, ← sameHeap] at trace
+  obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, represented, finalHeaps, maps, worlds, frame, sourceMetadata, reached⟩ :=
+    prefixMeaning origin index metadata owned history entry added prefixLength spine trace
+  rw [rename_prefix] at bodyEvaluation
+  have evaluated := CallableContextFrames.withFrame_evaluates (.var actualReference) caller.read
+    (next_evaluates prepared.layout.frame index actual store (encode prepared.layout.frame current)) bodyEvaluation
+  obtain ⟨restoredHeaps, restoredFrame, restoredCaller⟩ :=
+    CallableIndexedBodyFrames.restore registered unmapped typed caller finalHeaps worlds frame
+  exact ⟨origin, index, metadata, value, _, finalMap, finalWorld, owned, history,
+    renamed.symm ▸ evaluated, represented, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata,
+    restoredCaller, snapshots.transport restoredFrame, by simpa only [sameEnvironment, sameHeap] using reached⟩
+
+
+include parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
+  actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook actualTyped in
+/-- The legacy continuation forgets the extra actual history and spine only. -/
 theorem hook_preserves_with
     (prefixMeaning : ∀ {next : NativeFrame} {parameterStore : Store}
       {prefixContext : Core.Context} {prefixActual : Environment} {embedding : Renaming}
@@ -351,29 +422,15 @@ theorem hook_preserves_with
       TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld
         (SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd) :: administrative) program function context
         (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) environment bound after outcome := by
-  obtain ⟨origin, index, metadata, owned, history, emitted⟩ := CallableIndexedFormation.namedBody_history prepared acceptedHook
-  have renamed : code.rename ξ = SourceCoreCallableIndexedFrames.withFrame
-      (.var (ξ (base.globals.length + 1)))
-      (SourceCoreCallableIndexedDispatch.literal prepared.layout.frame (.state index)) (parameterCode.rename ξ) := by
-    rw [emitted, withFrame_rename, Expr.rename, CallableIndexedRenaming.literal]
-  obtain ⟨installedHeaps, installedCaller⟩ := CallableIndexedBodyFrames.install registered heaps unmapped typed caller (.stable history)
-  obtain ⟨entry⟩ := TypedMixedNamedParameters.entry_of_accepted functions onError acceptedPrefix parameters inputs extended definitions registered represented
-    environments installedHeaps initialLocals (agree_prefix actualLayout (encode prepared.layout.frame current))
-    (RuntimeEnvironmentHasTypes.cons .unit
-      (.cons (SourceCoreCallableIndexedFrames.encode_runtime_typed world registered current) actualTyped))
-    canonicalReference installedCaller.read unmapped
-  obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.allocation allocated
-  rw [← sameEnvironment, ← sameHeap] at trace
-  obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, represented, finalHeaps, maps, worlds, frame, sourceMetadata, reached⟩ :=
-    prefixMeaning entry trace
-  rw [rename_prefix] at bodyEvaluation
-  have evaluated := CallableContextFrames.withFrame_evaluates (.var actualReference) caller.read
-    (next_evaluates prepared.layout.frame index actual store (encode prepared.layout.frame current)) bodyEvaluation
-  obtain ⟨restoredHeaps, restoredFrame, restoredCaller⟩ :=
-    CallableIndexedBodyFrames.restore registered unmapped typed caller finalHeaps worlds frame
-  exact ⟨origin, index, metadata, value, _, finalMap, finalWorld, owned, history,
-    renamed.symm ▸ evaluated, represented, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata,
-    restoredCaller, snapshots.transport restoredFrame, by simpa only [sameEnvironment, sameHeap] using reached⟩
+  exact hook_preserves_with_spine (prepared := prepared) (functions := functions) (program := program)
+    (onError := onError) (parameters := parameters) (inputs := inputs) (extended := extended)
+    (acceptedPrefix := acceptedPrefix) (definitions := definitions) (registered := registered)
+    (acceptedHook := acceptedHook) (represented := represented) (environments := environments)
+    (heaps := heaps) (initialLocals := initialLocals) (actualLayout := actualLayout)
+    (actualTyped := actualTyped) (canonicalReference := canonicalReference) (actualReference := actualReference)
+    (unmapped := unmapped) (typed := typed) (caller := caller) (snapshots := snapshots)
+    (FunctionCallBody.Trace program function context)
+    (fun _ _ _ _ _ {_ _ _} entry _ _ _ {_ _} trace => prefixMeaning entry trace) allocated trace
 
 
 include certificate parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
