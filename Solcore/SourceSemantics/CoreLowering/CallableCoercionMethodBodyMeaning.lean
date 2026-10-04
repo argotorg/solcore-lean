@@ -146,6 +146,69 @@ variable {checked : Checked} {base : Base checked}
   {sourceBody : Dynamic.BodyInstance}
   (sourceFrame : Frame sourceBody function)
 
+include parameters extended represented sourceFrame in
+/-- Shared source-method entry. Runtime and ordinary consumers supply their
+concrete hook proof through this internal continuation. -/
+theorem preserves_with
+    (continuation : ∀ {environment : Dynamic.Environment} {bound after : Dynamic.Heap}
+      {outcome : Dynamic.ExpressionOutcome},
+      Dynamic.BindersAllocate [] before function.parameters arguments environment bound →
+      FunctionCallBody.Trace program function context environment bound outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : BodyOutcome program sourceBody function.evidence before arguments outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records := by
+  have arity : function.parameters.length = arguments.length := by
+    rw [parameters]
+    simpa only [List.length_map] using represented.length.1
+  obtain ⟨environment, bound, allocated, bodyTrace⟩ := sourceFrame.trace_of_body extended arity trace
+  exact continuation allocated bodyTrace
+
+include extended sourceFrame in
+/-- Only the independently selected method frame turns a reflected actual hook
+result into its source method body judgment. -/
+theorem reflects_with {value : Value} {finalStore : Store}
+    (continuation :
+    ∃ environment bound outcome after finalMap finalWorld,
+      Dynamic.BindersAllocate [] before function.parameters arguments environment bound ∧
+      FunctionCallBody.Trace program function context environment bound outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records) :
+    ∃ outcome after finalMap finalWorld,
+      BodyOutcome program sourceBody function.evidence before arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
+      CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records := by
+  obtain ⟨environment, bound, outcome, after, finalMap, finalWorld, allocated, trace,
+    related, finalHeaps, maps, worlds, frame, metadata, finalCaller, finalSnapshots⟩ := continuation
+  exact ⟨outcome, after, finalMap, finalWorld, sourceFrame.body_of_trace extended allocated trace,
+    related, finalHeaps, maps, worlds, frame, metadata, finalCaller, finalSnapshots⟩
+
 include certificate parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
   contextValid unique uninitialized missing faithful functionLeaves functionTypes actualTyped sourceFrame in
@@ -162,10 +225,10 @@ theorem preserves {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame location current currentGhost finalStore ∧
       CallableIndexedSnapshots.All prepared.graph.inputs prepared.graph.table prepared.layout.frame finalMap finalStore records := by
-  have arity : function.parameters.length = arguments.length := by
-    rw [parameters]
-    simpa only [List.length_map] using represented.length.1
-  obtain ⟨environment, bound, allocated, bodyTrace⟩ := sourceFrame.trace_of_body extended arity trace
+  apply preserves_with (prepared := prepared) (functions := functions) (program := program)
+    (parameters := parameters) (extended := extended) (represented := represented) (sourceFrame := sourceFrame)
+    (trace := trace)
+  intro environment bound after outcome allocated bodyTrace
   obtain ⟨_, _, _, value, finalStore, finalMap, finalWorld, _, _, evaluated, related,
     finalHeaps, maps, worlds, frame, metadata, finalCaller, finalSnapshots, _⟩ :=
     BuiltinNamedCalls.hook_preserves
@@ -207,8 +270,10 @@ theorem reflects {value : Value} {finalStore : Store}
       (represented := represented) (environments := environments) (heaps := heaps) (initialLocals := initialLocals)
       (actualLayout := actualLayout) (actualTyped := actualTyped) (canonicalReference := canonicalReference) (actualReference := actualReference)
       (unmapped := unmapped) (typed := typed) (caller := caller) (snapshots := snapshots) completed
-  exact ⟨outcome, after, finalMap, finalWorld, sourceFrame.body_of_trace extended allocated trace,
-    related, finalHeaps, maps, worlds, frame, metadata, finalCaller, finalSnapshots⟩
+  exact reflects_with (prepared := prepared) (functions := functions) (program := program)
+    (extended := extended) (sourceFrame := sourceFrame)
+    ⟨environment, bound, outcome, after, finalMap, finalWorld, allocated, trace,
+      related, finalHeaps, maps, worlds, frame, metadata, finalCaller, finalSnapshots⟩
 
 include certificate parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
   actualLayout canonicalReference actualReference unmapped typed caller snapshots acceptedHook extension
