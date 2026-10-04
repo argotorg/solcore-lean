@@ -1782,6 +1782,7 @@ import Solcore.Test.SourceCoreRecursiveNamedCallEvidenceBounds
 import Solcore.Test.SourceCoreRecursiveNamedPublicEvidenceMeaning
 import Solcore.Test.SourceRecursiveStageTupleExpressions
 import Solcore.Test.SourceCoreRecursiveStageAmbientArguments
+import Solcore.Test.SourceCoreRecursiveStageTupleMeaning
 
 set_option autoImplicit false
 
@@ -2931,6 +2932,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedPreparedHeaderPolicies.run
   SourceRecursiveStagePrimitiveOperators.run
   SourceRecursiveStageTupleExpressions.run
+  SourceCoreRecursiveStageTupleMeaning.run
   SourceCoreRecursiveNamedPreparedCallEvidence.run
   SourceCoreRecursiveStagePrimitiveMeaning.run
   SourceCoreGenericImperativeMatchExtraction.run
