@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallContractCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableAppliedViewProvenance
 
 /-! A caller frame built from retained source metadata, with a scoped
 representation refinement. Its source ledger records closure parameters and
@@ -82,6 +83,24 @@ inductive LambdaOrigin (plan : Plan) (owner : Key) (id : ExpressionId) :
       (body : function.body = receipt.body) :
       LambdaOrigin plan owner id contextual.substitution function contract
 
+  | applied {checked : SourceCoreCompatibleCatalog.Checked}
+      {base : SourceCoreCompatibleFunctions.Prepared checked}
+      {inputs : SourceCoreCallableAncestryPreparation.Inputs base}
+      {callerFrame lexicalFrame : SourceCoreCallablePairedFrames.Frame}
+      {caller lexical : SourceCoreCallableAncestryReadRecipes.State} {view target : Core.Word}
+      {function : Dynamic.Closure} {contract : Contract}
+      (recipe : CallableAppliedViewProvenance.Recipe inputs callerFrame lexicalFrame caller lexical view target)
+      (canonical : CallableAppliedViewProvenance.CanonicalHeader inputs recipe.read.template contract)
+      (retained : recipe.read.descriptor.contract = some contract)
+      (samePlan : base.plan = plan) (sameOwner : recipe.read.template.owner = owner)
+      (sameId : recipe.read.template.id = id)
+      (source : function.source = (recipe.read.after lexical).metadata.source)
+      (parameters : function.parameters = recipe.applied.parameters.map
+        (TypedBinder.applySubstitution recipe.read.substitution))
+      (result : function.resultType = recipe.read.substitution.apply recipe.applied.resultType)
+      (body : function.body = recipe.applied.body) :
+      LambdaOrigin plan owner id recipe.read.template.active function contract
+
 theorem LambdaOrigin.binds {plan : Plan} {owner : Key} {id : ExpressionId} {active : TypeSystem.Substitution}
     {function : Dynamic.Closure} {contract : Contract}
     (origin : LambdaOrigin plan owner id active function contract) : Binds plan (.closure function) (semanticContract contract) := by
@@ -95,6 +114,12 @@ theorem LambdaOrigin.binds {plan : Plan} {owner : Key} {id : ExpressionId} {acti
     refine .closure (receipt.parameters_eq.trans parameters.symm) ?_
     change contract.stagedResult = true ↔ Staging.ComptimeOnlyType function.resultType
     rw [receipt.stagedResult, result]
+    exact SourceStageAnalysis.typeIsComptimeOnly_eq_true_iff _
+
+  | applied recipe canonical _ _ _ _ _ parameters result _ =>
+    refine .closure ((recipe.contract_parameters canonical).trans parameters.symm) ?_
+    change contract.stagedResult = true ↔ Staging.ComptimeOnlyType function.resultType
+    rw [recipe.contract_result canonical, result]
     exact SourceStageAnalysis.typeIsComptimeOnly_eq_true_iff _
 
 /-- Static metadata provenance for the visible descriptor of a value. The

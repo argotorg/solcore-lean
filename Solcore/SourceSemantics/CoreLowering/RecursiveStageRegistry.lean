@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableAppliedViewProvenance
 import Solcore.SourceSemantics.Staging.RecursiveScope
 import Solcore.SourceSemantics.CoreLowering.LambdaMetadataViews
 
@@ -30,12 +31,31 @@ inductive Selected (checkedProgram : CheckedProgram) (plan : Plan) (table : Sour
       (origin : CallableLedger.LambdaOrigin plan sidecar.caller.key id active function site.contract) :
       Selected checkedProgram plan table function (scope sidecar active function)
 
+  | applied {checked : SourceCoreCompatibleCatalog.Checked}
+      {base : SourceCoreCompatibleFunctions.Prepared checked}
+      {inputs : SourceCoreCallableAncestryPreparation.Inputs base}
+      {callerFrame lexicalFrame : SourceCoreCallablePairedFrames.Frame}
+      {caller lexical : SourceCoreCallableAncestryReadRecipes.State} {view target : Core.Word}
+      {sidecar : Sidecar} {function : Dynamic.Closure}
+      (recipe : CallableAppliedViewProvenance.Recipe inputs callerFrame lexicalFrame caller lexical view target)
+      (sameProgram : base.sourceProgram = checkedProgram) (samePlan : base.plan = plan)
+      (sameTable : inputs.callable.table = table)
+      (prepared : prepareSidecar plan sidecar.caller.key = .ok sidecar)
+      (sameOwner : recipe.read.template.owner = sidecar.caller.key)
+      (site : LambdaSite plan table sidecar.caller.key recipe.read.template.id recipe.read.template.active target)
+      (source : function.source = (recipe.read.after lexical).metadata.source)
+      (owner : function.source.owner = sidecar.caller.key.declaration)
+      (origin : CallableLedger.LambdaOrigin plan sidecar.caller.key recipe.read.template.id
+        recipe.read.template.active function site.contract) :
+      Selected checkedProgram plan table function
+        (scope sidecar (recipe.read.substitution.compose lexical.metadata.active) function)
+
 def registry (checkedProgram : CheckedProgram) (plan : Plan) (table : SourceCoreStageCodebook.Table) :
     Staging.Recursive.Registry where
   Closure := Selected checkedProgram plan table
-  source := by intro function selected related; cases related; rfl
-  context := by intro function selected related; cases related; rfl
-  evidence := by intro function selected related; cases related; rfl
+  source := by intro function selected related; cases related <;> rfl
+  context := by intro function selected related; cases related <;> rfl
+  evidence := by intro function selected related; cases related <;> rfl
 
 /-- Actual sidecar/table preparation and the emitted lambda's static receipt
 select a recursive body scope, even when compilation used a raw metadata view.
@@ -85,5 +105,6 @@ theorem Selected.original {checkedProgram : CheckedProgram} {plan : Plan} {table
       selected = scope sidecar active function ∧ selected.origin.declaration = sidecar.caller.key.declaration := by
   cases related with
   | lambda prepared _ _ owner _ => exact ⟨_, _, prepared, rfl, owner⟩
+  | applied _ _ _ _ prepared _ _ _ owner _ => exact ⟨_, _, prepared, rfl, owner⟩
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveStageRegistry

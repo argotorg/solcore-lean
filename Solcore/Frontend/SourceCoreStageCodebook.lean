@@ -250,4 +250,89 @@ def prepare (program : CheckedProgram) (plan : Plan) (checked : SourceCoreDataCa
     let projected ← (checked.project type).mapError SourceCoreLocalPolymorphism.Error.projection
     pure projected.type) limits firstId
 
+private theorem provenance_bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β}
+    {value : β} (accepted : (action >>= next) = .ok value) :
+    ∃ input, action = .ok input ∧ next input = .ok value := by
+  cases action with
+  | error error => cases accepted
+  | ok input => exact ⟨input, rfl, accepted⟩
+
+private theorem provenance_forIn {α β ε : Type} {items : List α} {initial final : β}
+    {step : α → β → Except ε (ForInStep β)} {invariant : β → Prop}
+    (accepted : forIn items initial step = .ok final) (start : invariant initial)
+    (each : ∀ item, item ∈ items → ∀ state outcome, invariant state → step item state = .ok outcome →
+      ∃ updated, outcome = .yield updated ∧ invariant updated) : invariant final := by
+  induction items generalizing initial with
+  | nil =>
+    simp only [List.forIn_nil, pure, Except.pure, Except.ok.injEq] at accepted
+    exact accepted ▸ start
+  | cons item items ih =>
+    rw [List.forIn_cons] at accepted
+    obtain ⟨outcome, ran, accepted⟩ := provenance_bind_ok accepted
+    obtain ⟨updated, rfl, preserved⟩ := each item List.mem_cons_self initial outcome start ran
+    exact ih accepted preserved (fun next member => each next (List.mem_cons_of_mem item member))
+
+private def AuthenticContext (program : CheckedProgram) (plan : Plan)
+    (item : SourceCoreLocalEvidence.Prepared) : Prop :=
+  ∃ candidate parent, SourceCoreLocalEvidence.prepare program plan candidate parent = .ok item
+
+private theorem contextualReceipt_authentic {program : CheckedProgram} {plan : Plan}
+    {parents : List SourceCoreLocalEvidence.Prepared} {candidate : SourceCoreLocalPolymorphism.Instance}
+    {item : SourceCoreLocalEvidence.Prepared}
+    (accepted : contextualReceipt program plan parents candidate = .ok item) :
+    AuthenticContext program plan item := by
+  unfold contextualReceipt at accepted
+  cases generated : SourceCoreLocalEvidence.prepareForEmission program plan candidate none parents with
+  | error error => simp [generated, Except.map, Except.mapError] at accepted
+  | ok emission =>
+    have same : emission.prepared = item := by simpa [generated, Except.map, Except.mapError] using accepted
+    exact ⟨candidate, emission.readParent, same ▸ emission.authentic⟩
+
+private theorem contextualReceipts_authentic (program : CheckedProgram) (plan : Plan) (fuel : Nat)
+    {parents output : List SourceCoreLocalEvidence.Prepared} {pending : List SourceCoreLocalPolymorphism.Instance}
+    (initial : ∀ item ∈ parents, AuthenticContext program plan item)
+    (accepted : contextualReceipts program plan fuel parents pending = .ok output) :
+    ∀ item ∈ output, AuthenticContext program plan item := by
+  induction fuel generalizing parents pending output with
+  | zero =>
+    cases pending with
+    | nil => cases accepted; exact initial
+    | cons candidate tail => cases accepted
+  | succ fuel ih =>
+    cases pending with
+    | nil => cases accepted; exact initial
+    | cons candidate tail =>
+      rw [contextualReceipts] at accepted <;> try simp
+      obtain ⟨state, loop, accepted⟩ := provenance_bind_ok accepted
+      have generated := provenance_forIn loop
+        (invariant := fun state => ∀ item ∈ state.1, AuthenticContext program plan item) initial ?_
+      · dsimp only at accepted
+        split at accepted
+        · split at accepted <;> cases accepted
+        · exact ih generated accepted
+      · intro candidate member state outcome valid ran
+        dsimp only at ran
+        cases produced : contextualReceipt program plan state.1 candidate with
+        | error error =>
+          simp only [produced, pure, Except.pure] at ran
+          split at ran <;> cases ran <;> exact ⟨_, rfl, valid⟩
+        | ok item =>
+          simp only [produced, pure, Except.pure] at ran
+          cases ran
+          refine ⟨_, rfl, ?_⟩
+          intro next occurs
+          rcases List.mem_append.mp occurs with old | fresh
+          · exact valid next old
+          · cases List.mem_singleton.mp fresh
+            exact contextualReceipt_authentic produced
+
+/-- Every returned context retains a successful invocation of the original
+local-evidence factory, including its complete caller and ordered witnesses. -/
+theorem prepareContexts_authentic {program : CheckedProgram} {plan : Plan}
+    {candidates : List SourceCoreLocalPolymorphism.Instance} {prepared : List SourceCoreLocalEvidence.Prepared}
+    (accepted : prepareContexts program plan candidates = .ok prepared)
+    {item : SourceCoreLocalEvidence.Prepared} (member : item ∈ prepared) :
+    ∃ candidate parent, SourceCoreLocalEvidence.prepare program plan candidate parent = .ok item :=
+  contextualReceipts_authentic program plan candidates.length (by simp) accepted item member
+
 end Solcore.Frontend.SourceCoreStageCodebook
