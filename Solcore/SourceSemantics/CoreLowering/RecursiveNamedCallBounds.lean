@@ -524,6 +524,69 @@ private theorem roots_functional {nodes : List NodeId} {left right : List Statem
 /-- Actual body outcome inversion exposes the original strictly smaller
 function-statement derivation at the statically retained call context. Arity
 rejects the distinct pre-allocation body fault. -/
+theorem body_trace_of_fields {program : Program}
+    {body : Dynamic.BodyInstance} {function : Dynamic.Closure} {size : Nat}
+    {types : List TypeSystem.Ty} {context : SourceSemantics.Context}
+    {before after : Dynamic.Heap} {arguments : List Dynamic.Value} {outcome : Dynamic.ExpressionOutcome}
+    (sourceEq : function.source = body.source)
+    (contextEq : function.context = body.context)
+    (parametersEq : function.parameters = body.source.inputs)
+    (resultEq : function.resultType = body.resultType)
+    (rootsEq : Dynamic.StatementRoots body.source.roots function.body)
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
+    (arity : function.parameters.length = arguments.length)
+    (executed : BodyOutcome program size body function.evidence before arguments outcome after) :
+    ∃ child environment bound,
+      Dynamic.BindersAllocate [] before function.parameters arguments environment bound ∧
+      BodyTrace program child function context environment bound outcome after ∧ child < size := by
+  have rootsUnique : ∀ {roots}, Dynamic.StatementRoots body.source.roots roots → roots = function.body := by
+    intro roots selected
+    exact roots_functional selected rootsEq
+  have contextUnique : ∀ {inputTypes actualContext},
+      MonoBindersExtend body.source.owner body.context body.source.inputs inputTypes actualContext →
+      actualContext = context := by
+    intro inputTypes actualContext extension
+    have actual : MonoBindersExtend function.source.owner function.context function.parameters inputTypes actualContext := by
+      simpa only [sourceEq, contextEq, parametersEq] using extension
+    have same : types = inputTypes := extended.bodyTypes_eq.symm.trans actual.bodyTypes_eq
+    subst inputTypes
+    exact (extended.functional actual).symm
+  cases executed with
+  | value invokes =>
+    cases invokes with
+    | returned covers roots extension allocated execution returned =>
+      have sameRoots := rootsUnique roots
+      have sameContext := contextUnique extension
+      subst_vars
+      exact ⟨_, _, _, parametersEq.symm ▸ allocated, .returned (sourceEq.symm ▸ execution),
+        SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | unit covers same roots extension allocated execution fellThrough =>
+      have sameRoots := rootsUnique roots
+      have sameContext := contextUnique extension
+      obtain ⟨_, rfl⟩ := fellThrough
+      subst_vars
+      exact ⟨_, _, _, parametersEq.symm ▸ allocated,
+        .unit (resultEq.symm ▸ same) (sourceEq.symm ▸ execution),
+        SourceExecutionSize.child_lt_stepSize (by simp)⟩
+  | fault fails =>
+    cases fails with
+    | arity mismatch => exact False.elim (mismatch (by simpa only [parametersEq] using arity))
+    | statements roots extension allocated failed =>
+      have sameRoots := rootsUnique roots
+      have sameContext := contextUnique extension
+      subst_vars
+      exact ⟨_, _, _, parametersEq.symm ▸ allocated, .fault (sourceEq.symm ▸ failed),
+        SourceExecutionSize.child_lt_stepSize (by simp)⟩
+    | controlEscape roots extension allocated executed escape =>
+      have sameRoots := rootsUnique roots
+      have sameContext := contextUnique extension
+      subst_vars
+      exact ⟨_, _, _, parametersEq.symm ▸ allocated, .escaped (sourceEq.symm ▸ executed) escape,
+        SourceExecutionSize.child_lt_stepSize (by simp)⟩
+
+/-- Actual body outcome inversion exposes the original strictly smaller
+function-statement derivation at the statically retained call context. Arity
+rejects the distinct pre-allocation body fault. -/
 theorem body_trace {program : Program} {instantiation : DeclarationInstantiation}
     {body : Dynamic.BodyInstance} {function : Dynamic.Closure} {size : Nat}
     {types : List TypeSystem.Ty} {context : SourceSemantics.Context}
@@ -535,50 +598,8 @@ theorem body_trace {program : Program} {instantiation : DeclarationInstantiation
     ∃ child environment bound,
       Dynamic.BindersAllocate [] before function.parameters arguments environment bound ∧
       BodyTrace program child function context environment bound outcome after ∧ child < size := by
-  have rootsUnique : ∀ {roots}, Dynamic.StatementRoots body.source.roots roots → roots = function.body := by
-    intro roots selected
-    exact roots_functional selected frame.roots
-  have contextUnique : ∀ {inputTypes actualContext},
-      MonoBindersExtend body.source.owner body.context body.source.inputs inputTypes actualContext →
-      actualContext = context := by
-    intro inputTypes actualContext extension
-    have actual : MonoBindersExtend function.source.owner function.context function.parameters inputTypes actualContext := by
-      simpa only [frame.source, frame.context, frame.parameters] using extension
-    have same : types = inputTypes := extended.bodyTypes_eq.symm.trans actual.bodyTypes_eq
-    subst inputTypes
-    exact (extended.functional actual).symm
-  cases executed with
-  | value invokes =>
-    cases invokes with
-    | returned covers roots extension allocated execution returned =>
-      have sameRoots := rootsUnique roots
-      have sameContext := contextUnique extension
-      subst_vars
-      exact ⟨_, _, _, frame.parameters.symm ▸ allocated, .returned (frame.source.symm ▸ execution),
-        SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | unit covers same roots extension allocated execution fellThrough =>
-      have sameRoots := rootsUnique roots
-      have sameContext := contextUnique extension
-      obtain ⟨_, rfl⟩ := fellThrough
-      subst_vars
-      exact ⟨_, _, _, frame.parameters.symm ▸ allocated,
-        .unit (frame.result.symm ▸ same) (frame.source.symm ▸ execution),
-        SourceExecutionSize.child_lt_stepSize (by simp)⟩
-  | fault fails =>
-    cases fails with
-    | arity mismatch => exact False.elim (mismatch (by simpa only [frame.parameters] using arity))
-    | statements roots extension allocated failed =>
-      have sameRoots := rootsUnique roots
-      have sameContext := contextUnique extension
-      subst_vars
-      exact ⟨_, _, _, frame.parameters.symm ▸ allocated, .fault (frame.source.symm ▸ failed),
-        SourceExecutionSize.child_lt_stepSize (by simp)⟩
-    | controlEscape roots extension allocated executed escape =>
-      have sameRoots := rootsUnique roots
-      have sameContext := contextUnique extension
-      subst_vars
-      exact ⟨_, _, _, frame.parameters.symm ▸ allocated, .escaped (frame.source.symm ▸ executed) escape,
-        SourceExecutionSize.child_lt_stepSize (by simp)⟩
+  exact body_trace_of_fields frame.source frame.context frame.parameters frame.result frame.roots
+    extended arity executed
 
 /-- Actual named-hook acceptance fixes the installed frame literal. The
 original completion supplies its body child under the real two hidden slots;
