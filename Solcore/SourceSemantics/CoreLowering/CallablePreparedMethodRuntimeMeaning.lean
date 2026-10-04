@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyKernel
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentMeaning
 import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentSource
@@ -246,6 +247,15 @@ def Body.with_evidence (dictionary : Dynamic.EvidenceEnvironment) (covers : dict
     valid := ⟨body.valid.ledger, body.valid.runtime, covers⟩
     projection := body.projection, unique := body.unique, emitted := body.emitted }
 
+/-- The concrete builtin receipt keeps its original record type. Only its
+static fields are passed to the shared body kernel. -/
+def Body.toKernel : CallableRuntimeBodyKernel.BodyFor layouts owner active frameLayout globals onError values function
+    expressionSyntax (fun context => CompatibleExpressionBuiltinRuntime.Certificate readFuel values function.source context solved reasonAt)
+    (fun context => CompatibleRuntimeContextValidity.Valid solved context function.evidence) .reachable
+    ambient administrative context scope output code fellThrough escaped registry faults :=
+  { flow := body.flow, tree := body.tree, sites := body.sites, initialValid := body.valid
+    projection := body.projection, unique := body.unique, emitted := body.emitted }
+
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault in
 /-- The original source grade feeds the single imperative proof. The returned
 heap and reached lexical exit belong to this exact emitted body. -/
@@ -273,23 +283,22 @@ theorem Body.preserves_sized (size : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
         context scope environment before after outcome := by
-  have flow := RecursiveNamedImperativeFor.preservesAt_match_with
-    (validity := fun context => CompatibleRuntimeContextValidity.Valid solved context function.evidence)
-    (extend := fun valid extended => valid.extend extended) (runtimeOf := fun _ valid => valid)
-    (functions := functions) (definitions := definitions) (registered := registered) (extension := extension)
-    (program := program) (evidence := function.evidence) (transport := builtinTransport) (bindings := builtinBindings)
-    (budget := size) (faithful := faithful) (observations := observations)
-    (meaningMost := fun context valid child _ => RecursiveNamedBoundedContracts.preserves_at_of_unbounded
+  have expressions : ∀ context, CompatibleRuntimeContextValidity.Valid solved context function.evidence →
+      RecursiveNamedHeaderContracts.AtMost size (fun child => RecursiveNamedBoundedContracts.PreservesAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context function.evidence
+        function.source (CompatibleExpressionBuiltinRuntime.Certificate readFuel values function.source context solved reasonAt)
+        faults builtinEntry) := by
+    intro context valid child _
+    exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
       (ProtectedExpressionMeaning.preserves_of_typed builtinEntry
         (CompatibleExpressionBuiltinRuntime.preserves functions extension faithful observations functionTypes
-          program function.evidence valid.ledger valid.runtime body.unique uninitialized missing)) child)
-    .reachable body.unique body.tree body.sites size (Nat.le_refl size)
+          program function.evidence valid.ledger valid.runtime body.unique uninitialized missing)) child
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, reached, _⟩ :=
-    RecursiveNamedFunctionFinishBounds.preserves_at_emitted functions program body.tree body.projection body.unique
-      escapedFault builtinTransport body.emitted
-      (fun context => CompatibleRuntimeContextValidity.Valid solved context function.evidence)
-      size flow body.valid environments heaps locals agrees typed reference read unmapped True.intro trace
+    body.toKernel.preserves_sized functions definitions registered extension program faithful observations escapedFault
+      builtinTransport builtinBindings (fun valid extended => valid.extend extended) (fun valid => valid)
+      size size (Nat.le_refl size) expressions environments heaps locals agrees typed reference read unmapped True.intro trace
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, reached⟩
+
 
 include body definitions registered extension faithful observations functionTypes uninitialized missing escapedFault in
 /-- Source-only sizing is confined to preservation. -/
@@ -358,17 +367,12 @@ theorem Body.reflects_sized (budget size : Nat) (within : size ≤ budget)
       (ProtectedExpressionMeaning.reflects_of_typed builtinEntry
         (CompatibleExpressionBuiltinRuntime.reflects functions extension faithful observations functionTypes
           program function.evidence valid.ledger valid.runtime uninitialized missing)) budget
-  have flow := RecursiveNamedImperativeFor.reflectsAt_match_with
-    (validity := fun context => CompatibleRuntimeContextValidity.Valid solved context function.evidence)
-    (extend := fun valid extended => valid.extend extended) (runtimeOf := fun _ valid => valid)
-    functions definitions registered extension program function.evidence builtinTransport builtinBindings
-    budget expressions faithful observations .reachable functionTypes body.unique body.tree body.sites
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, reached, _⟩ :=
-    RecursiveNamedFunctionFinishBounds.reflects_at_emitted functions program body.tree body.projection body.unique
-      escapedFault builtinTransport body.emitted
-      (fun context => CompatibleRuntimeContextValidity.Valid solved context function.evidence)
-      budget size within flow body.valid environments heaps locals agrees typed reference read unmapped True.intro evaluated
+    body.toKernel.reflects_sized functions definitions registered extension program faithful observations functionTypes escapedFault
+      builtinTransport builtinBindings (fun valid extended => valid.extend extended) (fun valid => valid)
+      budget size within expressions environments heaps locals agrees typed reference read unmapped True.intro evaluated
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, reached⟩
+
 
 end ConcreteBody
 
