@@ -51,6 +51,39 @@ def Certificate (fuel : Nat) (values : SourceCoreCompatibleValues.Context) (sour
     GenericExpressionMeaning.Certificate := fun scope id code =>
   ∃ tree : Tree fuel values source context solved reasonAt scope id code, Supported tree
 
+
+/-- Static primitive leaves keep the original compiler tree and all its sites. -/
+def PrimitiveCertificate (fuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
+    (context : SourceSemantics.Context) (solved : List SolvedRequirement) (reasonAt : ExpressionId → Word) :
+    GenericExpressionMeaning.Certificate := fun scope id code =>
+  ∃ tree : CompatibleExpressionPrimitives.Tree fuel values source context solved reasonAt scope id code,
+    RecursiveStagePrimitiveMeaning.Supported tree
+
+/-- A finite tuple tree over concrete static leaf receipts. Only the reached
+ordered mapM children occur; repeated identifiers and all leaf metadata remain. -/
+inductive TreeFor (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
+    (leaves : GenericExpressionMeaning.Certificate) (scope : SourceCoreLocalCell.Scope) :
+    ExpressionId → SourceCoreBasic.LoweredExpr → Prop where
+  | leaf {id code} (receipt : leaves scope id code) : TreeFor values source leaves scope id code
+  | tuple {id node ids types codes entries}
+      (header : CompatibleExpressionTuples.Header values source id node ids types codes)
+      (sequence : DataExpressionSequence.Tree source (Entries scope entries) scope ids types codes)
+      (children : ∀ child code, (child, code) ∈ entries → TreeFor values source leaves scope child code) :
+      TreeFor values source leaves scope id (SourceCoreCalls.packArguments codes)
+
+def CertificateFor (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
+    (leaves : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun scope id code => TreeFor values source leaves scope id code
+
+/-- The original primitive grammar enters the same tuple proof by retaining
+its actual supported tree, rather than reconstructing a leaf from an outcome. -/
+theorem Supported.toFor {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
+    {tree : Tree fuel values source context solved reasonAt scope id code} (sites : Supported tree) :
+    TreeFor values source (PrimitiveCertificate fuel values source context solved reasonAt) scope id code := by
+  induction sites with
+  | primitive tree supported => exact .leaf ⟨tree, supported⟩
+  | tuple header sequence children sites ih => exact .tuple header sequence ih
+
 inductive PacksOutcome : Staging.Recursive.ValuesOutcome → Staging.Recursive.Outcome → Prop where
   | values {values value} (pack : Dynamic.ValuesPack values value) : PacksOutcome (.values values) (.value value)
   | fault (failure) : PacksOutcome (.fault failure) (.fault failure)
@@ -251,6 +284,52 @@ private theorem tuple_preserves (unique : NodeOccurrencesUnique invocation.sourc
     by simpa only [header.sourceType] using payload, finalHeaps, maps, worlds, frame, metadata⟩
 end TupleStep
 
+
+section WithLeaves
+variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  (program : Program) (stages : Staging.Recursive.Registry) (invocation : Staging.Recursive.Scope)
+  {leaves : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
+
+/-- The sole ordered tuple reflection consumes each original native child.
+Concrete upper families discharge the static leaf meanings internally. -/
+theorem reflects_with_leaves
+    (meaning : RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program stages invocation context leaves faults) :
+    RecursiveStageMeaning.ReflectsFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program stages invocation context (CertificateFor values invocation.source leaves) faults := by
+  intro scope id code tree
+  induction tree with
+  | leaf receipt => exact meaning receipt
+  | tuple header sequence children ih =>
+    intro node found mapping world admin environment canonical actual before store ξ value finalStore
+      environments heaps locals agrees evaluated
+    refine tuple_reflects functions program stages invocation ?_ ⟨_, _, _, _, rfl, header, sequence⟩
+      found environments heaps locals agrees evaluated
+    intro current child childCode certified
+    obtain ⟨rfl, member⟩ := certified
+    exact ih child childCode member
+
+/-- The same ordered tuple proof preserves successful leaves and the first
+failure. Its leaf laws use the same full heap and metadata relation. -/
+theorem preserves_with_leaves (unique : NodeOccurrencesUnique invocation.source)
+    (meaning : RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program stages invocation context leaves faults) :
+    RecursiveStageMeaning.PreservesFor (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program stages invocation context (CertificateFor values invocation.source leaves) faults := by
+  intro scope id code tree
+  induction tree with
+  | leaf receipt => exact meaning receipt
+  | tuple header sequence children ih =>
+    intro node found mapping world admin environment canonical actual before store ξ outcome after
+      environments heaps locals agrees trace
+    refine tuple_preserves functions program stages invocation unique ?_ ⟨_, _, _, _, rfl, header, sequence⟩
+      found environments heaps locals agrees trace
+    intro current child childCode certified
+    obtain ⟨rfl, member⟩ := certified
+    exact ih child childCode member
+end WithLeaves
+
 section Meaning
 variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
   (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
@@ -268,25 +347,18 @@ theorem reflects :
   cases sameSource
   intro scope id code certified
   obtain ⟨tree, supported⟩ := certified
-  induction supported with
-  | primitive tree sites =>
-    intro node found mapping world admin environment canonical actual before store ξ value finalStore
-      environments heaps locals agrees evaluated
-    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      RecursiveStagePrimitiveMeaning.reflects functions program stages invocation rfl uninitialized sameLedger runtime
-        sites found environments heaps locals agrees evaluated
-    refine ⟨outcome, after, finalMap, finalWorld, trace, ?_, finalHeaps, maps, worlds, frame, metadata⟩
-    cases represented with
-    | value payload => exact .value payload
-    | fault matched => exact .fault matched
-  | tuple header sequence children sites ih =>
-    intro node found mapping world admin environment canonical actual before store ξ value finalStore
-      environments heaps locals agrees evaluated
-    refine tuple_reflects functions program stages invocation ?_ ⟨_, _, _, _, rfl, header, sequence⟩
-      found environments heaps locals agrees evaluated
-    intro current child childCode certified
-    obtain ⟨rfl, member⟩ := certified
-    exact ih child childCode member
+  refine reflects_with_leaves functions program stages invocation ?_ supported.toFor
+  intro current child childCode leaf
+  obtain ⟨tree, sites⟩ := leaf
+  intro node found mapping world admin environment canonical actual before store ξ value finalStore
+    environments heaps locals agrees evaluated
+  obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+    RecursiveStagePrimitiveMeaning.reflects functions program stages invocation rfl uninitialized sameLedger runtime
+      sites found environments heaps locals agrees evaluated
+  refine ⟨outcome, after, finalMap, finalWorld, trace, ?_, finalHeaps, maps, worlds, frame, metadata⟩
+  cases represented with
+  | value payload => exact .value payload
+  | fault matched => exact .fault matched
 
 include sameSource sameLedger runtime uninitialized in
 /-- Preservation uses the sole ordered pack proof at each tuple node. The
@@ -298,25 +370,19 @@ theorem preserves (unique : NodeOccurrencesUnique source)
   cases sameSource
   intro scope id code certified
   obtain ⟨tree, supported⟩ := certified
-  induction supported with
-  | primitive tree sites =>
-    intro node found mapping world admin environment canonical actual before store ξ outcome after
-      environments heaps locals agrees trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      RecursiveStagePrimitiveMeaning.preserves functions program stages invocation rfl unique uninitialized
-        extension sameLedger runtime sites found environments heaps locals agrees trace
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, metadata⟩
-    cases represented with
-    | value payload => exact .value payload
-    | fault matched => exact .fault matched
-  | tuple header sequence children sites ih =>
-    intro node found mapping world admin environment canonical actual before store ξ outcome after
-      environments heaps locals agrees trace
-    refine tuple_preserves functions program stages invocation unique ?_ ⟨_, _, _, _, rfl, header, sequence⟩
-      found environments heaps locals agrees trace
-    intro current child childCode certified
-    obtain ⟨rfl, member⟩ := certified
-    exact ih child childCode member
+  refine preserves_with_leaves functions program stages invocation unique ?_ supported.toFor
+  intro current child childCode leaf
+  obtain ⟨tree, sites⟩ := leaf
+  intro node found mapping world admin environment canonical actual before store ξ outcome after
+    environments heaps locals agrees trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+    RecursiveStagePrimitiveMeaning.preserves functions program stages invocation rfl unique uninitialized
+      extension sameLedger runtime sites found environments heaps locals agrees trace
+  refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, metadata⟩
+  cases represented with
+  | value payload => exact .value payload
+  | fault matched => exact .fault matched
+
 end Meaning
 
 
@@ -370,6 +436,42 @@ private theorem child_certificates
       · cases same; exact child
       · exact children other otherCode remaining
 
+/-- The actual ordered child vector is certified once for every concrete leaf family. -/
+private theorem of_ordered_children (leaves : GenericExpressionMeaning.Certificate)
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {budget : Nat} {compilation : SourceCoreFunctions.Context} {id : ExpressionId} {node : ExpressionNode}
+    {ids : List ExpressionId} {codes : List SourceCoreBasic.LoweredExpr}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
+    (form : node.form = .tuple ids) (typed : ExpressionHasType source context id node.type)
+    (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node (SourceCoreCalls.packArguments codes).type)
+    (acceptedChildren : ids.mapM (fun child => SourceCoreFunctions.lowerExpressionWithPolicy policy body budget
+      compilation source scope child reasonAt) = .ok codes)
+    (extract : ∀ child, child ∈ ids → ∀ childNode code, source.lookupExpression? child = some childNode →
+      ExpressionHasType source context child childNode.type →
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body budget compilation source scope child reasonAt = .ok code →
+      CertificateFor values source leaves scope child code) :
+    CertificateFor values source leaves scope id (SourceCoreCalls.packArguments codes) := by
+  obtain ⟨types, typedChildren, sourceType⟩ := CompatibleExpressionTuples.source_types unique found form metadata.coercions typed
+  obtain ⟨count, nodes, children⟩ := child_certificates unique typedChildren acceptedChildren extract
+  have sequence := CompatibleExpressionConstructors.sequence_of_nodes
+    (certificate := Entries scope (ids.zip codes)) count nodes (fun child code member => ⟨rfl, member⟩)
+  exact .tuple ⟨metadata, form, sourceType⟩ sequence children
+
+/-- The legacy static receipt is an erasure of the same finite tuple tree.
+Only primitive leaves are accepted by this conversion. -/
+theorem TreeFor.toOriginal {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
+    (tree : TreeFor values source (PrimitiveCertificate fuel values source context solved reasonAt) scope id code) :
+    Certificate fuel values source context solved reasonAt scope id code := by
+  classical
+  induction tree with
+  | leaf receipt =>
+    obtain ⟨tree, sites⟩ := receipt
+    exact ⟨.primitive tree, .primitive tree sites⟩
+  | tuple header sequence children ih =>
+    let trees := fun child code member => (ih child code member).choose
+    have sites := fun child code member => (ih child code member).choose_spec
+    exact ⟨.tuple header sequence trees, .tuple header sequence trees sites⟩
+
 /-- The production tuple branch returns its exact mapM child vector. The caller
 must discharge each reached child's static certificate from that child's actual
 acceptance; this theorem does not automate the full general expression grammar. -/
@@ -389,18 +491,39 @@ theorem of_functions {policy : SourceCoreFunctions.Policy} {body : SourceCoreFun
       SourceCoreFunctions.lowerExpressionWithPolicy policy body budget compilation source scope child reasonAt = .ok code →
       Certificate fuel values source context compilation.solvedRequirements reasonAt scope child code) :
     Certificate fuel values source context compilation.solvedRequirements reasonAt scope id lowered := by
-  classical
   obtain ⟨codes, acceptedChildren, rfl, metadata⟩ := CompatibleExpressionTuples.of_functions
     found form special readPolicy leaf accepted
-  obtain ⟨types, typedChildren, sourceType⟩ := CompatibleExpressionTuples.source_types unique found form metadata.coercions typed
-  obtain ⟨count, nodes, children⟩ := child_certificates unique typedChildren acceptedChildren extract
-  have sequence := CompatibleExpressionConstructors.sequence_of_nodes
-    (certificate := Entries scope (ids.zip codes)) count nodes (fun child code member => ⟨rfl, member⟩)
-  let trees := fun child code member => (children child code member).choose
-  have sites := fun child code member => (children child code member).choose_spec
-  let header : CompatibleExpressionTuples.Header values source id node ids types codes :=
-    ⟨metadata, form, sourceType⟩
-  exact ⟨.tuple header sequence trees, .tuple header sequence trees sites⟩
+  have built := of_ordered_children
+    (PrimitiveCertificate fuel values source context compilation.solvedRequirements reasonAt)
+    unique found form typed metadata acceptedChildren
+    (fun child member childNode code childFound childTyped childAccepted =>
+      (extract child member childNode code childFound childTyped childAccepted).choose_spec.toFor)
+  exact built.toOriginal
+
+
+/-- The production tuple branch returns its exact mapM child vector. The caller
+must discharge each reached child's static certificate from that child's actual
+acceptance; this theorem does not automate the full general expression grammar. -/
+theorem of_functions_with_leaves (leaves : GenericExpressionMeaning.Certificate) {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {budget : Nat} {compilation : SourceCoreFunctions.Context} {id : ExpressionId} {node : ExpressionNode}
+    {ids : List ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
+    (form : node.form = .tuple ids) (typed : ExpressionHasType source context id node.type)
+    (special : ∀ child remaining, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower compilation child remaining source scope id reasonAt) = .ok none)
+    (readPolicy : policy.readExpression source id = SourceCoreCompatibleDataExpressions.readExpression values.checked source id)
+    (leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (budget + 1) compilation source scope id reasonAt = .ok lowered)
+    (extract : ∀ child, child ∈ ids → ∀ childNode code, source.lookupExpression? child = some childNode →
+      ExpressionHasType source context child childNode.type →
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body budget compilation source scope child reasonAt = .ok code →
+      CertificateFor values source leaves scope child code) :
+    CertificateFor values source leaves scope id lowered := by
+  obtain ⟨codes, acceptedChildren, rfl, metadata⟩ := CompatibleExpressionTuples.of_functions
+    found form special readPolicy leaf accepted
+  exact of_ordered_children leaves unique found form typed metadata acceptedChildren extract
+
 end Extraction
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
