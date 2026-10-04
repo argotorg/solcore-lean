@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedFormationEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
 import Solcore.SourceSemantics.CoreLowering.NativeExpressionContextSupport
@@ -109,7 +110,7 @@ def nativePrefix (caller : Header indexed.ancestry values indexed.layouts.defini
 
 /-- The exact bundle, all inventory globals and the independent frame reference
 fix only the used administrative prefix. Any unused native suffix is arbitrary. -/
-theorem entry_prefix
+theorem entry_prefix_for
     {caller : Header indexed.ancestry values indexed.layouts.definitions program}
     {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
     {locations : Locations} {mapping : LocationMap} {world : StoreTyping}
@@ -117,7 +118,7 @@ theorem entry_prefix
     {context : Core.Context} {environment : Dynamic.Environment}
     (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
     (globals : caller.globals = indexed.base.globals.length)
-    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1 scope mapping world heap store canonical)
+    (entry : CallableIndexedLambdaNestedFormationEntries.Entry caller headers locations 0 1 scope mapping world heap store canonical)
     (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
       mapping world context scope environment canonical indexed.layouts.definitions) :
     NativeExpressionContextSupport.Agrees (nativePrefix caller).length (nativePrefix caller) context := by
@@ -157,6 +158,49 @@ theorem entry_prefix
       simpa [SourceCoreLocalCell.coreContext, nativePrefix, List.getElem?_append, outside, offset,
         last, Value.type] using atType
 
+
+theorem entry_prefix
+    {caller : Header indexed.ancestry values indexed.layouts.definitions program}
+    {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
+    {locations : Locations} {mapping : LocationMap} {world : StoreTyping}
+    {heap : Dynamic.Heap} {store : Store} {canonical : Environment}
+    {context : Core.Context} {environment : Dynamic.Environment}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1 scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world context scope environment canonical indexed.layouts.definitions) :
+    NativeExpressionContextSupport.Agrees (nativePrefix caller).length (nativePrefix caller) context :=
+  entry_prefix_for complete globals (CallableIndexedLambdaNestedFormationEntries.Entry.of_named entry) related
+
+def captures_for
+    {caller : Header indexed.ancestry values indexed.layouts.definitions program}
+    {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
+    {locations : Locations} {mapping : LocationMap} {world : StoreTyping}
+    {heap : Dynamic.Heap} {store : Store} {canonical actual : Environment}
+    {context actualContext : Core.Context} {environment : Dynamic.Environment} {ξ : Renaming}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (entry : CallableIndexedLambdaNestedFormationEntries.Entry caller headers locations 0 1 scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world context scope environment canonical indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
+    Captures indexed mapping world scope environment actual := by
+  let represented := environments_prefix related (nativePrefix caller) (entry_prefix_for complete globals entry related)
+  let same : EnvironmentsAgree ξ (canonical.take (scope.length + (nativePrefix caller).length)) actual :=
+    agrees_prefix agrees (scope.length + (nativePrefix caller).length)
+  exact {
+    administrative := nativePrefix caller
+    canonical := canonical.take (scope.length + (nativePrefix caller).length)
+    actualContext := actualContext
+    embedding := ξ
+    represented := represented
+    agrees := same
+    respects := TypedLexicalWhile.environment_respects represented.runtime_hasTypes typed same
+    typed := typed }
+
+
 def captures
     {caller : Header indexed.ancestry values indexed.layouts.definitions program}
     {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
@@ -170,22 +214,39 @@ def captures
       mapping world context scope environment canonical indexed.layouts.definitions)
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
-    Captures indexed mapping world scope environment actual := by
-  let represented := environments_prefix related (nativePrefix caller) (entry_prefix complete globals entry related)
-  let same : EnvironmentsAgree ξ (canonical.take (scope.length + (nativePrefix caller).length)) actual :=
-    agrees_prefix agrees (scope.length + (nativePrefix caller).length)
-  exact {
-    administrative := nativePrefix caller
-    canonical := canonical.take (scope.length + (nativePrefix caller).length)
-    actualContext := actualContext
-    embedding := ξ
-    represented := represented
-    agrees := same
-    respects := TypedLexicalWhile.environment_respects represented.runtime_hasTypes typed same
-    typed := typed }
+    Captures indexed mapping world scope environment actual :=
+  captures_for complete globals (CallableIndexedLambdaNestedFormationEntries.Entry.of_named entry) related agrees typed
 
 /-- The actual finite capture retains all catalog slots and the same physical
 frame. Slot bounds are static and independent of native environment typing. -/
+theorem capture_globals_for
+    {caller : Header indexed.ancestry values indexed.layouts.definitions program}
+    {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
+    {locations : Locations} {mapping : LocationMap} {world : StoreTyping}
+    {heap : Dynamic.Heap} {store : Store} {canonical actual : Environment}
+    {context actualContext : Core.Context} {environment : Dynamic.Environment} {ξ : Renaming}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (slots : ∀ header, header ∈ headers → header.slot < indexed.base.globals.length)
+    (entry : CallableIndexedLambdaNestedFormationEntries.Entry caller headers locations 0 1 scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world context scope environment canonical indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
+    CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope
+      (captures_for complete globals entry related agrees typed).canonical entry.catalog.authority.frameLocation := by
+  have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope canonical
+      entry.catalog.authority.frameLocation :=
+    ⟨entry.catalog.globals, by simpa only [globals] using entry.reference⟩
+  apply observed.take
+  · intro header member
+    have bound := slots header member
+    simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
+    omega
+  · simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
+    omega
+
+
 theorem capture_globals
     {caller : Header indexed.ancestry values indexed.layouts.definitions program}
     {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
@@ -201,17 +262,8 @@ theorem capture_globals
     (agrees : EnvironmentsAgree ξ canonical actual)
     (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
     CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope
-      (captures complete globals entry related agrees typed).canonical entry.catalog.authority.frameLocation := by
-  have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope canonical
-      entry.catalog.authority.frameLocation :=
-    ⟨entry.catalog.globals, by simpa only [globals] using entry.reference⟩
-  apply observed.take
-  · intro header member
-    have bound := slots header member
-    simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
-    omega
-  · simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
-    omega
+      (captures complete globals entry related agrees typed).canonical entry.catalog.authority.frameLocation :=
+  capture_globals_for complete globals slots (CallableIndexedLambdaNestedFormationEntries.Entry.of_named entry) related agrees typed
 
 /-- Actual compiled preparation relates the ordered global and function rows.
 Every retained Header's real selected slot then has the required finite bound. -/
@@ -390,6 +442,65 @@ theorem Lambda.reference {id : ExpressionId} {lowered : SourceCoreBasic.LoweredE
   rw [List.getElem?_take, if_pos bound, Lambda.reference_index head, ← globals]
   exact entry.reference
 
+/-- Source lambda inversion is indexed by the actual closure fields in Code.
+No body semantics or reconstructed source context is needed. -/
+theorem source_value_of_code
+    (code : Code indexed function scope administrative)
+    (unique : NodeOccurrencesUnique function.source)
+    (emptyCoercions : code.sourceNode.coercions = [])
+    {before after : Dynamic.Heap} {value : Dynamic.Value}
+    (evaluation : Dynamic.ExpressionEvaluates program function.context function.evidence
+      function.source function.captured before code.id value after) :
+    value = .closure function ∧ after = before := by
+  have contains := lookupExpression?_sound code.sourceFound
+  cases evaluation with
+  | intro found raw coercions =>
+    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
+      (lookupExpression?_complete unique contains))
+    subst same
+    rw [emptyCoercions] at coercions
+    cases coercions
+    rw [code.sourceForm] at raw
+    cases raw
+    exact ⟨rfl, rfl⟩
+  | generalizedLocal found form _ _ _ _ _ _ _ =>
+    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
+      (lookupExpression?_complete unique contains))
+    subst same
+    rw [code.sourceForm] at form
+    cases form
+
+/-- The actual lambda form and empty coercion path exclude every fault branch. -/
+theorem excludes_fault_of_code
+    (code : Code indexed function scope administrative)
+    (unique : NodeOccurrencesUnique function.source)
+    (emptyCoercions : code.sourceNode.coercions = [])
+    {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (failed : Dynamic.ExpressionFaults program function.context function.evidence
+      function.source function.captured before code.id reason after) : False := by
+  have contains := lookupExpression?_sound code.sourceFound
+  cases failed with
+  | missing absent => exact Dynamic.ExpressionAbsentIn.excludes_contains absent contains
+  | form found raw =>
+    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
+      (lookupExpression?_complete unique contains))
+    subst same
+    rw [code.sourceForm] at raw
+    cases raw
+  | coercion found _ failed =>
+    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
+      (lookupExpression?_complete unique contains))
+    subst same
+    rw [emptyCoercions] at failed
+    cases failed
+  | generalizedLocalRequirement found form _ _ _ _ _ _ _ | generalizedLocalCoercion found form _ _ _ _ _ _ _ =>
+    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
+      (lookupExpression?_complete unique contains))
+    subst same
+    rw [code.sourceForm] at form
+    cases form
+
+
 theorem Lambda.source_value {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (head : Lambda (registry := registry) (faults := faults) caller context evidence scope id lowered)
     (unique : NodeOccurrencesUnique (CallableIndexedNamedGeneration.source caller.named))
@@ -397,24 +508,10 @@ theorem Lambda.source_value {id : ExpressionId} {lowered : SourceCoreBasic.Lower
     (evaluation : Dynamic.ExpressionEvaluates program context evidence
       (CallableIndexedNamedGeneration.source caller.named) environment before id value after) :
     value = .closure (head.formed environment) ∧ after = before := by
-  have contains := lookupExpression?_sound head.code.sourceFound
-  rw [head.identifier] at contains
-  cases evaluation with
-  | intro found raw coercions =>
-    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
-      (lookupExpression?_complete unique contains))
-    subst same
-    rw [head.coercions] at coercions
-    cases coercions
-    rw [head.code.sourceForm] at raw
-    cases raw
-    exact ⟨rfl, rfl⟩
-  | generalizedLocal found form _ _ _ _ _ _ _ =>
-    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
-      (lookupExpression?_complete unique contains))
-    subst same
-    rw [head.code.sourceForm] at form
-    cases form
+  apply source_value_of_code (head.actualCode environment) unique head.coercions
+  change Dynamic.ExpressionEvaluates program context evidence (CallableIndexedNamedGeneration.source caller.named)
+    environment before head.code.id value after
+  simpa only [head.identifier] using evaluation
 
 theorem Lambda.excludes_fault {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (head : Lambda (registry := registry) (faults := faults) caller context evidence scope id lowered)
@@ -422,28 +519,10 @@ theorem Lambda.excludes_fault {id : ExpressionId} {lowered : SourceCoreBasic.Low
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
     (failed : Dynamic.ExpressionFaults program context evidence
       (CallableIndexedNamedGeneration.source caller.named) environment before id reason after) : False := by
-  have contains := lookupExpression?_sound head.code.sourceFound
-  rw [head.identifier] at contains
-  cases failed with
-  | missing absent => exact Dynamic.ExpressionAbsentIn.excludes_contains absent contains
-  | form found raw =>
-    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
-      (lookupExpression?_complete unique contains))
-    subst same
-    rw [head.code.sourceForm] at raw
-    cases raw
-  | coercion found _ failed =>
-    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
-      (lookupExpression?_complete unique contains))
-    subst same
-    rw [head.coercions] at failed
-    cases failed
-  | generalizedLocalRequirement found form _ _ _ _ _ _ _ | generalizedLocalCoercion found form _ _ _ _ _ _ _ =>
-    have same := Option.some.inj ((lookupExpression?_complete unique found).symm.trans
-      (lookupExpression?_complete unique contains))
-    subst same
-    rw [head.code.sourceForm] at form
-    cases form
+  apply excludes_fault_of_code (head.actualCode environment) unique head.coercions
+  change Dynamic.ExpressionFaults program context evidence (CallableIndexedNamedGeneration.source caller.named)
+    environment before head.code.id reason after
+  simpa only [head.identifier] using failed
 
 /-- Formation stores the complete static body in the same fixed function
 model used by the heap. The original native environment is never shortened. -/

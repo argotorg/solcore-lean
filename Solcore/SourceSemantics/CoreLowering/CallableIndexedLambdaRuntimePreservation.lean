@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeBody
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNamedRuntimeBodyMeaning
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedRuntimeBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCalls
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
@@ -43,9 +44,7 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   {arguments : List Dynamic.Value} {nativeArguments : List Value} {before : Dynamic.Heap}
   {store : Store} {location : Location} {current : NativeFrame} {currentGhost : GhostFrame}
 
-/-- Only the actual prefix continuation and original frame effects are used
-here. The shared body kernel supplies completion; no body is executed again. -/
-private theorem wrap_body_for (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+theorem wrap_body_at_for (inputs : CallableIndexedLambdaEntryPrefix.Context code)
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost)
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap} {result : Value} {bodyStore : Store}
     {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -78,6 +77,32 @@ private theorem wrap_body_for (inputs : CallableIndexedLambdaEntryPrefix.Context
     finalHeaps (entry.entry.worlds.trans worlds) (entry.entry.frame.trans frame)
   exact ⟨applied, related, restoredHeaps, entry.entry.maps.trans maps, entry.entry.worlds.trans worlds,
     restoredFrame, entry.entry.metadata.trans metadata, restoredCaller⟩
+
+private theorem wrap_body_for (inputs : CallableIndexedLambdaEntryPrefix.Context code)
+    (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap} {result : Value} {bodyStore : Store}
+    {finalMap : LocationMap} {finalWorld : StoreTyping}
+    (evaluated : Evaluates entry.entry.actualBody entry.entry.store
+      (code.receipt.body.rename entry.entry.embedding) result bodyStore)
+    (related : FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result)
+    (finalHeaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after bodyStore)
+    (maps : LocationMap.Extends entry.entry.mapping finalMap) (worlds : WorldExtends entry.entry.world finalWorld)
+    (frame : AdministrativePreserved entry.entry.mapping entry.entry.store finalMap bodyStore)
+    (metadata : Dynamic.HeapMetadataExtend entry.entry.heap after) :
+    Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+      store CallableIndexedLambdaCalls.applyPayload result (bodyStore.set location (encode prepared.ancestry.layout.frame current)) ∧
+    FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
+    CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after
+      (bodyStore.set location (encode prepared.ancestry.layout.frame current)) ∧
+    LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+    AdministrativePreserved mapping store finalMap (bodyStore.set location (encode prepared.ancestry.layout.frame current)) ∧
+    Dynamic.HeapMetadataExtend before after ∧
+    CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost
+      (bodyStore.set location (encode prepared.ancestry.layout.frame current)) :=
+  wrap_body_at_for captured code history functions inputs entry evaluated related finalHeaps maps worlds frame metadata
+
 
 include extension uninitialized missing escaped functionLeaves functionTypes in
 /-- The independent source allocation is identified with this actual prefix.
@@ -266,6 +291,109 @@ theorem preserves_named_sized_for (budget size : Nat) (within : size ≤ budget)
 
 end NamedModel
 
+section NestedModel
+variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
+  {capturedActual : Environment}
+  (captured : Captures prepared mapping world scope function.captured capturedActual)
+  (code : Code prepared function scope captured.administrative) (history : History code)
+  {program : Program} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {headers : RecursiveNamedCatalog.Inventory prepared.ancestry values prepared.layouts.definitions program}
+  {locations : RecursiveNamedCatalog.Locations (prepared := prepared.ancestry) (values := values)
+    (ambient := CallableIndexedAmbient.ambientDefinitions prepared) (program := program)}
+  {rank : Nat} {caller : RecursiveNamedCatalog.Header prepared.ancestry values prepared.layouts.definitions program}
+  (body : CallableIndexedLambdaNestedRuntimeBodyMeaning.Body headers caller registry faults rank code)
+  (profile : values.checked.catalog.callableContracts = true)
+  (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions prepared) headers)
+  (globals : caller.globals = prepared.base.globals.length)
+  (slots : ∀ header, header ∈ headers → header.slot < prepared.base.globals.length)
+  (metadataSource : history.metadata = CallableIndexedNamedGeneration.state caller.named)
+  (family : CallableIndexedLambdaNamedRuntimeBodyMeaning.CatalogFamily headers locations 0 (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) registry faults)
+  (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
+  (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (uninitialized : ∀ id location, faults (.uninitializedLocation location) (code.reasonAt id))
+  (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((code.reasonAt id).add tag))
+  (escaped : faults .controlEscapedFunction code.compilation.internalReason)
+  {arguments : List Dynamic.Value} {nativeArguments : List Value} {before : Dynamic.Heap}
+  {store : Store} {location : Location} {current : NativeFrame} {currentGhost : GhostFrame}
+
+  (initial : RecursiveNamedCatalog.Entry headers locations 0 code.compilation.administrativePrefix scope mapping world before store captured.canonical)
+  (sameFrame : initial.authority.frameLocation = location)
+
+include body complete globals slots metadataSource family owners extension uninitialized missing escaped initial sameFrame in
+/-- The actual ordered prefix retains its catalog source entry. The original
+source child grade feeds the shared kernel, then the sole wrap/restore adapter
+returns the complete caller store. -/
+theorem entry_preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
+    (entry : CallableIndexedLambdaEntryPrefix.EntryFor captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) registry arguments nativeArguments before store location current currentGhost)
+    {added : Environment} (length : added.length = code.receipt.loweredParameters.length)
+    (spine : entry.entry.canonical = added ++ captured.canonical)
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.BodyTrace program size function body.body.context environment bound outcome after) :
+    ∃ result finalStore finalMap finalWorld,
+      Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+        store CallableIndexedLambdaCalls.applyPayload result finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile))
+        finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
+  rw [← sameEnvironment, ← sameHeap] at trace
+  let original := CallableIndexedLambdaCatalogEntries.source_entry entry initial sameFrame length spine
+  let installed := CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.entry_of_source body original metadataSource globals entry.entry.environments
+  obtain ⟨result, bodyStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.preserves_sized code body profile complete globals slots extension family owners
+      uninitialized missing escaped budget size within
+      entry.entry.environments entry.entry.heaps entry.entry.locals entry.entry.lookups entry.entry.actualTyped
+      entry.entry.reference entry.entry.read entry.entry.unmapped ⟨installed⟩ trace
+  exact ⟨result, _, finalMap, finalWorld,
+    wrap_body_at_for captured code history (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) body.body.toContext entry evaluated related finalHeaps maps worlds frame metadata⟩
+
+variable
+  (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile))
+    mapping world code.receipt.loweredParameters arguments nativeArguments)
+  (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) mapping world before store)
+  (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+  (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+  {currentMetadata : Option MetadataState}
+  (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
+  (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
+  (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
+
+include body complete globals slots metadataSource family owners extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed in
+/-- The original source body child supplies its grade independently of the
+native application. Its actual prefix spine closes catalog installation and
+full caller restoration without any unsized-to-sized conversion. -/
+theorem preserves_nested_sized_for (budget size : Nat) (within : size ≤ budget)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    {environment : Dynamic.Environment} {bound : Dynamic.Heap}
+    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment bound)
+    (trace : RecursiveNamedCallBounds.BodyTrace program size function body.body.context environment bound outcome after) :
+    ∃ result finalStore finalMap finalWorld,
+      Evaluates [value code captured.embedding history.native capturedActual, DataPatternValues.packValues nativeArguments]
+        store CallableIndexedLambdaCalls.applyPayload result finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile))
+        finalMap finalWorld function.resultType code.receipt.resultCore faults outcome result ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (RecursiveNamedCatalog.Entry headers locations 0 code.compilation.administrativePrefix scope finalMap finalWorld after finalStore captured.canonical) ∧
+      CellState prepared.ancestry.graph.inputs prepared.ancestry.graph.table prepared.ancestry.layout.frame location current currentGhost finalStore := by
+  have unmapped : location ∉ mapping := sameFrame ▸ initial.authority.unmapped
+  obtain ⟨entry, added, length, spine⟩ := CallableIndexedLambdaEntryPrefix.entry_exists_for_with_spine
+    captured code history body.body.toContext (CallableIndexedLambdaNestedRuntimeCertificates.model headers locations registry faults profile) represented heaps locals reference read currentCarried unmapped allowed
+  obtain ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata, caller⟩ :=
+    entry_preserves_nested_sized_for captured code history body profile complete globals slots metadataSource family owners extension
+      uninitialized missing escaped initial sameFrame budget size within entry length spine allocated trace
+  exact ⟨result, finalStore, finalMap, finalWorld, evaluated, related, finalHeaps, maps, worlds, frame, metadata,
+    ⟨initial.extend maps worlds frame metadata⟩, caller⟩
+
+end NestedModel
+
 variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
   {capturedActual : Environment}
@@ -340,5 +468,7 @@ theorem preserves {callerContext : SourceSemantics.Context} {callerEvidence : Dy
   exact preserves_for captured code history body (model prepared profile)
     (observations prepared profile) (runtime_views prepared profile)
     extension uninitialized missing escaped initial sameFrame represented heaps locals reference read currentCarried allowed executed
+
+
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimePreservation

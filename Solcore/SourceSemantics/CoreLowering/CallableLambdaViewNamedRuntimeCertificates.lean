@@ -306,19 +306,19 @@ theorem canonical_call_found {id : ExpressionId} {output : Lowered}
   | authenticated receipt => exact call_found receipt
 
 include edited avoids in
-theorem head_transport_with {calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
+theorem head_transport_generic {calls target : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
     {before after : GenericExpressionMeaning.Certificate}
     {reasonAt : ExpressionId → Word} {id : ExpressionId} {node : ExpressionNode} {output : Lowered}
     (callTransport : calls before scope id output → Reaches source roots (.expression id) →
       (∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) →
-      Head headers compilation view context evidence after scope id output)
+      target after scope id output)
     (found : source.lookupExpression? id = some node)
     (head : CompatibleExpressionCalls.Head
       calls
       values source context reasonAt before scope id output)
     (reached : Reaches source roots (.expression id))
     (expressions : ∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) :
-    CompatibleExpressionCalls.Head (Head headers compilation view context evidence)
+    CompatibleExpressionCalls.Head target
       values view context reasonAt after scope id output := by
   cases head with
   | primitive head => exact .primitive (composition_transport edited avoids found head reached expressions)
@@ -363,6 +363,24 @@ theorem head_transport_with {calls : GenericExpressionMeaning.Certificate → Ge
   | call head => exact .call (callTransport head reached expressions)
 
 
+include edited avoids in
+theorem head_transport_with {calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
+    {before after : GenericExpressionMeaning.Certificate}
+    {reasonAt : ExpressionId → Word} {id : ExpressionId} {node : ExpressionNode} {output : Lowered}
+    (callTransport : calls before scope id output → Reaches source roots (.expression id) →
+      (∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) →
+      Head headers compilation view context evidence after scope id output)
+    (found : source.lookupExpression? id = some node)
+    (head : CompatibleExpressionCalls.Head
+      calls
+      values source context reasonAt before scope id output)
+    (reached : Reaches source roots (.expression id))
+    (expressions : ∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) :
+    CompatibleExpressionCalls.Head (Head headers compilation view context evidence)
+      values view context reasonAt after scope id output :=
+  head_transport_generic edited avoids callTransport found head reached expressions
+
+
 /-- The canonical grammar retains original emission receipts and fixes the
 same actual caller dictionary at every nested argument occurrence. -/
 abbrev Certificates (evidence : Dynamic.EvidenceEnvironment)
@@ -376,12 +394,12 @@ abbrev Certificates (evidence : Dynamic.EvidenceEnvironment)
     (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate solved source id code)
 
 include edited avoids in
-theorem transport_with {calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
+theorem transport_generic {calls target : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
     (callFound : ∀ {children scope id output}, calls children scope id output → ∃ node, source.lookupExpression? id = some node)
     (callTransport : ∀ {before after scope id node output}, source.lookupExpression? id = some node →
       calls before scope id output → Reaches source roots (.expression id) →
       (∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) →
-      Head headers compilation view context evidence after scope id output)
+      target after scope id output)
     {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
     {id : ExpressionId} {output : Lowered}
     (receipt : CompatibleExpressionCalls.Tree.WithLiterals
@@ -389,7 +407,7 @@ theorem transport_with {calls : GenericExpressionMeaning.Certificate → Generic
       (solved := solved) (reasonAt := reasonAt)
       (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate solved source id code) scope id output)
     (reached : Reaches source roots (.expression id)) :
-    Certificates evidence headers compilation fuel view context solved reasonAt scope id output := by
+    RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsFor target fuel values view context solved reasonAt scope id output := by
   obtain ⟨tree, sites⟩ := receipt
   revert reached
   induction sites with
@@ -406,14 +424,14 @@ theorem transport_with {calls : GenericExpressionMeaning.Certificate → Generic
     -- Extra unused proof entries are excluded from the canonical proof fold;
     -- every actual ordered child vector and its emitted code stays unchanged.
     let selectedEntries := entries.filter (fun entry => decide (NodeId.expression entry.1 ∈ node.form.references))
-    have transformed : CompatibleExpressionCalls.Head (Head headers compilation view context evidence)
+    have transformed : CompatibleExpressionCalls.Head target
         values view context reasonAt (CompatibleExpressionCalls.Entries scope selectedEntries) scope id lowered :=
-      head_transport_with edited avoids (callTransport found) found head reached (by
+      head_transport_generic edited avoids (callTransport found) found head reached (by
         intro child code member certified
         obtain ⟨sameScope, present⟩ := certified
         exact ⟨sameScope, List.mem_filter.mpr ⟨present, by simpa using member⟩⟩)
     have transformedChildren : ∀ child code, (child, code) ∈ selectedEntries →
-        Certificates evidence headers compilation fuel view context solved reasonAt scope child code := by
+        RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsFor target fuel values view context solved reasonAt scope child code := by
       intro child code member
       have selected := List.mem_filter.mp member
       have reference : NodeId.expression child ∈ node.form.references := of_decide_eq_true selected.2
@@ -422,6 +440,24 @@ theorem transport_with {calls : GenericExpressionMeaning.Certificate → Generic
       (transformedChildren child code member).choose
     exact ⟨.node transformed trees,
       .node transformed trees (fun child code member => (transformedChildren child code member).choose_spec)⟩
+
+
+include edited avoids in
+theorem transport_with {calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate}
+    (callFound : ∀ {children scope id output}, calls children scope id output → ∃ node, source.lookupExpression? id = some node)
+    (callTransport : ∀ {before after scope id node output}, source.lookupExpression? id = some node →
+      calls before scope id output → Reaches source roots (.expression id) →
+      (∀ child code, NodeId.expression child ∈ node.form.references → before scope child code → after scope child code) →
+      Head headers compilation view context evidence after scope id output)
+    {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
+    {id : ExpressionId} {output : Lowered}
+    (receipt : CompatibleExpressionCalls.Tree.WithLiterals
+      (calls := calls) (fuel := fuel) (values := values) (source := source) (context := context)
+      (solved := solved) (reasonAt := reasonAt)
+      (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate solved source id code) scope id output)
+    (reached : Reaches source roots (.expression id)) :
+    Certificates evidence headers compilation fuel view context solved reasonAt scope id output :=
+  transport_generic (target := Head headers compilation view context evidence) edited avoids callFound callTransport receipt reached
 
 include edited avoids in
 theorem transport {fuel : Nat} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}

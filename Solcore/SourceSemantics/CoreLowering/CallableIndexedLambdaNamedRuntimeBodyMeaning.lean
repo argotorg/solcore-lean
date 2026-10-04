@@ -142,7 +142,7 @@ variable {checked : Checked} {base : Base checked}
     (capturePrefix := capturePrefix) functions registry header (conditions header))
 
 include transport catalog authorized in
-private theorem head_preserves
+theorem head_preserves_for
     (budget size : Nat) (within : size ≤ budget)
     (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
@@ -176,8 +176,22 @@ private theorem head_preserves
       exact evaluated
     · simpa only [receipt.sourceType, receipt.nativeType] using represented
 
+
 include transport catalog authorized in
-private theorem head_reflects
+private theorem head_preserves
+    (budget size : Nat) (within : size ≤ budget)
+    (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
+    (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
+    (arguments : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.PreservesAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P))
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyPreservesAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CallableLambdaViewNamedRuntimeCertificates.Head headers compilation source context evidence certificate) faults P :=
+  head_preserves_for functions P transport catalog conditions authorized budget size within idsUnique unique owners arguments bodies
+
+include transport catalog authorized in
+theorem head_reflects_for
     (budget size : Nat) (within : size ≤ budget)
     (arguments : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P))
@@ -208,6 +222,18 @@ private theorem head_reflects
     exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent,
       by simpa only [receipt.sourceType, receipt.nativeType] using represented,
       finalHeaps, maps, worlds, preserved, heapMetadata⟩
+
+
+include transport catalog authorized in
+private theorem head_reflects
+    (budget size : Nat) (within : size ≤ budget)
+    (arguments : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P))
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CallableLambdaViewNamedRuntimeCertificates.Head headers compilation source context evidence certificate) faults P :=
+  head_reflects_for functions P transport catalog conditions authorized budget size within arguments bodies
 
 variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
   {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
