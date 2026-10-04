@@ -89,6 +89,111 @@ theorem meanings_functional {values : List SourceCorePublicValues.Value} {left r
     | cons other rest => rw [means_functional head other, ih rest]
 
 
+section Evidence
+open GeneralHeap ReadOnly CompatiblePayload CoreProof
+open RecursiveNamedCatalog RecursiveNamedPublicStartMeaning RecursiveNamedPublicDataInputs
+open RecursiveNamedCatalogInvocationBounds
+variable (authenticated : Bool) {artifact : Artifact} {session : Session artifact} {key : Key}
+  {publicArguments : List SourceCorePublicValues.Value} {boundaryFuel : Nat}
+  {checkpoint : Checkpoint artifact} {recipe : Recipe}
+  {encodedValues : SourceCoreCompatibleValues.Context}
+  {values : SourceCoreCompatibleValues.Context}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions} {program : SourceSemantics.Program}
+  {headers : Inventory recipe.compiled.indexed.ancestry values ambient.definitions program} {locations : Locations} {capturePrefix : Nat}
+  {compilation : Header recipe.compiled.indexed.ancestry values ambient.definitions program → SourceCoreFunctions.Context}
+  {expressionSyntax : Header recipe.compiled.indexed.ancestry values ambient.definitions program → ExpressionId → Prop}
+  {diagnosticPolicy : AssignmentDiagnosticPolicy}
+  (functions : FunctionModel values.checked.catalog ambient)
+  (extension : SourceCoreRawMetadata.Extends values.registry encodedValues.registry)
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  (runtimeViews : FunctionRuntimeViews functions)
+  {faults : FunctionCalls.FaultRep}
+  (uninitialized : ∀ header ∈ headers, ∀ id location, faults (.uninitializedLocation location) (header.reasonAt id))
+  (missing : ∀ header ∈ headers, ∀ id key value tag, MetadataRep encodedValues.registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((header.reasonAt id).add tag))
+  (escaped : ∀ header ∈ headers, faults .controlEscapedFunction header.escaped)
+  (prefixMatches : ∀ header ∈ headers, (compilation header).administrativePrefix = capturePrefix + 1)
+  (profiles : ∀ header, header ∈ headers →
+    ∀ {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+      {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+      {actual : Environment} {ξ : Renaming} {frameLocation : Location}
+      {current : CallableIndexedHistory.NativeFrame} {ghost : CallableIndexedHistory.GhostFrame},
+      BodyState headers locations capturePrefix functions encodedValues.registry header arguments before initialStore initialMap initialWorld
+        administrative actualContext actual ξ frameLocation current ghost →
+      RuntimeMatchProfileForWith authenticated diagnosticPolicy headers header (compilation header) header.readFuel (expressionSyntax header)
+        (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) encodedValues.registry faults)
+
+variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+  (caller : Entry headers locations capturePrefix 0 [] mapping world before store
+    (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed))
+  {header : Header recipe.compiled.indexed.ancestry values ambient.definitions program}
+  {root : SourceCoreIndexedSession.Root recipe.compiled} (selected : RecursiveNamedPublicRootMeaning.RootSelection headers root header)
+  {arguments : List Dynamic.Value} {payloads : List Core.Value}
+  (started : StartAt session key publicArguments boundaryFuel checkpoint recipe root world store payloads encodedValues)
+  (data : ∀ argument ∈ publicArguments, DataPublic argument)
+  (sameChecked : values.checked = recipe.compiled.compatible.checked)
+  (programTyped : ProgramWellFormed program)
+  (record : SourceCompilationPlan.exactSpecialization recipe.compiled.indexed.base.plan header.named.signature.key =
+    .ok header.named.specialized)
+  (meanings : RecursiveNamedPublicDataInputs.Meanings publicArguments arguments)
+  (heaps : CompatibleAmbientHeap.HeapRepresents values.checked encodedValues.registry functions mapping world before store)
+
+
+include selected started data sameChecked programTyped record meanings in
+/-- Actual encoding supplies the same independently interpreted source arguments.
+Native carrier equality is not used to infer a source type or authority. -/
+theorem source_arguments :
+    CallableIndexedParameterMeaning.Arguments (CompatibleAmbientHeap.payloadModel values.checked encodedValues.registry functions)
+      mapping world header.bindings arguments payloads := by
+  obtain ⟨actual, related, represented⟩ := RecursiveNamedPublicDataInputs.StartAt.data_arguments functions mapping started selected data sameChecked programTyped record
+  have same := meanings_functional related meanings
+  exact same ▸ represented
+
+
+include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
+/-- Source execution is preserved by the actual checkpoint initial state.
+The exact encoded prefix and full store are transported by equality only. -/
+theorem has_sufficient_fuel_evidence
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (executed : Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after) :
+    ∃ value finalStore finalMap finalWorld required,
+      (∀ fuel, required ≤ fuel → checkpoint.NativeDone fuel value finalStore) ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked encodedValues.registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked encodedValues.registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (Entry headers locations capturePrefix 0 [] finalMap finalWorld after finalStore
+        (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed)) := by
+  exact RecursiveNamedPublicStartMeaning.has_sufficient_fuel_with_evidence authenticated true functions extension faithful observations runtimeViews
+    uninitialized missing escaped prefixMatches profiles caller selected started
+    (source_arguments functions selected started data sameChecked programTyped record meanings) heaps executed
+
+include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
+/-- Original checkpoint completion reflects through the same initial state.
+Source representation, staging and heap conditions remain independent. -/
+theorem completed_reflects_program_evidence
+    (admitted : Staging.ProgramHasStages program)
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    {fuel : Nat} {value : Core.Value} {finalStore : Core.Store}
+    (completed : checkpoint.NativeDone fuel value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      Dynamic.ProgramOutcome program (RecursiveNamedProgramEntrySource.entry header arguments) before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked encodedValues.registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked encodedValues.registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (Entry headers locations capturePrefix 0 [] finalMap finalWorld after finalStore
+        (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed)) := by
+  exact RecursiveNamedPublicStartMeaning.completed_reflects_program_with_evidence authenticated true functions extension faithful observations runtimeViews
+    uninitialized missing escaped prefixMatches profiles caller selected started
+    (source_arguments functions selected started data sameChecked programTyped record meanings) heaps admitted heapTyped argumentsTyped completed
+
+end Evidence
+
 section Meaning
 open GeneralHeap ReadOnly CompatiblePayload CoreProof
 open RecursiveNamedCatalog RecursiveNamedPublicStartMeaning RecursiveNamedPublicDataInputs
@@ -140,17 +245,6 @@ variable {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {
   (heaps : CompatibleAmbientHeap.HeapRepresents values.checked encodedValues.registry functions mapping world before store)
 
 
-include selected started data sameChecked programTyped record meanings in
-/-- Actual encoding supplies the same independently interpreted source arguments.
-Native carrier equality is not used to infer a source type or authority. -/
-theorem source_arguments :
-    CallableIndexedParameterMeaning.Arguments (CompatibleAmbientHeap.payloadModel values.checked encodedValues.registry functions)
-      mapping world header.bindings arguments payloads := by
-  obtain ⟨actual, related, represented⟩ := RecursiveNamedPublicDataInputs.StartAt.data_arguments functions mapping started selected data sameChecked programTyped record
-  have same := meanings_functional related meanings
-  exact same ▸ represented
-
-
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Source execution is preserved by the actual checkpoint initial state.
 The exact encoded prefix and full store are transported by equality only. -/
@@ -166,9 +260,7 @@ theorem has_sufficient_fuel
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (Entry headers locations capturePrefix 0 [] finalMap finalWorld after finalStore
         (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed)) := by
-  exact RecursiveNamedPublicStartMeaning.has_sufficient_fuel_with true functions extension faithful observations runtimeViews
-    uninitialized missing escaped prefixMatches profiles caller selected started
-    (source_arguments functions selected started data sameChecked programTyped record meanings) heaps executed
+  exact has_sufficient_fuel_evidence false functions extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps executed
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps in
 /-- Original checkpoint completion reflects through the same initial state.
@@ -188,9 +280,7 @@ theorem completed_reflects_program
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (Entry headers locations capturePrefix 0 [] finalMap finalWorld after finalStore
         (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed)) := by
-  exact RecursiveNamedPublicStartMeaning.completed_reflects_program_with true functions extension faithful observations runtimeViews
-    uninitialized missing escaped prefixMatches profiles caller selected started
-    (source_arguments functions selected started data sameChecked programTyped record meanings) heaps admitted heapTyped argumentsTyped completed
+  exact completed_reflects_program_evidence false functions extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles caller selected started data sameChecked programTyped record meanings heaps admitted heapTyped argumentsTyped completed
 
 end Meaning
 
