@@ -63,6 +63,30 @@ theorem list_unique {program : CheckedProgram} {caller : SourceSpecialization.Sp
       · exact CallableCoercionSelectionIdentity.primary_unique ledger headAccepted
       · exact ih tailAccepted key member
 
+/-- Actual primary and ordered method roots exclude faults for any method
+selector. Only the reached ledger rows are identified. -/
+theorem selected_safe_for {compiler : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available : SourceCompilationPlan.EvidenceEnvironment}
+    {primaryId : RequirementId} {methodIds : List RequirementId} {arity : Nat}
+    {traitName methodName : String} {method : ExecutableImplMethods.CheckedMethod} {context : Context}
+    {program : Program} {evidence dictionary : EvidenceEnvironment} {body : BodyInstance}
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (roots : CallableCoercionMethodCertificates.Roots compiler caller node available
+      primaryId methodIds arity methodName method)
+    (selected : OperatorMethodSelected program context evidence traitName methodName
+      (primaryId :: methodIds) body dictionary)
+    {failed : RequirementId} (fault : RequirementListFaults context evidence (primaryId :: methodIds) failed) : False := by
+  have primaryUnique := CallableCoercionSelectionIdentity.primary_unique ledger roots.primarySelected
+  have remainingUnique := list_unique ledger roots.methodsSelected
+  cases selected with
+  | intro primary _ _ _ _ _ _ _ _ _ remaining _ _ _ =>
+    cases primary with
+    | intro produced _ =>
+      cases fault with
+      | head unavailable => exact excludes_unavailable primaryUnique produced unavailable
+      | tail _ failed => exact excludes_list_fault remainingUnique remaining failed
+
+
 /-- Successful source selection provides the real evidence closures; actual
 compiler selection identifies the ledger rows used by any competing fault. -/
 theorem selected_safe {compiler : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
@@ -74,14 +98,6 @@ theorem selected_safe {compiler : CheckedProgram} {caller : SourceSpecialization
     (selected : OperatorMethodSelected program context evidence "Coerce" "coerce" step.requirements body dictionary)
     {failed : RequirementId} (fault : RequirementListFaults context evidence step.requirements failed) : False := by
   obtain ⟨receipt⟩ := CallableCoercionMethodCertificates.of_accepted accepted
-  have primaryUnique := CallableCoercionSelectionIdentity.primary_unique ledger receipt.primarySelected
-  have remainingUnique := list_unique ledger receipt.methodsSelected
-  cases selected with
-  | intro primary _ _ _ _ _ _ _ _ _ remaining _ _ _ =>
-    cases primary with
-    | intro produced _ =>
-      cases fault with
-      | head unavailable => exact excludes_unavailable primaryUnique produced unavailable
-      | tail _ failed => exact excludes_list_fault remainingUnique remaining failed
+  exact selected_safe_for ledger receipt.roots selected fault
 
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionRequirementSafety
