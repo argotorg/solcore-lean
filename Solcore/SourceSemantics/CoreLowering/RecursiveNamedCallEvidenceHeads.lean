@@ -173,27 +173,34 @@ variable {locations : RecursiveNamedCatalog.Locations}
 
 /-- The requirement identifiers select one dictionary for this exact caller.
 Only the original argument and called-body children consume smaller budgets. -/
-theorem preserves_at (budget size : Nat) (within : size ≤ budget)
+theorem preserves_at_for (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
+      protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
+    (conditions : ∀ header, BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → BodyAuthorization (headers := headers) (locations := locations)
+      (capturePrefix := capturePrefix) functions registry header (conditions header))
+    (budget size : Nat) (within : size ≤ budget)
     (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
     (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
     (argumentMeaning : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.PreservesAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source children faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix)))
+      P))
     (bodyMeaning : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
-      (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+      (BodyPreservesAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Head headers compilation source context evidence children) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
+      P := by
   intro scope id lowered head
   cases head with
   | ordinary ordinary =>
-    exact RecursiveNamedExpressionHeadBounds.preserves_at functions budget size within unique owners argumentMeaning bodyMeaning ordinary
+    exact RecursiveNamedExpressionHeadBounds.preserves_at_for functions P transport catalog conditions authorized budget size within unique owners argumentMeaning bodyMeaning ordinary
   | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees typed installed trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨callerEntry⟩ := installed
+    obtain ⟨callerEntry⟩ := catalog installed
     have instantiationEq := certified.selected.metadata receipt
     have form : node.form = .call callee arguments (.declaration header.instantiation) := by
       simpa only [instantiationEq] using receipt.form
@@ -205,36 +212,61 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
     have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
       simpa only [certified.selected.signature] using receipt.native.inputType
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, heapMetadata, _⟩ :=
-      RecursiveNamedExpressionHeadBounds.call_preserves_bounded functions certified.sequence certified.nativeTypes packed budget
+      RecursiveNamedExpressionHeadBounds.call_preserves_bounded_for functions certified.sequence certified.nativeTypes packed P transport (conditions header) (authorized header certified.selected.member) budget
         argumentMeaning (bodyMeaning header certified.selected.member) owners certified.selected.member
-        callerEntry environments heaps locals agrees typed independent within
+        callerEntry installed environments heaps locals agrees typed independent within
     refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, preserved, heapMetadata⟩
     · change Evaluates actual store (lowered.expression.rename ξ) value finalStore
       rw [certified.emitted receipt metadata.coercions]
       simpa only [NamedCalls.Arguments.call_rename] using evaluated
     · simpa only [certified.sourceType, (congrArg (fun code : Lowered => code.type) (certified.emitted receipt metadata.coercions))] using represented
 
-/-- Reflection consumes the original completed call and its strict native
-children. Its source grade and authenticated dictionary remain independent. -/
-theorem reflects_at (budget size : Nat) (within : size ≤ budget)
-    (argumentMeaning : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
+theorem preserves_at (budget size : Nat) (within : size ≤ budget)
+    (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
+    (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
+    (argumentMeaning : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.PreservesAt child
       (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source children faults
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix)))
     (bodyMeaning : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
-      (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+      (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head headers compilation source context evidence children) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  preserves_at_for functions _ entry_transport (fun entry => entry)
+    (fun _ => fun {_ _ _ _ _ _ _ _ _ _ _ _} _ => True)
+    (fun _ _ => by unfold BodyAuthorization; intros; trivial) budget size within idsUnique unique owners argumentMeaning
+    (by
+      intro header member child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodyMeaning header member child smaller entry trace)
+
+/-- Reflection consumes the original completed call and its strict native
+children. Its source grade and authenticated dictionary remain independent. -/
+theorem reflects_at_for (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
+      protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
+    (conditions : ∀ header, BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → BodyAuthorization (headers := headers) (locations := locations)
+      (capturePrefix := capturePrefix) functions registry header (conditions header))
+    (budget size : Nat) (within : size ≤ budget)
+    (argumentMeaning : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source children faults
+      P))
+    (bodyMeaning : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Head headers compilation source context evidence children) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
+      P := by
   intro scope id lowered head
   cases head with
   | ordinary ordinary =>
-    exact RecursiveNamedExpressionHeadBounds.reflects_at functions budget size within argumentMeaning bodyMeaning ordinary
+    exact RecursiveNamedExpressionHeadBounds.reflects_at_for functions P transport catalog conditions authorized budget size within argumentMeaning bodyMeaning ordinary
   | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees typed installed evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨callerEntry⟩ := installed
+    obtain ⟨callerEntry⟩ := catalog installed
     have emitted := certified.emitted receipt metadata.coercions
     change EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore at evaluated
     rw [emitted] at evaluated
@@ -242,9 +274,9 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
     have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
       simpa only [certified.selected.signature] using receipt.native.inputType
     obtain ⟨traceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preserved, heapMetadata, _⟩ :=
-      RecursiveNamedExpressionHeadBounds.call_reflects_bounded functions certified.sequence certified.nativeTypes packed budget
+      RecursiveNamedExpressionHeadBounds.call_reflects_bounded_for functions certified.sequence certified.nativeTypes packed P transport (conditions header) (authorized header certified.selected.member) budget
         argumentMeaning (bodyMeaning header certified.selected.member) certified.selected.member
-        callerEntry environments heaps locals agrees typed evaluated within
+        callerEntry installed environments heaps locals agrees typed evaluated within
     have instantiationEq := certified.selected.metadata receipt
     have form : node.form = .call callee arguments (.declaration header.instantiation) := by
       simpa only [instantiationEq] using receipt.form
@@ -257,6 +289,22 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
     exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent,
       by simpa only [certified.sourceType, congrArg (fun code : Lowered => code.type) emitted] using represented,
       finalHeaps, maps, worlds, preserved, heapMetadata⟩
+
+theorem reflects_at (budget size : Nat) (within : size ≤ budget)
+    (argumentMeaning : RecursiveNamedBoundedContracts.Below budget (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source children faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix)))
+    (bodyMeaning : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults)) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head headers compilation source context evidence children) faults
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  reflects_at_for functions _ entry_transport (fun entry => entry)
+    (fun _ => fun {_ _ _ _ _ _ _ _ _ _ _ _} _ => True)
+    (fun _ _ => by unfold BodyAuthorization; intros; trivial) budget size within argumentMeaning
+    (by
+      intro header member child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodyMeaning header member child smaller entry trace)
 
 end Bounds
 
@@ -280,15 +328,16 @@ theorem projected {context : SourceSemantics.Context} {evidence : Dynamic.Eviden
 
 /-- Only the actual selected global positions need valid native annotations.
 The same ordered argument Tree types the original packed argument code. -/
-theorem native {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+theorem native_at {definitions : DataEnvironment}
+    (extension : values.checked.catalog.definitions.Extends definitions) {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {children : GenericExpressionMeaning.Certificate} {administrative : Core.Context}
     (slots : ∀ header, header ∈ headers → administrative[compilation.administrativePrefix + header.slot]? =
       some header.named.signature.referenceType)
     (head : Head headers compilation source context evidence children scope id output)
     (typed : ∀ child code, children scope child code →
-      CompatibleExpressionScalarNativeTyping.NativeTyping values.checked.catalog.definitions
+      CompatibleExpressionScalarNativeTyping.NativeTyping definitions
         (SourceCoreLocalCell.coreContext scope ++ administrative) code) :
-    CompatibleExpressionScalarNativeTyping.NativeTyping values.checked.catalog.definitions
+    CompatibleExpressionScalarNativeTyping.NativeTyping definitions
       (SourceCoreLocalCell.coreContext scope ++ administrative) output := by
   cases head with
   | ordinary ordinary =>
@@ -297,7 +346,7 @@ theorem native {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
         calleeRequirements calleeCoercions valid predicates evidence arity emission selectedSlot sequence nativeTypes =>
       have packed := CompatibleExpressionConstructorNativeTyping.packed_native sequence typed
       have equation := emission.equation
-      have resultWF := CompatibleExpressionCertificateNativeTyping.project_wellFormed metadata.projected
+      have resultWF := CompatibleExpressionCertificateNativeTyping.project_wellFormed metadata.projected |>.extend_definitions extension
       refine ⟨resultWF, ?_⟩
       rw [equation.1, selectedSlot]
       rw [← body.resultType]
@@ -309,7 +358,7 @@ theorem native {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
       · rw [equation.2.1]; exact packed.2
   | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
     have packed := CompatibleExpressionConstructorNativeTyping.packed_native certified.sequence typed
-    have resultWF := CompatibleExpressionCertificateNativeTyping.project_wellFormed metadata.projected
+    have resultWF := CompatibleExpressionCertificateNativeTyping.project_wellFormed metadata.projected |>.extend_definitions extension
     rw [certified.emitted receipt metadata.coercions]
     refine ⟨resultWF, ?_⟩
     change HasType _ (SourceCoreCalls.call _ _ _ _) (LanguageResult.resultType _) _
@@ -326,5 +375,17 @@ theorem native {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceE
         simpa only [certified.selected.signature] using receipt.native.inputType
       rw [parameter]
       exact packed.2
+
+theorem native {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {children : GenericExpressionMeaning.Certificate} {administrative : Core.Context}
+    (slots : ∀ header, header ∈ headers → administrative[compilation.administrativePrefix + header.slot]? =
+      some header.named.signature.referenceType)
+    (head : Head headers compilation source context evidence children scope id output)
+    (typed : ∀ child code, children scope child code →
+      CompatibleExpressionScalarNativeTyping.NativeTyping values.checked.catalog.definitions
+        (SourceCoreLocalCell.coreContext scope ++ administrative) code) :
+    CompatibleExpressionScalarNativeTyping.NativeTyping values.checked.catalog.definitions
+      (SourceCoreLocalCell.coreContext scope ++ administrative) output :=
+  native_at (.refl _) slots head typed
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads

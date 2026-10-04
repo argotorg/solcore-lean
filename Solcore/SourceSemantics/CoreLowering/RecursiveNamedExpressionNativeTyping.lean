@@ -25,12 +25,12 @@ def Slots (headers : Inventory prepared values ambient.definitions program)
   ∀ header, header ∈ headers →
     administrative[compilation.administrativePrefix + header.slot]? = some header.named.signature.referenceType
 
-private theorem primitive_native {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+private theorem primitive_native {definitions : DataEnvironment} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
     {children : GenericExpressionMeaning.Certificate} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     {context : Core.Context}
     (head : CompatibleExpressionTypedCompositions.Head values.checked source children scope id lowered)
-    (typed : ∀ child code, children scope child code → NativeTyping values.checked.catalog.definitions context code) :
-    NativeTyping values.checked.catalog.definitions context lowered := by
+    (typed : ∀ child code, children scope child code → NativeTyping definitions context code) :
+    NativeTyping definitions context lowered := by
   cases head with
   | group _ _ _ _ child => exact typed _ _ child
   | pair _ _ _ _ _ first second =>
@@ -63,12 +63,17 @@ variable {readFuel : Nat} {source : TypedSource} {context : SourceSemantics.Cont
   (shaped : Shapes values.checked.signatures values.checked.catalog) (complete : Complete values.checked.catalog)
   {administrative : Core.Context} (slots : Slots headers compilation administrative)
 
-include shaped complete slots in
-theorem tree_native_with (callerEvidence : Option Dynamic.EvidenceEnvironment)
-    (tree : CompatibleExpressionCalls.Tree (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context) readFuel values source context solved reasonAt scope id lowered) :
-    NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
+include shaped complete in
+theorem tree_native_for {definitions : DataEnvironment}
+    (extension : values.checked.catalog.definitions.Extends definitions)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (callTyped : ∀ {children scope id lowered}, calls children scope id lowered →
+      (∀ child code, children scope child code → NativeTyping definitions (SourceCoreLocalCell.coreContext scope ++ administrative) code) →
+      NativeTyping definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered)
+    (tree : CompatibleExpressionCalls.Tree calls readFuel values source context solved reasonAt scope id lowered) :
+    NativeTyping definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
   induction tree with
-  | fragment child => exact builtins_native administrative shaped complete child
+  | fragment child => exact builtins_native_at administrative shaped complete extension child
   | node head _ ih =>
     have children := fun child code (receipt : CompatibleExpressionCalls.Entries scope _ scope child code) =>
       ih child code receipt.2
@@ -76,21 +81,29 @@ theorem tree_native_with (callerEvidence : Option Dynamic.EvidenceEnvironment)
     | primitive head => exact primitive_native head children
     | constructor receipt _ _ sequence =>
       have packed := packed_native sequence children
-      have registered := receipt.registered
+      have registered := extension.constructor_lookup receipt.registered
       rw [← packed_type] at registered
       obtain ⟨_, ownerRegistered⟩ := DataEnvironment.lookupConstructorPayloadType?_owner registered
       exact ⟨.namedData ownerRegistered, SourceCoreCompatibleDataExpressions.construct_hasType _ registered packed.2⟩
     | member _ baseMetadata _ layout child =>
       have childType := child_type layout baseMetadata.projected
-      exact ⟨result_wellFormed layout, layout_native layout shaped complete
+      exact ⟨(result_wellFormed layout).extend_definitions extension, layout_native_at extension layout shaped complete
         (by rw [← childType]; exact (children _ _ child).2)⟩
-    | index header _ _ _ first second => exact index_native header (children _ _ first) (children _ _ second) (reasonAt _)
+    | index header _ _ _ first second => exact index_native_at header (children _ _ first) (children _ _ second) (reasonAt _) extension
     | builtin head => exact BuiltinCallNativeTyping.Head.native head children
-    | call head =>
-      cases callerEvidence with
-      | none => exact named_native slots head children
-      | some evidence => exact RecursiveNamedCallEvidenceHeads.native slots head children
+    | call head => exact callTyped head children
     | tuple _ sequence => exact packed_native sequence children
+
+include shaped complete slots in
+theorem tree_native_with (callerEvidence : Option Dynamic.EvidenceEnvironment)
+    (tree : CompatibleExpressionCalls.Tree (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context) readFuel values source context solved reasonAt scope id lowered) :
+    NativeTyping values.checked.catalog.definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
+  apply tree_native_for shaped complete (.refl _)
+    (RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context) (tree := tree)
+  intro children scope id lowered head typed
+  cases callerEvidence with
+  | none => exact named_native slots head typed
+  | some evidence => exact RecursiveNamedCallEvidenceHeads.native slots head typed
 
 include shaped complete slots in
 theorem tree_native

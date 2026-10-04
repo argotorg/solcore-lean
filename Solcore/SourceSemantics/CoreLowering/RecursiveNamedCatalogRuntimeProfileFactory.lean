@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedSourceContextFacts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogNativeContexts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeMatchProfiles
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationTreeMeaning
 
 /-! Runtime profiles are extracted from the actual cached body at its actual
 entry. One existing compiler traversal produces the same Tree and residual
@@ -145,6 +146,57 @@ variable {checked : Checked} {base : Base checked}
 
 /-- The fields describe this compiler invocation and its reached static children.
 None is a body/expression execution law or an arbitrary profile. -/
+structure InputsFor (certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate) (tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    (header : Header prepared values ambient.definitions program)
+    (expressionSyntax : ExpressionId → Prop)
+    (administrative : Core.Context) where
+  matchCompilation : SourceCoreCompatibleDataMatches.Context
+  invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word
+  invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
+  factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy header.function.source invalidOperand
+  matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess header.policy matchCompilation
+  matchValues : matchCompilation.values = values
+  matchDefinitions : matchCompilation.definitions = ambient.definitions
+  matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame header.globals
+    (header.layouts.allocatorAt header.owner header.active header.onError))
+  matchLedger : matchCompilation.solvedRequirements = header.solved
+  matchChildStatic : GenericImperativeMatch.MatchChildStatic matchCompilation header.function.source
+    certificates
+    ambient.definitions administrative
+  readPolicy : header.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked
+  binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+    header.policy.lowerBinder header.function.source scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked header.function.source scope binder
+  allocationPolicy : header.policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator prepared.layout.frame header.globals
+    (header.layouts.allocatorAt header.owner header.active header.onError))
+  expressions : ∀ sourceContext, sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+    sourceContext.signatures = values.checked.signatures →
+    ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext → expressionSyntax id →
+    header.function.source.lookupExpression? id = some node → ExpressionHasType header.function.source sourceContext id node.type →
+    header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+    certificates sourceContext scope id lowered
+  assignments : CompatibleAssignmentStatements.AssignmentPolicy header.policy values invalidProjection invalidOperand missingDefault
+  unaryPolicy : CompatibleBitNotStatements.Policy header.policy values invalidProjection invalidUnary missingDefault
+  assignmentExpressions : ∀ sourceContext scope fuel id lowered,
+    sourceContext.typeVariables = [] → sourceContext.residualTypeVariables = true →
+    sourceContext.signatures = values.checked.signatures →
+    CompatibleExpressionReads.ScopeDeclarations header.function.source scope sourceContext →
+    expressionSyntax id → ∀ node, header.function.source.lookupExpression? id = some node →
+    ExpressionHasType header.function.source sourceContext id node.type →
+    header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      certificates sourceContext scope id lowered ∧
+      HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+        (LanguageResult.resultType lowered.type) ambient.definitions
+  syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax header.context
+    (.statements true header.function.body) header.function.resultType
+  sourceSignatures : header.context.signatures = values.checked.signatures
+  declarations : CompatibleExpressionReads.ScopeDeclarations header.function.source (bodyScope header) header.context
+  projection : values.checked.catalog.project header.function.resultType = .ok header.output
+  accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+    (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
+
+
 structure InputsWith (authenticated : Bool) (tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
     (headers : Inventory prepared values ambient.definitions program)
     (header : Header prepared values ambient.definitions program)
@@ -195,6 +247,21 @@ structure InputsWith (authenticated : Bool) (tracked : Bool) (diagnosticPolicy :
   projection : values.checked.catalog.project header.function.resultType = .ok header.output
   accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
     (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
+
+/-- Every legacy field belongs to the exact same static expression family. -/
+def InputsWith.to_for {tracked : Bool}
+    (inputs : InputsWith authenticated tracked diagnosticPolicy headers header compilation expressionSyntax administrative) :
+    InputsFor (fun context => RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith
+      (if authenticated then some header.function.evidence else none) headers compilation header.readFuel
+      header.function.source context header.solved header.reasonAt) tracked diagnosticPolicy header expressionSyntax administrative := by
+  rcases inputs with ⟨matchCompilation, invalidProjection, invalidOperand, invalidUnary, missingDefault,
+    factory, matchPolicy, matchValues, matchDefinitions, matchAllocator, matchLedger, matchChildStatic,
+    readPolicy, binderPolicy, allocationPolicy, expressions, assignments, unaryPolicy, assignmentExpressions,
+    syntaxTree, sourceSignatures, declarations, projection, accepted⟩
+  exact ⟨matchCompilation, invalidProjection, invalidOperand, invalidUnary, missingDefault,
+    factory, matchPolicy, matchValues, matchDefinitions, matchAllocator, matchLedger, matchChildStatic,
+    readPolicy, binderPolicy, allocationPolicy, expressions, assignments, unaryPolicy, assignmentExpressions,
+    syntaxTree, sourceSignatures, declarations, projection, accepted⟩
 
 
 abbrev Inputs (tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
@@ -335,6 +402,24 @@ def Inputs.of_exact (tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPol
     Inputs tracked diagnosticPolicy headers header compilation expressionSyntax administrative :=
   InputsWith.of_exact false tracked diagnosticPolicy headers header compilation expressionSyntax administrative matchCompilation invalidProjection invalidOperand invalidUnary missingDefault factory matchPolicy matchValues matchDefinitions matchAllocator matchLedger matchChildStatic readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy assignmentExpressions syntaxTree sourceSignatures declarations projection accepted
 
+structure ReceiptFor (certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate) (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    (header : Header prepared values ambient.definitions program)
+    (expressionSyntax : ExpressionId → Prop)
+    (administrative : Core.Context) where
+  accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+    (bodyScope header) header.function.body header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
+  projection : values.checked.catalog.project header.function.resultType = .ok header.output
+  signatures : header.context.signatures = values.checked.signatures
+  flow : Expr
+  generated : SourceCoreLoops.lowerFlowStatementsWithPolicy header.policy header.fuel header.function.source
+    (bodyScope header) header.function.body header.output header.reasonAt true header.escaped = .ok flow
+  extracted : GenericImperativeMatch.ExtractionFor diagnosticPolicy header.layouts header.owner header.active
+    prepared.layout.frame header.globals header.onError values header.function.source expressionSyntax
+    certificates
+    ambient.definitions administrative header.solved header.context (bodyScope header)
+    (.statements true header.function.body) header.function.resultType header.output flow
+
+
 structure ReceiptWith (authenticated : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
     (headers : Inventory prepared values ambient.definitions program)
     (header : Header prepared values ambient.definitions program)
@@ -353,6 +438,13 @@ structure ReceiptWith (authenticated : Bool) (diagnosticPolicy : AssignmentDiagn
     ambient.definitions administrative header.solved header.context (bodyScope header)
     (.statements true header.function.body) header.function.resultType header.output flow
 
+def ReceiptWith.to_for
+    (receipt : ReceiptWith authenticated diagnosticPolicy headers header compilation expressionSyntax administrative) :
+    ReceiptFor (fun context => RecursiveNamedExpressionCompilerCertificates.RuntimeExpressionsWith
+      (if authenticated then some header.function.evidence else none) headers compilation header.readFuel
+      header.function.source context header.solved header.reasonAt) diagnosticPolicy header expressionSyntax administrative :=
+  ⟨receipt.accepted, receipt.projection, receipt.signatures, receipt.flow, receipt.generated, receipt.extracted⟩
+
 
 abbrev Receipt (diagnosticPolicy : AssignmentDiagnosticPolicy)
     (headers : Inventory prepared values ambient.definitions program)
@@ -363,17 +455,27 @@ abbrev Receipt (diagnosticPolicy : AssignmentDiagnosticPolicy)
 
 /-- The complete Header validity is used only in its forward runtime form.
 Interpretation refers to the exact returned diagnostic predicate. -/
+def ReceiptFor.profile
+    {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    (receipt : ReceiptFor certificates diagnosticPolicy header expressionSyntax administrative)
+    (catalog : SignatureCatalogWellFormed values.checked.signatures)
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (interpreted : receipt.extracted.diagnostics registry faults) :
+    MatchProfileWith (fun context => CompatibleRuntimeContextValidity.Valid header.solved context header.function.evidence) certificates
+      diagnosticPolicy header expressionSyntax administrative registry faults := by
+  have sites : CatalogSites diagnosticPolicy registry faults receipt.extracted.tree := by
+    obtain ⟨errors, ledgers⟩ := receipt.extracted.materialize registry faults interpreted
+    exact catalog_sites catalog ledgers header.valid.ledger receipt.signatures
+  exact MatchProfileWith.of_extracted header.valid receipt.accepted receipt.projection receipt.generated
+    receipt.extracted.tree sites
+
 def ReceiptWith.profile
     (receipt : ReceiptWith authenticated diagnosticPolicy headers header compilation expressionSyntax administrative)
     (catalog : SignatureCatalogWellFormed values.checked.signatures)
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (interpreted : receipt.extracted.diagnostics registry faults) :
-    RuntimeMatchProfileForWith authenticated diagnosticPolicy headers header compilation header.readFuel expressionSyntax administrative registry faults := by
-  have sites : CatalogSites diagnosticPolicy registry faults receipt.extracted.tree := by
-    obtain ⟨errors, ledgers⟩ := receipt.extracted.materialize registry faults interpreted
-    exact catalog_sites catalog ledgers header.valid.ledger receipt.signatures
-  exact RuntimeMatchProfileForWith.of_extracted authenticated header.valid receipt.accepted receipt.projection receipt.generated
-    receipt.extracted.tree sites
+    RuntimeMatchProfileForWith authenticated diagnosticPolicy headers header compilation header.readFuel expressionSyntax administrative registry faults :=
+  receipt.to_for.profile catalog interpreted
 
 def Receipt.profile
     (receipt : Receipt diagnosticPolicy headers header compilation expressionSyntax administrative)
@@ -382,6 +484,42 @@ def Receipt.profile
     (interpreted : receipt.extracted.diagnostics registry faults) :
     RuntimeMatchProfileFor diagnosticPolicy headers header compilation header.readFuel expressionSyntax administrative registry faults :=
   ReceiptWith.profile receipt catalog interpreted
+
+section GenericFactory
+variable {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {locations : Locations} {functions : FunctionModel values.checked.catalog ambient}
+  {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {before : Dynamic.Heap}
+  {initialStore : Store} {initialMap : LocationMap} {initialWorld : StoreTyping}
+  {actualContext : Core.Context} {actual : Environment} {ξ : Renaming} {frameLocation : Location}
+  {current : CallableIndexedHistory.NativeFrame} {ghost : CallableIndexedHistory.GhostFrame}
+  {tracked : Bool} {suffix : Core.Context}
+  (cachedTyped : HasType (base.globals.map (·.referenceType) ++ .cell prepared.layout.frame.type :: suffix)
+    (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code)
+    header.named.signature.functionType ambient.definitions)
+  (support : supported (.lambda header.named.signature.parameterType
+    (LanguageResult.resultType header.named.signature.resultType) header.code) (base.globals.length + 1) = true)
+  (complete : Complete headers) (globals : header.globals = base.globals.length)
+  (entry : BodyState headers locations 0 functions registry header arguments before initialStore initialMap initialWorld
+    administrative actualContext actual ξ frameLocation current ghost)
+
+include cachedTyped support complete globals entry in
+/-- One actual body traversal serves every static expression certificate family. -/
+theorem extract_source_for
+    (inputs : InputsFor certificates tracked diagnosticPolicy header expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) :
+    Nonempty (ReceiptFor certificates diagnosticPolicy header expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
+  have typed := canonical_cached complete globals cachedTyped support entry
+  obtain ⟨flow, generated, extracted, _⟩ := GenericImperativeMatch.extraction_of_typed_body_with_lowering true diagnosticPolicy
+    inputs.factory inputs.matchPolicy inputs.matchValues inputs.matchDefinitions inputs.matchAllocator inputs.matchChildStatic
+    inputs.readPolicy inputs.binderPolicy inputs.allocationPolicy inputs.expressions inputs.assignments inputs.unaryPolicy
+    header.unique inputs.assignmentExpressions inputs.syntaxTree
+    (RecursiveNamedSourceContextFacts.header_typeVariables header) (RecursiveNamedSourceContextFacts.header_residual header)
+    inputs.sourceSignatures inputs.declarations inputs.projection inputs.accepted typed
+  rw [inputs.matchLedger] at extracted
+  exact ⟨⟨inputs.accepted, inputs.projection, inputs.sourceSignatures, flow, generated, extracted⟩⟩
+
+end GenericFactory
 
 variable {locations : Locations} {functions : FunctionModel values.checked.catalog ambient}
   {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {before : Dynamic.Heap}
@@ -406,15 +544,8 @@ entry. The existing single compiler traversal supplies every body node. -/
 theorem extract_source_with :
     Nonempty (ReceiptWith authenticated diagnosticPolicy headers header compilation expressionSyntax
       (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) := by
-  have typed := canonical_cached complete globals cachedTyped support entry
-  obtain ⟨flow, generated, extracted, _⟩ := GenericImperativeMatch.extraction_of_typed_body_with_lowering true diagnosticPolicy
-    inputs.factory inputs.matchPolicy inputs.matchValues inputs.matchDefinitions inputs.matchAllocator inputs.matchChildStatic
-    inputs.readPolicy inputs.binderPolicy inputs.allocationPolicy inputs.expressions inputs.assignments inputs.unaryPolicy
-    header.unique inputs.assignmentExpressions inputs.syntaxTree
-    (RecursiveNamedSourceContextFacts.header_typeVariables header) (RecursiveNamedSourceContextFacts.header_residual header)
-    inputs.sourceSignatures inputs.declarations inputs.projection inputs.accepted typed
-  rw [inputs.matchLedger] at extracted
-  exact ⟨⟨inputs.accepted, inputs.projection, inputs.sourceSignatures, flow, generated, extracted⟩⟩
+  obtain ⟨result⟩ := extract_source_for cachedTyped support complete globals entry inputs.to_for
+  exact ⟨⟨result.accepted, result.projection, result.signatures, result.flow, result.generated, result.extracted⟩⟩
 
 include inputs cachedTyped support complete globals entry in
 /-- Pointwise provider for mutual body induction. The chosen static receipt
@@ -466,5 +597,75 @@ theorem provider (inputs : Inputs tracked diagnosticPolicy headers header compil
   provider_with inputs cachedTyped support complete globals entry catalog
 
 end Factory
+
+section Formation
+variable {values : SourceCoreCompatibleValues.Context}
+  {indexed : SourceCoreCallableIndexedPrograms.Prepared values.checked}
+  {program : Program} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
+  {header : Header indexed.ancestry values indexed.layouts.definitions program}
+  {expressionSyntax : ExpressionId → Prop} {administrative suffix : Core.Context}
+  {diagnosticPolicy : AssignmentDiagnosticPolicy} {tracked authenticated : Bool} {locations : Locations}
+  {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+  {initialMap : LocationMap} {initialWorld : StoreTyping} {actualContext : Core.Context}
+  {actual : Environment} {ξ : Renaming} {frameLocation : Location}
+  {current : CallableIndexedHistory.NativeFrame} {ghost : CallableIndexedHistory.GhostFrame}
+
+abbrev FormationCertificates (authenticated : Bool)
+    (header : Header indexed.ancestry values indexed.layouts.definitions program)
+    (context : SourceSemantics.Context) :=
+  RecursiveNamedLambdaFormationTreeMeaning.Expressions (caller := header) (headers := headers)
+    (context := context) (evidence := header.function.evidence) (registry := registry) (faults := faults)
+    (fuel := header.readFuel) (solved := header.solved) (reasonAt := header.reasonAt) authenticated
+
+abbrev FormationInputs (authenticated tracked : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    (header : Header indexed.ancestry values indexed.layouts.definitions program)
+    (expressionSyntax : ExpressionId → Prop) (administrative : Core.Context) :=
+  InputsFor (ambient := CallableIndexedAmbient.ambientDefinitions indexed)
+    (FormationCertificates (headers := headers) (registry := registry) (faults := faults) authenticated header)
+    tracked diagnosticPolicy header expressionSyntax administrative
+
+abbrev FormationReceipt (authenticated : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy)
+    (header : Header indexed.ancestry values indexed.layouts.definitions program)
+    (expressionSyntax : ExpressionId → Prop) (administrative : Core.Context) :=
+  ReceiptFor (ambient := CallableIndexedAmbient.ambientDefinitions indexed)
+    (FormationCertificates (headers := headers) (registry := registry) (faults := faults) authenticated header)
+    diagnosticPolicy header expressionSyntax administrative
+
+/-- Static children are constructed at this actual aligned parameter result.
+The complete cached code and its finite support still provide whole-body typing. -/
+theorem formation_provider
+    (profile : values.checked.catalog.callableContracts = true)
+    (entry : BodyState (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers locations 0
+      (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry header
+      arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost)
+    (aligned : RecursiveNamedLambdaFormationEntries.BodyAligned (indexed := indexed)
+      (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry entry)
+    (inputs : RecursiveNamedLambdaFormationEntries.BodyAligned (indexed := indexed)
+      (CallableIndexedLambdaRuntimeValues.model indexed program registry faults profile) registry entry →
+      FormationInputs (headers := headers) (registry := registry) (faults := faults) authenticated tracked diagnosticPolicy header expressionSyntax
+        (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative))
+    (cachedTyped : HasType (indexed.base.globals.map (·.referenceType) ++ .cell indexed.ancestry.layout.frame.type :: suffix)
+      (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code)
+      header.named.signature.functionType indexed.layouts.definitions)
+    (support : supported (.lambda header.named.signature.parameterType
+      (LanguageResult.resultType header.named.signature.resultType) header.code) (indexed.base.globals.length + 1) = true)
+    (complete : Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : header.globals = indexed.base.globals.length)
+    (catalog : SignatureCatalogWellFormed values.checked.signatures) :
+    ∃ result : FormationReceipt (headers := headers) (registry := registry) (faults := faults) authenticated diagnosticPolicy header expressionSyntax
+        (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative),
+      result.accepted = (inputs aligned).accepted ∧ result.projection = (inputs aligned).projection ∧
+      ∀ observedFaults : FunctionCalls.FaultRep, result.extracted.diagnostics registry observedFaults →
+        ∃ profile : MatchProfileWith (ambient := CallableIndexedAmbient.ambientDefinitions indexed)
+            (fun context => CompatibleRuntimeContextValidity.Valid header.solved context header.function.evidence)
+            (FormationCertificates (headers := headers) (registry := registry) (faults := faults) authenticated header)
+            diagnosticPolicy header expressionSyntax
+            (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry observedFaults,
+          profile.flow = result.flow ∧ HEq profile.tree result.extracted.tree := by
+  obtain ⟨result⟩ := extract_source_for cachedTyped support complete globals entry (inputs aligned)
+  exact ⟨result, Subsingleton.elim _ _, Subsingleton.elim _ _,
+    fun observedFaults interpreted => ⟨result.profile catalog interpreted, rfl, HEq.rfl⟩⟩
+end Formation
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogRuntimeProfileFactory

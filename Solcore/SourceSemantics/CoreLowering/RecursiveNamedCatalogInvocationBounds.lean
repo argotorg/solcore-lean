@@ -249,6 +249,25 @@ theorem named_parameters_sized (authority : Authority headers locations captureP
 variable (functions : FunctionModel values.checked.catalog ambient) (registry : SourceCoreRawMetadata.Registry)
   (header : Header prepared values ambient.definitions program) (faults : FunctionCalls.FaultRep)
 
+/-- A static predicate at the original, fully retained body state. It does not
+contain an execution law or recover a source history from native typing. -/
+abbrev BodyCondition :=
+  ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost},
+    BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost → Prop
+
+/-- Actual hook ownership and its carried history authorize precisely the
+state reached by the named parameter prefix. Arbitrary body states are excluded. -/
+def BodyAuthorization (condition : BodyCondition (headers := headers) (locations := locations)
+    (capturePrefix := capturePrefix) functions registry header) : Prop :=
+  ∀ {origin index metadata arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation},
+    prepared.graph.inputs.callable.table.idAt? (.named header.named.signature.key) = some origin →
+    Carries prepared.graph.inputs prepared.graph.table (.state index) (.named origin) (some metadata) →
+    header.code = withFrame (.var (base.globals.length + 1))
+      (SourceCoreCallableIndexedDispatch.literal prepared.layout.frame (.state index)) header.parameterCode →
+    ∀ entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation (.state index) (.named origin), condition entry
+
 /-- A pointwise body obligation at the real parameter entry. The independent
 source context is the one retained by this header and its marked prefix. -/
 def BodyPreservesAt (size : Nat) : Prop :=
@@ -272,6 +291,40 @@ def BodyReflectsAt (size : Nat) : Prop :=
     (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
       administrative actualContext actual ξ frameLocation current ghost)
     {value finalStore},
+    EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore →
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyTrace program sourceSize header.function header.context entry.environment entry.heap outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after
+
+/-- A pointwise body obligation at the real parameter entry. The independent
+source context is the one retained by this header and its marked prefix. -/
+def BodyPreservesAtWith (condition : BodyCondition (headers := headers) (locations := locations)
+    (capturePrefix := capturePrefix) functions registry header) (size : Nat) : Prop :=
+  ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost}
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    {outcome after}, condition entry →
+    RecursiveNamedCallBounds.BodyTrace program size header.function header.context entry.environment entry.heap outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after
+
+/-- Reflection consumes the original body subderivation. Its independent source
+cost is an output and is never compared with the native input cost. -/
+def BodyReflectsAtWith (condition : BodyCondition (headers := headers) (locations := locations)
+    (capturePrefix := capturePrefix) functions registry header) (size : Nat) : Prop :=
+  ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost}
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    {value finalStore}, condition entry →
     EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore →
     ∃ sourceSize outcome after finalMap finalWorld,
       RecursiveNamedCallBounds.BodyTrace program sourceSize header.function header.context entry.environment entry.heap outcome after ∧
@@ -338,8 +391,11 @@ private theorem next_evaluates (index : Int) (actual : Environment) (store : Sto
   exact CallableIndexedContextFrames.literal_evaluates _ _ _ _
 
 /-- Only the real strictly smaller source body child selects the body IH. -/
-theorem invocation_preserves_bounded (budget : Nat)
-    (bodyMeaning : Below budget (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults))
+theorem invocation_preserves_bounded_with
+    (condition : BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : BodyAuthorization (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header condition)
+    (budget : Nat)
+    (bodyMeaning : Below budget (BodyPreservesAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults condition))
     {scope : Scope} {canonical : Environment}
     (caller : Entry headers locations capturePrefix callerPrefix scope mapping world heap store canonical)
     (member : header ∈ headers) {arguments : List Dynamic.Value} {payloads : List Value}
@@ -369,7 +425,7 @@ theorem invocation_preserves_bounded (budget : Nat)
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same state.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
   obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps, bodyMaps, bodyWorlds, bodyFrame, bodyMetadata⟩ :=
-    bodyMeaning child (Nat.lt_of_lt_of_le smaller within) state bodyTrace
+    bodyMeaning child (Nat.lt_of_lt_of_le smaller within) state (authorized owned history emitted state) bodyTrace
   have prefixEvaluation := entry.agreement.wrap bodyEvaluation
   rw [rename_prefix] at prefixEvaluation
   have reference : (DataPatternValues.packValues payloads :: capture.captured)[capture.embedding.lift (base.globals.length + 1)]? =
@@ -390,9 +446,37 @@ theorem invocation_preserves_bounded (budget : Nat)
   exact ⟨capture, value, _, finalMap, finalWorld, renamed.symm ▸ evaluation, result, restoredHeaps, maps, worlds,
     restoredFrame, sourceMetadata, ⟨caller.extend maps worlds restoredFrame sourceMetadata⟩⟩
 
+theorem invocation_preserves_bounded (budget : Nat)
+    (bodyMeaning : Below budget (BodyPreservesAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults))
+    {scope : Scope} {canonical : Environment}
+    (caller : Entry headers locations capturePrefix callerPrefix scope mapping world heap store canonical)
+    (member : header ∈ headers) {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world header.bindings arguments payloads)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store)
+    {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence heap arguments outcome after)
+    (within : size ≤ budget) :
+    ∃ capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world heap store,
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
+          (header.code.rename capture.embedding.lift) value finalStore ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+        Nonempty (Entry headers locations capturePrefix callerPrefix scope finalMap finalWorld after finalStore canonical) := by
+  exact invocation_preserves_bounded_with (fun _ => True) (by unfold BodyAuthorization; intros; trivial) budget
+    (by
+      intro child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodyMeaning child smaller entry trace) caller member represented heaps trace within
 /-- Original hook and parameter sizes choose the reflected body IH. -/
-theorem invocation_reflects_bounded (budget : Nat)
-    (bodyMeaning : Below budget (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults))
+theorem invocation_reflects_bounded_with
+    (condition : BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : BodyAuthorization (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header condition)
+    (budget : Nat)
+    (bodyMeaning : Below budget (BodyReflectsAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults condition))
     {scope : Scope} {canonical : Environment}
     (caller : Entry headers locations capturePrefix callerPrefix scope mapping world heap store canonical)
     (member : header ∈ headers) {arguments : List Dynamic.Value} {payloads : List Value}
@@ -415,7 +499,7 @@ theorem invocation_reflects_bounded (budget : Nat)
   obtain ⟨origin, index, metadata, owned, history, emitted, entry, child, bodyStore, bodyCompleted, smaller, restored⟩ :=
     named_parameters_sized caller.authority member represented heaps capture completed
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps, bodyMaps, bodyWorlds, bodyFrame, bodyMetadata⟩ :=
-    bodyMeaning child (Nat.lt_of_lt_of_le smaller within) entry bodyCompleted
+    bodyMeaning child (Nat.lt_of_lt_of_le smaller within) entry (authorized owned history emitted entry) bodyCompleted
   have maps := entry.maps.trans bodyMaps
   have worlds := entry.worlds.trans bodyWorlds
   have frame := entry.frame.trans bodyFrame
@@ -425,6 +509,32 @@ theorem invocation_reflects_bounded (budget : Nat)
   subst finalStore
   exact ⟨_, outcome, after, finalMap, finalWorld, body_of_trace_sized entry.allocation trace, result, restoredHeaps,
     maps, worlds, restoredFrame, sourceMetadata, ⟨caller.extend maps worlds restoredFrame sourceMetadata⟩⟩
+
+theorem invocation_reflects_bounded (budget : Nat)
+    (bodyMeaning : Below budget (BodyReflectsAt (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults))
+    {scope : Scope} {canonical : Environment}
+    (caller : Entry headers locations capturePrefix callerPrefix scope mapping world heap store canonical)
+    (member : header ∈ headers) {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world header.bindings arguments payloads)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store)
+    (capture : Capture headers locations capturePrefix caller.authority.frameLocation header mapping world heap store)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
+      (header.code.rename capture.embedding.lift) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyOutcome program sourceSize header.sourceBody header.function.evidence heap arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+      Nonempty (Entry headers locations capturePrefix callerPrefix scope finalMap finalWorld after finalStore canonical) := by
+  exact invocation_reflects_bounded_with (fun _ => True) (by unfold BodyAuthorization; intros; trivial) budget
+    (by
+      intro child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodyMeaning child smaller entry trace) caller member represented heaps capture completed within
 
 private theorem finish_rename (type : Ty) (flow : Expr) (fellThrough escaped : Word) (ξ : Renaming) :
     (CompatibleStatements.finish type flow fellThrough escaped).rename ξ =

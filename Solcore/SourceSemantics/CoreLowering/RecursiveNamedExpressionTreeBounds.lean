@@ -41,9 +41,85 @@ variable {checked : Checked} {base : Base checked}
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
   {certificate : GenericExpressionMeaning.Certificate}
 
+include extension faithful functionLeaves functionTypes unique missing in
+/-- Every existing head uses child obligations at the same inclusive budget;
+only an actual named callee consumes the strictly smaller body contract. -/
+theorem head_preserves_at_with_calls (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (budget size : Nat) (within : size ≤ budget)
+    (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
+      P)
+    (callMeaning : RecursiveNamedBoundedContracts.PreservesAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (calls certificate) faults P) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Head (calls)
+        values source context reasonAt certificate) faults
+      P := by
+  intro scope id lowered head
+  cases head with
+  | primitive head =>
+    exact RecursiveNamedExpressionCompositionsBounds.Head.preserves_at functions program evidence
+      transport budget size within unique children head
+  | constructor receipt form accepted sequence =>
+    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence unique missing transport budget size within children
+      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
+  | member metadata baseMetadata form layout certified =>
+    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence unique missing transport budget size within children
+      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
+  | index header found form sourceType first second =>
+    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence unique missing transport budget size within children
+      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
+  | builtin head =>
+    exact RecursiveNamedBuiltinHeadBounds.Head.preserves_at functions functionLeaves program evidence unique
+      transport budget size within children head
+  | tuple receipt sequence =>
+    exact RecursiveNamedTupleHeadBounds.preserves_at functions program evidence transport budget size within unique children
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
+  | call head => exact callMeaning head
+
 include extension faithful functionLeaves functionTypes unique owners missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
 only an actual named callee consumes the strictly smaller body contract. -/
+theorem head_preserves_at_with_for (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
+      protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
+    (conditions : ∀ header, BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → BodyAuthorization (headers := headers) (locations := locations)
+      (capturePrefix := capturePrefix) functions registry header (conditions header))
+    (authenticated : Bool)
+    (idsUnique : authenticated = true → RequirementIdsUnique context)
+    (budget size : Nat) (within : size ≤ budget)
+    (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
+      P)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyPreservesAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Head (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
+        values source context reasonAt certificate) faults
+      P :=
+  head_preserves_at_with_calls functions extension faithful functionLeaves functionTypes evidence unique missing P transport
+    (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) budget size within children
+    (by
+      intro scope id lowered head
+      cases authenticated with
+      | false =>
+        exact RecursiveNamedExpressionHeadBounds.preserves_at_for functions P transport catalog conditions authorized budget size within unique owners
+          (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
+      | true =>
+        exact RecursiveNamedCallEvidenceHeads.preserves_at_for functions P transport catalog conditions authorized budget size within (idsUnique rfl) unique owners
+          (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head)
+
+include extension faithful functionLeaves functionTypes unique owners missing in
 theorem head_preserves_at_with (authenticated : Bool)
     (idsUnique : authenticated = true → RequirementIdsUnique context)
     (budget size : Nat) (within : size ≤ budget)
@@ -56,38 +132,13 @@ theorem head_preserves_at_with (authenticated : Bool)
       program context evidence source
       (CompatibleExpressionCalls.Head (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
         values source context reasonAt certificate) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-  intro scope id lowered head
-  cases head with
-  | primitive head =>
-    exact RecursiveNamedExpressionCompositionsBounds.Head.preserves_at functions program evidence
-      entry_transport budget size within unique children head
-  | constructor receipt form accepted sequence =>
-    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing entry_transport budget size within children
-      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
-  | member metadata baseMetadata form layout certified =>
-    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing entry_transport budget size within children
-      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
-  | index header found form sourceType first second =>
-    exact RecursiveNamedDataExpressionHeadBounds.preserves_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing entry_transport budget size within children
-      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
-  | builtin head =>
-    exact RecursiveNamedBuiltinHeadBounds.Head.preserves_at functions functionLeaves program evidence unique
-      entry_transport budget size within children head
-  | tuple receipt sequence =>
-    exact RecursiveNamedTupleHeadBounds.preserves_at functions program evidence entry_transport budget size within unique children
-      ⟨_, _, _, _, rfl, receipt, sequence⟩
-  | call head =>
-    cases authenticated with
-    | false =>
-      exact RecursiveNamedExpressionHeadBounds.preserves_at functions budget size within unique owners
-        (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
-    | true =>
-      exact RecursiveNamedCallEvidenceHeads.preserves_at functions budget size within (idsUnique rfl) unique owners
-        (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  head_preserves_at_with_for functions extension faithful functionLeaves functionTypes evidence unique owners missing
+    _ entry_transport (fun entry => entry) (fun _ => fun {_ _ _ _ _ _ _ _ _ _ _ _} _ => True)
+    (fun _ _ => by unfold BodyAuthorization; intros; trivial) authenticated idsUnique budget size within children
+    (by
+      intro header member child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodies header member child smaller entry trace)
 
 include extension faithful functionLeaves functionTypes unique owners missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
@@ -108,6 +159,81 @@ theorem head_preserves_at (budget size : Nat) (within : size ≤ budget)
 include extension faithful functionLeaves functionTypes missing in
 /-- Original native children select their own pointwise obligations. Reflection
 constructs a separately measured source trace. -/
+theorem head_reflects_at_with_calls (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (budget size : Nat) (within : size ≤ budget)
+    (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
+      P)
+    (callMeaning : RecursiveNamedBoundedContracts.ReflectsAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (calls certificate) faults P) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Head (calls)
+        values source context reasonAt certificate) faults
+      P := by
+  intro scope id lowered head
+  cases head with
+  | primitive head =>
+    exact RecursiveNamedExpressionCompositionsBounds.Head.reflects_at functions program evidence
+      transport budget size within children head
+  | constructor receipt form accepted sequence =>
+    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence missing transport budget size within children
+      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
+  | member metadata baseMetadata form layout certified =>
+    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence missing transport budget size within children
+      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
+  | index header found form sourceType first second =>
+    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := calls) functions extension faithful functionLeaves functionTypes
+      program evidence missing transport budget size within children
+      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
+  | builtin head =>
+    exact RecursiveNamedBuiltinHeadBounds.Head.reflects_at functions functionLeaves program evidence
+      transport budget size within children head
+  | tuple receipt sequence =>
+    exact RecursiveNamedTupleHeadBounds.reflects_at functions program evidence transport budget size within children
+      ⟨_, _, _, _, rfl, receipt, sequence⟩
+  | call head => exact callMeaning head
+
+include extension faithful functionLeaves functionTypes missing in
+/-- Original native children select their own pointwise obligations. Reflection
+constructs a separately measured source trace. -/
+theorem head_reflects_at_with_for (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P)
+    (catalog : ∀ {scope mapping world heap store canonical}, P scope mapping world heap store canonical →
+      protectedEntry headers locations capturePrefix compilation.administrativePrefix scope mapping world heap store canonical)
+    (conditions : ∀ header, BodyCondition (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → BodyAuthorization (headers := headers) (locations := locations)
+      (capturePrefix := capturePrefix) functions registry header (conditions header))
+    (authenticated : Bool)
+    (budget size : Nat) (within : size ≤ budget)
+    (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults
+      P)
+    (bodies : ∀ header, header ∈ headers → RecursiveNamedBoundedContracts.Below budget
+      (BodyReflectsAtWith (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (conditions header))) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Head (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
+        values source context reasonAt certificate) faults
+      P :=
+  head_reflects_at_with_calls functions extension faithful functionLeaves functionTypes evidence missing P transport
+    (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) budget size within children
+    (by
+      intro scope id lowered head
+      cases authenticated with
+      | false =>
+        exact RecursiveNamedExpressionHeadBounds.reflects_at_for functions P transport catalog conditions authorized budget size within
+          (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
+      | true =>
+        exact RecursiveNamedCallEvidenceHeads.reflects_at_for functions P transport catalog conditions authorized budget size within
+          (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head)
+
+include extension faithful functionLeaves functionTypes missing in
 theorem head_reflects_at_with (authenticated : Bool)
     (budget size : Nat) (within : size ≤ budget)
     (children : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
@@ -119,38 +245,13 @@ theorem head_reflects_at_with (authenticated : Bool)
       program context evidence source
       (CompatibleExpressionCalls.Head (RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
         values source context reasonAt certificate) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-  intro scope id lowered head
-  cases head with
-  | primitive head =>
-    exact RecursiveNamedExpressionCompositionsBounds.Head.reflects_at functions program evidence
-      entry_transport budget size within children head
-  | constructor receipt form accepted sequence =>
-    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence missing entry_transport budget size within children
-      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
-  | member metadata baseMetadata form layout certified =>
-    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence missing entry_transport budget size within children
-      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
-  | index header found form sourceType first second =>
-    exact RecursiveNamedDataExpressionHeadBounds.reflects_at (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context) functions extension faithful functionLeaves functionTypes
-      program evidence missing entry_transport budget size within children
-      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
-  | builtin head =>
-    exact RecursiveNamedBuiltinHeadBounds.Head.reflects_at functions functionLeaves program evidence
-      entry_transport budget size within children head
-  | tuple receipt sequence =>
-    exact RecursiveNamedTupleHeadBounds.reflects_at functions program evidence entry_transport budget size within children
-      ⟨_, _, _, _, rfl, receipt, sequence⟩
-  | call head =>
-    cases authenticated with
-    | false =>
-      exact RecursiveNamedExpressionHeadBounds.reflects_at functions budget size within
-        (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
-    | true =>
-      exact RecursiveNamedCallEvidenceHeads.reflects_at functions budget size within
-        (fun child smaller => children child (Nat.le_of_lt smaller)) bodies head
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  head_reflects_at_with_for functions extension faithful functionLeaves functionTypes evidence missing
+    _ entry_transport (fun entry => entry) (fun _ => fun {_ _ _ _ _ _ _ _ _ _ _ _} _ => True)
+    (fun _ _ => by unfold BodyAuthorization; intros; trivial) authenticated budget size within children
+    (by
+      intro header member child smaller arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry result after _ trace
+      exact bodies header member child smaller entry trace)
 
 include extension faithful functionLeaves functionTypes missing in
 /-- Original native children select their own pointwise obligations. Reflection
@@ -168,9 +269,45 @@ theorem head_reflects_at (budget size : Nat) (within : size ≤ budget)
       (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
   head_reflects_at_with functions extension faithful functionLeaves functionTypes evidence missing false budget size within children bodies
 
-include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
+include extension faithful functionLeaves functionTypes unique uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
 remaining catalog-body Below family is the explicit mutual-induction boundary. -/
+theorem preserves_at_with_literals_with_for (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (P : ProtectedExpressionMeaning.Entry)
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults)
+    (budget size : Nat) (within : size ≤ budget)
+    (heads : ∀ certificate child, child ≤ budget →
+      (∀ smaller, smaller ≤ budget → RecursiveNamedBoundedContracts.PreservesAt smaller
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P) →
+      RecursiveNamedBoundedContracts.PreservesAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Head calls values source context reasonAt certificate) faults P) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      P := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites generalizing size with
+  | fragment child childSites =>
+    intro root found
+    exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
+      (ProtectedExpressionMeaning.preserves_of_typed P
+        (CompatibleExpressionBuiltins.preserves_with_literals functions extension faithful functionLeaves functionTypes
+          program evidence unique uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
+  | @node id lowered entries head children childSites ih =>
+    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Entries scope entries) faults
+        P := by
+      intro child childWithin current expression code certified
+      obtain ⟨rfl, member⟩ := certified
+      exact ih expression code member child childWithin
+    intro root found
+    exact heads _ size within meaning head found
+
+include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 theorem preserves_at_with_literals_with (authenticated : Bool)
     (idsUnique : authenticated = true → RequirementIdsUnique context)
     (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -182,26 +319,10 @@ theorem preserves_at_with_literals_with (authenticated : Bool)
       program context evidence source
       (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
         (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites generalizing size with
-  | fragment child childSites =>
-    intro root found
-    exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
-      (ProtectedExpressionMeaning.preserves_of_typed _
-        (CompatibleExpressionBuiltins.preserves_with_literals functions extension faithful functionLeaves functionTypes
-          program evidence unique uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
-  | @node id lowered entries head children childSites ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
-        (CompatibleExpressionCalls.Entries scope entries) faults
-        (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-      intro child childWithin current expression code certified
-      obtain ⟨rfl, member⟩ := certified
-      exact ih expression code member child childWithin
-    intro root found
-    exact head_preserves_at_with functions extension faithful functionLeaves functionTypes evidence unique owners missing authenticated idsUnique
-      budget size within meaning bodies head found
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  preserves_at_with_literals_with_for functions extension faithful functionLeaves functionTypes evidence unique uninitialized missing
+    _ _ literalMeaning budget size within
+    (fun _ child childWithin children => head_preserves_at_with functions extension faithful functionLeaves functionTypes evidence unique owners missing authenticated idsUnique budget child childWithin children bodies)
 
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 /-- Structural induction closes every expression child of the same Tree. The
@@ -273,6 +394,42 @@ theorem preserves_at_runtime
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and
 independent source costs. No source body trace is an input. -/
+theorem reflects_at_with_literals_with_for (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (P : ProtectedExpressionMeaning.Entry)
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults)
+    (budget size : Nat) (within : size ≤ budget)
+    (heads : ∀ certificate child, child ≤ budget →
+      (∀ smaller, smaller ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt smaller
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P) →
+      RecursiveNamedBoundedContracts.ReflectsAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Head calls values source context reasonAt certificate) faults P) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls)
+        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      P := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites generalizing size with
+  | fragment child childSites =>
+    intro root found
+    exact RecursiveNamedBoundedContracts.reflects_at_of_unbounded
+      (ProtectedExpressionMeaning.reflects_of_typed P
+        (CompatibleExpressionBuiltins.reflects_with_literals functions extension faithful functionLeaves functionTypes
+          program evidence uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
+  | @node id lowered entries head children childSites ih =>
+    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Entries scope entries) faults
+        P := by
+      intro child childWithin current expression code certified
+      obtain ⟨rfl, member⟩ := certified
+      exact ih expression code member child childWithin
+    intro root found
+    exact heads _ size within meaning head found
+
+include extension faithful functionLeaves functionTypes uninitialized missing in
 theorem reflects_at_with_literals_with (authenticated : Bool)
     (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source literals faults)
@@ -283,26 +440,10 @@ theorem reflects_at_with_literals_with (authenticated : Bool)
       program context evidence source
       (CompatibleExpressionCalls.Tree.WithLiterals (calls := RecursiveNamedCallEvidenceHeads.Calls (if authenticated then some evidence else none) headers compilation source context)
         (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
-      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites generalizing size with
-  | fragment child childSites =>
-    intro root found
-    exact RecursiveNamedBoundedContracts.reflects_at_of_unbounded
-      (ProtectedExpressionMeaning.reflects_of_typed _
-        (CompatibleExpressionBuiltins.reflects_with_literals functions extension faithful functionLeaves functionTypes
-          program evidence uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
-  | @node id lowered entries head children childSites ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
-        (CompatibleExpressionCalls.Entries scope entries) faults
-        (protectedEntry headers locations capturePrefix compilation.administrativePrefix) := by
-      intro child childWithin current expression code certified
-      obtain ⟨rfl, member⟩ := certified
-      exact ih expression code member child childWithin
-    intro root found
-    exact head_reflects_at_with functions extension faithful functionLeaves functionTypes evidence missing authenticated
-      budget size within meaning bodies head found
+      (protectedEntry headers locations capturePrefix compilation.administrativePrefix) :=
+  reflects_at_with_literals_with_for functions extension faithful functionLeaves functionTypes evidence uninitialized missing
+    _ _ literalMeaning budget size within
+    (fun _ child childWithin children => head_reflects_at_with functions extension faithful functionLeaves functionTypes evidence missing authenticated budget child childWithin children bodies)
 
 include extension faithful functionLeaves functionTypes uninitialized missing in
 /-- Reflection uses the same structural Tree, with original native bounds and

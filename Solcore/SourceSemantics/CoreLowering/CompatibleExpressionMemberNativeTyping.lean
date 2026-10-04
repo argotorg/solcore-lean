@@ -123,14 +123,16 @@ private theorem row_native {checked : SourceCoreCompatibleCatalog.Checked} {site
   cases actualProjected
   exact ⟨registered, nativeAt⟩
 
-theorem layout_native {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
+theorem layout_native_at {definitions : DataEnvironment}
+    {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
     {base field : TypeSystem.Ty} {index : Nat} {identity : DataTypeId} {branches : List Expr} {result : Ty}
+    (extension : checked.catalog.definitions.Extends definitions)
     (layout : Layout checked site base field index identity branches result)
     (shaped : Shapes checked.signatures checked.catalog) (complete : Complete checked.catalog)
     {context : Core.Context} {child : Expr}
-    (childTyped : HasType context child (LanguageResult.resultType (.namedData identity)) checked.catalog.definitions) :
+    (childTyped : HasType context child (LanguageResult.resultType (.namedData identity)) definitions) :
     HasType context (SourceCoreDataExpressions.member identity result branches child)
-      (LanguageResult.resultType result) checked.catalog.definitions := by
+      (LanguageResult.resultType result) definitions := by
   cases layout with
   | @intro signature arguments infos nominal selected certificate generated =>
     obtain ⟨entry, entryAt, _⟩ := identity_entry certificate.identityLookup
@@ -143,8 +145,8 @@ theorem layout_native {checked : SourceCoreCompatibleCatalog.Checked} {site : So
         simp [DataEnvironment.lookupDataType?, SourceCoreCompatibleCatalog.Catalog.definitions, List.getElem?_map, entryAt, stored]
       obtain ⟨_, _, _, count⟩ := shaped.nominal_coverage complete
         (by simpa [SourceCoreRawMetadata.runtimeType_idempotent] using nominal) selected certificate.identityLookup registered
-      apply SourceCoreDataExpressions.member_hasType registered
-        (projectType_wellFormed certificate.projectedField) childTyped
+      apply SourceCoreDataExpressions.member_hasType (extension.data_lookup registered)
+        ((projectType_wellFormed certificate.projectedField).extend_definitions extension) childTyped
       apply branches_native
       · rw [generated, List.length_map, relation_length certificate.rows, List.length_zipIdx, count]
       · intro position payload code payloadAt codeAt
@@ -166,6 +168,16 @@ theorem layout_native {checked : SourceCoreCompatibleCatalog.Checked} {site : So
           have payloadEq := Option.some.inj payloadLookup
           subst payload
           exact LanguageResult.success_hasType (projectPacked_native fieldAt (HasType.second (HasType.var rfl)))
+
+theorem layout_native {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
+    {base field : TypeSystem.Ty} {index : Nat} {identity : DataTypeId} {branches : List Expr} {result : Ty}
+    (layout : Layout checked site base field index identity branches result)
+    (shaped : Shapes checked.signatures checked.catalog) (complete : Complete checked.catalog)
+    {context : Core.Context} {child : Expr}
+    (childTyped : HasType context child (LanguageResult.resultType (.namedData identity)) checked.catalog.definitions) :
+    HasType context (SourceCoreDataExpressions.member identity result branches child)
+      (LanguageResult.resultType result) checked.catalog.definitions :=
+  layout_native_at (.refl _) layout shaped complete childTyped
 
 theorem child_type {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
     {base field : TypeSystem.Ty} {index : Nat} {identity : DataTypeId} {branches : List Expr} {result native : Ty}
