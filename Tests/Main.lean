@@ -1777,6 +1777,8 @@ import Solcore.Test.SourceCoreRecursiveNamedPreparedCallEvidence
 import Solcore.Test.SourceCoreCallableIndexedLambdaModelEntryBounds
 import Solcore.Test.SourceCoreCallableIndexedLambdaModelPreservation
 import Solcore.Test.SourceCoreRecursiveStagePrimitiveMeaning
+import Solcore.Test.SourceCoreCallableIndexedLambdaRuntimeValues
+import Solcore.Test.SourceCoreRecursiveNamedCallEvidenceBounds
 
 set_option autoImplicit false
 
