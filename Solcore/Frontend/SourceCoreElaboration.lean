@@ -4599,3 +4599,382 @@ theorem evaluateStagedBool_checked {solved : List SolvedRequirement} {source : T
   bool_checked accepted
 
 end Solcore.Frontend.SourceCoreElaboration.Internal.Staged
+
+/-! The closed Integer statement evaluator keeps validation and execution
+separate. Every accepted branch remains in the static receipt, while source
+execution later follows only the selected branch and records allocations. -/
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+open SourceInference TypeSystem
+
+def bind (binder : TypedBinder) (value : Int) : Binding := ⟨binder, value⟩
+
+def evaluate (solved : List SolvedRequirement) (source : TypedSource)
+    (environment : Environment) (execute : Bool) (fuel : Nat)
+    (fallthroughSite : ErrorSite) (fallthroughReason : ErrorReason)
+    (statements : List StatementId) : Except Error StagedIntegerEvaluation :=
+  evaluateStagedIntegerStatementsFuelWith id (rejectStagedIntegerCallsWith id)
+    solved execute fuel source environment fallthroughSite fallthroughReason statements
+
+def bindInputs (source : TypedSource) (seen : List Resolved.LocalId)
+    (binders : List TypedBinder) (values : List Int) : Except Error Environment :=
+  bindStagedIntegerInputsWith id source seen binders values
+
+/-- The original input checks keep order and reject repeated binder identities.
+Well-formed source binder extension is supplied independently from source typing. -/
+inductive InputsChecked (source : TypedSource) : List Resolved.LocalId →
+    List TypedBinder → List Int → Environment → Prop where
+  | nil (seen : List Resolved.LocalId) : InputsChecked source seen [] [] []
+  | cons {seen : List Resolved.LocalId} {binder : TypedBinder} {rest : List TypedBinder}
+      {value : Int} {values : List Int} {environment : Environment}
+      (owned : binder.id.owner = source.owner)
+      (fresh : binder.id ∉ seen)
+      (monomorphic : binder.scheme.quantified = [])
+      (typed : binder.scheme.body = .integer)
+      (tail : InputsChecked source (binder.id :: seen) rest values environment) :
+      InputsChecked source seen (binder :: rest) (value :: values) (bind binder value :: environment)
+
+inductive Checked (solved : List SolvedRequirement) (source : TypedSource) :
+    Environment → Bool → Nat → List StatementId → StagedIntegerEvaluation → Prop where
+  | letValue {environment : Environment} {execute : Bool} {fuel : Nat}
+      {statement : StatementId} {rest : List StatementId} {node : StatementNode}
+      {binder : TypedBinder} {initializer : ExpressionId} {initial result : StagedIntegerEvaluation}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .letDecl binder (some initializer))
+      (nodeType : node.type = .unit)
+      (fresh : environment.contains binder.id = false)
+      (owned : binder.id.owner = source.owner)
+      (monomorphic : binder.scheme.quantified = [])
+      (binderType : binder.scheme.body = .integer)
+      (initialChecked : IntegerChecked solved source environment execute fuel initializer initial)
+      (bodyChecked : Checked solved source (bind binder initial.value :: environment) execute fuel rest result) :
+      Checked solved source environment execute (fuel + 1) (statement :: rest)
+        ⟨result.value, initial.consumedRequirements ++ result.consumedRequirements⟩
+  | returnValue {environment : Environment} {execute : Bool} {fuel : Nat}
+      {statement : StatementId} {node : StatementNode} {value : ExpressionId}
+      {result : StagedIntegerEvaluation}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .returnStmt (some value))
+      (nodeType : node.type = .integer)
+      (valueChecked : IntegerChecked solved source environment execute fuel value result) :
+      Checked solved source environment execute (fuel + 1) [statement] result
+  | conditional {environment : Environment} {execute : Bool} {fuel : Nat}
+      {statement : StatementId} {node : StatementNode} {condition : ExpressionId}
+      {yes no : List StatementId} {guard : StagedBoolEvaluation}
+      {left right : StagedIntegerEvaluation}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .ifThen condition yes (some no))
+      (nodeType : node.type = .integer)
+      (conditionChecked : BoolChecked solved source environment execute fuel condition guard)
+      (thenChecked : Checked solved source environment (execute && guard.value) fuel yes left)
+      (elseChecked : Checked solved source environment (execute && !guard.value) fuel no right) :
+      Checked solved source environment execute (fuel + 1) [statement]
+        ⟨if guard.value then left.value else right.value,
+          guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+  | block {environment : Environment} {execute : Bool} {fuel : Nat}
+      {statement : StatementId} {node : StatementNode} {body : List StatementId}
+      {result : StagedIntegerEvaluation}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .block body)
+      (nodeType : node.type = .integer)
+      (bodyChecked : Checked solved source environment execute fuel body result) :
+      Checked solved source environment execute (fuel + 1) [statement] result
+
+/-- Actual public function acceptance retains the complete source roots,
+original binder order, and the successful ledger reconciliation. -/
+inductive FunctionChecked (function : CheckedFunction) (arguments : List Int) (value : Int) : Prop where
+  | intro {environment : Environment} {roots : List StatementId} {result : StagedIntegerEvaluation}
+      (sourceOwned : function.typedBody.owner = function.declaration)
+      (arity : function.typedBody.inputs.length = arguments.length)
+      (inferredType : function.inferredBodyType = .integer)
+      (functionType : function.type = .function
+        (Ty.productMany (function.typedBody.inputs.map fun binder => binder.scheme.body)) .integer)
+      (inputs : InputsChecked function.typedBody [] function.typedBody.inputs arguments environment)
+      (rootsEq : roots.map NodeId.statement = function.typedBody.roots)
+      (checked : Checked function.solvedRequirements function.typedBody environment true
+        (function.typedBody.nodes.length + 1) roots result)
+      (valueEq : result.value = value)
+      (reconciled : reconcileConsumedRequirements function.declaration
+        (function.solvedRequirements.map fun requirement => requirement.id) result.consumedRequirements = .ok []) :
+      FunctionChecked function arguments value
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+open SourceInference TypeSystem
+set_option linter.unusedSimpArgs false
+set_option maxHeartbeats 3000000
+
+private theorem lookup_statement {source : TypedSource} {statement : StatementId} {node : StatementNode}
+    (accepted : lookupStatement source statement = .ok node) :
+    source.lookupStatement? statement = some node := by
+  unfold lookupStatement at accepted
+  split at accepted <;> simp_all [fail, TypedSource.lookupStatement?]
+
+private theorem ensure_unit {site : ErrorSite} {type : Ty}
+    (accepted : ensureTypeWith id site .unit type = .ok ()) : type = .unit := by
+  unfold ensureTypeWith at accepted
+  cases lowered : lowerType site type with
+  | error reason => simp [lowered, Except.mapError, Bind.bind, Except.bind] at accepted
+  | ok actual =>
+    have same : actual = .unit := by
+      by_cases same : actual = .unit
+      · exact same
+      · simp [lowered, Except.mapError, Bind.bind, Except.bind, same, failWith] at accepted
+    subst actual
+    cases type <;> simp_all [lowerType, fail, Bind.bind, Except.bind, pure, Pure.pure, Except.pure]
+    case constructor head =>
+      cases head with
+      | declaration declaration => simp [lowerType, fail] at lowered
+      | builtin builtin => cases builtin <;> simp_all [lowerType, fail, Ty.unit]
+    case application function argument => split at lowered <;> contradiction
+    case product left right =>
+      cases leftEq : lowerType site left <;> simp only [leftEq] at lowered
+      · cases lowered
+      · cases rightEq : lowerType site right <;> simp [rightEq] at lowered
+
+/-- Input acceptance retains the actual ordered compiler environment. -/
+theorem inputs_checked {source : TypedSource} {seen : List Resolved.LocalId}
+    {binders : List TypedBinder} {values : List Int} {environment : Environment}
+    (accepted : bindInputs source seen binders values = .ok environment) :
+    InputsChecked source seen binders values environment := by
+  induction binders generalizing seen values environment with
+  | nil =>
+    cases values <;> simp_all [bindInputs, bindStagedIntegerInputsWith, failWith, pure, Pure.pure, Except.pure]
+    exact .nil seen
+  | cons binder rest ih =>
+    cases values with
+    | nil => simp [bindInputs, bindStagedIntegerInputsWith, failWith] at accepted
+    | cons value values =>
+      simp only [bindInputs, bindStagedIntegerInputsWith] at accepted
+      have owned : binder.id.owner = source.owner := by
+        by_cases owned : binder.id.owner = source.owner
+        · exact owned
+        · simp [owned, failWith] at accepted
+      have fresh : binder.id ∉ seen := by
+        by_cases fresh : binder.id ∈ seen
+        · simp [owned, fresh, failWith] at accepted
+        · exact fresh
+      have monomorphic : binder.scheme.quantified = [] := by
+        by_cases mono : binder.scheme.quantified = []
+        · exact mono
+        · simp [owned, fresh, mono, failWith] at accepted
+      have typed : binder.scheme.body = .integer := by
+        by_cases typed : binder.scheme.body = .integer
+        · exact typed
+        · simp [owned, fresh, monomorphic, typed, failWith] at accepted
+      simp only [owned, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte,
+        List.contains_eq_mem, fresh, decide_false, monomorphic, List.isEmpty_nil,
+        Bool.not_true, typed] at accepted
+      cases tailEq : bindStagedIntegerInputsWith id source (binder.id :: seen) rest values with
+      | error reason => simp [tailEq, Bind.bind, Except.bind] at accepted
+      | ok tail =>
+        simp only [tailEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+        subst environment
+        exact .cons owned fresh monomorphic typed (ih tailEq)
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+open SourceInference TypeSystem
+set_option linter.unusedSimpArgs false
+set_option maxHeartbeats 3000000
+
+/-- The sole statement fuel proof retains validation of both branches and the
+exact order in which the original evaluator consumes requirements. -/
+theorem checked {solved : List SolvedRequirement} {source : TypedSource}
+    {environment : Environment} {execute : Bool} {fuel : Nat}
+    {fallthroughSite : ErrorSite} {fallthroughReason : ErrorReason}
+    {statements : List StatementId} {result : StagedIntegerEvaluation}
+    (accepted : evaluate solved source environment execute fuel fallthroughSite fallthroughReason statements = .ok result) :
+    Checked solved source environment execute fuel statements result := by
+  induction fuel generalizing environment execute fallthroughSite fallthroughReason statements result with
+  | zero => cases statements <;> simp [evaluate, evaluateStagedIntegerStatementsFuelWith, failWith] at accepted
+  | succ fuel ih =>
+    cases statements with
+    | nil => simp [evaluate, evaluateStagedIntegerStatementsFuelWith, failWith] at accepted
+    | cons statement rest =>
+      simp only [evaluate, evaluateStagedIntegerStatementsFuelWith] at accepted
+      cases found : lookupStatement source statement with
+      | error reason => simp [found, Except.mapError, Bind.bind, Except.bind] at accepted
+      | ok node =>
+        simp only [found, Except.mapError, id, Bind.bind, Except.bind] at accepted
+        have found' := lookup_statement found
+        cases form : node.form <;> simp only [form] at accepted
+        all_goals try simp [failWith] at accepted
+        case letDecl binder initializer =>
+          cases validatedType : ensureTypeWith id (.occurrence statement.occurrence) .unit node.type with
+          | error reason => simp [validatedType, Bind.bind, Except.bind] at accepted
+          | ok checkedType =>
+            cases checkedType
+            simp only [validatedType, Bind.bind, Except.bind] at accepted
+            have typed := ensure_unit validatedType
+            have fresh : environment.contains binder.id = false := by
+              cases fresh : environment.contains binder.id
+              · rfl
+              · simp [fresh, failWith] at accepted
+            simp only [fresh, Bool.false_eq_true, ↓reduceIte] at accepted
+            cases validated : validateStagedIntegerBinderWith id (.binder binder.id) source binder with
+            | error reason => simp [validated, Bind.bind, Except.bind] at accepted
+            | ok checkedBinder =>
+              cases checkedBinder
+              simp only [validated, Bind.bind, Except.bind] at accepted
+              have facts := Staged.binder_checked validated
+              cases initializer with
+              | none => simp [failWith, Bind.bind, Except.bind] at accepted
+              | some initializer =>
+                simp only at accepted
+                cases initialEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                    solved source environment execute fuel initializer with
+                | error reason => simp [initialEq, Bind.bind, Except.bind] at accepted
+                | ok initial =>
+                  simp only [initialEq, Bind.bind, Except.bind] at accepted
+                  cases bodyEq : evaluateStagedIntegerStatementsFuelWith id (rejectStagedIntegerCallsWith id)
+                      solved execute fuel source ({ binder, value := initial.value } :: environment)
+                      fallthroughSite fallthroughReason rest with
+                  | error reason => simp [bodyEq, Bind.bind, Except.bind] at accepted
+                  | ok body =>
+                    simp only [bodyEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                    subst result
+                    exact .letValue found' form typed fresh facts.1 facts.2.1 facts.2.2
+                      (integer_checked initialEq) (ih bodyEq)
+        case returnStmt value =>
+          have empty : rest = [] := by
+            cases rest <;> simp_all [failWith]
+          subst rest
+          simp only [List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          have typed : node.type = .integer := by
+            by_cases typed : node.type = .integer
+            · exact typed
+            · simp [typed, failWith] at accepted
+          simp only [typed, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at accepted
+          cases value with
+          | none => simp [failWith] at accepted
+          | some value => exact .returnValue found' form typed (integer_checked accepted)
+        case ifThen condition yes no =>
+          have empty : rest = [] := by
+            cases rest <;> simp_all [failWith]
+          subst rest
+          simp only [List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          have typed : node.type = .integer := by
+            by_cases typed : node.type = .integer
+            · exact typed
+            · simp [typed, failWith] at accepted
+          simp only [typed, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at accepted
+          cases no with
+          | none => simp [failWith] at accepted
+          | some no =>
+            simp only at accepted
+            cases guardEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment execute fuel condition with
+            | error reason => simp [guardEq, Bind.bind, Except.bind] at accepted
+            | ok guard =>
+              simp only [guardEq, Bind.bind, Except.bind] at accepted
+              cases leftEq : evaluateStagedIntegerStatementsFuelWith id (rejectStagedIntegerCallsWith id)
+                  solved (execute && guard.value) fuel source environment (.occurrence statement.occurrence)
+                  (.conditionalBranchFallthrough .thenBranch) yes with
+              | error reason => simp [leftEq, Bind.bind, Except.bind] at accepted
+              | ok left =>
+                simp only [leftEq, Bind.bind, Except.bind] at accepted
+                cases rightEq : evaluateStagedIntegerStatementsFuelWith id (rejectStagedIntegerCallsWith id)
+                    solved (execute && !guard.value) fuel source environment (.occurrence statement.occurrence)
+                    (.conditionalBranchFallthrough .elseBranch) no with
+                | error reason => simp [rightEq, Bind.bind, Except.bind] at accepted
+                | ok right =>
+                  simp only [rightEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                  subst result
+                  simpa only [List.append_assoc] using
+                    (Checked.conditional found' form typed (bool_checked guardEq) (ih leftEq) (ih rightEq))
+        case block body =>
+          have empty : rest = [] := by
+            cases rest <;> simp_all [failWith]
+          subst rest
+          simp only [List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          have typed : node.type = .integer := by
+            by_cases typed : node.type = .integer
+            · exact typed
+            · simp [typed, failWith] at accepted
+          simp only [typed, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at accepted
+          exact .block found' form typed (ih accepted)
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+open SourceInference TypeSystem
+set_option linter.unusedSimpArgs false
+
+private theorem statement_roots {roots : List NodeId} {statements : List StatementId}
+    (accepted : statementRoots roots = .ok statements) : statements.map NodeId.statement = roots := by
+  induction roots generalizing statements with
+  | nil => simp [statementRoots, pure, Pure.pure, Except.pure] at accepted; subst statements; rfl
+  | cons head rest ih =>
+    cases head with
+    | expression expression => simp [statementRoots, fail] at accepted
+    | statement statement =>
+      simp only [statementRoots] at accepted
+      cases tailEq : statementRoots rest with
+      | error reason => simp [tailEq, Bind.bind, Except.bind] at accepted
+      | ok tail =>
+        simp only [tailEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+        subst statements
+        simp [ih tailEq]
+
+/-- The public reject-calls function entry uses the same statement evaluator,
+actual input binding, and successful complete ledger reconciliation. -/
+theorem function_checked {function : CheckedFunction} {arguments : List Int} {value : Int}
+    (accepted : evaluateStagedIntegerFunction function arguments = .ok value) :
+    FunctionChecked function arguments value := by
+  unfold evaluateStagedIntegerFunction evaluateStagedIntegerFunctionWith at accepted
+  have owned : function.typedBody.owner = function.declaration := by
+    by_cases owned : function.typedBody.owner = function.declaration
+    · exact owned
+    · simp [owned, failWith] at accepted
+  have arity : function.typedBody.inputs.length = arguments.length := by
+    by_cases arity : function.typedBody.inputs.length = arguments.length
+    · exact arity
+    · simp [owned, arity, failWith] at accepted
+  simp only [owned, arity, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at accepted
+  cases inputsEq : bindStagedIntegerInputsWith (fun error => error) function.typedBody [] function.typedBody.inputs arguments with
+  | error reason => simp [inputsEq, Bind.bind, Except.bind] at accepted
+  | ok environment =>
+    simp only [inputsEq, Bind.bind, Except.bind] at accepted
+    have inferred : function.inferredBodyType = .integer := by
+      by_cases inferred : function.inferredBodyType = .integer
+      · exact inferred
+      · simp [inferred, failWith, Bind.bind, Except.bind] at accepted
+    simp only [inferred, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, pure, Pure.pure, Except.pure,
+      Bind.bind, Except.bind] at accepted
+    have typed : function.type = .function
+        (Ty.productMany (function.typedBody.inputs.map fun binder => binder.scheme.body)) .integer := by
+      by_cases typed : function.type = .function
+          (Ty.productMany (function.typedBody.inputs.map fun binder => binder.scheme.body)) .integer
+      · exact typed
+      · simp [typed, failWith, Bind.bind, Except.bind] at accepted
+    simp only [typed, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, pure, Pure.pure, Except.pure,
+      Bind.bind, Except.bind] at accepted
+    cases rootsEq : statementRoots function.typedBody.roots with
+    | error reason => simp [rootsEq, Except.mapError, Bind.bind, Except.bind] at accepted
+    | ok roots =>
+      simp only [rootsEq, Except.mapError, id, Bind.bind, Except.bind] at accepted
+      cases evaluated : evaluateStagedIntegerStatementsFuelWith (fun error => error) rejectStagedIntegerCalls
+          function.solvedRequirements true (function.typedBody.nodes.length + 1) function.typedBody environment
+          (match finalStatement? roots with
+            | some statement => .occurrence statement.occurrence
+            | none => .declaration function.declaration)
+          .statementListFallthrough roots with
+      | error reason => simp [evaluated, Bind.bind, Except.bind] at accepted
+      | ok result =>
+        simp only [evaluated, Bind.bind, Except.bind] at accepted
+        cases reconciled : reconcileConsumedRequirements function.declaration
+            (function.solvedRequirements.map fun requirement => requirement.id) result.consumedRequirements with
+        | error reason => simp [reconciled, Except.mapError, Bind.bind, Except.bind] at accepted
+        | ok unconsumed =>
+          simp only [reconciled, Except.mapError, id, Bind.bind, Except.bind] at accepted
+          have empty : unconsumed = [] := by
+            cases unconsumed <;> simp_all [failWith, Bind.bind, Except.bind]
+          subst unconsumed
+          simp only [List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte,
+            pure, Pure.pure, Except.pure, Bind.bind, Except.bind, Except.ok.injEq] at accepted
+          exact .intro owned arity inferred typed (inputs_checked inputsEq) (statement_roots rootsEq)
+            (checked evaluated) accepted reconciled
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
