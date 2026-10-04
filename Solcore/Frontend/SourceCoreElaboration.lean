@@ -5155,3 +5155,498 @@ theorem function_of_accepted {function : CheckedFunction} {draft : BodyDraft}
                 bodyEq reconcileEq rfl rfl rfl rfl rfl
 
 end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.IntegerLet
+
+/-! Static acceptance of the pure compatibility residual fragment. Runtime
+Word/Bool inputs remain ordinary resolved variables; only actual Integer lets
+are erased. This interface adds no new execution path or semantic law. -/
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+open SourceInference TypeSystem
+set_option maxHeartbeats 3000000
+set_option linter.unusedSimpArgs false
+
+def expression (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
+    (expressionId : ExpressionId) : Except Error LoweredExpression :=
+  lowerExpressionFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
+    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    scope environment [] expressionId
+
+def asType (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
+    (expected : Core.Ty) (expressionId : ExpressionId) : Except Error LoweredExpression :=
+  lowerExpressionAsWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
+    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    scope environment [] expected expressionId
+
+/-- A finite syntax restriction, not an execution or typing assumption. Integer
+subcomputations of the three builtin forms use the existing staged checker. -/
+def expressionSupported (source : TypedSource) : Nat → ExpressionId → Bool
+  | 0, _ => false
+  | fuel + 1, id =>
+      match source.lookupExpression? id with
+      | none => false
+      | some node => node.coercions.isEmpty && match node.form with
+          | .literal _ | .integerLiteral _ _ | .reference _ (.local _)
+          | .reference _ (.builtinBoolean _) => true
+          | .group inner => expressionSupported source fuel inner
+          | .conditional condition yes no => expressionSupported source fuel condition &&
+              expressionSupported source fuel yes && expressionSupported source fuel no
+          | .call _ _ (.builtinFunction .wordFromInteger)
+          | .call _ _ (.builtinFunction .integerEq)
+          | .call _ _ (.builtinFunction .integerLt) => true
+          | _ => false
+
+def statementsSupported (source : TypedSource) : Nat → List StatementId → Bool
+  | 0, _ | _, [] => false
+  | fuel + 1, statement :: rest =>
+      match source.lookupStatement? statement with
+      | none => false
+      | some node => match node.form with
+          | .letDecl binder (some _) => binder.scheme.body == Ty.integer &&
+              statementsSupported source fuel rest
+          | .returnStmt (some value) => rest.isEmpty && expressionSupported source fuel value
+          | .ifThen condition yes (some no) => rest.isEmpty && expressionSupported source fuel condition &&
+              statementsSupported source fuel yes && statementsSupported source fuel no
+          | .block body => rest.isEmpty && statementsSupported source fuel body
+          | _ => false
+
+inductive ExpressionChecked (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) (environment : Environment) : Nat → ExpressionId → LoweredExpression → Prop where
+  | literal {fuel expression node literal value}
+      (found : source.lookupExpression? expression = some node) (form : node.form = .literal literal)
+      (requirements : node.requirements = []) (coercions : node.coercions = [])
+      (interpreted : interpretWordLiteral? ⟨node.span, literal⟩ = some value) :
+      ExpressionChecked solved source scope environment (fuel + 1) expression ⟨.word value, []⟩
+  | stagedWord {fuel expression result}
+      (checked : WordChecked solved source environment true fuel expression result) :
+      ExpressionChecked solved source scope environment fuel expression ⟨.word result.value, result.consumedRequirements⟩
+  | stagedBool {fuel expression result}
+      (checked : BoolChecked solved source environment true fuel expression result) :
+      ExpressionChecked solved source scope environment fuel expression ⟨.bool result.value, result.consumedRequirements⟩
+  | local {fuel expression node name binder}
+      (found : source.lookupExpression? expression = some node) (form : node.form = .reference name (.local binder))
+      (requirements : node.requirements = []) (coercions : node.coercions = [])
+      (available : scope.ids.contains binder = true) :
+      ExpressionChecked solved source scope environment (fuel + 1) expression ⟨.var binder, []⟩
+  | boolean {fuel expression node name value}
+      (found : source.lookupExpression? expression = some node) (form : node.form = .reference name (.builtinBoolean value))
+      (requirements : node.requirements = []) (coercions : node.coercions = []) :
+      ExpressionChecked solved source scope environment (fuel + 1) expression ⟨.bool value, []⟩
+  | group {fuel expression node inner result}
+      (found : source.lookupExpression? expression = some node) (form : node.form = .group inner)
+      (requirements : node.requirements = []) (coercions : node.coercions = [])
+      (child : ExpressionChecked solved source scope environment fuel inner result) :
+      ExpressionChecked solved source scope environment (fuel + 1) expression result
+  | conditional {fuel expression node condition yes no guard left right}
+      (found : source.lookupExpression? expression = some node) (form : node.form = .conditional condition yes no)
+      (requirements : node.requirements = []) (coercions : node.coercions = [])
+      (conditionChecked : ExpressionChecked solved source scope environment fuel condition guard)
+      (thenChecked : ExpressionChecked solved source scope environment fuel yes left)
+      (elseChecked : ExpressionChecked solved source scope environment fuel no right) :
+      ExpressionChecked solved source scope environment (fuel + 1) expression
+        ⟨.ifE guard.resolved left.resolved right.resolved,
+          guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+
+inductive StatementsChecked (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) : Environment → Nat → List StatementId → LoweredExpression → Prop where
+  | letValue {environment fuel statement rest node binder initializer initial result}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .letDecl binder (some initializer)) (unit : node.type = .unit)
+      (scopeFresh : scope.ids.contains binder.id = false) (environmentFresh : IntegerLet.contains environment binder.id = false)
+      (owned : binder.id.owner = source.owner) (monomorphic : binder.scheme.quantified = [])
+      (binderType : binder.scheme.body = .integer)
+      (initialChecked : IntegerChecked solved source environment true fuel initializer initial)
+      (bodyChecked : StatementsChecked solved source scope (Statements.bind binder initial.value :: environment) fuel rest result) :
+      StatementsChecked solved source scope environment (fuel + 1) (statement :: rest)
+        ⟨result.resolved, initial.consumedRequirements ++ result.consumedRequirements⟩
+  | returnValue {environment fuel statement node value result}
+      (found : source.lookupStatement? statement = some node) (form : node.form = .returnStmt (some value))
+      (valueChecked : ExpressionChecked solved source scope environment fuel value result) :
+      StatementsChecked solved source scope environment (fuel + 1) [statement] result
+  | conditional {environment fuel statement node condition yes no guard left right}
+      (found : source.lookupStatement? statement = some node) (form : node.form = .ifThen condition yes (some no))
+      (conditionChecked : ExpressionChecked solved source scope environment fuel condition guard)
+      (thenChecked : StatementsChecked solved source scope environment fuel yes left)
+      (elseChecked : StatementsChecked solved source scope environment fuel no right) :
+      StatementsChecked solved source scope environment (fuel + 1) [statement]
+        ⟨.ifE guard.resolved left.resolved right.resolved,
+          guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+  | block {environment fuel statement node body result}
+      (found : source.lookupStatement? statement = some node) (form : node.form = .block body)
+      (bodyChecked : StatementsChecked solved source scope environment fuel body result) :
+      StatementsChecked solved source scope environment (fuel + 1) [statement] result
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+open SourceInference TypeSystem
+set_option maxHeartbeats 5000000
+set_option linter.unusedSimpArgs false
+
+/-- Every supported successful default lowering carries the original ordered
+child results; this proof never evaluates the produced residual expression. -/
+theorem expression_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {scope : Resolved.Context} {environment : Environment} {fuel : Nat}
+    {expressionId : ExpressionId} {result : LoweredExpression}
+    (supported : expressionSupported source fuel expressionId = true)
+    (accepted : expression solved source scope environment fuel expressionId = .ok result) :
+    ExpressionChecked solved source scope environment fuel expressionId result := by
+  induction fuel generalizing expressionId result with
+  | zero => simp [expressionSupported] at supported
+  | succ fuel ih =>
+    cases found : lookupExpression source expressionId with
+    | error error => simp [expression, lowerExpressionFuelWith, found, Except.mapError, Bind.bind, Except.bind] at accepted
+    | ok node =>
+      have found' := Staged.lookup_success found
+      simp only [expressionSupported, found', Bool.and_eq_true] at supported
+      have coercions : node.coercions = [] := by simpa using supported.1
+      have shape := supported.2
+      simp only [expression, lowerExpressionFuelWith, found, Except.mapError, id, Bind.bind, Except.bind] at accepted
+      cases form : node.form <;> simp only [form] at shape accepted
+      all_goals try simp at shape
+      case literal literal =>
+        simp only [coercions, lowerExpressionNodeWith, form] at accepted
+        have requirements : node.requirements = [] := by
+          by_cases empty : node.requirements = []
+          · exact empty
+          · simp [empty, failWith] at accepted
+        simp only [requirements, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+        cases typeEq : lowerType (.occurrence node.id.occurrence) node.type with
+        | error reason => simp [typeEq] at accepted
+        | ok type =>
+          simp only [typeEq] at accepted
+          cases interpreted : interpretWordLiteral? ⟨node.span, literal⟩ with
+          | none => simp [interpreted, failWith] at accepted
+          | some value =>
+            simp only [interpreted, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+            subst result
+            exact .literal found' form requirements coercions interpreted
+      case integerLiteral literal resolution =>
+        simp only [coercions, lowerExpressionNodeWith, form, lowerIntegerLiteralWith, lowerIntegerLiteralResolutionWith] at accepted
+        cases checked : validateWordIntegerLiteralWith id (.occurrence node.id.occurrence) solved node.type node.requirements literal resolution with
+        | error error => simp [checked, Bind.bind, Except.bind] at accepted
+        | ok value =>
+          simp only [checked, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+          subst result
+          apply ExpressionChecked.stagedWord (result := ⟨value.value, value.consumedRequirements⟩)
+          exact .literal found' form (by simpa [validateWordIntegerLiteral, coercions] using checked)
+      case reference name resolution =>
+        cases resolution <;> try simp only at shape accepted
+        all_goals try simp at shape
+        case «local» binder =>
+          simp only [coercions, lowerExpressionNodeWith, form] at accepted
+          have requirements : node.requirements = [] := by
+            by_cases empty : node.requirements = []
+            · exact empty
+            · simp [empty, failWith] at accepted
+          simp only [requirements, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          cases typeEq : lowerType (.occurrence node.id.occurrence) node.type with
+          | error reason => simp [typeEq] at accepted
+          | ok type =>
+            simp only [typeEq] at accepted
+            have available : scope.ids.contains binder = true := by
+              cases available : scope.ids.contains binder
+              · have absent : binder ∉ scope.ids := by simpa using available
+                simp [absent, failWith] at accepted
+              · rfl
+            simp only [available, ↓reduceIte, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+            subst result
+            exact .local found' form requirements coercions available
+        case builtinBoolean value =>
+          simp only [coercions, lowerExpressionNodeWith, form] at accepted
+          have requirements : node.requirements = [] := by
+            by_cases empty : node.requirements = []
+            · exact empty
+            · simp [empty, failWith] at accepted
+          simp only [requirements, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          cases typeEq : lowerType (.occurrence node.id.occurrence) node.type with
+          | error reason => simp [typeEq] at accepted
+          | ok type =>
+            simp only [typeEq] at accepted
+            simp only [pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+            subst result
+            exact .boolean found' form requirements coercions
+      case group inner =>
+        simp only [coercions, lowerExpressionNodeWith, form] at accepted
+        have requirements : node.requirements = [] := by
+          by_cases empty : node.requirements = []
+          · exact empty
+          · simp [empty, failWith] at accepted
+        simp only [requirements, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+        cases typeEq : lowerType (.occurrence node.id.occurrence) node.type with
+        | error reason => simp [typeEq] at accepted
+        | ok type =>
+          simp only [typeEq] at accepted
+          exact .group found' form requirements coercions (ih shape accepted)
+      case conditional condition yes no =>
+        simp only [coercions, lowerExpressionNodeWith, form] at accepted
+        have requirements : node.requirements = [] := by
+          by_cases empty : node.requirements = []
+          · exact empty
+          · simp [empty, failWith] at accepted
+        simp only [requirements, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+        cases typeEq : lowerType (.occurrence node.id.occurrence) node.type with
+        | error reason => simp [typeEq] at accepted
+        | ok type =>
+          simp only [typeEq] at accepted
+          change (do
+            let guard ← expression solved source scope environment fuel condition
+            let left ← expression solved source scope environment fuel yes
+            let right ← expression solved source scope environment fuel no
+            pure (LoweredExpression.mk (.ifE guard.resolved left.resolved right.resolved)
+              (guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements))) = .ok result at accepted
+          cases guardEq : expression solved source scope environment fuel condition with
+          | error reason => simp [guardEq, Bind.bind, Except.bind] at accepted
+          | ok guard =>
+            cases leftEq : expression solved source scope environment fuel yes with
+            | error reason => simp [guardEq, leftEq, Bind.bind, Except.bind] at accepted
+            | ok left =>
+              cases rightEq : expression solved source scope environment fuel no with
+              | error reason => simp [guardEq, leftEq, rightEq, Bind.bind, Except.bind] at accepted
+              | ok right =>
+                simp only [guardEq, leftEq, rightEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                subst result
+                exact .conditional found' form requirements coercions (ih shape.1.1 guardEq) (ih shape.1.2 leftEq) (ih shape.2 rightEq)
+      case call callee arguments resolution =>
+        cases resolution <;> try simp only at shape accepted
+        all_goals try simp at shape
+        case builtinFunction function =>
+          cases function <;> try simp only at shape accepted
+          all_goals try simp at shape
+          case wordFromInteger =>
+            simp only [lowerWordFromIntegerWith] at accepted
+            cases validated : validateBuiltinFunctionCallWith id source node callee arguments .wordFromInteger with
+            | error error => simp [validated, Bind.bind, Except.bind] at accepted
+            | ok validatedUnit =>
+              cases validatedUnit
+              simp only [validated, Bind.bind, Except.bind] at accepted
+              cases arguments with
+              | nil => simp [failWith] at accepted
+              | cons argument rest =>
+                cases rest with
+                | cons other rest => simp [failWith] at accepted
+                | nil =>
+                  cases childEq : evaluateStagedIntegerFuelWith id rejectStagedIntegerCalls solved source environment true fuel argument with
+                  | error error => simp [childEq, Bind.bind, Except.bind] at accepted
+                  | ok child =>
+                    simp only [childEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                    subst result
+                    have receipt := WordChecked.fromInteger (execute := true) found' form
+                      (Staged.builtin_checked validated) (integer_checked childEq)
+                    simpa only [↓reduceIte] using ExpressionChecked.stagedWord (scope := scope) receipt
+          case integerEq =>
+            simp only [lowerStagedBoolWith] at accepted
+            cases evaluated : evaluateStagedBoolFuelWith id rejectStagedIntegerCalls solved source environment true (fuel + 1) expressionId with
+            | error error => simp [evaluated, Bind.bind, Except.bind] at accepted
+            | ok value =>
+              simp only [evaluated, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .stagedBool (bool_checked evaluated)
+          case integerLt =>
+            simp only [lowerStagedBoolWith] at accepted
+            cases evaluated : evaluateStagedBoolFuelWith id rejectStagedIntegerCalls solved source environment true (fuel + 1) expressionId with
+            | error error => simp [evaluated, Bind.bind, Except.bind] at accepted
+            | ok value =>
+              simp only [evaluated, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .stagedBool (bool_checked evaluated)
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+open SourceInference TypeSystem
+set_option maxHeartbeats 5000000
+set_option linter.unusedSimpArgs false
+
+private theorem after_unit {α : Type} {first : Except Error Unit}
+    {next : Except Error α} {result : α}
+    (accepted : (first >>= fun _ => next) = .ok result) : next = .ok result := by
+  cases first with
+  | error error => simp [Bind.bind, Except.bind] at accepted
+  | ok value => exact accepted
+
+/-- The actual type-checking wrapper retains exactly the same lowering result. -/
+theorem asType_expression {solved : List SolvedRequirement} {source : TypedSource}
+    {scope : Resolved.Context} {environment : Environment} {fuel : Nat}
+    {expected : Core.Ty} {expressionId : ExpressionId} {result : LoweredExpression}
+    (accepted : asType solved source scope environment fuel expected expressionId = .ok result) :
+    expression solved source scope environment fuel expressionId = .ok result := by
+  cases found : lookupExpression source expressionId with
+  | error error => simp [asType, lowerExpressionAsWith, found, Except.mapError, Bind.bind, Except.bind] at accepted
+  | ok node =>
+    simp only [asType, lowerExpressionAsWith, found, Except.mapError, id, Bind.bind, Except.bind] at accepted
+    split at accepted
+    · split at accepted
+      · simp [failWith] at accepted
+      · exact after_unit accepted
+    · exact after_unit accepted
+
+/-- A single fuel induction recovers the original successful statement branches,
+including both checked arms and their ordered consumed requirements. -/
+theorem statements_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {scope : Resolved.Context} {environment : Environment} {fuel : Nat}
+    {expected : Core.Ty} {site : ErrorSite} {reason : ErrorReason}
+    {statements : List StatementId} {result : LoweredExpression}
+    (supported : statementsSupported source fuel statements = true)
+    (accepted : IntegerLet.lower solved source scope environment fuel expected site reason statements = .ok result) :
+    StatementsChecked solved source scope environment fuel statements result := by
+  induction fuel generalizing environment expected site reason statements result with
+  | zero => cases statements <;> simp [statementsSupported] at supported
+  | succ fuel ih =>
+    cases statements with
+    | nil => simp [statementsSupported] at supported
+    | cons statement rest =>
+      cases found : lookupStatement source statement with
+      | error error => simp [IntegerLet.lower, lowerStatementsFuelWith, found, Except.mapError, Bind.bind, Except.bind] at accepted
+      | ok node =>
+        have found' := Statements.lookup_statement found
+        simp only [statementsSupported, found'] at supported
+        cases form : node.form <;> simp only [form] at supported
+        all_goals try simp at supported
+        case letDecl binder initializer =>
+          cases initializer with
+          | none => simp at supported
+          | some initializer =>
+            simp only [Bool.and_eq_true, beq_iff_eq] at supported
+            have receipt := IntegerLet.let_of_accepted accepted found' form supported.1
+            cases receipt with
+            | intro _ _ unit scopeFresh envFresh owned mono binderType initialAccepted initialChecked bodyAccepted output =>
+              subst result
+              exact .letValue found' form unit scopeFresh envFresh owned mono binderType initialChecked
+                (ih supported.2 bodyAccepted)
+        case returnStmt value =>
+          cases value with
+          | none => simp at supported
+          | some value =>
+            simp only [Bool.and_eq_true] at supported
+            have restNil : rest = [] := by simpa using supported.1
+            subst rest
+            simp only [IntegerLet.lower, lowerStatementsFuelWith, found, Except.mapError, id,
+              Bind.bind, Except.bind, form, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+            exact .returnValue found' form (expression_checked supported.2 (asType_expression (after_unit accepted)))
+        case ifThen condition yes no =>
+          cases no with
+          | none => simp at supported
+          | some no =>
+            simp only [Bool.and_eq_true] at supported
+            have restNil : rest = [] := by simpa using supported.1.1.1
+            subst rest
+            simp only [IntegerLet.lower, lowerStatementsFuelWith, found, Except.mapError, id,
+              Bind.bind, Except.bind, form, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+            have accepted := after_unit accepted
+            change (do
+              let guard ← asType solved source scope environment fuel .bool condition
+              let left ← IntegerLet.lower solved source scope environment fuel expected (.occurrence statement.occurrence)
+                (.conditionalBranchFallthrough .thenBranch) yes
+              let right ← IntegerLet.lower solved source scope environment fuel expected (.occurrence statement.occurrence)
+                (.conditionalBranchFallthrough .elseBranch) no
+              pure (LoweredExpression.mk (.ifE guard.resolved left.resolved right.resolved)
+                (guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements))) = .ok result at accepted
+            cases guardEq : asType solved source scope environment fuel .bool condition with
+            | error error => simp [guardEq, Bind.bind, Except.bind] at accepted
+            | ok guard =>
+              cases leftEq : IntegerLet.lower solved source scope environment fuel expected (.occurrence statement.occurrence)
+                  (.conditionalBranchFallthrough .thenBranch) yes with
+              | error error => simp [guardEq, leftEq, Bind.bind, Except.bind] at accepted
+              | ok left =>
+                cases rightEq : IntegerLet.lower solved source scope environment fuel expected (.occurrence statement.occurrence)
+                    (.conditionalBranchFallthrough .elseBranch) no with
+                | error error => simp [guardEq, leftEq, rightEq, Bind.bind, Except.bind] at accepted
+                | ok right =>
+                  simp only [guardEq, leftEq, rightEq, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                  subst result
+                  exact .conditional found' form (expression_checked supported.1.1.2 (asType_expression guardEq))
+                    (ih supported.1.2 leftEq) (ih supported.2 rightEq)
+        case block body =>
+          have restNil : rest = [] := by simpa using supported.1
+          subst rest
+          simp only [IntegerLet.lower, lowerStatementsFuelWith, found, Except.mapError, id,
+            Bind.bind, Except.bind, form, List.isEmpty_nil, Bool.not_true, Bool.false_eq_true, ↓reduceIte] at accepted
+          exact .block found' form (ih supported.2 (after_unit accepted))
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
+open SourceInference TypeSystem
+set_option maxHeartbeats 3000000
+set_option linter.unusedSimpArgs false
+
+/-- Actual input lowering retains every binder and its original order. -/
+inductive InputsChecked : List Resolved.LocalId → List TypedBinder → Resolved.Context → Prop where
+  | nil {seen} : InputsChecked seen [] []
+  | cons {seen binder rest type scope}
+      (fresh : seen.contains binder.id = false)
+      (monomorphic : binder.scheme.quantified = [])
+      (projected : lowerType (.binder binder.id) binder.scheme.body = .ok type)
+      (tail : InputsChecked (binder.id :: seen) rest scope) :
+      InputsChecked seen (binder :: rest) ((binder.id, type) :: scope)
+
+private theorem inputs_checked_aux {seen : List Resolved.LocalId}
+    {inputs : List TypedBinder} {scope : Resolved.Context}
+    (accepted : lowerInputsAux seen inputs = .ok scope) : InputsChecked seen inputs scope := by
+  induction inputs generalizing seen scope with
+  | nil =>
+    simp only [lowerInputsAux, Except.ok.injEq] at accepted
+    subst scope
+    exact .nil
+  | cons binder rest ih =>
+    simp only [lowerInputsAux] at accepted
+    have fresh : seen.contains binder.id = false := by
+      cases fresh : seen.contains binder.id
+      · rfl
+      · have member : binder.id ∈ seen := by simpa using fresh
+        simp [member, fail] at accepted
+    simp only [fresh, Bool.false_eq_true, ↓reduceIte] at accepted
+    have mono : binder.scheme.quantified = [] := by
+      cases quantified : binder.scheme.quantified with
+      | nil => rfl
+      | cons head tail => simp [quantified, fail] at accepted
+    simp only [mono, List.isEmpty_nil, ↓reduceIte] at accepted
+    cases projected : lowerType (.binder binder.id) binder.scheme.body with
+    | error error => simp [projected, Bind.bind, Except.bind] at accepted
+    | ok type =>
+      cases lowered : lowerInputsAux (binder.id :: seen) rest with
+      | error error => simp [projected, lowered, Bind.bind, Except.bind] at accepted
+      | ok scope =>
+        simp only [projected, lowered, Bind.bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+        subst accepted
+        exact .cons fresh mono projected (ih lowered)
+
+theorem inputs_checked {inputs : List TypedBinder} {scope : Resolved.Context}
+    (accepted : IntegerLet.inputScope inputs = .ok scope) : InputsChecked [] inputs scope :=
+  inputs_checked_aux accepted
+
+/-- Successful finalization preserves the exact draft, checks the full
+unconsumed remainder, and supplies its own positional lowering and type check. -/
+theorem finalized_fields {draft : BodyDraft} {artifact : ElaboratedFunction}
+    (accepted : draft.finalize = .ok artifact) :
+    artifact.declaration = draft.declaration ∧ artifact.inputs = draft.inputs ∧
+    artifact.resolved = draft.resolved ∧ artifact.returnType = draft.returnType ∧
+    draft.unconsumedRequirements = [] := by
+  have consumed : draft.unconsumedRequirements = [] := by
+    by_cases consumed : draft.unconsumedRequirements = []
+    · exact consumed
+    · simp [BodyDraft.finalize, consumed, throw, throwThe, MonadExceptOf.throw, Bind.bind, Except.bind] at accepted
+  simp only [BodyDraft.finalize, consumed, List.isEmpty_nil, Bool.not_true,
+    Bool.false_eq_true, ↓reduceIte, pure, Pure.pure, Except.pure, Bind.bind, Except.bind] at accepted
+  split at accepted
+  · cases accepted
+  · split at accepted
+    · cases accepted
+    · split at accepted
+      · cases accepted
+        exact ⟨rfl, rfl, rfl, rfl, consumed⟩
+      · cases accepted
+
+/-- The actual public wrapper exposes the same accepted draft and finalization. -/
+theorem elaborated_body {function : CheckedFunction} {artifact : ElaboratedFunction}
+    (accepted : elaborateFunction function = .ok artifact) :
+    ∃ draft, lowerFunctionBody function = .ok draft ∧ draft.finalize = .ok artifact := by
+  unfold elaborateFunction at accepted
+  cases lowered : lowerFunctionBody function with
+  | error error => simp [lowered, Bind.bind, Except.bind] at accepted
+  | ok draft =>
+    simp only [lowered, Bind.bind, Except.bind] at accepted
+    exact ⟨draft, rfl, accepted⟩
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Residual
