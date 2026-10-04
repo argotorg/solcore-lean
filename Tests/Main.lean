@@ -1793,6 +1793,8 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaEntrySpines
 import Solcore.Test.SourceCoreCompatibleExpressionReadCompletion
 import Solcore.Test.SourceCoreRecursiveStageMappingTupleMeaning
 import Solcore.Test.SourceCoreRecursiveStageAmbientGuards
+import Solcore.Test.SourceCoreCallablePreparedOperatorSourceMeaning
+import Solcore.Test.SourceCoreCallableIndexedLambdaStaticBodySupport
 
 set_option autoImplicit false
 
