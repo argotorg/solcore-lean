@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogBodyFinishBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForReflection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBounds
@@ -127,6 +128,64 @@ variable (authenticated runtime : Bool) {checked : Checked} {base : Base checked
       MatchProfileForModeWith authenticated runtime diagnosticPolicy headers header (compilation header) header.readFuel (expressionSyntax header)
         (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
 
+namespace NamedFamily
+
+/-- The real named profile supplies the neutral kernel fields directly. -/
+def origin (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P) (binders : ProtectedExpressionMeaning.Binds P)
+    {header : Header prepared values ambient.definitions program}
+    {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    {expressionSyntax : ExpressionId → Prop} {administrative : Core.Context}
+    (profile : MatchProfileWith (fun context => ContextFor runtime header.solved context header.function.evidence)
+      certificates diagnosticPolicy header expressionSyntax administrative registry faults)
+    (escapedFault : faults .controlEscapedFunction header.escaped) :
+    CallableRuntimeBodyOrigins.Origin values ambient registry faults :=
+  { layouts := header.layouts, owner := header.owner, active := header.active
+    frameLayout := prepared.layout.frame, globals := header.globals, onError := header.onError
+    function := header.function, expressionSyntax := expressionSyntax, certificates := certificates
+    validity := fun context => ContextFor runtime header.solved context header.function.evidence
+    diagnosticPolicy := diagnosticPolicy, administrative := administrative, context := header.context
+    scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))
+    output := header.output, code := header.body, fellThrough := header.fellThrough, escaped := header.escaped
+    solved := header.solved, protectedEntry := P
+    body := { flow := profile.flow, tree := profile.tree, sites := profile.errors, initialValid := profile.initialValid
+              projection := profile.projection, unique := header.unique, emitted := profile.emitted }
+    definitions := header.definitions_eq, registered := header.registered, escapedFault := escapedFault
+    transport := transport, binders := binders, extend := fun valid extended => context_extend valid extended
+    runtimeOf := fun valid => context_runtime valid }
+
+/-- The actual parameter result supplies the full state, including its physical
+frame reference. No authority is recovered from a native type. -/
+def entry (P : ProtectedExpressionMeaning.Entry)
+    (transport : ProtectedExpressionMeaning.Transport P) (binders : ProtectedExpressionMeaning.Binds P)
+    {header : Header prepared values ambient.definitions program}
+    {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    {expressionSyntax : ExpressionId → Prop}
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location}
+    {current : CallableIndexedHistory.NativeFrame} {ghost : CallableIndexedHistory.GhostFrame}
+    (profile : MatchProfileWith (fun context => ContextFor runtime header.solved context header.function.evidence)
+      certificates diagnosticPolicy header expressionSyntax
+      (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative) registry faults)
+    (escapedFault : faults .controlEscapedFunction header.escaped)
+    (state : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    (aligned : P (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      state.mapping state.world state.heap state.store state.canonical) :
+    CallableRuntimeBodyOrigins.Entry (origin runtime P transport binders profile escapedFault) functions :=
+  { mapping := state.mapping, world := state.world, environment := state.environment
+    canonical := state.canonical, actual := state.actualBody, heap := state.heap, store := state.store
+    embedding := state.embedding, actualContext := CallableIndexedParameterTyped.prefixContext header.bindings actualContext
+    frameLocation := frameLocation, native := current
+    environments := state.environments, heaps := state.heaps, locals := state.locals, lookups := state.lookups
+    actualTyped := state.actualTyped, reference := by simpa only [origin, List.length_map, List.length_reverse] using state.reference
+    read := state.state.read
+    unmapped := Eq.mp (congrArg (fun location => location ∉ state.mapping) state.catalog_frame) state.catalog.authority.unmapped
+    installed := aligned }
+
+end NamedFamily
+
 include extension faithful observations escaped in
 /-- No callee/body execution meaning is an external premise. The original
 source body grade determines the strong-induction budget. -/
@@ -156,36 +215,34 @@ theorem preserves_at_with_family
     (size : Nat) :
     ∀ header, header ∈ headers → BodyPreservesAtWith
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (BodyEntryCondition functions registry P header) size := by
-  induction size using Nat.strongRecOn with
-  | ind size ih =>
-    intro header member arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry outcome after aligned trace
-    let profile := profileProvider header member entry aligned
-    have children : ∀ context, ContextFor runtime header.solved context header.function.evidence →
-        RecursiveNamedHeaderContracts.AtMost size (fun child => RecursiveNamedBoundedContracts.PreservesAt child
-          (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context header.function.evidence header.function.source
-          (certificates header context) faults
-          (P header)) := by
-      intro context valid child within
-      exact expressionMeaning header member context valid size child within
-        (fun callee calleeMember smaller strict => ih smaller strict callee calleeMember)
-    have flow : RecursiveNamedLoopContracts.PreservesAtFor
-        (entry := P header) functions program header.function.evidence
-        (fun context => ContextFor runtime header.solved context header.function.evidence)
-        (source := header.function.source) (context := header.context) (registry := registry) (faults := faults)
-        (frameLayout := prepared.layout.frame) (globals := header.globals)
-        (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-        size (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
-        true header.function.body header.function.resultType header.output profile.flow :=
-      RecursiveNamedImperativeFor.preservesAt_match_with
-        (validity := fun context => ContextFor runtime header.solved context header.function.evidence)
-        (extend := fun valid extended => context_extend valid extended)
-        (runtimeOf := fun _ valid => context_runtime valid) functions header.definitions_eq header.registered extension
-        program header.function.evidence (transports header) (binders header) size faithful observations children diagnosticPolicy header.unique
-        profile.tree profile.errors size (Nat.le_refl size)
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluation, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
-      RecursiveNamedCatalogBodyFinishBounds.state_preserves_at_for functions (escaped header member) (P header) (transports header)
-        (fun context => ContextFor runtime header.solved context header.function.evidence) profile size flow entry aligned trace
-    exact ⟨value, finalStore, finalMap, finalWorld, evaluation, result, heaps, maps, worlds, frame, metadata⟩
+  let Index := Σ header : {header // header ∈ headers}, Σ administrative : Core.Context,
+    MatchProfileWith (fun context => ContextFor runtime header.val.solved context header.val.function.evidence)
+      (certificates header.val) diagnosticPolicy header.val (expressionSyntax header.val)
+      (SourceCoreCompatibleCatalog.packTypes (header.val.bindings.map Prod.snd) :: administrative) registry faults
+  let origins : Index → CallableRuntimeBodyOrigins.Origin values ambient registry faults := fun index =>
+    NamedFamily.origin runtime (P index.1.val) (transports index.1.val) (binders index.1.val) index.2.2 (escaped index.1.val index.1.property)
+  have bodies := CallableRuntimeBodyMutualMeaning.preserves_at origins functions extension program faithful observations
+    (by
+      intro index context valid budget child within below
+      rcases index with ⟨⟨header, member⟩, administrative, profile⟩
+      apply expressionMeaning header member context valid budget child within
+      intro callee calleeMember smaller strict arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry outcome after aligned trace
+      let actualProfile := profileProvider callee calleeMember entry aligned
+      let target : Index := ⟨⟨callee, calleeMember⟩, administrative, actualProfile⟩
+      have meaning := below target smaller strict
+      let actualEntry := NamedFamily.entry runtime functions (P callee) (transports callee) (binders callee)
+        actualProfile (escaped callee calleeMember) entry aligned
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
+        meaning actualEntry trace
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds, frame, metadata⟩) size
+  intro header member arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry outcome after aligned trace
+  let profile := profileProvider header member entry aligned
+  let index : Index := ⟨⟨header, member⟩, administrative, profile⟩
+  let actualEntry := NamedFamily.entry runtime functions (P header) (transports header) (binders header)
+    profile (escaped header member) entry aligned
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
+    bodies index actualEntry trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds, frame, metadata⟩
 
 include extension faithful observations runtimeViews owners uninitialized missing escaped prefixMatches profiles in
 /-- No callee/body execution meaning is an external premise. The original
@@ -251,36 +308,34 @@ theorem reflects_at_with_family
     (size : Nat) :
     ∀ header, header ∈ headers → BodyReflectsAtWith
       (headers := headers) (locations := locations) (capturePrefix := capturePrefix) functions registry header faults (BodyEntryCondition functions registry P header) size := by
-  induction size using Nat.strongRecOn with
-  | ind size ih =>
-    intro header member arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry value finalStore aligned completed
-    let profile := profileProvider header member entry aligned
-    have children : ∀ context, ContextFor runtime header.solved context header.function.evidence →
-        RecursiveNamedBoundedContracts.Below size (fun child => RecursiveNamedBoundedContracts.ReflectsAt child
-          (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context header.function.evidence header.function.source
-          (certificates header context) faults
-          (P header)) := by
-      intro context valid child smaller
-      exact expressionMeaning header member context valid size child (Nat.le_of_lt smaller)
-        (fun callee calleeMember smaller strict => ih smaller strict callee calleeMember)
-    have flow : RecursiveNamedBoundedContracts.Below size (fun child => RecursiveNamedLoopContracts.ReflectsAtFor
-        (entry := P header) functions program header.function.evidence
-        (fun context => ContextFor runtime header.solved context header.function.evidence)
-        (source := header.function.source) (context := header.context) (registry := registry) (faults := faults)
-        (frameLayout := prepared.layout.frame) (globals := header.globals)
-        (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-        child (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
-        true header.function.body header.function.resultType header.output profile.flow) :=
-      RecursiveNamedImperativeFor.reflectsAt_match_with
-        (validity := fun context => ContextFor runtime header.solved context header.function.evidence)
-        (extend := fun valid extended => context_extend valid extended)
-        (runtimeOf := fun _ valid => context_runtime valid) functions header.definitions_eq header.registered extension
-        program header.function.evidence (transports header) (binders header) size children faithful observations diagnosticPolicy runtimeViews header.unique
-        profile.tree profile.errors
-    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
-      RecursiveNamedCatalogBodyFinishBounds.state_reflects_at_for functions (escaped header member) (P header) (transports header)
-        (fun context => ContextFor runtime header.solved context header.function.evidence) profile size size (Nat.le_refl size) flow entry aligned completed
-    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata⟩
+  let Index := Σ header : {header // header ∈ headers}, Σ administrative : Core.Context,
+    MatchProfileWith (fun context => ContextFor runtime header.val.solved context header.val.function.evidence)
+      (certificates header.val) diagnosticPolicy header.val (expressionSyntax header.val)
+      (SourceCoreCompatibleCatalog.packTypes (header.val.bindings.map Prod.snd) :: administrative) registry faults
+  let origins : Index → CallableRuntimeBodyOrigins.Origin values ambient registry faults := fun index =>
+    NamedFamily.origin runtime (P index.1.val) (transports index.1.val) (binders index.1.val) index.2.2 (escaped index.1.val index.1.property)
+  have bodies := CallableRuntimeBodyMutualMeaning.reflects_at origins functions extension program faithful observations runtimeViews
+    (by
+      intro index context valid budget child within below
+      rcases index with ⟨⟨header, member⟩, administrative, profile⟩
+      apply expressionMeaning header member context valid budget child within
+      intro callee calleeMember smaller strict arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry value finalStore aligned completed
+      let actualProfile := profileProvider callee calleeMember entry aligned
+      let target : Index := ⟨⟨callee, calleeMember⟩, administrative, actualProfile⟩
+      have meaning := below target smaller strict
+      let actualEntry := NamedFamily.entry runtime functions (P callee) (transports callee) (binders callee)
+        actualProfile (escaped callee calleeMember) entry aligned
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
+        meaning actualEntry completed
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata⟩) size
+  intro header member arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost entry value finalStore aligned completed
+  let profile := profileProvider header member entry aligned
+  let index : Index := ⟨⟨header, member⟩, administrative, profile⟩
+  let actualEntry := NamedFamily.entry runtime functions (P header) (transports header) (binders header)
+    profile (escaped header member) entry aligned
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata, _, _⟩ :=
+    bodies index actualEntry completed
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds, frame, metadata⟩
 
 include extension faithful observations runtimeViews uninitialized missing escaped prefixMatches profiles in
 /-- Completed native bodies select only original strict native children.
