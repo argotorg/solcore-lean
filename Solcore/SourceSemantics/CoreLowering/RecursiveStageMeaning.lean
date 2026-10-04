@@ -15,46 +15,46 @@ open Core Frontend Frontend.SourceInference GeneralHeap CoreProof ReadOnly
 abbrev Certificate := GenericExpressionMeaning.Certificate
 abbrev FaultRep := Staging.Recursive.Failure → Word → Prop
 
-inductive ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+inductive ResultRepresentsFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (sourceType : TypeSystem.Ty) (type : Ty) (faults : FaultRep) :
     Staging.Recursive.Outcome → Value → Prop where
   | value {source value} (represented : model.Represents mapping world sourceType source value type) :
-      ResultRepresents model mapping world sourceType type faults (.value source) (.inRight .word value)
+      ResultRepresentsFor model mapping world sourceType type faults (.value source) (.inRight .word value)
   | fault {failure token} (represented : faults failure token) :
-      ResultRepresents model mapping world sourceType type faults (.fault failure) (.inLeft type (.word token))
+      ResultRepresentsFor model mapping world sourceType type faults (.fault failure) (.inLeft type (.word token))
 
-def Preserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def PreservesFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (registry : Staging.Recursive.Registry) (frame : Staging.Recursive.Scope) (context : SourceSemantics.Context)
     (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
   ∀ {node}, frame.source.lookupExpression? id = some node →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ outcome after},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
     Staging.Recursive.Expression program registry frame context environment before id outcome after →
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
-      ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      ResultRepresentsFor model finalMap finalWorld node.type lowered.type faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def Reflects {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def ReflectsFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (registry : Staging.Recursive.Registry) (frame : Staging.Recursive.Scope) (context : SourceSemantics.Context)
     (certificate : Certificate) (faults : FaultRep) : Prop :=
   ∀ {scope id lowered}, certificate scope id lowered →
   ∀ {node}, frame.source.lookupExpression? id = some node →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ value finalStore},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
     Evaluates actual store (lowered.expression.rename ξ) value finalStore →
     ∃ outcome after finalMap finalWorld,
       Staging.Recursive.Expression program registry frame context environment before id outcome after ∧
-      ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      ResultRepresentsFor model finalMap finalWorld node.type lowered.type faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
@@ -68,43 +68,84 @@ def BodyTrace (program : Program) (registry : Staging.Recursive.Registry) (frame
     Staging.Recursive.Statements program registry frame context environment before function.body finalContext control after ∧
       Staging.Recursive.BodyResult function.resultType control outcome
 
-def BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def BodyPreservesFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (registry : Staging.Recursive.Registry) (frame : Staging.Recursive.Scope) (function : Dynamic.Closure)
     (certificate : FunctionCode.BodyCertificate) (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
   ∀ {context staticFinal facts}, StatementsHaveType function.source
     {returnType := function.resultType, loopDepth := 0} context function.body staticFinal facts →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ outcome after},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
     BodyTrace program registry frame function context environment before outcome after →
     ∃ value finalStore finalMap finalWorld,
       Evaluates actual store (body.rename ξ) value finalStore ∧
-      ResultRepresents model finalMap finalWorld function.resultType type faults outcome value ∧
+      ResultRepresentsFor model finalMap finalWorld function.resultType type faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
-def BodyReflects {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def BodyReflectsFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (program : Program) (registry : Staging.Recursive.Registry) (frame : Staging.Recursive.Scope) (function : Dynamic.Closure)
     (certificate : FunctionCode.BodyCertificate) (faults : FaultRep) : Prop :=
   ∀ {scope type body}, certificate function.source scope function.body type body →
   ∀ {context staticFinal facts}, StatementsHaveType function.source
     {returnType := function.resultType, loopDepth := 0} context function.body staticFinal facts →
   ∀ {mapping world administrativeContext environment canonical actual before store ξ value finalStore},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical →
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
     GenericHeap.HeapRepresents model mapping world before store →
     Dynamic.EnvironmentAgrees before context.locals environment →
     EnvironmentsAgree ξ canonical actual →
     Evaluates actual store (body.rename ξ) value finalStore →
     ∃ outcome after finalMap finalWorld,
       BodyTrace program registry frame function context environment before outcome after ∧
-      ResultRepresents model finalMap finalWorld function.resultType type faults outcome value ∧
+      ResultRepresentsFor model finalMap finalWorld function.resultType type faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
+
+theorem ResultRepresentsFor.extend {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects definitions} {mapping futureMapping : LocationMap}
+    {world futureWorld : StoreTyping} {sourceType : TypeSystem.Ty} {type : Ty} {faults : FaultRep}
+    {outcome : Staging.Recursive.Outcome} {value : Value}
+    (represented : ResultRepresentsFor model mapping world sourceType type faults outcome value)
+    (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
+    ResultRepresentsFor model futureMapping futureWorld sourceType type faults outcome value := by
+  cases represented with
+  | value payload => exact .value (model.extend payload maps worlds)
+  | fault failure => exact .fault failure
+
+/-- Legacy interfaces use the same relation with the original catalog projection and definitions. -/
+abbrev ResultRepresents {catalog : SourceCoreDataCatalog.Catalog} :=
+  @ResultRepresentsFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev Preserves {catalog : SourceCoreDataCatalog.Catalog} :=
+  @PreservesFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev Reflects {catalog : SourceCoreDataCatalog.Catalog} :=
+  @ReflectsFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev BodyPreserves {catalog : SourceCoreDataCatalog.Catalog} :=
+  @BodyPreservesFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev BodyReflects {catalog : SourceCoreDataCatalog.Catalog} :=
+  @BodyReflectsFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev ResultRepresents.value {catalog : SourceCoreDataCatalog.Catalog}
+    {model : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
+    {sourceType : TypeSystem.Ty} {type : Ty} {faults : FaultRep} {source : Dynamic.Value} {value : Value}
+    (represented : model.Represents mapping world sourceType source value type) :
+    ResultRepresents model mapping world sourceType type faults (.value source) (.inRight .word value) :=
+  ResultRepresentsFor.value represented
+
+abbrev ResultRepresents.fault {catalog : SourceCoreDataCatalog.Catalog}
+    {model : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
+    {sourceType : TypeSystem.Ty} {type : Ty} {faults : FaultRep}
+    {failure : Staging.Recursive.Failure} {token : Word} (represented : faults failure token) :
+    ResultRepresents model mapping world sourceType type faults (.fault failure) (.inLeft type (.word token)) :=
+  ResultRepresentsFor.fault represented
 
 theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog}
     {model : GenericHeap.PayloadModel catalog} {mapping futureMapping : LocationMap}
@@ -112,10 +153,8 @@ theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog}
     {outcome : Staging.Recursive.Outcome} {value : Value}
     (represented : ResultRepresents model mapping world sourceType type faults outcome value)
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
-    ResultRepresents model futureMapping futureWorld sourceType type faults outcome value := by
-  cases represented with
-  | value payload => exact .value (model.extend payload maps worlds)
-  | fault failure => exact .fault failure
+    ResultRepresents model futureMapping futureWorld sourceType type faults outcome value :=
+  ResultRepresentsFor.extend represented maps worlds
 
 /-- A nested failure in the callee bypasses both outer gates and all
 arguments. Its original fault label and the callee's exact heap survive. -/

@@ -12,17 +12,18 @@ open Core Frontend Frontend.SourceInference GeneralHeap CoreProof ReadOnly DataP
 open DataExpressionSequence (Tree Values pair_rename)
 open RecursiveStageMeaning
 
-inductive Result {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+inductive ResultFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (mapping : LocationMap) (world : StoreTyping) (types : List TypeSystem.Ty)
     (codes : List SourceCoreBasic.LoweredExpr) (faults : FaultRep) : Staging.Recursive.ValuesOutcome → Value → Prop where
   | values {sources values}
       (represented : Values model mapping world types (codes.map (·.type)) sources values) :
-      Result model mapping world types codes faults (.values sources) (.inRight .word (packValues values))
+      ResultFor model mapping world types codes faults (.values sources) (.inRight .word (packValues values))
   | fault {reason token} (represented : faults reason token) :
-      Result model mapping world types codes faults (.fault reason)
+      ResultFor model mapping world types codes faults (.fault reason)
         (.inLeft (SourceCoreCalls.packArguments codes).type (.word token))
 
-variable {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+section Ambient
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
   {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope}
   {context : SourceSemantics.Context} {certificate : Certificate} {faults : FaultRep}
   {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
@@ -30,12 +31,12 @@ variable {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadM
 
 /-- Successful evaluation keeps left-to-right effects and every represented
 payload, including captured references inside earlier argument values. -/
-theorem preserves_values (tree : Tree frame.source certificate scope ids sourceTypes codes)
-    (meaning : Preserves model program registry frame context certificate faults)
+theorem preserves_values_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : PreservesFor model program registry frame context certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -88,12 +89,12 @@ theorem preserves_values (tree : Tree frame.source certificate scope ids sourceT
 
 /-- A source fault evaluates only its successful prefix. The generated helper
 propagates the exact token without evaluating later arguments. -/
-theorem preserves_fault (tree : Tree frame.source certificate scope ids sourceTypes codes)
-    (meaning : Preserves model program registry frame context certificate faults)
+theorem preserves_fault_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : PreservesFor model program registry frame context certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {reason : Staging.Recursive.Failure}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -145,19 +146,19 @@ theorem preserves_fault (tree : Tree frame.source certificate scope ids sourceTy
 /-- Completed Core bundles reconstruct the recursive staged argument trace.
 The earlier successful argument payload is kept under the exact inserted slot;
 a later stage failure is propagated with its original scope and call. -/
-theorem reflects (tree : Tree frame.source certificate scope ids sourceTypes codes)
-    (meaning : Reflects model program registry frame context certificate faults)
+theorem reflects_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : ReflectsFor model program registry frame context certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
     (evaluated : Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
       Staging.Recursive.Expressions program registry frame context environment before ids outcome after ∧
-      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      ResultFor model finalMap finalWorld sourceTypes codes faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
@@ -237,11 +238,163 @@ theorem reflects (tree : Tree frame.source certificate scope ids sourceTypes cod
               firstMaps.trans maps, firstWorlds.trans worlds,
               firstFrame.trans frame, firstMetadata.trans metadata⟩
             simpa [packValues, nonempty] using
-              Result.values (codes := lowered :: nextCode :: codes)
+              ResultFor.values (codes := lowered :: nextCode :: codes)
                 (.cons (model.extend payload maps worlds) restRep)
 
 /-- Finite source arguments, including failures, produce the actual Core
 bundle. Child correspondence is universal over all related states. -/
+theorem preserves_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : PreservesFor model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Staging.Recursive.ValuesOutcome}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (execution : Staging.Recursive.Expressions program registry frame context environment before ids outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore ∧
+      ResultFor model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  cases outcome with
+  | values sources =>
+    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata⟩ := preserves_values_for tree meaning environments heaps locals layout execution
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
+      finalHeaps, maps, worlds, frame, metadata⟩
+  | fault reason =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata⟩ := preserves_fault_for tree meaning environments heaps locals layout execution
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
+      finalHeaps, maps, worlds, frame, metadata⟩
+
+/-- Only an existing finite source trace supplies a sufficient fuel bound. -/
+theorem preserves_sufficient_fuel_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : PreservesFor model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Staging.Recursive.ValuesOutcome}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (execution : Staging.Recursive.Expressions program registry frame context environment before ids outcome after) :
+    ∃ value finalStore finalMap finalWorld required,
+      (∀ fuel, required ≤ fuel → runStateful fuel
+        (.initial ((SourceCoreCalls.packArguments codes).expression.rename ξ) actual store) = .done value finalStore) ∧
+      ResultFor model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩ := preserves_for tree meaning environments heaps locals layout execution
+  obtain ⟨required, runs⟩ := evaluation_runStateful_complete_with_sufficient_fuel evaluated
+  exact ⟨value, finalStore, finalMap, finalWorld, required, runs, represented, finalHeaps, maps, worlds, frame, metadata⟩
+
+theorem reflects_done_for (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : ReflectsFor model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value} {fuel : Nat}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (completed : runStateful fuel
+      (.initial ((SourceCoreCalls.packArguments codes).expression.rename ξ) actual store) = .done value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      Staging.Recursive.Expressions program registry frame context environment before ids outcome after ∧
+      ResultFor model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  reflects_for tree meaning environments heaps locals layout (runStateful_evaluation_sound completed)
+
+end Ambient
+
+/-- The legacy result keeps the original catalog projection and runtime definitions. -/
+abbrev Result {catalog : SourceCoreDataCatalog.Catalog} :=
+  @ResultFor catalog (GenericHeap.strictProjection catalog) catalog.definitions
+
+abbrev Result.values {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+    {mapping : LocationMap} {world : StoreTyping} {types : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr} {faults : FaultRep} {sources : List Dynamic.Value} {values : List Value}
+    (represented : Values model mapping world types (codes.map (·.type)) sources values) :
+    Result model mapping world types codes faults (.values sources) (.inRight .word (packValues values)) :=
+  ResultFor.values represented
+
+abbrev Result.fault {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+    {mapping : LocationMap} {world : StoreTyping} {types : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr} {faults : FaultRep}
+    {reason : Staging.Recursive.Failure} {token : Word} (represented : faults reason token) :
+    Result model mapping world types codes faults (.fault reason)
+      (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) :=
+  ResultFor.fault represented
+
+variable {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+  {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope}
+  {context : SourceSemantics.Context} {certificate : Certificate} {faults : FaultRep}
+  {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
+  {codes : List SourceCoreBasic.LoweredExpr}
+
+theorem preserves_values (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : Preserves model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (execution : Staging.Recursive.Expressions program registry frame context environment before ids (.values sources) after) :
+    ∃ values finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inRight .word (packValues values)) finalStore ∧
+      Values model finalMap finalWorld sourceTypes (codes.map (·.type)) sources values ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_values_for tree meaning environments heaps locals layout execution
+
+theorem preserves_fault (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : Preserves model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {reason : Staging.Recursive.Failure}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (execution : Staging.Recursive.Expressions program registry frame context environment before ids (.fault reason) after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_fault_for tree meaning environments heaps locals layout execution
+
+theorem reflects (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : Reflects model program registry frame context certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (evaluated : Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      Staging.Recursive.Expressions program registry frame context environment before ids outcome after ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  reflects_for tree meaning environments heaps locals layout evaluated
+
 theorem preserves (tree : Tree frame.source certificate scope ids sourceTypes codes)
     (meaning : Preserves model program registry frame context certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
@@ -257,20 +410,9 @@ theorem preserves (tree : Tree frame.source certificate scope ids sourceTypes co
       Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  cases outcome with
-  | values sources =>
-    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := preserves_values tree meaning environments heaps locals layout execution
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
-  | fault reason =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := preserves_fault tree meaning environments heaps locals layout execution
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_for tree meaning environments heaps locals layout execution
 
-/-- Only an existing finite source trace supplies a sufficient fuel bound. -/
 theorem preserves_sufficient_fuel (tree : Tree frame.source certificate scope ids sourceTypes codes)
     (meaning : Preserves model program registry frame context certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
@@ -287,11 +429,8 @@ theorem preserves_sufficient_fuel (tree : Tree frame.source certificate scope id
       Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-    maps, worlds, frame, metadata⟩ := preserves tree meaning environments heaps locals layout execution
-  obtain ⟨required, runs⟩ := evaluation_runStateful_complete_with_sufficient_fuel evaluated
-  exact ⟨value, finalStore, finalMap, finalWorld, required, runs, represented, finalHeaps, maps, worlds, frame, metadata⟩
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_sufficient_fuel_for tree meaning environments heaps locals layout execution
 
 theorem reflects_done (tree : Tree frame.source certificate scope ids sourceTypes codes)
     (meaning : Reflects model program registry frame context certificate faults)
@@ -310,7 +449,7 @@ theorem reflects_done (tree : Tree frame.source certificate scope ids sourceType
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  reflects tree meaning environments heaps locals layout (runStateful_evaluation_sound completed)
+  reflects_done_for tree meaning environments heaps locals layout completed
 
 /-- An accepted user-callable gate evaluates recursive staged arguments at
 its two real hidden slots. An argument failure returns before application and
