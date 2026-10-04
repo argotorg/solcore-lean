@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaCatalogEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeBody
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
@@ -39,21 +40,8 @@ Only the original frame cell is installed, then the reached prefix's certified
 effects and ordered canonical additions transport that observation. -/
 def catalog_entry_for : RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix
     (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
-    reached.mapping reached.world reached.heap reached.store reached.canonical := by
-  let installed := initial.authority.install (Current.stable reached.nextHistory)
-  have frame : AdministrativePreserved mapping
-      (store.set initial.authority.frameLocation (encode prepared.ancestry.layout.frame reached.next))
-      reached.mapping reached.store := by
-    simpa only [sameFrame] using reached.frame
-  refine ⟨installed.extend reached.maps reached.worlds frame reached.metadata, ?_⟩
-  intro header member
-  obtain ⟨added, length, canonical⟩ := reached.spine
-  rw [canonical]
-  simp only [List.length_append, List.length_map, List.length_reverse]
-  have index : code.receipt.loweredParameters.length + scope.length + callerPrefix + header.slot =
-      added.length + (scope.length + callerPrefix + header.slot) := by omega
-  rw [index, List.getElem?_append_right (by omega)]
-  simpa only [Nat.add_sub_cancel_left] using initial.globals header member
+    reached.mapping reached.world reached.heap reached.store reached.canonical :=
+  CallableIndexedLambdaCatalogEntries.catalog_entry_sized reached initial sameFrame
 
 /-- This is the same physical frame cell as the one in the supplied original
 catalog authority; it is not recovered from a native frame type. -/
