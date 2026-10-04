@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLeaves
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCompletion
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadSource
 
 /-! Bidirectional source correspondence for accepted compatible local reads.
@@ -68,10 +68,8 @@ theorem Certificate.reflects {fuel : Nat} {context : ValuesContext} {source : Ty
         mapping world certificate.node.type certificate.type faults outcome value ∧
       CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world after finalStore ∧
       AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after := by
-  obtain ⟨outcome, after, native, nativeStore, sourceTrace, evaluated, represented, finalHeaps, frame, metadata⟩ :=
-    certificate.evaluates functions extension program sourceContext evidence binding environments heaps locals agrees uninitialized
-  obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated evaluation
-  exact ⟨outcome, after, sourceTrace, represented, finalHeaps, frame, metadata⟩
+  exact certificate.completed functions extension program sourceContext evidence binding
+    environments heaps locals agrees uninitialized evaluation
 
 /-- A static occurrence receipt for the universal child-expression interface.
 The receipt contains compiler and source typing facts, never a child run. -/
