@@ -359,6 +359,9 @@ import Solcore.SourceSemantics.CoreLowering.PrimitiveExpressions
 import Solcore.SourceSemantics.CoreLowering.GeneralHeap
 import Solcore.SourceSemantics.CoreLowering.GeneralExpressions
 import Solcore.SourceSemantics.CoreLowering.GeneralStatements
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
 
 import Solcore.SourceSemantics.CoreLowering.BasicStatementTreeCertificates
 import Solcore.SourceSemantics.CoreLowering.WordMapping
