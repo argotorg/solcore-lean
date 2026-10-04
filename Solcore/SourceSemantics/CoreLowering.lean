@@ -613,6 +613,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaRuntimeValues
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveStageMappingReadMeaning
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
