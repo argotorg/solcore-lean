@@ -80,6 +80,61 @@ theorem binds : ProtectedExpressionMeaning.Binds
           (scope.length + 1 + base.globals.length) + 1 := by simp only [List.length_cons]; omega
       simpa only [index, List.getElem?_cons_succ] using entry.reference
 
+section Effects
+variable {bindings : List Binding} {nativeArguments : List Value}
+  {mapping prefixMap : LocationMap} {world prefixWorld : StoreTyping}
+  {before prefixHeap : Dynamic.Heap} {store prefixStore : Store}
+  {canonical prefixCanonical added : Environment} {location : Location} {next : NativeFrame}
+  (initial : RecursiveNamedCatalog.Entry headers locations capturePrefix callerPrefix [] mapping world before store canonical)
+  (sameFrame : initial.authority.frameLocation = location)
+  (maps : LocationMap.Extends mapping prefixMap) (worlds : WorldExtends world prefixWorld)
+  (frame : AdministrativePreserved mapping (store.set location (encode prepared.layout.frame next)) prefixMap prefixStore)
+  (metadata : Dynamic.HeapMetadataExtend before prefixHeap)
+  (length : added.length = bindings.length)
+  (spine : prefixCanonical = added ++ DataPatternValues.packValues nativeArguments :: canonical)
+
+/-- Actual installation and prefix effects suffice before any body completion.
+The ordered spine retains the packed slot and every original catalog row. -/
+def catalog_entry_of_effects {nextGhost : GhostFrame}
+    (history : Current prepared.graph.inputs prepared.graph.table next nextGhost) :
+    RecursiveNamedCatalog.Entry headers locations capturePrefix (callerPrefix + 1)
+      (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) prefixMap prefixWorld
+      prefixHeap prefixStore prefixCanonical := by
+  let installed := initial.authority.install history
+  have effects : AdministrativePreserved mapping
+      (store.set initial.authority.frameLocation (encode prepared.layout.frame next)) prefixMap prefixStore := by
+    simpa only [sameFrame] using frame
+  refine ⟨installed.extend maps worlds effects metadata, ?_⟩
+  intro header member
+  rw [spine]
+  simp only [List.length_map, List.length_reverse]
+  have index : bindings.length + (callerPrefix + 1) + header.slot =
+      added.length + (callerPrefix + header.slot + 1) := by omega
+  rw [index, List.getElem?_append_right (by omega)]
+  simpa only [Nat.add_sub_cancel_left, List.getElem?_cons_succ, List.length_nil, Nat.zero_add]
+    using initial.globals header member
+
+/-- Source attribution and actual carried history remain separate inputs.
+No native evaluation or type creates the source method frame. -/
+def source_entry_of_effects {origin : Word} {state : MetadataState}
+    (reference : prefixCanonical[(bindings.reverse.map (fun binding => (binding.1.id, binding.2))).length + 1 + base.globals.length]? =
+      some (.cellRef prepared.layout.frame.type location))
+    (owned : prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin)
+    (history : Carries prepared.graph.inputs prepared.graph.table next (.named origin) (some state))
+    (sourceFrame : CallableCoercionMethodFrame.Frame sourceBody function)
+    (sameSource : sourceBody.source = CallableIndexedNamedGeneration.source named) :
+    SourceEntry named sourceBody function headers locations capturePrefix (callerPrefix + 1)
+      (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) prefixMap prefixWorld
+      prefixHeap prefixStore prefixCanonical :=
+  { catalog := catalog_entry_of_effects initial sameFrame maps worlds frame metadata length spine (.stable history)
+    sourceFrame, sameSource, origin, metadata := state, owned
+    ghost := rfl
+    carried := history
+    reference := by
+      change prefixCanonical[_]? = some (Value.cellRef prepared.layout.frame.type initial.authority.frameLocation)
+      simpa only [sameFrame] using reference }
+end Effects
+
 section Prefix
 variable {functions : FunctionModel values.checked.catalog ambient} {registry : SourceCoreRawMetadata.Registry}
   {context : SourceSemantics.Context} {bindings : List Binding} {arguments : List Dynamic.Value}
@@ -101,20 +156,8 @@ def catalog_entry {nextGhost : GhostFrame}
     (history : Current prepared.graph.inputs prepared.graph.table next nextGhost) :
     RecursiveNamedCatalog.Entry headers locations capturePrefix (callerPrefix + 1)
       (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) reached.mapping reached.world
-      reached.heap reached.store reached.canonical := by
-  let installed := initial.authority.install history
-  have effects : AdministrativePreserved mapping
-      (store.set initial.authority.frameLocation (encode prepared.layout.frame next)) reached.mapping reached.store := by
-    simpa only [sameFrame] using reached.frame
-  refine ⟨installed.extend reached.maps reached.worlds effects reached.metadata, ?_⟩
-  intro header member
-  rw [spine]
-  simp only [List.length_map, List.length_reverse]
-  have index : bindings.length + (callerPrefix + 1) + header.slot =
-      added.length + (callerPrefix + header.slot + 1) := by omega
-  rw [index, List.getElem?_append_right (by omega)]
-  simpa only [Nat.add_sub_cancel_left, List.getElem?_cons_succ, List.length_nil, Nat.zero_add]
-    using initial.globals header member
+      reached.heap reached.store reached.canonical :=
+  catalog_entry_of_effects initial sameFrame reached.maps reached.worlds reached.frame reached.metadata length spine history
 
 /-- The actual hook's owned key and complete history are joined to the
 independent trait-method frame. The source dictionary is never reconstructed. -/
@@ -126,13 +169,8 @@ def source_entry {origin : Word} {metadata : MetadataState}
     SourceEntry named sourceBody function headers locations capturePrefix (callerPrefix + 1)
       (bindings.reverse.map (fun binding => (binding.1.id, binding.2))) reached.mapping reached.world
       reached.heap reached.store reached.canonical :=
-  { catalog := catalog_entry reached initial sameFrame length spine (.stable history)
-    sourceFrame, sameSource, origin, metadata, owned
-    ghost := rfl
-    carried := history
-    reference := by
-      change reached.canonical[_]? = some (Value.cellRef prepared.layout.frame.type initial.authority.frameLocation)
-      simpa only [sameFrame] using reached.reference }
+  source_entry_of_effects initial sameFrame reached.maps reached.worlds reached.frame reached.metadata length spine
+    reached.reference owned history sourceFrame sameSource
 
 include initial sameFrame in
 /-- Body effects restore the original caller catalog, including its complete
