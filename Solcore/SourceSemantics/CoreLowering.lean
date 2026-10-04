@@ -644,6 +644,12 @@ import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSourceHookMean
 import Solcore.SourceSemantics.CoreLowering.SourceStagedIntegerStatementsMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
+import Solcore.SourceSemantics.CoreLowering.SourceStagingHeapRelation
+import Solcore.SourceSemantics.CoreLowering.SourceStagedIntegerLetMeaning
+import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallSourceBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallStageBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedActualNamedSourceReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedStageOrigins
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
