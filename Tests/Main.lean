@@ -1786,6 +1786,8 @@ import Solcore.Test.SourceCoreRecursiveStageTupleMeaning
 import Solcore.Test.SourceCoreCallablePreparedMethodSelection
 import Solcore.Test.SourceCoreRecursiveNamedLambdaFormationExpressions
 import Solcore.Test.SourceCoreCallablePreparedMethodRuntimeMeaning
+import Solcore.Test.SourceCoreCallablePreparedOperatorSuffixMeaning
+import Solcore.Test.SourceCoreCallableIndexedLambdaCatalogEntries
 import Solcore.Test.SourceCoreRecursiveStageMappingReadMeaning
 import Solcore.Test.SourceCoreCallableIndexedLambdaEntrySpines
 import Solcore.Test.SourceCoreCompatibleExpressionReadCompletion
@@ -2942,6 +2944,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceRecursiveStageTupleExpressions.run
   SourceCoreRecursiveStageTupleMeaning.run
   SourceCoreCallablePreparedMethodSelection.run
+  SourceCoreCallablePreparedOperatorSuffixMeaning.run
   SourceCoreRecursiveNamedLambdaFormationExpressions.run
   SourceCoreRecursiveStageMappingReadMeaning.run
   SourceCoreRecursiveStageMappingTupleMeaning.run
