@@ -33,21 +33,30 @@ theorem recaptureFrame (frame : Dynamic.ClosureFrame program function) (environm
     Dynamic.ClosureFrame program {function with captured := environment} :=
   {frame with code := {frame.code with occurrence := frame.code.occurrence}}
 
+/-- Recapture changes only the source capture environment. The generic
+static Tree, actual view callback, flow and full code remain the same receipt. -/
+def recaptureBodyWith
+    {expressionSyntax : TypedSource → ExpressionId → Prop}
+    {certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    (code : Code indexed function scope administrative)
+    (body : CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates code program registry faults)
+    (environment : Dynamic.Environment) :
+    CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates (recaptureCode code environment) program registry faults :=
+  { toContext := recaptureContext code body.toContext environment
+    frame := recaptureFrame body.frame environment
+    readFuel := body.readFuel, policy := body.policy, callback := body.callback
+    flow := body.flow, generated := body.generated, projection := body.projection, emitted := body.emitted
+    actualTree := body.actualTree, actualSites := body.actualSites, tree := body.tree, sites := body.sites
+    valid := body.valid, unique := body.unique }
+
 /-- The complete actual and canonical trees, code equality and runtime ledger
 are rebuilt together. The closure frame alone is insufficient for this step. -/
 def recaptureBody (code : Code indexed function scope administrative)
     (body : CallableIndexedLambdaRuntimeBody.Body code program registry faults)
     (environment : Dynamic.Environment) :
-    CallableIndexedLambdaRuntimeBody.Body (recaptureCode code environment) program registry faults := by
-  rcases body with ⟨inputs, frame, readFuel, policy, callback, flow, generated, projection, emitted, actualTree, actualSites, tree, sites, valid, unique⟩
-  constructor
-  case toContext => exact recaptureContext code inputs environment
-  case readFuel => exact readFuel
-  case policy => exact policy
-  case flow => exact flow
-  case actualTree => exact actualTree
-  case tree => exact tree
-  all_goals first | exact recaptureFrame frame environment | assumption
+    CallableIndexedLambdaRuntimeBody.Body (recaptureCode code environment) program registry faults :=
+  CallableIndexedLambdaRuntimeBody.Body.fromWith
+    (recaptureBodyWith code body.toWith environment)
 
 /-- Typing of a used prefix comes from real values in the same environment.
 The native environment outside that prefix is retained by the caller. -/
@@ -175,6 +184,45 @@ def captures
     respects := TypedLexicalWhile.environment_respects represented.runtime_hasTypes typed same
     typed := typed }
 
+/-- The actual finite capture retains all catalog slots and the same physical
+frame. Slot bounds are static and independent of native environment typing. -/
+theorem capture_globals
+    {caller : Header indexed.ancestry values indexed.layouts.definitions program}
+    {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
+    {locations : Locations} {mapping : LocationMap} {world : StoreTyping}
+    {heap : Dynamic.Heap} {store : Store} {canonical actual : Environment}
+    {context actualContext : Core.Context} {environment : Dynamic.Environment} {ξ : Renaming}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (slots : ∀ header, header ∈ headers → header.slot < indexed.base.globals.length)
+    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1 scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world context scope environment canonical indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
+    CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope
+      (captures complete globals entry related agrees typed).canonical entry.catalog.authority.frameLocation := by
+  have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals headers locations 1 scope canonical
+      entry.catalog.authority.frameLocation :=
+    ⟨entry.catalog.globals, by simpa only [globals] using entry.reference⟩
+  apply observed.take
+  · intro header member
+    have bound := slots header member
+    simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
+    omega
+  · simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
+    omega
+
+/-- Actual compiled preparation relates the ordered global and function rows.
+Every retained Header's real selected slot then has the required finite bound. -/
+theorem cached_capture_slots (cached : SourceCoreUnifiedCompilation.Compiled)
+    {values : SourceCoreCompatibleValues.Context} {program : Program}
+    (headers : Inventory cached.indexed.ancestry values cached.indexed.layouts.definitions program) :
+    ∀ header, header ∈ headers → header.slot < cached.indexed.base.globals.length := by
+  intro header _member
+  rw [CallableIndexedPreparedInventories.cached_globals, List.length_map]
+  exact (List.getElem?_eq_some_iff.mp header.selected).1
+
 section Lambda
 variable {caller : Header indexed.ancestry values indexed.layouts.definitions program}
   {headers : Inventory indexed.ancestry values indexed.layouts.definitions program}
@@ -184,6 +232,69 @@ variable {caller : Header indexed.ancestry values indexed.layouts.definitions pr
 /-- This receipt contains the actual lambda compiler output and its static body
 at the finite named prefix. The source capture environment is supplied only
 when the original formation is evaluated. -/
+structure LambdaWith
+    (expressionSyntax : TypedSource → ExpressionId → Prop)
+    (certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate)
+    (caller : Header indexed.ancestry values indexed.layouts.definitions program)
+    (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (scope : SourceCoreLocalCell.Scope) (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr) where
+  parameters : List TypedBinder
+  result : TypeSystem.Ty
+  statements : List StatementId
+  code : Code indexed (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence [])
+    scope (nativePrefix caller)
+  body : CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates code program registry faults
+  compilation : code.compilation = CallableIndexedNamedGeneration.context indexed caller.named
+  active : code.active = []
+  identifier : code.id = id
+  emitted : code.lowered = lowered
+  sourceType : code.sourceNode.type = FunctionValues.sourceType
+    (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence [])
+  nativeType : lowered.type = CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore
+  ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions []
+  coercions : code.sourceNode.coercions = []
+
+theorem site_native_type {parameters : List TypedBinder} {result : TypeSystem.Ty}
+    {statements : List StatementId}
+    (site : CallableIndexedLambdaGeneration.Site indexed caller.named parameters result statements
+      context evidence [] scope (nativePrefix caller)) :
+    site.code.lowered.type = CallableContract.functionType
+      site.code.receipt.parameterCore site.code.receipt.resultCore := by
+  have checked := site.code.receipt.checked
+  rw [site.code.callables] at checked
+  unfold SourceCoreBasic.ensureType at checked
+  have reported : site.code.reported = CallableContract.functionType
+      site.code.receipt.parameterCore site.code.receipt.resultCore := by
+    split at checked
+    · assumption
+    · cases checked
+  have nativeType : site.code.lowered.type = site.code.reported :=
+    congrArg SourceCoreBasic.LoweredExpr.type site.code.receipt.emitted
+  exact nativeType.trans reported
+
+/-- The actual contextual generation site supplies every compiler field. The
+independent source annotation and complete static body stay explicit. -/
+theorem LambdaWith.of_site
+    {expressionSyntax : TypedSource → ExpressionId → Prop}
+    {certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate} {parameters : List TypedBinder} {result : TypeSystem.Ty}
+    {statements : List StatementId}
+    (site : CallableIndexedLambdaGeneration.Site indexed caller.named parameters result statements
+      context evidence [] scope (nativePrefix caller))
+    (body : CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates site.code program registry faults)
+    (sourceType : site.code.sourceNode.type = FunctionValues.sourceType
+      (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence []))
+    (requirements : site.code.sourceNode.requirements = [])
+    (coercions : site.code.sourceNode.coercions = []) :
+    Nonempty (LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope
+      site.code.id site.code.lowered) := by
+  have nativeType := site_native_type site
+  exact ⟨{
+    parameters := parameters, result := result, statements := statements, code := site.code,
+    body := body, compilation := site.compilation, active := site.active,
+    identifier := rfl, emitted := rfl, sourceType := sourceType, nativeType := nativeType,
+    ordinary := by rw [requirements, coercions]; rfl,
+    coercions := coercions }⟩
+
 structure Lambda (caller : Header indexed.ancestry values indexed.layouts.definitions program)
     (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (scope : SourceCoreLocalCell.Scope) (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr) where
@@ -216,23 +327,14 @@ theorem Lambda.of_site {parameters : List TypedBinder} {result : TypeSystem.Ty}
     (coercions : site.code.sourceNode.coercions = []) :
     Nonempty (Lambda (registry := registry) (faults := faults) caller context evidence scope
       site.code.id site.code.lowered) := by
-  have checked := site.code.receipt.checked
-  rw [site.code.callables] at checked
-  unfold SourceCoreBasic.ensureType at checked
-  have reported : site.code.reported = CallableContract.functionType
-      site.code.receipt.parameterCore site.code.receipt.resultCore := by
-    split at checked
-    · assumption
-    · cases checked
-  have nativeType : site.code.lowered.type = site.code.reported :=
-    congrArg SourceCoreBasic.LoweredExpr.type site.code.receipt.emitted
-  have nativeType := nativeType.trans reported
+  have nativeType := site_native_type site
   exact ⟨{
     parameters := parameters, result := result, statements := statements, code := site.code,
     body := body, compilation := site.compilation, active := site.active,
     identifier := rfl, emitted := rfl, sourceType := sourceType, nativeType := nativeType,
     ordinary := by rw [requirements, coercions]; rfl,
     coercions := coercions }⟩
+
 
 def Lambda.formed {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (head : Lambda (registry := registry) (faults := faults) caller context evidence scope id lowered)
@@ -487,6 +589,103 @@ theorem reflects_at
     exact .value source
   obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size original
   exact ⟨sourceSize, _, before, mapping, world, sized, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
+
+section GenericLambda
+variable {expressionSyntax : TypedSource → ExpressionId → Prop}
+  {certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+
+def LambdaWith.formed {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope id lowered)
+    (environment : Dynamic.Environment) : Dynamic.Closure :=
+  CallableIndexedLambdaGeneration.closure caller.named head.parameters head.result head.statements context evidence environment
+
+def LambdaWith.actualCode {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope id lowered)
+    (environment : Dynamic.Environment) : Code indexed (head.formed environment) scope (nativePrefix caller) :=
+  recaptureCode head.code environment
+
+def LambdaWith.history {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store} {canonical : Environment}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope id lowered)
+    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1
+      scope mapping world heap store canonical) (environment : Dynamic.Environment) : History (head.actualCode environment) where
+  native := entry.catalog.authority.current
+  ghost := .named entry.origin
+  metadata := CallableIndexedNamedGeneration.state caller.named
+  carried := entry.history
+  source := rfl
+  owner := by
+    change caller.named.signature.key = head.code.compilation.owner
+    rw [head.compilation]
+    rfl
+  active := head.active.symm
+
+theorem LambdaWith.reference_index {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope id lowered) :
+    head.code.referenceIndex = scope.length + 1 + indexed.base.globals.length := by
+  simp only [Code.referenceIndex, head.compilation, SourceCoreCallableIndexedAncestry.creationReferenceIndex,
+    CallableIndexedNamedGeneration.context, CompatibleNamedBody.bodyContext]
+
+theorem LambdaWith.reference {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store} {canonical actual : Environment}
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {ξ : Renaming}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults) caller context evidence scope id lowered)
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1
+      scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      administrative scope environment canonical indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions) :
+    (captures complete globals entry related agrees typed).canonical[(head.actualCode environment).referenceIndex]? =
+      some (.cellRef indexed.ancestry.layout.frame.type entry.catalog.authority.frameLocation) := by
+  have bound : head.code.referenceIndex < scope.length + (nativePrefix caller).length := by
+    rw [LambdaWith.reference_index head]
+    simp only [nativePrefix, List.length_cons, List.length_append, List.length_map, List.length_nil]
+    omega
+  change (canonical.take (scope.length + (nativePrefix caller).length))[head.code.referenceIndex]? = _
+  rw [List.getElem?_take, if_pos bound, LambdaWith.reference_index head, ← globals]
+  exact entry.reference
+
+/-- The body keeps the actual Code view, canonical Tree and emitted flow while
+formation replaces only the captured source environment. -/
+def LambdaWith.actualBody {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults)
+      caller context evidence scope id lowered) (environment : Dynamic.Environment) :
+    CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates
+      (head.actualCode environment) program registry faults :=
+  recaptureBodyWith head.code head.body environment
+
+/-- Formation supplies the ordered capture condition from the real catalog
+entry. The same-Code/History origin receipt is independent and stays explicit. -/
+theorem LambdaWith.capture_condition
+    {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    {canonical actual : Environment} {administrative actualContext : Core.Context}
+    {environment : Dynamic.Environment} {ξ : Renaming}
+    (head : LambdaWith expressionSyntax certificates (registry := registry) (faults := faults)
+      caller context evidence scope id lowered)
+    (origin : {function : Dynamic.Closure} → {scope : SourceCoreLocalCell.Scope} → {administrative : Core.Context} →
+      (code : Code indexed function scope administrative) → History code → Prop)
+    (complete : RecursiveNamedCatalogNativeContexts.Complete (ambient := CallableIndexedAmbient.ambientDefinitions indexed) headers)
+    (globals : caller.globals = indexed.base.globals.length)
+    (slots : ∀ header, header ∈ headers → header.slot < indexed.base.globals.length)
+    (entry : Entry (ambient := CallableIndexedAmbient.ambientDefinitions indexed) indexed caller headers locations 0 1
+      scope mapping world heap store canonical)
+    (related : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      administrative scope environment canonical indexed.layouts.definitions)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext indexed.layouts.definitions)
+    (originAt : origin (head.actualCode environment) (head.history entry environment)) :
+    CallableIndexedLambdaRuntimeValues.captureCondition indexed program
+      (fun {_ _ _} code => CallableIndexedLambdaStaticBodySupport.BodyWith expressionSyntax certificates code program registry faults)
+      origin (headers := headers) (locations := locations) 1
+      (captures complete globals entry related agrees typed) (head.actualCode environment)
+      (head.history entry environment) (head.actualBody environment) :=
+  ⟨originAt, entry.catalog.authority.frameLocation, capture_globals complete globals slots entry related agrees typed⟩
+
+end GenericLambda
 
 end Lambda
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFormationHeads

@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewStaticTyping
 import Solcore.SourceSemantics.CoreLowering.BuiltinLexicalStatements
 
 /-! Independent source typing and lexical syntax across a local lambda view.
@@ -645,13 +646,15 @@ theorem expression_typing_original {id : ExpressionId} {context : Context} {type
     syntaxTree (reached.metadata edited.metadata) typed
 
 include edited avoids unique in
-/-- Ordinary let/block/if syntax, with its independent expression typing,
-transports at the actual lexical contexts. No body execution is stored here. -/
-theorem lexical_syntax {context : Context} {mode : Bool} {statements : List StatementId}
+/-- Lexical syntax transports the same reached expression certificates.
+Independent expression typing follows the full source typing judgments. -/
+theorem lexical_syntax_with {before after : ExpressionId → Prop}
+    (expressions : ∀ id, Reaches source roots (.expression id) → before id → after id)
+    {context : Context} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty}
-    (syntaxTree : BuiltinLexicalStatements.Syntax source context mode statements expected)
+    (syntaxTree : GenericLexicalStatements.Syntax source before context mode statements expected)
     (reached : ∀ id ∈ statements, Reaches source roots (.statement id)) :
-    BuiltinLexicalStatements.Syntax view context mode statements expected := by
+    GenericLexicalStatements.Syntax view after context mode statements expected := by
   induction syntaxTree with
   | nil allowed => exact .nil allowed
   | returnUnit rest found form sourceType =>
@@ -659,15 +662,15 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
   | @returnValue context mode id node expression expressionNode expected rest found form sourceType expressionFound valueType typed value =>
     have child : Reaches source roots (.expression expression) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique value child
+    have certified := expressions _ child value
     exact .returnValue rest (edited.metadata.symm.statement found) form sourceType
-      ((expression_lookup edited avoids child).symm.trans expressionFound) valueType (typing _ _ typed) certified
+      ((expression_lookup edited avoids child).symm.trans expressionFound) valueType (CallableLambdaViewStaticTyping.expression edited avoids unique typed child) certified
   | @tail context id node expression expressionNode expected found form sourceType expressionFound valueType typed value =>
     have child : Reaches source roots (.expression expression) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique value child
+    have certified := expressions _ child value
     exact .tail (edited.metadata.symm.statement found) form sourceType
-      ((expression_lookup edited avoids child).symm.trans expressionFound) valueType (typing _ _ typed) certified
+      ((expression_lookup edited avoids child).symm.trans expressionFound) valueType (CallableLambdaViewStaticTyping.expression edited avoids unique typed child) certified
   | @uninitialized context nextContext mode id node binder rest expected found form declaration mono extended ordinary remaining ih =>
     exact .uninitialized (edited.metadata.symm.statement found) form
       ((rootBinder edited.metadata binder.id).symm.trans declaration) mono
@@ -677,20 +680,20 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
   | @initialized context nextContext mode id node binder initializer initializerNode rest expected found form declaration mono extended ordinary initializerFound sourceType initializerTyped initializerSyntax remaining ih =>
     have child : Reaches source roots (.expression initializer) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique initializerSyntax child
+    have certified := expressions _ child initializerSyntax
     exact .initialized (edited.metadata.symm.statement found) form
       ((rootBinder edited.metadata binder.id).symm.trans declaration) mono
       (by simpa only [edited.metadata.owner] using extended)
       (by simpa only [edited.metadata.inputs] using ordinary)
       ((expression_lookup edited avoids child).symm.trans initializerFound) sourceType
-      (typing _ _ initializerTyped) certified
+      (CallableLambdaViewStaticTyping.expression edited avoids unique initializerTyped child) certified
       (ih (fun child member => reached child (List.mem_cons_of_mem id member)))
   | @discard context mode id node expression expressionNode semicolon rest expected found form notTail sourceType expressionFound typed value remaining ih =>
     have child : Reaches source roots (.expression expression) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique value child
+    have certified := expressions _ child value
     exact .discard (edited.metadata.symm.statement found) form notTail sourceType
-      ((expression_lookup edited avoids child).symm.trans expressionFound) (typing _ _ typed) certified
+      ((expression_lookup edited avoids child).symm.trans expressionFound) (CallableLambdaViewStaticTyping.expression edited avoids unique typed child) certified
       (ih (fun child member => reached child (List.mem_cons_of_mem id member)))
   | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH =>
     exact .block (edited.metadata.symm.statement found) form sourceType
@@ -700,9 +703,9 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
   | @ifThen context mode id node condition conditionNode thenBody elseBody rest expected found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax remaining thenIH elseIH restIH =>
     have child : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique conditionSyntax child
+    have certified := expressions _ child conditionSyntax
     exact .ifThen (edited.metadata.symm.statement found) form sourceType
-      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType (typing _ _ typed) certified
+      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType (CallableLambdaViewStaticTyping.expression edited avoids unique typed child) certified
       (thenIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member])))
       (elseIH (fun child member => .statement (reached id (by simp)) found
@@ -717,9 +720,9 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
   | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
     have child : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    obtain ⟨certified, typing⟩ := builtins edited avoids unique conditionSyntax child
+    have certified := expressions _ child conditionSyntax
     exact .terminalIf (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form sourceType
-      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType (typing _ _ typed) certified
+      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType (CallableLambdaViewStaticTyping.expression edited avoids unique typed child) certified
       (thenIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member])))
       (elseIH (fun child member => .statement (reached id (by simp)) found
@@ -727,13 +730,37 @@ theorem lexical_syntax {context : Context} {mode : Bool} {statements : List Stat
       (thenStops.transport (statement_identity edited.metadata)) (elseStops.transport (statement_identity edited.metadata))
 
 include edited avoids unique in
+/-- The same reached static syntax transports back to the canonical source. -/
+theorem lexical_syntax_original_with {before after : ExpressionId → Prop}
+    (expressions : ∀ id, Reaches source roots (.expression id) → before id → after id)
+    {context : Context} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty}
+    (syntaxTree : GenericLexicalStatements.Syntax view before context mode statements expected)
+    (reached : ∀ id ∈ statements, Reaches source roots (.statement id)) :
+    GenericLexicalStatements.Syntax source after context mode statements expected :=
+  lexical_syntax_with (reversed edited) (avoids.view edited.metadata) (edited.metadata.unique unique)
+    (fun id child childSyntax => expressions id (child.metadata edited.metadata.symm) childSyntax)
+    syntaxTree (fun id member => (reached id member).metadata edited.metadata)
+
+include edited avoids unique in
+/-- Ordinary let/block/if syntax, with its independent expression typing,
+transports at the actual lexical contexts. No body execution is stored here. -/
+theorem lexical_syntax {context : Context} {mode : Bool} {statements : List StatementId}
+    {expected : TypeSystem.Ty}
+    (syntaxTree : BuiltinLexicalStatements.Syntax source context mode statements expected)
+    (reached : ∀ id ∈ statements, Reaches source roots (.statement id)) :
+    BuiltinLexicalStatements.Syntax view context mode statements expected :=
+  lexical_syntax_with edited avoids unique
+    (fun _ child childSyntax => expression_syntax edited avoids unique childSyntax child) syntaxTree reached
+
+include edited avoids unique in
 theorem lexical_syntax_original {context : Context} {mode : Bool} {statements : List StatementId}
     {expected : TypeSystem.Ty}
     (syntaxTree : BuiltinLexicalStatements.Syntax view context mode statements expected)
     (reached : ∀ id ∈ statements, Reaches source roots (.statement id)) :
     BuiltinLexicalStatements.Syntax source context mode statements expected :=
-  lexical_syntax (reversed edited) (avoids.view edited.metadata) (edited.metadata.unique unique)
-    syntaxTree (fun id member => (reached id member).metadata edited.metadata)
+  lexical_syntax_original_with edited avoids unique
+    (fun _ child childSyntax => expression_syntax_original edited avoids unique childSyntax child) syntaxTree reached
 
 /-- Every statement in the actual body is its own reachability root. -/
 theorem body_syntax {source view : TypedSource} {changed : List ExpressionId}

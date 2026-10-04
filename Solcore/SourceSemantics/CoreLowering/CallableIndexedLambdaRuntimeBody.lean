@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaStaticBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
 
@@ -25,8 +26,8 @@ theorem context_valid {values : SourceCoreCompatibleValues.Context} {prepared : 
     (inputs : CallableIndexedLambdaEntryPrefix.Context code)
     (frame : Dynamic.ClosureFrame program function)
     (sameLedger : function.context.solvedRequirements = code.compilation.solvedRequirements) :
-    CompatibleRuntimeContextValidity.Valid code.compilation.solvedRequirements inputs.context function.evidence := by
-  exact (CompatibleRuntimeContextValidity.Valid.mk sameLedger frame.code.requirement_ledger frame.evidence_covers).mono inputs.extended
+    CompatibleRuntimeContextValidity.Valid code.compilation.solvedRequirements inputs.context function.evidence :=
+  CallableIndexedLambdaStaticBodySupport.context_valid code inputs frame sameLedger
 
 structure Body {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
@@ -66,6 +67,32 @@ structure Body {values : SourceCoreCompatibleValues.Context} {prepared : Prepare
   valid : CompatibleRuntimeContextValidity.Valid code.compilation.solvedRequirements context function.evidence
   unique : NodeOccurrencesUnique function.source
 
+def Body.toWith {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
+    {code : Code prepared function scope administrative} {program : Program}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (body : Body code program registry faults) :
+    CallableIndexedLambdaStaticBodySupport.BodyWith CompatibleExpressionBuiltins.Syntax
+      (fun fuel source context => CompatibleExpressionBuiltinRuntime.Certificate fuel values source context
+        code.compilation.solvedRequirements code.reasonAt) code program registry faults :=
+  { toContext := body.toContext, frame := body.frame, readFuel := body.readFuel, policy := body.policy,
+    callback := body.callback, flow := body.flow, generated := body.generated, projection := body.projection,
+    emitted := body.emitted, actualTree := body.actualTree, actualSites := body.actualSites,
+    tree := body.tree, sites := body.sites, valid := body.valid, unique := body.unique }
+
+def Body.fromWith {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {administrative : Core.Context}
+    {code : Code prepared function scope administrative} {program : Program}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    (body : CallableIndexedLambdaStaticBodySupport.BodyWith CompatibleExpressionBuiltins.Syntax
+      (fun fuel source context => CompatibleExpressionBuiltinRuntime.Certificate fuel values source context
+        code.compilation.solvedRequirements code.reasonAt) code program registry faults) :
+    Body code program registry faults :=
+  { toContext := body.toContext, frame := body.frame, readFuel := body.readFuel, policy := body.policy,
+    callback := body.callback, flow := body.flow, generated := body.generated, projection := body.projection,
+    emitted := body.emitted, actualTree := body.actualTree, actualSites := body.actualSites,
+    tree := body.tree, sites := body.sites, valid := body.valid, unique := body.unique }
+
 /-- The actual compiler-view Tree, its indexed diagnostics and the real flow
 acceptance construct the canonical receipt; canonical recompilation is absent. -/
 theorem Body.of_tree {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
@@ -98,26 +125,17 @@ theorem Body.of_tree {values : SourceCoreCompatibleValues.Context} {prepared : P
     ∃ body : Body code program registry faults,
       body.toContext = inputs ∧ body.readFuel = readFuel ∧ body.policy = policy ∧
       body.flow = flow ∧ HEq body.actualTree tree := by
-  obtain ⟨canonical, canonicalSites⟩ := CallableLambdaViewMatchRuntimeCertificates.original edited avoids unique sites
-  have accepted := loops_accepted code policy callback
-  unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
-  rw [generated] at accepted
-  exact ⟨{
-    toContext := inputs
-    frame := frame
-    readFuel := readFuel
-    policy := policy
-    callback := callback
-    flow := flow
-    generated := generated
-    projection := projection
-    emitted := Except.ok.inj accepted.symm
-    actualTree := tree
-    actualSites := sites
-    tree := canonical
-    sites := canonicalSites
-    valid := context_valid code inputs frame sameLedger
-    unique := unique }, rfl, rfl, rfl, rfl, HEq.rfl⟩
+  obtain ⟨body, sameContext, sameFuel, samePolicy, sameFlow, sameTree⟩ :=
+    CallableIndexedLambdaStaticBodySupport.BodyWith.of_tree
+      (expressionSyntax := CompatibleExpressionBuiltins.Syntax)
+      (certificates := fun fuel source context => CompatibleExpressionBuiltinRuntime.Certificate fuel values source context
+        code.compilation.solvedRequirements code.reasonAt) code inputs frame readFuel policy callback
+      edited avoids unique sameLedger
+      (fun _id reached syntaxTree => CallableLambdaViewSourceTyping.expression_syntax_original edited avoids unique syntaxTree reached)
+      (fun _context _scope _id _lowered reached certificate =>
+        CallableLambdaViewMatchRuntimeCertificates.builtin_original edited avoids certificate reached)
+      projection generated sites
+  exact ⟨Body.fromWith body, sameContext, sameFuel, samePolicy, sameFlow, sameTree⟩
 
 
 theorem Body.accepted {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
@@ -128,7 +146,7 @@ theorem Body.accepted {values : SourceCoreCompatibleValues.Context} {prepared : 
     SourceCoreLoops.lowerStatementsWithPolicy body.policy code.fuel code.view
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
       function.body code.receipt.resultCore code.reasonAt code.compilation.internalReason code.compilation.internalReason =
-      .ok code.receipt.body := loops_accepted code body.policy body.callback
+      .ok code.receipt.body := body.toWith.accepted
 
 abbrev Entry {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}

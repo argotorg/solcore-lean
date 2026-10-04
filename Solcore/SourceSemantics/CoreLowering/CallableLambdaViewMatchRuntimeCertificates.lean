@@ -920,25 +920,27 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared}
     {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
     {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
     {values : SourceCoreCompatibleValues.Context} {definitions : DataEnvironment} {administrative : Core.Context}
+    {beforeSyntax afterSyntax : ExpressionId → Prop}
     {before after : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (unique : NodeOccurrencesUnique source)
+    (syntaxTransport : ∀ id, Reaches source roots (.expression id) → beforeSyntax id → afterSyntax id)
     (expressions : ∀ context scope id lowered, Reaches source roots (.expression id) →
       before context scope id lowered → after context scope id lowered)
-include avoids unique expressions
+include avoids unique syntaxTransport expressions
 
 /-- Transport the actual finite match/for/lexical Tree, with its original
 emitted code. The only child interface transports the same reached static
 expression certificate. Dead suffixes retain their original compiler issuer. -/
-theorem transport {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+theorem transport_with {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
-      (CompatibleExpressionBuiltins.Syntax source) before definitions administrative context scope position expected type code)
+      beforeSyntax before definitions administrative context scope position expected type code)
     (reached : PositionReached source roots position) :
     GenericImperativeMatch.Tree layouts owner active frame globals onError values view
-      (CompatibleExpressionBuiltins.Syntax view) after definitions administrative context scope position expected type code := by
+      afterSyntax after definitions administrative context scope position expected type code := by
   induction tree with
   | body syntaxTree body =>
-    exact .body (CallableLambdaViewSourceTyping.lexical_syntax edited avoids unique syntaxTree reached)
+    exact .body (CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique syntaxTransport syntaxTree reached)
       (CallableLambdaViewBodyTree.transport edited avoids expressions body reached)
   | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocated annotation same remaining ih =>
     let allocation := CallableLambdaViewAllocations.allocation
@@ -1166,22 +1168,22 @@ theorem transport {context : SourceSemantics.Context} {scope : SourceCoreLocalCe
     · exact stops.transport (statement_identity edited)
     · exact issued.transport (statement_identity edited)
 
-theorem transport_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
     {tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
-      (CompatibleExpressionBuiltins.Syntax source) before definitions administrative context scope position expected type code}
+      beforeSyntax before definitions administrative context scope position expected type code}
     (sites : tree.CatalogSites diagnosticPolicy registry faults)
     (reached : PositionReached source roots position) :
     ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
-      (CompatibleExpressionBuiltins.Syntax view) after definitions administrative context scope position expected type code,
+      afterSyntax after definitions administrative context scope position expected type code,
       tree.CatalogSites diagnosticPolicy registry faults := by
   classical
   induction sites with
   | @body context scope mode statements expected type code syntaxTree body =>
-    refine ⟨.body (CallableLambdaViewSourceTyping.lexical_syntax edited avoids unique syntaxTree reached)
+    refine ⟨.body (CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique syntaxTransport syntaxTree reached)
       (CallableLambdaViewBodyTree.transport edited avoids expressions body reached), ?_⟩
     exact .body
-      (syntaxTree := (CallableLambdaViewSourceTyping.lexical_syntax edited avoids unique syntaxTree reached))
+      (syntaxTree := (CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique syntaxTransport syntaxTree reached))
       (body := (CallableLambdaViewBodyTree.transport edited avoids expressions body reached))
 
   | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocated annotation same remaining remainingErrors ih =>
@@ -1520,7 +1522,7 @@ theorem transport_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registr
     have transportedChildren : ∀ request, request ∈ requests → ∀ childContext,
         GenericMatchChildren.ScopedContextFor view context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
         ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
-            (CompatibleExpressionBuiltins.Syntax view) after definitions administrative childContext request.scope
+            afterSyntax after definitions administrative childContext request.scope
             (.statements false request.statements) expected type request.code,
           tree.CatalogSites diagnosticPolicy registry faults := by
       intro request member childContext related
@@ -1576,7 +1578,7 @@ theorem transport_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registr
     have transportedChildren : ∀ request, request ∈ requests → ∀ childContext,
         GenericMatchChildren.ScopedContextFor view context (resolution.hiddenScrutinee :: scope.map Prod.fst) scrutineeNode.type resolution.cases resolution.defaultBody request childContext →
         ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
-            (CompatibleExpressionBuiltins.Syntax view) after definitions administrative childContext request.scope
+            afterSyntax after definitions administrative childContext request.scope
             (.statements false request.statements) expected type request.code,
           tree.CatalogSites diagnosticPolicy registry faults := by
       intro request member childContext related
@@ -1616,6 +1618,32 @@ theorem transport_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registr
       (stops := (stops.transport (statement_identity edited)))
       (issued := (issued.transport (statement_identity edited)))
        catalog patternContext (fun request member childContext related => (transportedChildren request member childContext related).choose_spec)
+
+omit syntaxTransport in
+theorem transport {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
+      (CompatibleExpressionBuiltins.Syntax source) before definitions administrative context scope position expected type code)
+    (reached : PositionReached source roots position) :
+    GenericImperativeMatch.Tree layouts owner active frame globals onError values view
+      (CompatibleExpressionBuiltins.Syntax view) after definitions administrative context scope position expected type code :=
+  transport_with edited avoids unique
+    (fun _id reached value => CallableLambdaViewSourceTyping.expression_syntax edited avoids unique value reached)
+    expressions tree reached
+
+omit syntaxTransport in
+theorem transport_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    {tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
+      (CompatibleExpressionBuiltins.Syntax source) before definitions administrative context scope position expected type code}
+    (sites : tree.CatalogSites diagnosticPolicy registry faults)
+    (reached : PositionReached source roots position) :
+    ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
+      (CompatibleExpressionBuiltins.Syntax view) after definitions administrative context scope position expected type code,
+      tree.CatalogSites diagnosticPolicy registry faults :=
+  transport_sites_with edited avoids unique
+    (fun _id reached value => CallableLambdaViewSourceTyping.expression_syntax edited avoids unique value reached)
+    expressions sites reached
 
 end Statements
 
