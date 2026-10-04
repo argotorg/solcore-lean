@@ -80,7 +80,7 @@ private theorem liftMany_insertion (count cutoff : Nat) :
 /-- Actual prefix receipts construct parameter allocation, the typed body
 environment and the surviving context-reference slot. Its read and unmapped
 status follow from allocation preservation. No final body facts are assumed. -/
-theorem entry_of_accepted
+theorem entry_of_accepted_with_spine
     {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
     (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
     {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -110,8 +110,9 @@ theorem entry_of_accepted
     (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
     (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
     (unmapped : contextLocation ∉ mapping) :
-    Nonempty (Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
-      administrative actualContext actual ξ parameterCode body) := by
+    ∃ entry : Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
+      administrative actualContext actual ξ parameterCode body,
+      ∃ added : Environment, added.length = bindings.length ∧ entry.canonical = added ++ canonical := by
   have tree := CallableIndexedParameterCertificates.of_accepted onError accepted
   have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) canonical
       (DataPatternValues.packValues nativeArguments :: canonical) := by
@@ -149,6 +150,43 @@ theorem entry_of_accepted
     allocated, by simpa [CallableIndexedParameters.scope_eq] using finalEnvironments, finalHeaps,
     GenericLexicalContext.binders_agree mono.1 mono.2 initialLocals allocated,
     maps, worlds, preservation, GenericLexicalContext.binders_metadata allocated, finalLookups, finalTyped,
-    finalReference, unchanged.trans read, finalUnmapped, agreement⟩⟩
+    finalReference, unchanged.trans read, finalUnmapped, agreement⟩, added, prefixLength, canonicalEq⟩
+
+/-- The original receipt forgets only the certified canonical allocation prefix. -/
+theorem entry_of_accepted
+    {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+    (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+    {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+    {active : TypeSystem.Substitution} {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    {function : Dynamic.Closure} {view : TypedSource} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
+    {scope : Scope} {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    (viewOfSource : LambdaMetadataViews.MetadataView function.source view)
+    (accepted : SourceCoreSourceCells.bindParameters
+      (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
+      view scope bindings output SourceCoreFunctions.argumentProjection (body.weakenAt bindings.length) = .ok parameterCode)
+    (parameters : function.parameters = bindings.map Prod.fst)
+    (kinds : ∀ binding ∈ bindings, function.source.inputs.any (fun input => decide (input.id = binding.1.id)) = false)
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
+    (definitions : layouts.definitions = ambient.definitions) (registered : layout.Registered ambient.definitions)
+    {mapping : LocationMap} {world : StoreTyping} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world bindings arguments nativeArguments)
+    {administrative actualContext : Core.Context} {canonical actual : Environment} {before : Dynamic.Heap} {store : Store}
+    {ξ : Renaming} {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      administrative scope function.captured canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+    (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (unmapped : contextLocation ∉ mapping) :
+    Nonempty (Entry layout globals contextLocation native values functions registry function context scope bindings arguments before store mapping world
+      administrative actualContext actual ξ parameterCode body) := by
+  obtain ⟨entry, _⟩ := entry_of_accepted_with_spine functions onError viewOfSource accepted parameters kinds extended
+    definitions registered represented environments heaps initialLocals actualLayout actualTyped reference read unmapped
+  exact ⟨entry⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaViewPrefix

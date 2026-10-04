@@ -157,7 +157,7 @@ def Entry.toFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
 
 /-- Every native prefix step is derived from its actual compiler receipt.
 The caller token and lexical token have independent carried histories. -/
-theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
     {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
     {capturedActual : Environment}
     (captured : Captures prepared mapping world scope function.captured capturedActual)
@@ -175,7 +175,9 @@ theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared
     (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
     (unmapped : location ∉ mapping)
     (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
-    Nonempty (EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost) := by
+    ∃ entry : EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost,
+      ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ captured.canonical := by
   let layout := prepared.ancestry.layout.frame
   let argument := DataPatternValues.packValues nativeArguments
   let saved := encode layout current
@@ -201,7 +203,7 @@ theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared
         (.cons (encode_runtime_typed world registered history.native) captured.typed)))
   obtain ⟨manifest, manifestTyped, manifestAgreement⟩ := CallableIndexedLambdaManifest.agreement
     captured.represented actualLayout descriptor fields code.receipt.allocatedBody (store.set location (encode layout next))
-  obtain ⟨entry⟩ := CallableIndexedLambdaViewPrefix.entry_of_accepted functions code.allocationError
+  obtain ⟨entry, added, prefixLength, canonicalEq⟩ := CallableIndexedLambdaViewPrefix.entry_of_accepted_with_spine functions code.allocationError
     code.viewOfSource (prefix_accepted code) (parameters code) inputs.kinds inputs.extended rfl registered represented
     captured.represented installedHeaps locals (GenericExpressionMeaning.agree_prefix actualLayout manifest)
     (.cons manifestTyped actualTyped) (inputs.referenceIndex ▸ reference) installedCurrent.read unmapped
@@ -235,7 +237,8 @@ theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared
       (code.receipt.body.rename entry.embedding) := by
     rw [emitted]
     exact manifestAgreement.trans entry.agreement
-  refine ⟨⟨next, nextHistory, _, _, _, entry, ?_, ?_, unmapped, refTyped, .stable currentCarried, read⟩⟩
+  refine ⟨⟨next, nextHistory, _, _, _, entry, ?_, ?_, unmapped, refTyped, .stable currentCarried, read⟩,
+    added, prefixLength, canonicalEq⟩
   · intro result bodyStore evaluated
     rw [wrapper]
     apply CallableContextFrames.withFrame_evaluates selected read nextEvaluation
@@ -248,6 +251,31 @@ theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared
     obtain ⟨rfl, rfl⟩ := evaluation_deterministic nextEval nextEvaluation
     rw [body_rename] at bodyEval
     exact ⟨bodyStore, agreement.unwrap bodyEval, finalEq⟩
+
+/-- The original generic entry keeps the same model and forgets only the
+canonical allocation prefix witness. -/
+theorem entry_exists_for {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    (captured : Captures prepared mapping world scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (history : History code)
+    (inputs : Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
+    {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world code.receipt.loweredParameters arguments nativeArguments)
+    {before : Dynamic.Heap} {store : Store} {location : Location}
+    {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+    (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+    (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
+    (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
+    (unmapped : location ∉ mapping)
+    (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
+    Nonempty (EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost) := by
+  obtain ⟨entry, _⟩ := entry_exists_for_with_spine captured code history inputs functions
+    represented heaps locals reference read currentCarried unmapped allowed
+  exact ⟨entry⟩
 
 /-- Every native prefix step is derived from its actual compiler receipt.
 The caller token and lexical token have independent carried histories. -/
