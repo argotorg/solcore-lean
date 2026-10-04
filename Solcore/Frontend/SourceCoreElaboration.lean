@@ -4978,3 +4978,180 @@ theorem function_checked {function : CheckedFunction} {arguments : List Int} {va
             (checked evaluated) accepted reconciled
 
 end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.Statements
+
+/-! Static receipts for the existing erased Integer-let branch. The complete
+public draft retains its actual unconsumed requirement remainder. -/
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged.IntegerLet
+open SourceInference TypeSystem
+set_option maxHeartbeats 3000000
+
+/-- The original default statement lowerer, with its actual Integer environment. -/
+def lower (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
+    (expected : Core.Ty) (site : ErrorSite) (reason : ErrorReason)
+    (statements : List StatementId) : Except Error LoweredExpression :=
+  lowerStatementsFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
+    rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source
+    scope environment [] expected site reason statements
+
+abbrev contains := StagedIntegerEnvironment.contains
+abbrev inputScope := lowerInputs
+abbrev roots := statementRoots
+abbrev lastStatement := finalStatement?
+
+/-- All fields describe this same successful private branch. Source binder
+extension and the meaning of the recursive body remain independent obligations. -/
+inductive LetAccepted (solved : List SolvedRequirement) (source : TypedSource)
+    (scope : Resolved.Context) (environment : Environment) (fuel : Nat)
+    (expected : Core.Ty) (site : ErrorSite) (reason : ErrorReason)
+    (statement : StatementId) (rest : List StatementId)
+    (node : StatementNode) (binder : TypedBinder) (initializer : ExpressionId)
+    (result : LoweredExpression) : Prop where
+  | intro {initial : StagedIntegerEvaluation} {body : LoweredExpression}
+      (found : source.lookupStatement? statement = some node)
+      (form : node.form = .letDecl binder (some initializer))
+      (unit : node.type = .unit)
+      (scopeFresh : scope.ids.contains binder.id = false)
+      (environmentFresh : contains environment binder.id = false)
+      (owned : binder.id.owner = source.owner)
+      (monomorphic : binder.scheme.quantified = [])
+      (binderType : binder.scheme.body = .integer)
+      (initialAccepted : integer solved source environment true fuel initializer = .ok initial)
+      (initialChecked : IntegerChecked solved source environment true fuel initializer initial)
+      (bodyAccepted : lower solved source scope (Statements.bind binder initial.value :: environment)
+        fuel expected site reason rest = .ok body)
+      (output : result = ⟨body.resolved, initial.consumedRequirements ++ body.consumedRequirements⟩) :
+      LetAccepted solved source scope environment fuel expected site reason statement rest node binder initializer result
+
+theorem let_of_accepted {solved : List SolvedRequirement} {source : TypedSource}
+    {scope : Resolved.Context} {environment : Environment} {fuel : Nat}
+    {expected : Core.Ty} {site : ErrorSite} {reason : ErrorReason}
+    {statement : StatementId} {rest : List StatementId} {node : StatementNode}
+    {binder : TypedBinder} {initializer : ExpressionId} {result : LoweredExpression}
+    (accepted : lower solved source scope environment (fuel + 1) expected site reason (statement :: rest) = .ok result)
+    (found : source.lookupStatement? statement = some node)
+    (form : node.form = .letDecl binder (some initializer))
+    (binderType : binder.scheme.body = .integer) :
+    LetAccepted solved source scope environment fuel expected site reason statement rest node binder initializer result := by
+  have looked : lookupStatement source statement = .ok node := by
+    unfold TypedSource.lookupStatement? at found
+    unfold lookupStatement
+    cases lookup : source.lookupNode? statement.occurrence <;> simp_all
+    split at found <;> simp_all
+  simp only [lower, lowerStatementsFuelWith, looked, Except.mapError, id,
+    Bind.bind, Except.bind, form] at accepted
+  cases unitEq : ensureTypeWith id (.occurrence statement.occurrence) .unit node.type with
+  | error error => simp [unitEq] at accepted
+  | ok checked =>
+    cases checked
+    simp only [unitEq] at accepted
+    have unit := Statements.ensure_unit unitEq
+    have fresh : (scope.ids.contains binder.id || environment.contains binder.id) = false := by
+      cases h : scope.ids.contains binder.id || environment.contains binder.id
+      · rfl
+      · rw [if_pos h] at accepted
+        simp [failWith] at accepted
+    have scopeFresh : scope.ids.contains binder.id = false := (Bool.or_eq_false_iff.mp fresh).1
+    have envFresh : environment.contains binder.id = false := (Bool.or_eq_false_iff.mp fresh).2
+    simp only [fresh, Bool.false_eq_true, ↓reduceIte] at accepted
+    have mono : binder.scheme.quantified = [] := by
+      cases qs : binder.scheme.quantified with
+      | nil => rfl
+      | cons head tail => simp [qs, failWith] at accepted
+    simp only [mono, List.isEmpty_nil, binderType, beq_self_eq_true, Bool.and_self,
+      ↓reduceIte] at accepted
+    cases validEq : validateStagedIntegerBinderWith id (.binder binder.id) source binder with
+    | error error => simp [validEq] at accepted
+    | ok checked =>
+      cases checked
+      simp only [validEq] at accepted
+      have owned := (Staged.binder_checked validEq).1
+      cases initialEq : evaluateStagedIntegerFuelWith id rejectStagedIntegerCalls solved source environment true fuel initializer with
+      | error error => simp [initialEq] at accepted
+      | ok initial =>
+        simp only [initialEq] at accepted
+        cases bodyEq : lowerStatementsFuelWith id (fun _ => rejectCalls) rejectStagedIntegerCalls none
+            rejectRequiredUnaries rejectRequiredBinaries rejectCoercions solved fuel source scope
+            ({binder, value := initial.value} :: environment) [] expected site reason rest with
+        | error error => simp [bodyEq] at accepted
+        | ok body =>
+          simp only [bodyEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+          exact .intro found form unit scopeFresh envFresh owned mono binderType initialEq
+            (integer_checked initialEq) bodyEq accepted.symm
+
+/-- A successful draft may retain unconsumed requirements. Finalization checks
+that remainder separately; this receipt keeps the exact reconciliation result. -/
+inductive FunctionAccepted (function : CheckedFunction) (draft : BodyDraft) : Prop where
+  | intro {statements : List StatementId} {head : StatementId} {tail : List StatementId}
+      {inputs : Resolved.Context} {expected : Core.Ty} {body : LoweredExpression}
+      (owned : function.typedBody.owner = function.declaration)
+      (rootsAccepted : roots function.typedBody.roots = .ok statements)
+      (rootsSame : statements.map NodeId.statement = function.typedBody.roots)
+      (nonempty : statements = head :: tail)
+      (inputsAccepted : inputScope function.typedBody.inputs = .ok inputs)
+      (expectedAccepted : lowerType (.declaration function.declaration) function.inferredBodyType = .ok expected)
+      (bodyAccepted : lower function.solvedRequirements function.typedBody inputs []
+        (function.typedBody.nodes.length + 1) expected
+        (match lastStatement statements with | some last => .occurrence last.occurrence | none => .declaration function.declaration)
+        .statementListFallthrough statements = .ok body)
+      (reconciled : reconcileConsumedRequirements function.declaration
+        (function.solvedRequirements.map (·.id)) body.consumedRequirements = .ok draft.unconsumedRequirements)
+      (declaration : draft.declaration = function.declaration)
+      (inputEq : draft.inputs = inputs)
+      (resolved : draft.resolved = body.resolved)
+      (returnType : draft.returnType = expected)
+      (rootOccurrence : draft.rootOccurrence = head.occurrence) :
+      FunctionAccepted function draft
+
+theorem function_of_accepted {function : CheckedFunction} {draft : BodyDraft}
+    (accepted : lowerFunctionBody function = .ok draft) : FunctionAccepted function draft := by
+  unfold lowerFunctionBody lowerFunctionBodyWith lowerFunctionBodyWithPolicies
+    lowerFunctionBodyWithAllPolicies lowerFunctionBodyWithRuntimePolicies
+    lowerFunctionBodyWithRuntimeAndStagedPolicies lowerFunctionBodyWithRawStagedValuePolicy at accepted
+  have owned : function.typedBody.owner = function.declaration := by
+    by_cases h : function.typedBody.owner = function.declaration
+    · exact h
+    · simp [h, failWith] at accepted
+  simp only [owned, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte] at accepted
+  cases rootsEq : statementRoots function.typedBody.roots with
+  | error error => simp [rootsEq, Except.mapError, Bind.bind, Except.bind] at accepted
+  | ok statements =>
+    simp only [rootsEq, Except.mapError, id, Bind.bind, Except.bind] at accepted
+    cases statements with
+    | nil => simp [failWith] at accepted
+    | cons head tail =>
+      simp only [pure, Pure.pure, Except.pure] at accepted
+      cases inputsEq : lowerInputs function.typedBody.inputs with
+      | error error => simp [inputsEq] at accepted
+      | ok inputs =>
+        simp only [inputsEq] at accepted
+        cases expectedEq : lowerType (.declaration function.declaration) function.inferredBodyType with
+        | error error => simp [expectedEq] at accepted
+        | ok expected =>
+          simp only [expectedEq] at accepted
+          change (show Except Error BodyDraft from do
+            let body ← lower function.solvedRequirements function.typedBody inputs []
+              (function.typedBody.nodes.length + 1) expected
+              (match finalStatement? (head :: tail) with | some last => .occurrence last.occurrence | none => .declaration function.declaration)
+              .statementListFallthrough (head :: tail)
+            let unconsumed ← (reconcileConsumedRequirements function.declaration
+              (function.solvedRequirements.map (fun r : SolvedRequirement => r.id)) body.consumedRequirements).mapError id
+            pure ⟨function.declaration, inputs, body.resolved, expected, head.occurrence, unconsumed⟩) = .ok draft at accepted
+          cases bodyEq : lower function.solvedRequirements function.typedBody inputs []
+              (function.typedBody.nodes.length + 1) expected
+              (match finalStatement? (head :: tail) with | some last => .occurrence last.occurrence | none => .declaration function.declaration)
+              .statementListFallthrough (head :: tail) with
+          | error error => simp [bodyEq, Bind.bind, Except.bind] at accepted
+          | ok body =>
+            simp only [bodyEq, Bind.bind, Except.bind] at accepted
+            cases reconcileEq : reconcileConsumedRequirements function.declaration
+                (function.solvedRequirements.map (·.id)) body.consumedRequirements with
+            | error error => simp [reconcileEq, Except.mapError] at accepted
+            | ok unconsumed =>
+              simp only [reconcileEq, Except.mapError, pure, Pure.pure,
+                Except.pure, Except.ok.injEq] at accepted
+              subst draft
+              exact .intro owned rootsEq (Statements.statement_roots rootsEq) rfl inputsEq expectedEq
+                bodyEq reconcileEq rfl rfl rfl rfl rfl
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged.IntegerLet
