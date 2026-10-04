@@ -127,6 +127,163 @@ def RawFormReflects (faults : FunctionCalls.FaultRep) (source : TypedSource)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
+section Common
+
+/-- The original raw trace and the reached ordered path stay separate. The
+path relation may retain the actual selected dictionaries and body receipts. -/
+inductive TraceFor (raw : Dynamic.ExpressionOutcome → Dynamic.Heap → Prop)
+    (path : Dynamic.Heap → Dynamic.Value → Dynamic.ExpressionOutcome → Dynamic.Heap → Prop) :
+    Dynamic.ExpressionOutcome → Dynamic.Heap → Prop where
+  | rawFault {reason after} (trace : raw (.fault reason) after) : TraceFor raw path (.fault reason) after
+  | path {value middle outcome after} (trace : raw (.value value) middle)
+      (tail : path middle value outcome after) : TraceFor raw path outcome after
+
+theorem Trace.toFor {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {node : ExpressionNode} {outcome : Dynamic.ExpressionOutcome}
+    (trace : Trace program context evidence source environment before node outcome after) :
+    TraceFor (RawOutcome program context evidence source environment before node)
+      (fun heap value => Path program context evidence heap node.coercions value) outcome after := by
+  cases trace with
+  | rawFault raw => exact .rawFault raw
+  | path raw path => exact .path raw path
+
+theorem TraceFor.toTrace {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {node : ExpressionNode} {outcome : Dynamic.ExpressionOutcome}
+    (trace : TraceFor (RawOutcome program context evidence source environment before node)
+      (fun heap value => Path program context evidence heap node.coercions value) outcome after) :
+    Trace program context evidence source environment before node outcome after := by
+  cases trace with
+  | rawFault raw => exact .rawFault raw
+  | path raw path => exact .path raw path
+
+variable {State : LocationMap → StoreTyping → Dynamic.Heap → Store → Type}
+  (extend : ∀ {mapping finalMap world finalWorld before after store finalStore},
+    State mapping world before store → LocationMap.Extends mapping finalMap → WorldExtends world finalWorld →
+    AdministrativePreserved mapping store finalMap finalStore → Dynamic.HeapMetadataExtend before after →
+    State finalMap finalWorld after finalStore)
+  {rawTrace : Dynamic.ExpressionOutcome → Dynamic.Heap → Prop}
+  {pathTrace : Dynamic.Heap → Dynamic.Value → Dynamic.ExpressionOutcome → Dynamic.Heap → Prop}
+  {sourceType targetType : TypeSystem.Ty} {output : Lowered}
+  {calls : List CallableCoercionSpine.Call} {reason : Word}
+  (finalType : CallableCoercionSpine.finalType operand.type calls = output.type)
+  (entry : State mapping world before store)
+
+include extend finalType entry in
+/-- The sole outer preservation joins the original raw outcome and ordered
+path. Concrete callers discharge both continuations from their static receipts. -/
+theorem preserves_for
+    (emitted : output.expression.rename ξ = CallableCoercionSpine.emit reason (operand.expression.rename ξ) calls)
+    (rawMeaning : ∀ {outcome after}, rawTrace outcome after →
+      ∃ value finalStore finalMap finalWorld,
+        Evaluates caller store (operand.expression.rename ξ) value finalStore ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld sourceType operand.type faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after)
+    (pathMeaning : ∀ {mapping world before after store input native outcome},
+      State mapping world before store →
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store →
+      ValueRep values.checked registry functions mapping world sourceType input native operand.type →
+      pathTrace before input outcome after →
+      ∃ value finalStore finalMap finalWorld,
+        CallableCoercionSpine.Runs caller reason store (.inRight .word native) calls value finalStore ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld targetType output.type faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+        Nonempty (State finalMap finalWorld after finalStore))
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : TraceFor rawTrace pathTrace outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates caller store (output.expression.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld targetType output.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (State finalMap finalWorld after finalStore) := by
+  cases trace with
+  | rawFault raw =>
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning raw
+    cases related with
+    | @fault fault token represented =>
+      refine ⟨.inLeft output.type (.word token), finalStore, finalMap, finalWorld, ?_, .fault represented,
+        heaps, maps, worlds, admin, metadata, ⟨extend entry maps worlds admin metadata⟩⟩
+      rw [emitted]
+      have runs := CallableCoercionSpine.Runs.failure caller reason finalStore operand.type (.word token) calls
+      simpa only [finalType] using runs.evaluates evaluated
+  | path raw path =>
+    obtain ⟨native, middleStore, middleMap, middleWorld, evaluated, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning raw
+    cases related with
+    | value represented =>
+      obtain ⟨result, finalStore, finalMap, finalWorld, runs, related, finalHeaps, tailMaps, tailWorlds,
+        tailAdmin, tailMetadata, finalEntry⟩ :=
+        pathMeaning (extend entry maps worlds admin metadata) heaps represented path
+      refine ⟨result, finalStore, finalMap, finalWorld, ?_, related, finalHeaps, maps.trans tailMaps,
+        worlds.trans tailWorlds, admin.trans tailAdmin, metadata.trans tailMetadata, finalEntry⟩
+      rw [emitted]
+      exact runs.evaluates evaluated
+
+include extend finalType entry in
+/-- Original completion supplies an operand receipt and ordered invocations.
+The receipt relation retains any measured child without recomputing a grade. -/
+theorem reflects_for {E : Value → Store → Prop}
+    {R : CallableCoercionSpine.Call → Store → Value → Value → Store → Prop}
+    (forget : ∀ {call before input result after}, R call before input result after →
+      CallableCoercionSpine.Invoke caller reason call before input result after)
+    (rawMeaning : ∀ {value finalStore}, E value finalStore →
+      ∃ outcome after finalMap finalWorld,
+        rawTrace outcome after ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld sourceType operand.type faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after)
+    (pathMeaning : ∀ {mapping world before store finalStore input native value},
+      State mapping world before store →
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store →
+      ValueRep values.checked registry functions mapping world sourceType input native operand.type →
+      CallableCoercionSpine.RunsFor R store (.inRight .word native) calls value finalStore →
+      ∃ outcome after finalMap finalWorld,
+        pathTrace before input outcome after ∧
+        FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+          finalMap finalWorld targetType output.type faults outcome value ∧
+        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+        Nonempty (State finalMap finalWorld after finalStore))
+    {value : Value} {finalStore : Store}
+    (completedPrefix : ∃ native middleStore, E native middleStore ∧
+      CallableCoercionSpine.RunsFor R middleStore native calls value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      TraceFor rawTrace pathTrace outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld targetType output.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (State finalMap finalWorld after finalStore) := by
+  obtain ⟨native, middleStore, evaluated, runs⟩ := completedPrefix
+  obtain ⟨rawOutcome, middle, middleMap, middleWorld, raw, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning evaluated
+  cases related with
+  | fault represented =>
+    obtain ⟨rfl, rfl⟩ := failed_runs ((runs.map forget).toRuns)
+    refine ⟨_, _, _, _, .rawFault raw, ?_, heaps, maps, worlds, admin, metadata,
+      ⟨extend entry maps worlds admin metadata⟩⟩
+    rw [finalType]
+    exact .fault represented
+  | value represented =>
+    obtain ⟨outcome, after, finalMap, finalWorld, path, related, finalHeaps, tailMaps, tailWorlds,
+      tailAdmin, tailMetadata, finalEntry⟩ :=
+      pathMeaning (extend entry maps worlds admin metadata) heaps represented runs
+    exact ⟨_, _, _, _, .path raw path, related, finalHeaps, maps.trans tailMaps, worlds.trans tailWorlds,
+      admin.trans tailAdmin, metadata.trans tailMetadata, finalEntry⟩
+end Common
+
 variable {raw : Workspace.RawWorkspace} {checkFuel : Nat}
   (checkedAccepted : checkProgram raw checkFuel = .ok compilerProgram)
   (extension : SourceCoreRawMetadata.Extends values.registry registry)
@@ -169,28 +326,18 @@ theorem preserves
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (Entry methods ambient.definitions caller finalMap finalWorld after finalStore) := by
-  cases source_inv receipt.found unique notLocal trace with
-  | rawFault raw =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning raw
-    cases related with
-    | @fault reason token represented =>
-      refine ⟨.inLeft output.type (.word token), finalStore, finalMap, finalWorld, (emitted.spine.renamed_completed_iff ξ).mpr ?_, ?_, heaps,
-        maps, worlds, admin, metadata, ⟨entry.extend maps worlds admin metadata⟩⟩
-      · refine ⟨_, _, evaluated, ?_⟩
-        rw [← emitted.calls_eq]
-        simpa only [chain.final_type] using CallableCoercionSpine.Runs.failure caller compilation.internalReason finalStore receipt.operand.type (.word token) (methods.map (·.call))
-      · exact .fault represented
-  | @path value middle outcome after raw path =>
-    obtain ⟨native, middleStore, middleMap, middleWorld, evaluated, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning raw
-    cases related with
-    | value represented =>
-      have pathTrace : PathOutcome methods middle value outcome after := by
-        cases outcome <;> simpa only [PathOutcome, Path, steps] using path
-      obtain ⟨result, finalStore, finalMap, finalWorld, completed, _, related, finalHeaps, tailMaps, tailWorlds, tailAdmin, tailMetadata, finalEntry⟩ :=
-        CallableCoercionSourcePathMeaning.emitted_preserves checkedAccepted ledger functions extension definitions registered faithful observations runtimeViews
-          uninitialized missing emitted chain (entry.extend maps worlds admin metadata) heaps represented evaluated pathTrace
-      exact ⟨_, _, _, _, completed, related, finalHeaps, maps.trans tailMaps, worlds.trans tailWorlds,
-        admin.trans tailAdmin, metadata.trans tailMetadata, finalEntry⟩
+  have codeEq : output.expression.rename ξ = CallableCoercionSpine.emit compilation.internalReason
+      (receipt.operand.expression.rename ξ) (methods.map (·.call)) := by
+    rw [emitted.spine.code, CallableCoercionSpine.emit_rename, ← emitted.calls_eq]
+  refine preserves_for functions (State := Entry methods ambient.definitions caller)
+    (fun entry maps worlds admin metadata => entry.extend maps worlds admin metadata)
+    chain.final_type entry codeEq rawMeaning ?_ (source_inv receipt.found unique notLocal trace).toFor
+  intro middleMap middleWorld middle after middleStore input native outcome next heaps represented path
+  have pathTrace : PathOutcome methods middle input outcome after := by
+    cases outcome <;> simpa only [PathOutcome, Path, steps] using path
+  exact CallableCoercionSourcePathMeaning.preserves checkedAccepted ledger functions extension definitions registered
+    faithful observations runtimeViews uninitialized missing emitted chain next heaps represented pathTrace
+    compilation.internalReason
 
 include extension definitions registered faithful observations runtimeViews uninitialized missing emitted steps chain entry in
 /-- Reflect only finite completion of the real emitted expression. The source
@@ -209,22 +356,20 @@ theorem reflects
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (Entry methods ambient.definitions caller finalMap finalWorld after finalStore) := by
   obtain ⟨native, middleStore, evaluated, runs⟩ := (emitted.spine.renamed_completed_iff ξ).mp completed
-  obtain ⟨rawOutcome, middle, middleMap, middleWorld, raw, related, heaps, maps, worlds, admin, metadata⟩ := rawMeaning evaluated
-  cases related with
-  | fault represented =>
-    rw [← emitted.calls_eq] at runs
-    obtain ⟨rfl, rfl⟩ := failed_runs runs
-    refine ⟨_, _, _, _, (Trace.rawFault raw).source receipt.found, ?_, heaps, maps, worlds, admin, metadata,
-      ⟨entry.extend maps worlds admin metadata⟩⟩
-    rw [chain.final_type]
-    exact .fault represented
-  | @value sourceValue nativeValue represented =>
-    obtain ⟨outcome, after, finalMap, finalWorld, path, related, finalHeaps, tailMaps, tailWorlds, tailAdmin, tailMetadata, finalEntry⟩ :=
-      CallableCoercionSourcePathMeaning.emitted_reflects functions extension definitions registered faithful observations runtimeViews
-        uninitialized missing emitted chain (entry.extend maps worlds admin metadata) heaps represented evaluated completed
-    have pathTrace : Path (Program.ofChecked compilerProgram) context evidence middle node.coercions sourceValue outcome after := by
-      cases outcome <;> simpa only [PathOutcome, Path, steps] using path
-    exact ⟨_, _, _, _, (Trace.path raw pathTrace).source receipt.found, related, finalHeaps, maps.trans tailMaps,
-      worlds.trans tailWorlds, admin.trans tailAdmin, metadata.trans tailMetadata, finalEntry⟩
+  rw [← emitted.calls_eq] at runs
+  have reflected := reflects_for functions (State := Entry methods ambient.definitions caller)
+    (rawTrace := RawOutcome (Program.ofChecked compilerProgram) context evidence source environment before node)
+    (pathTrace := fun heap value => Path (Program.ofChecked compilerProgram) context evidence heap node.coercions value)
+    (sourceType := node.rawType) (targetType := node.type)
+    (fun entry maps worlds admin metadata => entry.extend maps worlds admin metadata)
+    chain.final_type entry (fun invoked => invoked) rawMeaning
+    (fun next heaps represented runs => ?_) ⟨native, middleStore, evaluated, runs.toFor⟩
+  · obtain ⟨outcome, after, finalMap, finalWorld, trace, related, heaps, maps, worlds, admin, metadata, next⟩ := reflected
+    exact ⟨_, _, _, _, trace.toTrace.source receipt.found, related, heaps, maps, worlds, admin, metadata, next⟩
+  · obtain ⟨outcome, after, finalMap, finalWorld, selected, related, heaps, maps, worlds, admin, metadata, next⟩ :=
+      CallableCoercionPathMeaning.reflects functions extension definitions registered faithful observations runtimeViews
+        uninitialized missing chain next heaps represented runs.toRuns
+    refine ⟨_, _, _, _, ?_, related, heaps, maps, worlds, admin, metadata, next⟩
+    cases outcome <;> simpa only [PathOutcome, Path, steps] using selected.sound
 
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionMeaning

@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentSource
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodBodyMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedFunctionFinishBounds
@@ -1082,21 +1083,26 @@ variable
 include selected selection in
 /-- This pure bridge builds the actual source operator judgment from the same
 ordered argument trace and independently selected method body. -/
-theorem OperatorSource.expression {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+theorem OperatorSource.raw {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
-    (coercions : node.coercions = [])
     (trace : NamedCalls.Arguments.Trace program context evidence dictionary source environment before
       receipt.arguments sourceBody outcome after) :
-    Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after := by
-  have requirements : node.requirements = receipt.requirements := by
+    CallableCoercionExpressionMeaning.RawOutcome program context evidence source environment before node outcome after := by
+  have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions receipt.requirements := by
     have owned := receipt.ordinary
     change (let suffix := coercionRequirementIds node.coercions
       if node.requirements.length < suffix.length then none else
         let owned := node.requirements.take (node.requirements.length - suffix.length)
         if node.requirements = owned ++ suffix then some owned else none) = some receipt.requirements at owned
-    simpa [coercions, coercionRequirementIds] using owned
-  have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions receipt.requirements := by
-    simp [Dynamic.OrdinaryRequirementLayout, coercions, requirements, coercionRequirementIds]
+    dsimp only at owned
+    split at owned
+    · contradiction
+    · split at owned
+      · have same := Option.some.inj owned
+        change node.requirements = receipt.requirements ++ coercionRequirementIds node.coercions
+        rw [← same]
+        exact ‹node.requirements = _›
+      · contradiction
   have dispatch := selected.dispatch
   rcases receipt.form with ⟨operator, operand, form, arguments⟩ | ⟨operator, left, right, form, arguments⟩
   · simp only [form] at dispatch
@@ -1105,7 +1111,9 @@ theorem OperatorSource.expression {environment : Dynamic.Environment} {before af
     | argumentFault fault =>
       cases fault with
       | head fault =>
-        exact .fault (.form (lookupExpression?_sound receipt.found) (form ▸ .unaryOperand layout fault))
+        dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+        rw [form]
+        exact .unaryOperand layout fault
       | tail _ fault => cases fault
     | apply evaluated body =>
       cases evaluated with
@@ -1113,23 +1121,28 @@ theorem OperatorSource.expression {environment : Dynamic.Environment} {before af
         cases remaining
         cases body with
         | value invoked =>
-          apply Dynamic.ExpressionEvaluatesOutcome.value
-          apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound receipt.found)
-          · rw [form]; exact .unary layout operandEvaluated (.method dispatch selection invoked)
-          · rw [coercions]; exact .nil
-        | fault failed => exact .fault (.form (lookupExpression?_sound receipt.found)
-            (form ▸ .unaryApply layout operandEvaluated (.method dispatch selection failed)))
+          dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+          rw [form]
+          exact .unary layout operandEvaluated (.method dispatch selection invoked)
+        | fault failed =>
+          dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+          rw [form]
+          exact .unaryApply layout operandEvaluated (.method dispatch selection failed)
   · simp only [form] at dispatch
     rw [arguments] at trace
     cases trace with
     | argumentFault fault =>
       cases fault with
-      | head fault => exact .fault (.form (lookupExpression?_sound receipt.found)
-          (form ▸ .binaryLeft layout fault))
+      | head fault =>
+        dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+        rw [form]
+        exact .binaryLeft layout fault
       | tail leftEvaluated fault =>
         cases fault with
-        | head fault => exact .fault (.form (lookupExpression?_sound receipt.found)
-            (form ▸ .binaryRight layout leftEvaluated (.strict (binary_strict dispatch)) fault))
+        | head fault =>
+          dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+          rw [form]
+          exact .binaryRight layout leftEvaluated (.strict (binary_strict dispatch)) fault
         | tail _ fault => cases fault
     | apply evaluated body =>
       cases evaluated with
@@ -1139,14 +1152,30 @@ theorem OperatorSource.expression {environment : Dynamic.Environment} {before af
           cases remaining
           cases body with
           | value invoked =>
-            apply Dynamic.ExpressionEvaluatesOutcome.value
-            apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound receipt.found)
-            · rw [form]; exact .binaryEvaluateRight layout leftEvaluated (.strict (binary_strict dispatch)) rightEvaluated
-                (.method dispatch selection invoked)
-            · rw [coercions]; exact .nil
-          | fault failed => exact .fault (.form (lookupExpression?_sound receipt.found)
-              (form ▸ .binaryApply layout leftEvaluated (.strict (binary_strict dispatch)) rightEvaluated
-                (.method dispatch selection failed)))
+            dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+            rw [form]
+            exact .binaryEvaluateRight layout leftEvaluated
+              (.strict (binary_strict dispatch)) rightEvaluated (.method dispatch selection invoked)
+          | fault failed =>
+            dsimp only [CallableCoercionExpressionMeaning.RawOutcome]
+            rw [form]
+            exact .binaryApply layout leftEvaluated
+              (.strict (binary_strict dispatch)) rightEvaluated (.method dispatch selection failed)
+
+include selected selection in
+/-- The old whole-expression entry adds the empty coercion path to the same
+raw operator proof. The raw proof retains the original ordered requirements. -/
+theorem OperatorSource.expression {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (coercions : node.coercions = [])
+    (trace : NamedCalls.Arguments.Trace program context evidence dictionary source environment before
+      receipt.arguments sourceBody outcome after) :
+    Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after := by
+  have raw := selected.raw selection trace
+  cases outcome with
+  | value value =>
+    exact .value (.intro (lookupExpression?_sound receipt.found) raw (coercions ▸ .nil))
+  | fault reason => exact .fault (.form (lookupExpression?_sound receipt.found) raw)
 
 end OperatorSource
 
@@ -1204,6 +1233,16 @@ variable (alignment : OperatorAlignment (named := named) (sourceBody := sourceBo
   (nativeTypes : receipt.loweredArguments.map (·.type) = named.inputs.map Prod.snd)
 
 include alignment in
+/-- The actual operator operand is the issued method call, independently of
+its retained output-coercion suffix. -/
+theorem OperatorAlignment.operand_emitted (ξ : Renaming) :
+    receipt.operand.expression.rename ξ = SourceCoreCalls.call named.signature
+      (ξ (scope.length + compilation.administrativePrefix + receipt.native.index))
+      ((SourceCoreCalls.packArguments receipt.loweredArguments).expression.rename ξ) compilation.internalReason := by
+  simpa only [NamedCalls.Arguments.call_rename, alignment.signature] using
+    congrArg (fun value : SourceCoreBasic.LoweredExpr => value.expression.rename ξ) receipt.native.emitted
+
+include alignment in
 /-- The original suffix receipt is still retained. This final-expression
 consumer handles the explicit empty suffix only. -/
 theorem OperatorAlignment.emitted (coercions : node.coercions = []) (ξ : Renaming) :
@@ -1214,8 +1253,7 @@ theorem OperatorAlignment.emitted (coercions : node.coercions = []) (ξ : Renami
   rw [coercions] at suffix
   have same : receipt.operand = output := Except.ok.inj suffix
   exact (congrArg (fun value : SourceCoreBasic.LoweredExpr => value.expression.rename ξ) same.symm).trans
-    (by simpa only [NamedCalls.Arguments.call_rename, alignment.signature] using
-      congrArg (fun value : SourceCoreBasic.LoweredExpr => value.expression.rename ξ) receipt.native.emitted)
+    (alignment.operand_emitted receipt ξ)
 
 include extension faithful observations functionTypes uninitialized missing escaped callerValid callerUninitialized callerMissing
   children nativeTypes profile alignment selected selection in
