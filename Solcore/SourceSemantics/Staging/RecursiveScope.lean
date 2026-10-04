@@ -59,6 +59,7 @@ def Occurrence (scope : Scope) (id : ExpressionId) (form : ExpressionForm) : Pro
 Their independent atomic Dynamic rules can be reused without bypassing a
 nested stage guard. Output coercions are separately excluded. -/
 inductive AtomicForm : ExpressionForm → Prop where
+  | unit : AtomicForm (.tuple [])
   | literal (value) : AtomicForm (.literal value)
   | integerLiteral (source resolution) : AtomicForm (.integerLiteral source resolution)
   | reference (name resolution) : AtomicForm (.reference name resolution)

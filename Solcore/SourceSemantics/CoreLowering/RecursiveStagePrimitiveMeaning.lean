@@ -4,8 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionLiteralRuntime
 
 /-! Direct staged primitive correspondence over the actual compatible ambient
 heap. Static support retains the original compiler tree and selected literal
-rows. Empty tuples and mapping lazy initialization are outside this first
-support family. Methods, coercions and callable bodies remain separate. -/
+rows, including the empty tuple unit leaf. Mapping lazy initialization, methods,
+coercions and callable bodies remain separate. -/
 set_option autoImplicit false
 set_option maxRecDepth 32768
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
@@ -1028,17 +1028,33 @@ theorem preserves (extension : SourceCoreRawMetadata.Extends values.registry reg
       have free : CallFree invocation.source id := sameSource ▸ supported.callFree
       exact False.elim (free.no_stage (sameSource ▸ unique) trace)
 
-/-- Supported leaves retain every selected row; the unit literal is a separate
-source-rule gap rather than an ordinary-ledger assumption. -/
-theorem literal_no_unit {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
+/-- A real accepted literal already supplies the atomic source shape. Unit
+uses the empty tuple rule; no nonempty tuple becomes an atomic literal. -/
+theorem literal_of_certificate {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
+    (receipt : CompatibleExpressionLiteralRuntime.Certificate solved source id code) :
+    LiteralSupported (source := source) (solved := solved) id code := by
+  obtain ⟨node, found, literal, selected⟩ := receipt
+  refine ⟨node, found, literal, selected, ?_⟩
+  rcases code with ⟨type, expression⟩
+  cases literal with
+  | unit form _ _ _ => rw [form]; exact .unit
+  | bool value form _ _ _ => rw [form]; exact .reference _ _
+  | word value form _ _ _ _ => rw [form]; exact .literal _
+  | resolvedWord form _ => rw [form]; exact .integerLiteral _ _
+  | resolvedInteger form _ => rw [form]; exact .integerLiteral _ _
+
+/-- Unit is the only tuple in the atomic literal family. Pair support remains
+an ordered two-child tree, with a separate receipt for each occurrence. -/
+theorem literal_tuple_empty {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     (supported : LiteralSupported (source := source) (solved := solved) id code)
-    {node : ExpressionNode} (found : source.lookupExpression? id = some node) : node.form ≠ .tuple [] := by
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    {items : List ExpressionId} (form : node.form = .tuple items) : items = [] := by
   obtain ⟨other, actual, _, _, atomic⟩ := supported
   have same := Option.some.inj (actual.symm.trans found)
   subst other
-  intro form
   rw [form] at atomic
   cases atomic
+  rfl
 
 /-- The original accepted read plus its independent raw binding is enough for
 the first read family; a native payload type never supplies this binding. -/

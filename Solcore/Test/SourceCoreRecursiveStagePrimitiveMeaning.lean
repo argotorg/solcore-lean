@@ -4,8 +4,8 @@ import Solcore.Test.SourceCoreCompatibleGeneralRuntimeExtraction
 
 /-! Actual literal acceptance builds two ordered occurrences of the same static
 leaf, then the closed staged primitive theorem supplies reflection. Real native
-subtree audits retain all ledger rows and every native cell. Unsupported unit,
-mapping initialization and generalized reads remain explicit boundaries. -/
+subtree audits retain all ledger rows and every native cell. Unit is an actual
+empty-tuple leaf; mapping initialization and generalized reads remain boundaries. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
 set_option maxRecDepth 32768
@@ -65,14 +65,94 @@ theorem actual_pair_reflects :
   exact RecursiveStagePrimitiveMeaning.reflects functions program stages invocation sameSource uninitialized sameLedger runtime supported
 end Accepted
 
+section Unit
+variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+  {fuel readFuel : Nat} {compilation : SourceCoreFunctions.Context} {values : SourceCoreCompatibleValues.Context}
+  {source : TypedSource} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+  {id : ExpressionId} {node : ExpressionNode} {reasonAt : ExpressionId → Word}
+  {lowered : SourceCoreBasic.LoweredExpr}
+  (found : source.lookupExpression? id = some node) (form : node.form = .tuple [])
+  (type : node.type = .unit)
+  (special : ∀ child budget, (match policy.lowerSpecial? with
+    | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+    | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+  (readPolicy : policy.readExpression source id = SourceCoreCompatibleDataExpressions.readExpression values.checked source id)
+  (leafPolicy : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values)
+  (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered)
+
+include readFuel found form type special readPolicy leafPolicy accepted in
+theorem accepted_unit :
+    ∃ tree : Tree readFuel values source context compilation.solvedRequirements reasonAt scope id lowered,
+      Supported tree := by
+  have atomic : CompatibleExpressionLiterals.Atomic node.form := form ▸ .unit
+  have receipt := CompatibleExpressionLiteralRuntime.of_functions found atomic (fun _ => type)
+    special readPolicy leafPolicy accepted
+  exact ⟨.product (.literal receipt.forget), .product _ (.literal receipt.forget (literal_of_certificate receipt))⟩
+
+variable {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  (program : SourceSemantics.Program) (stages : Staging.Recursive.Registry) (invocation : Staging.Recursive.Scope)
+  (sameSource : invocation.source = source) (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
+  (runtime : RuntimeRequirementLedgerValid context) {faults : FunctionCalls.FaultRep}
+  (uninitialized : ∀ child location, faults (.uninitializedLocation location) (reasonAt child))
+
+include readFuel found form type special readPolicy leafPolicy accepted sameSource sameLedger runtime uninitialized in
+theorem actual_unit_reflects :
+    ReflectsCode functions program stages invocation (context := context) (registry := registry)
+      (faults := faults) scope id lowered := by
+  obtain ⟨tree, supported⟩ := accepted_unit (readFuel := readFuel) (context := context)
+    found form type special readPolicy leafPolicy accepted
+  exact RecursiveStagePrimitiveMeaning.reflects functions program stages invocation sameSource uninitialized sameLedger runtime supported
+
+include readFuel found form type special readPolicy leafPolicy accepted sameSource sameLedger runtime uninitialized in
+theorem actual_unit_preserves (unique : NodeOccurrencesUnique source)
+    (extension : SourceCoreRawMetadata.Extends values.registry registry)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Staging.Recursive.Outcome}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      administrativeContext scope environment canonical ambient.definitions)
+    (heaps : GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment) (agrees : EnvironmentsAgree ξ canonical actual)
+    (trace : Staging.Recursive.Expression program stages invocation context environment before id outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
+      Result functions (registry := registry) finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  obtain ⟨tree, supported⟩ := accepted_unit (readFuel := readFuel) (context := context)
+    found form type special readPolicy leafPolicy accepted
+  exact RecursiveStagePrimitiveMeaning.preserves functions program stages invocation sameSource unique uninitialized
+    extension sameLedger runtime supported (sameSource ▸ found) environments heaps locals agrees trace
+end Unit
+
+/-- The independent source unit rule preserves the complete source heap. -/
+theorem source_unit {program : SourceSemantics.Program} {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment} {heap : Dynamic.Heap}
+    {id : ExpressionId} {node : ExpressionNode}
+    (contains : ContainsExpression invocation.source id node) (form : node.form = .tuple [])
+    (requirements : node.requirements = []) (coercions : node.coercions = []) :
+    Staging.Recursive.Expression program stages invocation context environment heap id (.value .unit) heap := by
+  apply Staging.Recursive.Expression.atomicValue contains (form ▸ .unit) coercions
+  rw [form, requirements]
+  exact .tuple rfl .nil .nil
+
+/-- Native unit construction also leaves arbitrary captured values and cells untouched. -/
+theorem native_unit {environment : Environment} {store : Store} :
+    Evaluates environment store (LanguageResult.success .unit) (.inRight .word .unit) store :=
+  .inRight .unit
+
 section Boundaries
 
-theorem unit_not_supported {source : TypedSource} {solved : List SolvedRequirement}
+theorem nonempty_tuple_not_literal_supported {source : TypedSource} {solved : List SolvedRequirement}
     {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
-    (found : source.lookupExpression? id = some node) (unit : node.form = .tuple []) :
+    {first : ExpressionId} {rest : List ExpressionId}
+    (found : source.lookupExpression? id = some node) (tuple : node.form = .tuple (first :: rest)) :
     ¬ LiteralSupported (source := source) (solved := solved) id code := by
   intro supported
-  exact literal_no_unit supported found unit
+  have impossible := literal_tuple_empty supported found tuple
+  cases impossible
 
 theorem mapping_read_not_supported {fuel : Nat} {values : SourceCoreCompatibleValues.Context}
     {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {reason : Word}
@@ -113,7 +193,8 @@ private def content := String.intercalate "\n" [
   "function pairRead(a: Word, b: Word) returns ((Word, Word)) { return (a + 3, ~b); }",
   "function shortRead(gate: Bool) returns (Bool) { let absent: Bool; return gate && absent; }",
   "function firstFault() returns (Word) { let first: Word; let second: Word; return first + second; }",
-  "function secondFault() returns (Word) { let first: Word = 9; let second: Word; return first + second; }"
+  "function secondFault() returns (Word) { let first: Word = 9; let second: Word; return first + second; }",
+  "function unitRoot() { let unused: Word = 13; return (); }"
 ]
 
 private def finish (code : Core.Expr) (environment : Core.Environment) (store : Core.Store) (fuel : Nat) : IO (Core.Value × Core.Store) := do
@@ -129,7 +210,8 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit
   let mut roots := 0
   let mut reads := 0
   let mut literals := 0
-  for name in ["pairRead", "shortRead", "firstFault", "secondFault"] do
+  let mut units := 0
+  for name in ["pairRead", "shortRead", "firstFault", "secondFault", "unitRoot"] do
     let key ← SourceCoreUnifiedCorpusSupport.key compiled.sourceProgram name
     let named ← match compiled.indexed.base.functions.filter (·.signature.key == key) with
       | [named] => pure named
@@ -173,6 +255,9 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit
           let _ ← get "selected numeric Word row" (SourceCoreElaboration.validateWordIntegerLiteral selected.function.solvedRequirements node literal resolution)
           require (node.requirements == [resolution.requirement]) "numeric leaf ownership changed"
           literals := literals + 1
+        | .tuple [] =>
+          require (node.type == .unit && node.requirements.isEmpty && node.coercions.isEmpty) "unit full source metadata changed"
+          units := units + 1
         | .unary .. | .binary .. | .tuple .. => require (node.requirements.isEmpty && node.coercions.isEmpty) "primitive parent metadata changed"
         | _ => pure ()
     require (results.length == 1) "primitive return occurrence changed"
@@ -191,6 +276,9 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit
         solvedRequirements := ledger
         internalReason := Word.zero }
       let base ← get "actual primitive root lowering" (SourceCoreFunctions.lowerExpressionWithPolicy policy noBody 100 compilation source scope id reasonAt)
+      if name == "unitRoot" then
+        require (!ledger.isEmpty && rows.length == 3) "unit unused full ledger coverage lost"
+        require (base.type == .unit && base.expression == LanguageResult.success .unit) "actual unit lowering changed"
       for complete in rows do
         let lowered ← get "same full ledger primitive root" (SourceCoreFunctions.lowerExpressionWithPolicy policy noBody 100
           {compilation with solvedRequirements := complete} source scope id reasonAt)
@@ -200,6 +288,7 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit
           let result ← finish lowered.expression native store fuel
           require (result == baseline && result.2 == store) "original whole native store/resume changed"
         match name, baseline.1 with
+        | "unitRoot", .inRight .word .unit => pure ()
         | "pairRead", .inRight .word (.pair (.word first) (.word second)) =>
           require (first == Word.ofNatModulo 14 && second == (Word.ofNatModulo 5).bitNot) "ordered pair primitive result changed"
         | "shortRead", .inRight .word (.bool false) =>
@@ -235,10 +324,10 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit
           require (reason == reasonAt missing) "original first/later fault token changed"
         | _, other => throw (IO.userError s!"primitive subtree result changed {reprStr other}")
       roots := roots + 1
-  require (roots == 4 && reads == 8 && literals == 2) s!"actual primitive coverage {roots}/{reads}/{literals}"
+  require (roots == 5 && reads == 8 && literals == 3 && units == 1) s!"actual primitive coverage {roots}/{reads}/{literals}/{units}"
 
 def run : IO Unit := do
-  let compiled ← SourceCoreUnifiedCorpusSupport.prepare "native staged primitives" content ["pairRead", "shortRead", "firstFault", "secondFault"]
+  let compiled ← SourceCoreUnifiedCorpusSupport.prepare "native staged primitives" content ["pairRead", "shortRead", "firstFault", "secondFault", "unitRoot"]
   inspect compiled
-  IO.println "staged native primitives: actual supported reads/operators/Selected rows/full unused ledger/ordered pair/short circuit/exact fault/whole native store/resume GREEN"
+  IO.println "staged native primitives: actual unit/read/operator leaves/Selected rows/full unused ledger/ordered pair/short circuit/exact fault/whole native store/resume GREEN"
 end Tests.SourceCoreRecursiveStagePrimitiveMeaning
