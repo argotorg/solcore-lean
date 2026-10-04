@@ -78,6 +78,77 @@ private theorem insert_administrative {catalog : SourceCoreDataCatalog.Catalog} 
   | internal reference absent _ ih => exact .internal reference absent ih
 
 
+theorem parameter_prefix_with_spine
+    {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+    (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+    {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+    {active : TypeSystem.Substitution} {layout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    {function : Dynamic.Closure} {context : SourceSemantics.Context} {types : List TypeSystem.Ty}
+    {bindings : List Binding} {output : Ty} {body parameterCode : Expr}
+    (accepted : SourceCoreSourceCells.bindParameters
+      (SourceCoreCallableIndexedAllocationFrames.allocator layout globals (layouts.allocatorAt owner active onError))
+      function.source [] bindings output SourceCoreFunctions.argumentProjection body = .ok parameterCode)
+    (parameters : function.parameters = bindings.map Prod.fst)
+    (inputs : function.source.inputs = bindings.map Prod.fst)
+    (extended : MonoBindersExtend function.source.owner function.context function.parameters types context)
+    (definitions : layouts.definitions = ambient.definitions) (registered : layout.Registered ambient.definitions)
+    {mapping : LocationMap} {world : StoreTyping} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world bindings arguments nativeArguments)
+    {administrative actualContext : Core.Context} {canonical actual : Environment} {before : Dynamic.Heap} {store : Store}
+    {ξ : Renaming} {contextLocation : Location} {native : SourceCoreCallableIndexedFrames.Frame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+      administrative [] [] canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (initialLocals : Dynamic.EnvironmentAgrees before function.context.locals [])
+    (actualLayout : EnvironmentsAgree ξ (DataPatternValues.packValues nativeArguments :: canonical) actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[globals]? = some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (unmapped : contextLocation ∉ mapping)
+    {size : Nat} {result : Value} {afterStore : Store}
+    (completed : EvaluationSize size actual store (parameterCode.rename ξ) result afterStore) :
+    ∃ entry : Prefix layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
+      administrative actualContext actual ξ parameterCode body size result afterStore,
+      ∃ added : Environment, added.length = bindings.length ∧
+        entry.canonical = added ++ DataPatternValues.packValues nativeArguments :: canonical := by
+  have tree := CallableIndexedParameterCertificates.of_accepted onError accepted
+  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) canonical
+      (DataPatternValues.packValues nativeArguments :: canonical) := by
+    intro index value found; exact found
+  have length : (bindings.map Prod.snd).length = nativeArguments.length := by simpa using represented.length.2
+  obtain ⟨environment, heap, finalCanonical, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding, child,
+      allocated, finalEnvironments, finalHeaps, maps, worlds, preservation, _, lookups, spine, finalTyped, bodyCompletion, childLe, childStrict⟩ :=
+    RecursiveNamedCallBounds.parameter_prefix tree definitions registered represented environments heaps
+      sourceLayout actualLayout actualTyped (allTypes := bindings.map Prod.snd) (named := true) rfl (by simp) length
+      (fun {_ _} found => by simpa using found) (CallableIndexedParameters.inputKinds inputs)
+      (by simpa using reference) read unmapped completed
+  obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
+  have bundleTyped := (CallableIndexedParameters.Arguments.pack_typed represented).weaken worlds
+  have finalWithBundle := insert_administrative finalEnvironments bundleTyped
+  have scopeLength : (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) []).length = bindings.length := by simp
+  have exactEnvironment : Environment.insertAt finalCanonical bindings.length
+      (DataPatternValues.packValues nativeArguments) = finalLogical := by
+    rw [canonicalEq, ← prefixLength, insert_at_suffix, logicalEq]
+  rw [scopeLength, exactEnvironment, CallableIndexedParameters.scope_eq] at finalWithBundle
+  have finalReference : finalLogical[(bindings.reverse.map (fun binding => (binding.1.id, binding.2))).length + 1 + globals]? =
+      some (.cellRef layout.type contextLocation) := by
+    rw [logicalEq]
+    simp only [List.length_map, List.length_reverse]
+    have index : bindings.length + 1 + globals = added.length + (globals + 1) := by omega
+    rw [index, List.getElem?_append_right (by omega)]
+    simpa using reference
+  obtain ⟨finalUnmapped, unchanged⟩ := preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1
+  rw [← parameters] at allocated
+  have mono := FunctionCallBody.mono_binders extended
+  refine ⟨⟨environment, heap, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding,
+    allocated, by simpa using finalWithBundle, finalHeaps,
+    GenericLexicalContext.binders_agree mono.1 mono.2 initialLocals allocated,
+    maps, worlds, preservation, GenericLexicalContext.binders_metadata allocated, lookups, finalTyped,
+    finalReference, unchanged.trans read, finalUnmapped, child, bodyCompletion, childLe, childStrict⟩, added, prefixLength, ?_⟩
+  exact logicalEq
+
 theorem parameter_prefix
     {values : SourceCoreCompatibleValues.Context} {ambient : AmbientDefinitions values.checked.catalog.definitions}
     (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
@@ -111,40 +182,9 @@ theorem parameter_prefix
     (completed : EvaluationSize size actual store (parameterCode.rename ξ) result afterStore) :
     Nonempty (Prefix layout globals contextLocation native values functions registry function context bindings arguments before store mapping world
       administrative actualContext actual ξ parameterCode body size result afterStore) := by
-  have tree := CallableIndexedParameterCertificates.of_accepted onError accepted
-  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) canonical
-      (DataPatternValues.packValues nativeArguments :: canonical) := by
-    intro index value found; exact found
-  have length : (bindings.map Prod.snd).length = nativeArguments.length := by simpa using represented.length.2
-  obtain ⟨environment, heap, finalCanonical, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding, child,
-      allocated, finalEnvironments, finalHeaps, maps, worlds, preservation, _, lookups, spine, finalTyped, bodyCompletion, childLe, childStrict⟩ :=
-    RecursiveNamedCallBounds.parameter_prefix tree definitions registered represented environments heaps
-      sourceLayout actualLayout actualTyped (allTypes := bindings.map Prod.snd) (named := true) rfl (by simp) length
-      (fun {_ _} found => by simpa using found) (CallableIndexedParameters.inputKinds inputs)
-      (by simpa using reference) read unmapped completed
-  obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
-  have bundleTyped := (CallableIndexedParameters.Arguments.pack_typed represented).weaken worlds
-  have finalWithBundle := insert_administrative finalEnvironments bundleTyped
-  have scopeLength : (bindings.foldl (fun scope binding => (binding.1.id, binding.2) :: scope) []).length = bindings.length := by simp
-  have exactEnvironment : Environment.insertAt finalCanonical bindings.length
-      (DataPatternValues.packValues nativeArguments) = finalLogical := by
-    rw [canonicalEq, ← prefixLength, insert_at_suffix, logicalEq]
-  rw [scopeLength, exactEnvironment, CallableIndexedParameters.scope_eq] at finalWithBundle
-  have finalReference : finalLogical[(bindings.reverse.map (fun binding => (binding.1.id, binding.2))).length + 1 + globals]? =
-      some (.cellRef layout.type contextLocation) := by
-    rw [logicalEq]
-    simp only [List.length_map, List.length_reverse]
-    have index : bindings.length + 1 + globals = added.length + (globals + 1) := by omega
-    rw [index, List.getElem?_append_right (by omega)]
-    simpa using reference
-  obtain ⟨finalUnmapped, unchanged⟩ := preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1
-  rw [← parameters] at allocated
-  have mono := FunctionCallBody.mono_binders extended
-  exact ⟨⟨environment, heap, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding,
-    allocated, by simpa using finalWithBundle, finalHeaps,
-    GenericLexicalContext.binders_agree mono.1 mono.2 initialLocals allocated,
-    maps, worlds, preservation, GenericLexicalContext.binders_metadata allocated, lookups, finalTyped,
-    finalReference, unchanged.trans read, finalUnmapped, child, bodyCompletion, childLe, childStrict⟩⟩
+  obtain ⟨entry, _⟩ := parameter_prefix_with_spine functions onError accepted parameters inputs extended definitions registered
+    represented environments heaps initialLocals actualLayout actualTyped reference read unmapped completed
+  exact ⟨entry⟩
 
 section ConcreteBody
 structure Body (layouts : SourceCoreAllocationLayouts.Prepared)
@@ -408,18 +448,20 @@ include parameters inputs extended acceptedPrefix definitions registered represe
   actualLayout canonicalReference actualReference unmapped typed caller acceptedHook actualTyped in
 /-- The original hook completion supplies a strict parameter prefix, followed
 by its real marked allocation receipt. No continuation agreement supplies a size. -/
-theorem hook_prefix {size : Nat} {value : Value} {finalStore : Store}
+theorem hook_prefix_with_spine {size : Nat} {value : Value} {finalStore : Store}
     (evaluation : EvaluationSize size actual store (code.rename ξ) value finalStore) :
     ∃ origin index metadata bodyStore prefixSize,
       prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
       Carries prepared.graph.inputs prepared.graph.table (.state index) (.named origin) (some metadata) ∧
       prefixSize < size ∧ finalStore = bodyStore.set location (encode prepared.layout.frame current) ∧
-      Nonempty (Prefix prepared.layout.frame allocationGlobals location (.state index) values functions registry
+      (∃ entry : Prefix prepared.layout.frame allocationGlobals location (.state index) values functions registry
         function context bindings arguments before (store.set location (encode prepared.layout.frame (.state index))) mapping world
         administrative (.unit :: prepared.layout.frame.type :: actualContext)
         (.unit :: encode prepared.layout.frame current :: actual)
         (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) ξ))
-        parameterCode body prefixSize value bodyStore) := by
+        parameterCode body prefixSize value bodyStore,
+        ∃ added : Environment, added.length = bindings.length ∧
+          entry.canonical = added ++ DataPatternValues.packValues nativeArguments :: canonical) := by
   obtain ⟨origin, index, metadata, owned, history, emitted⟩ := CallableIndexedFormation.namedBody_history prepared acceptedHook
   have renamed : code.rename ξ = SourceCoreCallableIndexedFrames.withFrame
       (.var (ξ (base.globals.length + 1)))
@@ -432,11 +474,35 @@ theorem hook_prefix {size : Nat} {value : Value} {finalStore : Store}
     (next_evaluates prepared.layout.frame index actual store (encode prepared.layout.frame current))
   rw [← rename_prefix] at prefixEvaluation
   obtain ⟨installedHeaps, installedCaller⟩ := CallableIndexedBodyFrames.install registered heaps unmapped typed caller (.stable history)
-  obtain ⟨entry⟩ := parameter_prefix functions onError acceptedPrefix parameters inputs extended definitions registered represented
+  obtain ⟨entry, added, length, spine⟩ := parameter_prefix_with_spine functions onError acceptedPrefix parameters inputs extended definitions registered represented
     environments installedHeaps initialLocals (agree_prefix actualLayout (encode prepared.layout.frame current))
     (RuntimeEnvironmentHasTypes.cons .unit
       (.cons (SourceCoreCallableIndexedFrames.encode_runtime_typed world registered current) actualTyped))
     canonicalReference installedCaller.read unmapped prefixEvaluation
+  exact ⟨origin, index, metadata, bodyStore, prefixSize, owned, history, smaller, finalEq, entry, added, length, spine⟩
+
+
+include parameters inputs extended acceptedPrefix definitions registered represented environments heaps initialLocals
+  actualLayout canonicalReference actualReference unmapped typed caller acceptedHook actualTyped in
+theorem hook_prefix {size : Nat} {value : Value} {finalStore : Store}
+    (evaluation : EvaluationSize size actual store (code.rename ξ) value finalStore) :
+    ∃ origin index metadata bodyStore prefixSize,
+      prepared.graph.inputs.callable.table.idAt? (.named named.signature.key) = some origin ∧
+      Carries prepared.graph.inputs prepared.graph.table (.state index) (.named origin) (some metadata) ∧
+      prefixSize < size ∧ finalStore = bodyStore.set location (encode prepared.layout.frame current) ∧
+      Nonempty (Prefix prepared.layout.frame allocationGlobals location (.state index) values functions registry
+        function context bindings arguments before (store.set location (encode prepared.layout.frame (.state index))) mapping world
+        administrative (.unit :: prepared.layout.frame.type :: actualContext)
+        (.unit :: encode prepared.layout.frame current :: actual)
+        (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) ξ))
+        parameterCode body prefixSize value bodyStore) := by
+  obtain ⟨origin, index, metadata, bodyStore, prefixSize, owned, history, smaller, finalEq, entry, _⟩ :=
+    hook_prefix_with_spine (prepared := prepared) (functions := functions) (onError := onError)
+      (parameters := parameters) (inputs := inputs) (extended := extended) (acceptedPrefix := acceptedPrefix)
+      (definitions := definitions) (registered := registered) (acceptedHook := acceptedHook)
+      (represented := represented) (environments := environments) (heaps := heaps) (initialLocals := initialLocals)
+      (actualLayout := actualLayout) (actualTyped := actualTyped) (canonicalReference := canonicalReference)
+      (actualReference := actualReference) (unmapped := unmapped) (typed := typed) (caller := caller) evaluation
   exact ⟨origin, index, metadata, bodyStore, prefixSize, owned, history, smaller, finalEq, ⟨entry⟩⟩
 
 
