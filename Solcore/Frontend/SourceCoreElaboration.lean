@@ -3897,3 +3897,705 @@ theorem validateNativeIntegerLiteral_sound
             · simp [targetInteger, fail] at checked
 
 end Solcore.Frontend.SourceCoreElaboration
+
+/-! Static receipts for the existing closed staged evaluator. Validation visits
+both conditional branches, including when execution is disabled. These receipts
+retain that visitation order and do not assign source execution meaning to the
+placeholder values produced in validation mode. -/
+namespace Solcore.Frontend.SourceCoreElaboration.Internal.Staged
+open SourceInference TypeSystem
+
+/-- The existing function-local carrier, with no change to its private ABI. -/
+abbrev Binding := StagedIntegerBinding
+abbrev Environment := StagedIntegerEnvironment
+abbrev BinaryOperation := StagedIntegerBinaryOperation
+abbrev Comparison := StagedIntegerComparison
+abbrev binaryOperation? := stagedIntegerBinaryOperation?
+abbrev comparison? := stagedIntegerComparison?
+abbrev applyBinary := applyStagedIntegerBinary
+abbrev applyComparison := applyStagedIntegerComparison
+abbrev lookup := StagedIntegerEnvironment.lookup?
+
+/-- Fuel and validation-mode interfaces to the original mutual implementation.
+The original public entry points use an empty environment and execution mode. -/
+def integer (solved : List SolvedRequirement) (source : TypedSource)
+    (environment : Environment) (execute : Bool) (fuel : Nat) (expression : ExpressionId) :
+    Except Error StagedIntegerEvaluation :=
+  evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+    solved source environment execute fuel expression
+
+def word (solved : List SolvedRequirement) (source : TypedSource)
+    (environment : Environment) (execute : Bool) (fuel : Nat) (expression : ExpressionId) :
+    Except Error StagedWordEvaluation :=
+  evaluateStagedWordFuelWith id (rejectStagedIntegerCallsWith id)
+    solved source environment execute fuel expression
+
+def bool (solved : List SolvedRequirement) (source : TypedSource)
+    (environment : Environment) (execute : Bool) (fuel : Nat) (expression : ExpressionId) :
+    Except Error StagedBoolEvaluation :=
+  evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+    solved source environment execute fuel expression
+
+/-- The complete existing builtin validator is retained, including actual
+callee spelling, type, arity, and the ordered argument type checks. -/
+structure BuiltinChecked (source : TypedSource) (node : ExpressionNode)
+    (callee : ExpressionId) (arguments : List ExpressionId) (function : BuiltinFunctionId) : Prop where
+  accepted : validateBuiltinFunctionCall source node callee arguments function = .ok ()
+  requirements : node.requirements = []
+  coercions : node.coercions = []
+
+mutual
+  inductive IntegerChecked (solved : List SolvedRequirement) (source : TypedSource)
+      (environment : Environment) : Bool → Nat → ExpressionId → StagedIntegerEvaluation → Prop where
+    | literal {execute : Bool} {fuel : Nat} {expression : ExpressionId} {node : ExpressionNode}
+        {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution} {validated : NativeIntegerLiteral}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .integerLiteral literal resolution)
+        (accepted : validateNativeIntegerLiteral solved node literal resolution = .ok validated) :
+        IntegerChecked solved source environment execute (fuel + 1) expression
+          ⟨validated.value, validated.consumedRequirements⟩
+    | local {execute : Bool} {fuel : Nat} {expression : ExpressionId} {node : ExpressionNode}
+        {name : String} {binder : Resolved.LocalId} {binding : Binding}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .reference name (.local binder))
+        (typed : node.type = .integer) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (owned : binder.owner = source.owner) (selected : lookup environment binder = some binding)
+        (binderOwned : binding.binder.id.owner = source.owner)
+        (monomorphic : binding.binder.scheme.quantified = [])
+        (binderType : binding.binder.scheme.body = .integer) (spelling : name = binding.binder.name) :
+        IntegerChecked solved source environment execute (fuel + 1) expression ⟨binding.value, []⟩
+    | group {execute : Bool} {fuel : Nat} {expression inner : ExpressionId} {node : ExpressionNode}
+        {result : StagedIntegerEvaluation}
+        (found : source.lookupExpression? expression = some node) (form : node.form = .group inner)
+        (typed : node.type = .integer) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (child : IntegerChecked solved source environment execute fuel inner result) :
+        IntegerChecked solved source environment execute (fuel + 1) expression result
+    | binary {execute : Bool} {fuel : Nat} {expression callee left right : ExpressionId} {node : ExpressionNode}
+        {function : BuiltinFunctionId} {operation : BinaryOperation} {a b : StagedIntegerEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .call callee [left, right] (.builtinFunction function))
+        (operationEq : binaryOperation? function = some operation)
+        (validated : BuiltinChecked source node callee [left, right] function)
+        (leftChecked : IntegerChecked solved source environment execute fuel left a)
+        (rightChecked : IntegerChecked solved source environment execute fuel right b) :
+        IntegerChecked solved source environment execute (fuel + 1) expression
+          ⟨if execute then applyBinary operation a.value b.value else 0,
+            a.consumedRequirements ++ b.consumedRequirements⟩
+    | fromWord {execute : Bool} {fuel : Nat} {expression callee argument : ExpressionId} {node : ExpressionNode}
+        {child : StagedWordEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .call callee [argument] (.builtinFunction .wordToInteger))
+        (validated : BuiltinChecked source node callee [argument] .wordToInteger)
+        (checked : WordChecked solved source environment execute fuel argument child) :
+        IntegerChecked solved source environment execute (fuel + 1) expression
+          ⟨if execute then Int.ofNat child.value.val else 0, child.consumedRequirements⟩
+    | conditional {execute : Bool} {fuel : Nat} {expression condition yes no : ExpressionId} {node : ExpressionNode}
+        {guard : StagedBoolEvaluation} {left right : StagedIntegerEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .conditional condition yes no)
+        (typed : node.type = .integer) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (conditionChecked : BoolChecked solved source environment execute fuel condition guard)
+        (thenChecked : IntegerChecked solved source environment (execute && guard.value) fuel yes left)
+        (elseChecked : IntegerChecked solved source environment (execute && !guard.value) fuel no right) :
+        IntegerChecked solved source environment execute (fuel + 1) expression
+          ⟨if guard.value then left.value else right.value,
+            guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+
+  inductive WordChecked (solved : List SolvedRequirement) (source : TypedSource)
+      (environment : Environment) : Bool → Nat → ExpressionId → StagedWordEvaluation → Prop where
+    | literal {execute : Bool} {fuel : Nat} {expression : ExpressionId} {node : ExpressionNode}
+        {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution} {validated : WordIntegerLiteral}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .integerLiteral literal resolution)
+        (accepted : validateWordIntegerLiteral solved node literal resolution = .ok validated) :
+        WordChecked solved source environment execute (fuel + 1) expression
+          ⟨validated.value, validated.consumedRequirements⟩
+    | group {execute : Bool} {fuel : Nat} {expression inner : ExpressionId} {node : ExpressionNode}
+        {result : StagedWordEvaluation}
+        (found : source.lookupExpression? expression = some node) (form : node.form = .group inner)
+        (typed : node.type = .word) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (child : WordChecked solved source environment execute fuel inner result) :
+        WordChecked solved source environment execute (fuel + 1) expression result
+    | fromInteger {execute : Bool} {fuel : Nat} {expression callee argument : ExpressionId} {node : ExpressionNode}
+        {child : StagedIntegerEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .call callee [argument] (.builtinFunction .wordFromInteger))
+        (validated : BuiltinChecked source node callee [argument] .wordFromInteger)
+        (checked : IntegerChecked solved source environment execute fuel argument child) :
+        WordChecked solved source environment execute (fuel + 1) expression
+          ⟨if execute then Core.Word.ofIntModulo child.value else Core.Word.ofNatModulo 0, child.consumedRequirements⟩
+    | conditional {execute : Bool} {fuel : Nat} {expression condition yes no : ExpressionId} {node : ExpressionNode}
+        {guard : StagedBoolEvaluation} {left right : StagedWordEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .conditional condition yes no)
+        (typed : node.type = .word) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (conditionChecked : BoolChecked solved source environment execute fuel condition guard)
+        (thenChecked : WordChecked solved source environment (execute && guard.value) fuel yes left)
+        (elseChecked : WordChecked solved source environment (execute && !guard.value) fuel no right) :
+        WordChecked solved source environment execute (fuel + 1) expression
+          ⟨if guard.value then left.value else right.value,
+            guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+
+  inductive BoolChecked (solved : List SolvedRequirement) (source : TypedSource)
+      (environment : Environment) : Bool → Nat → ExpressionId → StagedBoolEvaluation → Prop where
+    | literal {execute : Bool} {fuel : Nat} {expression : ExpressionId} {node : ExpressionNode} {name : String} {value : Bool}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .reference name (.builtinBoolean value))
+        (typed : node.type = .bool) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (spelling : name = if value then "true" else "false") :
+        BoolChecked solved source environment execute (fuel + 1) expression ⟨value, []⟩
+    | group {execute : Bool} {fuel : Nat} {expression inner : ExpressionId} {node : ExpressionNode}
+        {result : StagedBoolEvaluation}
+        (found : source.lookupExpression? expression = some node) (form : node.form = .group inner)
+        (typed : node.type = .bool) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (child : BoolChecked solved source environment execute fuel inner result) :
+        BoolChecked solved source environment execute (fuel + 1) expression result
+    | comparison {execute : Bool} {fuel : Nat} {expression callee left right : ExpressionId} {node : ExpressionNode}
+        {function : BuiltinFunctionId} {operation : Comparison} {a b : StagedIntegerEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .call callee [left, right] (.builtinFunction function))
+        (operationEq : comparison? function = some operation)
+        (validated : BuiltinChecked source node callee [left, right] function)
+        (leftChecked : IntegerChecked solved source environment execute fuel left a)
+        (rightChecked : IntegerChecked solved source environment execute fuel right b) :
+        BoolChecked solved source environment execute (fuel + 1) expression
+          ⟨if execute then applyComparison operation a.value b.value else false,
+            a.consumedRequirements ++ b.consumedRequirements⟩
+    | conditional {execute : Bool} {fuel : Nat} {expression condition yes no : ExpressionId} {node : ExpressionNode}
+        {guard left right : StagedBoolEvaluation}
+        (found : source.lookupExpression? expression = some node)
+        (form : node.form = .conditional condition yes no)
+        (typed : node.type = .bool) (requirements : node.requirements = []) (coercions : node.coercions = [])
+        (conditionChecked : BoolChecked solved source environment execute fuel condition guard)
+        (thenChecked : BoolChecked solved source environment (execute && guard.value) fuel yes left)
+        (elseChecked : BoolChecked solved source environment (execute && !guard.value) fuel no right) :
+        BoolChecked solved source environment execute (fuel + 1) expression
+          ⟨if guard.value then left.value else right.value,
+            guard.consumedRequirements ++ left.consumedRequirements ++ right.consumedRequirements⟩
+end
+
+
+set_option linter.unusedSimpArgs false
+
+private theorem lookup_success {source : TypedSource} {expression : ExpressionId} {node : ExpressionNode}
+    (accepted : lookupExpression source expression = .ok node) :
+    source.lookupExpression? expression = some node := by
+  unfold lookupExpression at accepted
+  split at accepted <;> simp_all [fail, TypedSource.lookupExpression?]
+
+private theorem builtin_checked {source : TypedSource} {node : ExpressionNode}
+    {callee : ExpressionId} {arguments : List ExpressionId} {function : BuiltinFunctionId}
+    (accepted : validateBuiltinFunctionCallWith id source node callee arguments function = .ok ()) :
+    BuiltinChecked source node callee arguments function := by
+  have requirements : node.requirements = [] := by
+    by_cases same : node.requirements = []
+    · exact same
+    · simp [validateBuiltinFunctionCallWith, same, failWith, bind, Except.bind] at accepted
+  have coercions : node.coercions = [] := by
+    by_cases same : node.coercions = []
+    · exact same
+    · simp [validateBuiltinFunctionCallWith, requirements, same, failWith, bind, Except.bind] at accepted
+  exact ⟨accepted, requirements, coercions⟩
+
+/-- Successful metadata validation is independent of the error location and
+can replace the target checker by another checker accepting this same target. -/
+private theorem literal_recheck {site otherSite : ErrorSite}
+    {solved : List SolvedRequirement} {nodeType : Ty} {attached : List RequirementId}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {implementation : ProgramImplId} {check otherCheck : Ty → Except Error Unit}
+    {validated : ValidatedIntegerLiteral}
+    (accepted : validateIntegerLiteralResolutionWith id site solved nodeType attached literal resolution
+      implementation check = .ok validated)
+    (target : otherCheck resolution.targetType = .ok ()) :
+    validateIntegerLiteralResolutionWith id otherSite solved nodeType attached literal resolution
+      implementation otherCheck = .ok validated := by
+  unfold validateIntegerLiteralResolutionWith at accepted ⊢
+  simp only [bind, Except.bind, pure, Pure.pure, Except.pure] at accepted ⊢
+  repeat' (split at accepted <;>
+    simp_all [failWith, exactIntegerLiteralRequirementWith, bind, Except.bind, pure, Pure.pure, Except.pure])
+  all_goals cases decoded : numericLiteralValue? literal <;>
+    simp_all [failWith, exactIntegerLiteralRequirementWith, bind, Except.bind, pure, Pure.pure, Except.pure]
+  all_goals repeat' (split at accepted <;>
+    simp_all [failWith, bind, Except.bind, pure, Pure.pure, Except.pure])
+
+
+  all_goals cases checked : check nodeType <;>
+    simp_all [failWith, bind, Except.bind, pure, Pure.pure, Except.pure]
+  all_goals
+    cases rows : solved.filter (fun row => decide (row.id = resolution.requirement)) with
+    | nil => simp_all
+    | cons row tail =>
+      cases tail with
+      | cons other rest => simp_all
+      | nil =>
+        simp_all
+        cases evidence : row.evidence with
+        | assumption predicate =>
+          simp_all
+          repeat' (split at accepted <;> simp_all)
+        | implementation proof =>
+          cases proof with
+          | byImpl goal impl premises =>
+            simp_all
+            repeat' (split at accepted <;> simp_all)
+
+private theorem literal_target {site : ErrorSite}
+    {solved : List SolvedRequirement} {nodeType : Ty} {attached : List RequirementId}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {implementation : ProgramImplId} {check : Ty → Except Error Unit}
+    {validated : ValidatedIntegerLiteral}
+    (accepted : validateIntegerLiteralResolutionWith id site solved nodeType attached literal resolution
+      implementation check = .ok validated) : resolution.targetType = nodeType := by
+  unfold validateIntegerLiteralResolutionWith at accepted
+  split at accepted
+  · simp [failWith] at accepted
+  · rename_i equal
+    simpa [bne_iff_ne] using equal
+
+private theorem integer_literal_checked {site : ErrorSite}
+    {solved : List SolvedRequirement} {node : ExpressionNode}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : ValidatedIntegerLiteral}
+    (coercions : node.coercions = []) (typed : node.type = .integer)
+    (accepted : validateIntegerLiteralResolutionWith id site solved node.type node.requirements literal resolution
+      (.builtin .intInteger) (fun target => if target = Ty.integer then pure ()
+        else failWith id site (.stagedIntegerTypeMismatch .integer target)) = .ok validated) :
+    validateNativeIntegerLiteral solved node literal resolution =
+      .ok ⟨Int.ofNat validated.rawValue, validated.consumedRequirements⟩ := by
+  have target := (literal_target accepted).trans typed
+  have checked := literal_recheck (otherSite := .occurrence node.id.occurrence)
+    (otherCheck := fun target => if target = Ty.integer then pure ()
+      else fail (.occurrence node.id.occurrence) (.unsupportedType target)) accepted (by simp [target])
+  simp only [pure, Pure.pure, Except.pure] at checked
+  simp only [validateNativeIntegerLiteral, coercions, List.isEmpty_nil, Bool.not_true,
+    ↓reduceIte, checked, bind, Except.bind, pure, Pure.pure, Except.pure]
+
+private theorem word_literal_checked {site : ErrorSite}
+    {solved : List SolvedRequirement} {node : ExpressionNode}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : ValidatedIntegerLiteral}
+    (coercions : node.coercions = []) (typed : node.type = .word)
+    (accepted : validateIntegerLiteralResolutionWith id site solved node.type node.requirements literal resolution
+      (.builtin .intWord) (fun target => if target = Ty.word then pure ()
+        else failWith id site (.stagedWordTypeMismatch .word target)) = .ok validated) :
+    validateWordIntegerLiteral solved node literal resolution =
+      .ok ⟨Core.Word.ofNatModulo validated.rawValue, validated.consumedRequirements⟩ := by
+  have target := (literal_target accepted).trans typed
+  have checked := literal_recheck (otherSite := .occurrence node.id.occurrence)
+    (otherCheck := fun target => ensureTypeWith id (.occurrence node.id.occurrence) .word target)
+    accepted (by simp [target, ensureTypeWith, lowerType, Ty.word, Except.mapError, bind, Except.bind, pure, Pure.pure, Except.pure])
+  simp only [validateWordIntegerLiteral, coercions, List.isEmpty_nil, Bool.not_true,
+    ↓reduceIte, validateWordIntegerLiteralWith, checked, bind, Except.bind, pure, Pure.pure, Except.pure]
+
+private theorem binder_checked {site : ErrorSite} {source : TypedSource} {binder : TypedBinder}
+    (accepted : validateStagedIntegerBinderWith id site source binder = .ok ()) :
+    binder.id.owner = source.owner ∧ binder.scheme.quantified = [] ∧ binder.scheme.body = .integer := by
+  unfold validateStagedIntegerBinderWith at accepted
+  repeat' split at accepted
+  all_goals simp_all [failWith, bne_iff_ne]
+
+private theorem word_step {solved : List SolvedRequirement} {source : TypedSource} {environment : Environment}
+    {fuel : Nat}
+    (integers : ∀ execute expression result, integer solved source environment execute fuel expression = .ok result →
+      IntegerChecked solved source environment execute fuel expression result)
+    (words : ∀ execute expression result, word solved source environment execute fuel expression = .ok result →
+      WordChecked solved source environment execute fuel expression result)
+    (bools : ∀ execute expression result, bool solved source environment execute fuel expression = .ok result →
+      BoolChecked solved source environment execute fuel expression result)
+    {execute : Bool} {expression : ExpressionId} {result : StagedWordEvaluation}
+    (accepted : word solved source environment execute (fuel + 1) expression = .ok result) :
+    WordChecked solved source environment execute (fuel + 1) expression result := by
+  simp only [word, evaluateStagedWordFuelWith] at accepted
+  cases found : lookupExpression source expression with
+  | error error => simp [found, Except.mapError, bind, Except.bind] at accepted
+  | ok node =>
+    simp only [found, Except.mapError, id, bind, Except.bind] at accepted
+    have found' := lookup_success found
+    split at accepted
+    · rename_i callee arguments form
+      cases validated : validateBuiltinFunctionCallWith id source node callee arguments .wordFromInteger with
+      | error error => simp [validated] at accepted
+      | ok checked =>
+        cases checked
+        simp only [validated] at accepted
+        split at accepted
+        · rename_i argument
+          cases evaluated : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+              solved source environment execute fuel argument with
+          | error error => simp [evaluated] at accepted
+          | ok child =>
+            simp only [evaluated, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+            subst result
+            exact .fromInteger found' form (builtin_checked validated) (integers _ _ _ evaluated)
+        · simp [failWith] at accepted
+    · have coercions : node.coercions = [] := by
+        by_cases same : node.coercions = []
+        · exact same
+        · simp [same, failWith, bind, Except.bind] at accepted
+      have typed : node.type = .word := by
+        by_cases same : node.type = .word
+        · exact same
+        · simp [coercions, same, failWith, bind, Except.bind] at accepted
+      simp only [coercions, List.isEmpty_nil, ↓reduceIte, typed, bne_self_eq_false,
+        Bool.false_eq_true, pure, Pure.pure, Except.pure, bind, Except.bind, failWith] at accepted
+      split at accepted
+      · rename_i literal resolution form
+        cases evaluated : validateIntegerLiteralResolutionWith id (.occurrence expression.occurrence) solved node.type
+            node.requirements literal resolution (.builtin .intWord) (fun target =>
+              if target = Ty.word then pure ()
+              else failWith id (.occurrence expression.occurrence) (.stagedWordTypeMismatch .word target)) with
+        | error error =>
+          simp only [typed, pure, Pure.pure, Except.pure, failWith, id] at evaluated
+          simp [evaluated] at accepted
+        | ok child =>
+          have checked := word_literal_checked coercions typed evaluated
+          simp only [typed, pure, Pure.pure, Except.pure, failWith, id] at evaluated
+          dsimp only [id] at accepted evaluated
+          rw [evaluated] at accepted
+          simp only [Except.ok.injEq] at accepted
+          subst result
+          exact .literal found' form checked
+      · rename_i inner form
+        have requirements : node.requirements = [] := by
+          by_cases same : node.requirements = []
+          · exact same
+          · simp [same, failWith] at accepted
+        simp only [requirements, List.isEmpty_nil, ↓reduceIte] at accepted
+        exact .group found' form typed requirements coercions (words _ _ _ accepted)
+      · rename_i condition yes no form
+        have requirements : node.requirements = [] := by
+          by_cases same : node.requirements = []
+          · exact same
+          · simp [same, failWith, bind, Except.bind] at accepted
+        simp only [requirements, List.isEmpty_nil, ↓reduceIte] at accepted
+        cases guardEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+            solved source environment execute fuel condition with
+        | error error => simp [guardEq] at accepted
+        | ok guard =>
+          simp only [guardEq] at accepted
+          cases leftEq : evaluateStagedWordFuelWith id (rejectStagedIntegerCallsWith id)
+              solved source environment (execute && guard.value) fuel yes with
+          | error error => simp [leftEq] at accepted
+          | ok left =>
+            simp only [leftEq] at accepted
+            cases rightEq : evaluateStagedWordFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment (execute && !guard.value) fuel no with
+            | error error => simp [rightEq] at accepted
+            | ok right =>
+              simp only [rightEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .conditional found' form typed requirements coercions
+                (bools _ _ _ guardEq) (words _ _ _ leftEq) (words _ _ _ rightEq)
+      · simp [failWith] at accepted
+
+private theorem bool_step {solved : List SolvedRequirement} {source : TypedSource} {environment : Environment}
+    {fuel : Nat}
+    (integers : ∀ execute expression result, integer solved source environment execute fuel expression = .ok result →
+      IntegerChecked solved source environment execute fuel expression result)
+    (bools : ∀ execute expression result, bool solved source environment execute fuel expression = .ok result →
+      BoolChecked solved source environment execute fuel expression result)
+    {execute : Bool} {expression : ExpressionId} {result : StagedBoolEvaluation}
+    (accepted : bool solved source environment execute (fuel + 1) expression = .ok result) :
+    BoolChecked solved source environment execute (fuel + 1) expression result := by
+  simp only [bool, evaluateStagedBoolFuelWith] at accepted
+  cases found : lookupExpression source expression with
+  | error error => simp [found, Except.mapError, bind, Except.bind] at accepted
+  | ok node =>
+    simp only [found, Except.mapError, id, bind, Except.bind] at accepted
+    have found' := lookup_success found
+    split at accepted
+    · rename_i callee arguments function form
+      cases operationEq : stagedIntegerComparison? function with
+      | none =>
+        simp only [operationEq, failWith, id, bind, Except.bind] at accepted
+        repeat' split at accepted
+        all_goals simp_all
+      | some operation =>
+        simp only [operationEq] at accepted
+        cases validated : validateBuiltinFunctionCallWith id source node callee arguments function with
+        | error error => simp [validated] at accepted
+        | ok checked =>
+          cases checked
+          simp only [validated] at accepted
+          split at accepted
+          · rename_i left right
+            cases leftEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment execute fuel left with
+            | error error => simp [leftEq] at accepted
+            | ok a =>
+              simp only [leftEq] at accepted
+              cases rightEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                  solved source environment execute fuel right with
+              | error error => simp [rightEq] at accepted
+              | ok b =>
+                simp only [rightEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                subst result
+                exact .comparison found' form operationEq (builtin_checked validated)
+                  (integers _ _ _ leftEq) (integers _ _ _ rightEq)
+          · simp [failWith] at accepted
+    · have coercions : node.coercions = [] := by
+        by_cases same : node.coercions = []
+        · exact same
+        · simp [same, failWith, bind, Except.bind] at accepted
+      have typed : node.type = .bool := by
+        by_cases same : node.type = .bool
+        · exact same
+        · simp [coercions, same, failWith, bind, Except.bind] at accepted
+      have requirements : node.requirements = [] := by
+        by_cases same : node.requirements = []
+        · exact same
+        · simp [coercions, typed, same, failWith, bind, Except.bind] at accepted
+      simp only [coercions, requirements, List.isEmpty_nil, ↓reduceIte, typed, bne_self_eq_false,
+        Bool.false_eq_true, pure, Pure.pure, Except.pure, bind, Except.bind, failWith, id] at accepted
+      split at accepted
+      · rename_i name value form
+        by_cases spelling : name = builtinBooleanSpelling value
+        · simp only [spelling, ↓reduceIte, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+          subst result
+          exact .literal found' form typed requirements coercions spelling
+        · simp [spelling] at accepted
+      · rename_i inner form
+        exact .group found' form typed requirements coercions (bools _ _ _ accepted)
+      · rename_i condition yes no form
+        cases guardEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+            solved source environment execute fuel condition with
+        | error error => simp [guardEq] at accepted
+        | ok guard =>
+          simp only [guardEq] at accepted
+          cases leftEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+              solved source environment (execute && guard.value) fuel yes with
+          | error error => simp [leftEq] at accepted
+          | ok left =>
+            simp only [leftEq] at accepted
+            cases rightEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment (execute && !guard.value) fuel no with
+            | error error => simp [rightEq] at accepted
+            | ok right =>
+              simp only [rightEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .conditional found' form typed requirements coercions
+                (bools _ _ _ guardEq) (bools _ _ _ leftEq) (bools _ _ _ rightEq)
+      · simp [failWith] at accepted
+
+private theorem integer_step {solved : List SolvedRequirement} {source : TypedSource} {environment : Environment}
+    {fuel : Nat}
+    (integers : ∀ execute expression result, integer solved source environment execute fuel expression = .ok result →
+      IntegerChecked solved source environment execute fuel expression result)
+    (words : ∀ execute expression result, word solved source environment execute fuel expression = .ok result →
+      WordChecked solved source environment execute fuel expression result)
+    (bools : ∀ execute expression result, bool solved source environment execute fuel expression = .ok result →
+      BoolChecked solved source environment execute fuel expression result)
+    {execute : Bool} {expression : ExpressionId} {result : StagedIntegerEvaluation}
+    (accepted : integer solved source environment execute (fuel + 1) expression = .ok result) :
+    IntegerChecked solved source environment execute (fuel + 1) expression result := by
+  simp only [integer, evaluateStagedIntegerFuelWith] at accepted
+  cases found : lookupExpression source expression with
+  | error error => simp [found, Except.mapError, bind, Except.bind] at accepted
+  | ok node =>
+    simp only [found, Except.mapError, id, bind, Except.bind] at accepted
+    have found' := lookup_success found
+    split at accepted
+    · rename_i callee arguments form
+      cases validated : validateBuiltinFunctionCallWith id source node callee arguments .wordToInteger with
+      | error error => simp [validated] at accepted
+      | ok checked =>
+        cases checked
+        simp only [validated] at accepted
+        split at accepted
+        · rename_i argument
+          cases evaluated : evaluateStagedWordFuelWith id (rejectStagedIntegerCallsWith id)
+              solved source environment execute fuel argument with
+          | error error => simp [evaluated] at accepted
+          | ok child =>
+            simp only [evaluated, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+            subst result
+            exact .fromWord found' form (builtin_checked validated) (words _ _ _ evaluated)
+        · simp [failWith] at accepted
+    · rename_i callee arguments function notConversion form
+      cases operationEq : stagedIntegerBinaryOperation? function with
+      | none =>
+        simp only [operationEq, failWith, id, bind, Except.bind] at accepted
+        repeat' split at accepted
+        all_goals simp_all
+      | some operation =>
+        simp only [operationEq] at accepted
+        cases validated : validateBuiltinFunctionCallWith id source node callee arguments function with
+        | error error => simp [validated] at accepted
+        | ok checked =>
+          cases checked
+          simp only [validated] at accepted
+          split at accepted
+          · rename_i left right
+            cases leftEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment execute fuel left with
+            | error error => simp [leftEq] at accepted
+            | ok a =>
+              simp only [leftEq] at accepted
+              cases rightEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                  solved source environment execute fuel right with
+              | error error => simp [rightEq] at accepted
+              | ok b =>
+                simp only [rightEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+                subst result
+                exact .binary found' form operationEq (builtin_checked validated)
+                  (integers _ _ _ leftEq) (integers _ _ _ rightEq)
+          · simp [failWith] at accepted
+    · simp only [rejectStagedIntegerCallsWith, failWith, id, bind, Except.bind] at accepted
+      repeat' split at accepted
+      all_goals simp_all
+    · have coercions : node.coercions = [] := by
+        by_cases same : node.coercions = []
+        · exact same
+        · simp [same, failWith, bind, Except.bind] at accepted
+      have typed : node.type = .integer := by
+        by_cases same : node.type = .integer
+        · exact same
+        · simp [coercions, same, failWith, bind, Except.bind] at accepted
+      simp only [coercions, List.isEmpty_nil, ↓reduceIte, typed, bne_self_eq_false,
+        Bool.false_eq_true, pure, Pure.pure, Except.pure, bind, Except.bind, failWith] at accepted
+      split at accepted
+      · rename_i literal resolution form
+        cases evaluated : validateIntegerLiteralResolutionWith id (.occurrence expression.occurrence) solved node.type
+            node.requirements literal resolution (.builtin .intInteger) (fun target =>
+              if target = Ty.integer then pure ()
+              else failWith id (.occurrence expression.occurrence) (.stagedIntegerTypeMismatch .integer target)) with
+        | error error =>
+          simp only [typed, pure, Pure.pure, Except.pure, failWith, id] at evaluated
+          simp [evaluated] at accepted
+        | ok child =>
+          have checked := integer_literal_checked coercions typed evaluated
+          simp only [typed, pure, Pure.pure, Except.pure, failWith, id] at evaluated
+          dsimp only [id] at accepted evaluated
+          rw [evaluated] at accepted
+          simp only [Except.ok.injEq] at accepted
+          subst result
+          exact .literal found' form checked
+      · rename_i name binder form
+        have requirements : node.requirements = [] := by
+          by_cases same : node.requirements = []
+          · exact same
+          · simp [same, failWith, bind, Except.bind] at accepted
+        have owned : binder.owner = source.owner := by
+          by_cases same : binder.owner = source.owner
+          · exact same
+          · simp [requirements, same, failWith, bind, Except.bind] at accepted
+        simp only [requirements, List.isEmpty_nil, ↓reduceIte, owned, bne_self_eq_false,
+          Bool.false_eq_true, pure, Pure.pure, Except.pure, bind, Except.bind] at accepted
+        cases selected : StagedIntegerEnvironment.lookup? environment binder with
+        | none => simp [selected, failWith] at accepted
+        | some binding =>
+          simp only [selected] at accepted
+          cases checked : validateStagedIntegerBinderWith id (.occurrence expression.occurrence) source binding.binder with
+          | error error => simp [checked] at accepted
+          | ok checkedValue =>
+            cases checkedValue
+            simp only [checked] at accepted
+            have binderFacts := binder_checked checked
+            by_cases spelling : name = binding.binder.name
+            · simp only [spelling, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte,
+                pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .local found' form typed requirements coercions owned selected
+                binderFacts.1 binderFacts.2.1 binderFacts.2.2 spelling
+            · simp [spelling, failWith] at accepted
+      · rename_i inner form
+        have requirements : node.requirements = [] := by
+          by_cases same : node.requirements = []
+          · exact same
+          · simp [same, failWith] at accepted
+        simp only [requirements, List.isEmpty_nil, ↓reduceIte] at accepted
+        exact .group found' form typed requirements coercions (integers _ _ _ accepted)
+      · rename_i condition yes no form
+        have requirements : node.requirements = [] := by
+          by_cases same : node.requirements = []
+          · exact same
+          · simp [same, failWith, bind, Except.bind] at accepted
+        simp only [requirements, List.isEmpty_nil, ↓reduceIte] at accepted
+        cases guardEq : evaluateStagedBoolFuelWith id (rejectStagedIntegerCallsWith id)
+            solved source environment execute fuel condition with
+        | error error => simp [guardEq] at accepted
+        | ok guard =>
+          simp only [guardEq] at accepted
+          cases leftEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+              solved source environment (execute && guard.value) fuel yes with
+          | error error => simp [leftEq] at accepted
+          | ok left =>
+            simp only [leftEq] at accepted
+            cases rightEq : evaluateStagedIntegerFuelWith id (rejectStagedIntegerCallsWith id)
+                solved source environment (execute && !guard.value) fuel no with
+            | error error => simp [rightEq] at accepted
+            | ok right =>
+              simp only [rightEq, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+              subst result
+              exact .conditional found' form typed requirements coercions
+                (bools _ _ _ guardEq) (integers _ _ _ leftEq) (integers _ _ _ rightEq)
+      · simp [failWith] at accepted
+
+/-- One fuel induction extracts all three validation trees from the actual
+mutual evaluator. Disabled branches retain their own checks and consumption. -/
+theorem checked (solved : List SolvedRequirement) (source : TypedSource)
+    (environment : Environment) (fuel : Nat) :
+    (∀ execute expression result, integer solved source environment execute fuel expression = .ok result →
+      IntegerChecked solved source environment execute fuel expression result) ∧
+    (∀ execute expression result, word solved source environment execute fuel expression = .ok result →
+      WordChecked solved source environment execute fuel expression result) ∧
+    (∀ execute expression result, bool solved source environment execute fuel expression = .ok result →
+      BoolChecked solved source environment execute fuel expression result) := by
+  induction fuel with
+  | zero =>
+    constructor
+    · intro execute expression result accepted
+      simp [integer, evaluateStagedIntegerFuelWith, failWith] at accepted
+    constructor
+    · intro execute expression result accepted
+      simp [word, evaluateStagedWordFuelWith, failWith] at accepted
+    · intro execute expression result accepted
+      simp [bool, evaluateStagedBoolFuelWith, failWith] at accepted
+  | succ fuel ih =>
+    exact ⟨fun _ _ _ accepted => integer_step ih.1 ih.2.1 ih.2.2 accepted,
+      fun _ _ _ accepted => word_step ih.1 ih.2.1 ih.2.2 accepted,
+      fun _ _ _ accepted => bool_step ih.1 ih.2.2 accepted⟩
+
+theorem integer_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {environment : Environment} {execute : Bool} {fuel : Nat} {expression : ExpressionId}
+    {result : StagedIntegerEvaluation}
+    (accepted : integer solved source environment execute fuel expression = .ok result) :
+    IntegerChecked solved source environment execute fuel expression result :=
+  (checked solved source environment fuel).1 execute expression result accepted
+
+theorem word_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {environment : Environment} {execute : Bool} {fuel : Nat} {expression : ExpressionId}
+    {result : StagedWordEvaluation}
+    (accepted : word solved source environment execute fuel expression = .ok result) :
+    WordChecked solved source environment execute fuel expression result :=
+  (checked solved source environment fuel).2.1 execute expression result accepted
+
+theorem bool_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {environment : Environment} {execute : Bool} {fuel : Nat} {expression : ExpressionId}
+    {result : StagedBoolEvaluation}
+    (accepted : bool solved source environment execute fuel expression = .ok result) :
+    BoolChecked solved source environment execute fuel expression result :=
+  (checked solved source environment fuel).2.2 execute expression result accepted
+
+/-- The existing public closed Integer entry uses this exact fuel, mode, and environment. -/
+theorem evaluateStagedInteger_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {expression : ExpressionId} {result : StagedIntegerEvaluation}
+    (accepted : evaluateStagedInteger solved source expression = .ok result) :
+    IntegerChecked solved source [] true (source.nodes.length + 1) expression result :=
+  integer_checked accepted
+
+/-- All accepted Word conversions, groups, and conditional branches are covered. -/
+theorem evaluateStagedWord_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {expression : ExpressionId} {result : StagedWordEvaluation}
+    (accepted : evaluateStagedWord solved source expression = .ok result) :
+    WordChecked solved source [] true (source.nodes.length + 1) expression result :=
+  word_checked accepted
+
+/-- All accepted comparisons and Bool conditionals use the same checked traversal. -/
+theorem evaluateStagedBool_checked {solved : List SolvedRequirement} {source : TypedSource}
+    {expression : ExpressionId} {result : StagedBoolEvaluation}
+    (accepted : evaluateStagedBool solved source expression = .ok result) :
+    BoolChecked solved source [] true (source.nodes.length + 1) expression result :=
+  bool_checked accepted
+
+end Solcore.Frontend.SourceCoreElaboration.Internal.Staged
