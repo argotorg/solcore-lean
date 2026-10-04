@@ -118,17 +118,22 @@ theorem Dispatch.reason_represents {frame : Staging.CallBoundary.Frame} {site : 
 
 /-- Coverage is a property of the artifact's function-value relation and source
 contract ledger. It does not assume the current call or any child completes. -/
-def Covers {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+def CoversFor {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
     (frame : Staging.CallBoundary.Frame) (site : SourceCoreCallableContracts.Callsite)
     (call : ExpressionId) (arguments : List ExpressionId) (sourceType : TypeSystem.Ty) (type : Ty) : Prop :=
   ∀ {mapping world source carrier contract}, model.Represents mapping world sourceType source carrier type →
     frame.Binds source contract → Nonempty (Dispatch frame site call arguments source carrier)
 
+def Covers {catalog : SourceCoreDataCatalog.Catalog} (model : GenericHeap.PayloadModel catalog)
+    (frame : Staging.CallBoundary.Frame) (site : SourceCoreCallableContracts.Callsite)
+    (call : ExpressionId) (arguments : List ExpressionId) (sourceType : TypeSystem.Ty) (type : Ty) : Prop :=
+  CoversFor model frame site call arguments sourceType type
+
 /-- A finite staged-source rejection derives its Core callee computation from
 the universal child theorem, then emits the exact language failure without
 executing arguments. The post-callee heap, map/world and administrative frame
 are retained, including any writes or allocations performed by the callee. -/
-theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+theorem preserves_rejection_for {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate} {faults : FunctionCalls.FaultRep}
     {frame : Staging.CallBoundary.Frame} {site : SourceCoreCallableContracts.Callsite} {call callee : ExpressionId}
@@ -136,12 +141,12 @@ theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : G
     {lowered : SourceCoreBasic.LoweredExpr} {calleeNode : ExpressionNode}
     (certified : certificate scope callee lowered) (found : source.lookupExpression? callee = some calleeNode)
     (childMeaning : GenericExpressionMeaning.Preserves model program context evidence source certificate faults)
-    (coverage : Covers model frame site call arguments calleeNode.type lowered.type)
+    (coverage : CoversFor model frame site call arguments calleeNode.type lowered.type)
     (unknown : Word) (result : Ty) (argumentCode : Expr)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
     {store : Store} {ξ : Renaming} {reason : Staging.CallGuard.Fault}
-    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
     (heaps : GenericHeap.HeapRepresents model mapping world before store)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (layout : EnvironmentsAgree ξ canonical actual)
@@ -166,5 +171,33 @@ theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : G
     exact ⟨dispatch.reason reason, finalStore, finalMap, finalWorld,
       site.lower_stage_failure unknown dispatch.row _ dispatch.found failed evaluated,
       dispatch.reason_represents reason, finalHeaps, maps, worlds, framePreserved, metadataPreserved⟩
+
+theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate} {faults : FunctionCalls.FaultRep}
+    {frame : Staging.CallBoundary.Frame} {site : SourceCoreCallableContracts.Callsite} {call callee : ExpressionId}
+    {arguments : List ExpressionId} {metadata : IndirectCallResolution} {scope : SourceCoreLocalCell.Scope}
+    {lowered : SourceCoreBasic.LoweredExpr} {calleeNode : ExpressionNode}
+    (certified : certificate scope callee lowered) (found : source.lookupExpression? callee = some calleeNode)
+    (childMeaning : GenericExpressionMeaning.Preserves model program context evidence source certificate faults)
+    (coverage : Covers model frame site call arguments calleeNode.type lowered.type)
+    (unknown : Word) (result : Ty) (argumentCode : Expr)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {reason : Staging.CallGuard.Fault}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (execution : Staging.CallBoundary.Executes program frame context evidence source environment before call callee arguments metadata
+      (.stageFault reason) after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (site.lower unknown result (lowered.expression.rename ξ) argumentCode)
+        (.inLeft result (.word token)) finalStore ∧
+      ReasonRepresents site reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_rejection_for certified found childMeaning coverage unknown result argumentCode
+    environments heaps locals layout execution
 
 end Solcore.SourceSemantics.CoreLowering.CallStageBoundary

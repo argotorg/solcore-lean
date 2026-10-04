@@ -313,6 +313,57 @@ theorem reflects_done_for (tree : Tree frame.source certificate scope ids source
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
   reflects_for tree meaning environments heaps locals layout (runStateful_evaluation_sound completed)
 
+/-- An accepted user-callable gate evaluates recursive staged arguments at
+its two real hidden slots. An argument failure returns before application and
+keeps its own origin, rather than relabelling it as a fault at the caller. -/
+theorem preserves_call_argument_fault_for
+    {site : SourceCoreCallableContracts.Callsite} {call callee : ExpressionId}
+    {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (certified : certificate scope callee lowered) (found : frame.source.lookupExpression? callee = some node)
+    (tree : Tree frame.source certificate scope ids sourceTypes codes)
+    (meaning : PreservesFor model program registry frame context certificate faults)
+    (coverage : CallStageBoundary.CoversFor model frame.guards site call ids node.type lowered.type)
+    (unknown : Word) (resultType : Ty)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before middle after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {callable : Dynamic.Value} {contract : Staging.CallGuard.Contract}
+    {failure : Staging.Recursive.Failure}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (child : Staging.Recursive.Expression program registry frame context environment before callee (.value callable) middle)
+    (bound : frame.guards.Binds callable contract)
+    (accepted : Staging.CallBoundary.GuardAccepts frame.guards call ids callable)
+    (arguments : Staging.Recursive.Expressions program registry frame context environment middle ids (.fault failure) after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (site.lower unknown resultType (lowered.expression.rename ξ)
+        ((SourceCoreCalls.packArguments codes).expression.rename ξ)) (.inLeft resultType (.word token)) finalStore ∧
+      faults failure token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  obtain ⟨carrier, middleStore, middleMap, middleWorld, calleeRun, represented, middleHeaps,
+    firstMaps, firstWorlds, firstFrame, firstMetadata⟩ := meaning certified found environments heaps locals layout child
+  cases represented with
+  | value payload =>
+    obtain ⟨dispatch⟩ := coverage payload bound
+    rw [dispatch.shape] at calleeRun
+    have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) ξ)) canonical
+        (.unit :: .pair dispatch.function (.word dispatch.contract) :: actual) := GenericExpressionMeaning.agree_prefix
+      (GenericExpressionMeaning.agree_prefix layout (.pair dispatch.function (.word dispatch.contract))) .unit
+    obtain ⟨token, finalStore, finalMap, finalWorld, argumentRun, matched, finalHeaps,
+      maps, worlds, preserved, metadata⟩ := preserves_fault_for tree meaning
+        (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata) nextLayout arguments
+    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentRun
+    have gate : CallableContract.decision site.gates .beforeArguments unknown dispatch.contract = none := by
+      rw [site.decision_known .beforeArguments unknown dispatch.contract dispatch.row dispatch.found]
+      exact SourceCoreCallableContracts.reason_accepted _ _ _ (dispatch.accepted accepted)
+    exact ⟨token, finalStore, finalMap, finalWorld,
+      CallableContract.call_argument_failure site.gates unknown calleeRun gate argumentRun,
+      matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+      firstFrame.trans preserved, firstMetadata.trans metadata⟩
+
+
 end Ambient
 
 /-- The legacy result keeps the original catalog projection and runtime definitions. -/
@@ -479,26 +530,8 @@ theorem preserves_call_argument_fault
         ((SourceCoreCalls.packArguments codes).expression.rename ξ)) (.inLeft resultType (.word token)) finalStore ∧
       faults failure token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨carrier, middleStore, middleMap, middleWorld, calleeRun, represented, middleHeaps,
-    firstMaps, firstWorlds, firstFrame, firstMetadata⟩ := meaning certified found environments heaps locals layout child
-  cases represented with
-  | value payload =>
-    obtain ⟨dispatch⟩ := coverage payload bound
-    rw [dispatch.shape] at calleeRun
-    have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) ξ)) canonical
-        (.unit :: .pair dispatch.function (.word dispatch.contract) :: actual) := GenericExpressionMeaning.agree_prefix
-      (GenericExpressionMeaning.agree_prefix layout (.pair dispatch.function (.word dispatch.contract))) .unit
-    obtain ⟨token, finalStore, finalMap, finalWorld, argumentRun, matched, finalHeaps,
-      maps, worlds, preserved, metadata⟩ := preserves_fault tree meaning
-        (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata) nextLayout arguments
-    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentRun
-    have gate : CallableContract.decision site.gates .beforeArguments unknown dispatch.contract = none := by
-      rw [site.decision_known .beforeArguments unknown dispatch.contract dispatch.row dispatch.found]
-      exact SourceCoreCallableContracts.reason_accepted _ _ _ (dispatch.accepted accepted)
-    exact ⟨token, finalStore, finalMap, finalWorld,
-      CallableContract.call_argument_failure site.gates unknown calleeRun gate argumentRun,
-      matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-      firstFrame.trans preserved, firstMetadata.trans metadata⟩
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_call_argument_fault_for certified found tree meaning coverage unknown resultType
+    environments heaps locals layout child bound accepted arguments
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments

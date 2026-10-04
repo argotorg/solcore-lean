@@ -158,6 +158,36 @@ theorem ResultRepresents.extend {catalog : SourceCoreDataCatalog.Catalog}
 
 /-- A nested failure in the callee bypasses both outer gates and all
 arguments. Its original fault label and the callee's exact heap survive. -/
+theorem preserves_callee_fault_for {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
+    {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope}
+    {context : SourceSemantics.Context} {certificate : Certificate} {faults : FaultRep}
+    {site : SourceCoreCallableContracts.Callsite} {callee : ExpressionId} {scope : SourceCoreLocalCell.Scope}
+    {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (certified : certificate scope callee lowered) (found : frame.source.lookupExpression? callee = some node)
+    (childMeaning : PreservesFor model program registry frame context certificate faults)
+    (unknown : Word) (result : Ty) (argumentCode : Expr)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {failure : Staging.Recursive.Failure}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (child : Staging.Recursive.Expression program registry frame context environment before callee (.fault failure) after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (site.lower unknown result (lowered.expression.rename ξ) argumentCode)
+        (.inLeft result (.word token)) finalStore ∧ faults failure token ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata⟩ :=
+    childMeaning certified found environments heaps locals layout child
+  cases represented with
+  | fault reason =>
+    exact ⟨_, finalStore, finalMap, finalWorld,
+      CallableContract.call_callee_failure site.gates unknown evaluated,
+      reason, finalHeaps, maps, worlds, preserved, metadata⟩
+
 theorem preserves_callee_fault {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
     {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope}
     {context : SourceSemantics.Context} {certificate : Certificate} {faults : FaultRep}
@@ -179,17 +209,51 @@ theorem preserves_callee_fault {catalog : SourceCoreDataCatalog.Catalog} {model 
         (.inLeft result (.word token)) finalStore ∧ faults failure token ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata⟩ :=
-    childMeaning certified found environments heaps locals layout child
-  cases represented with
-  | fault reason =>
-    exact ⟨_, finalStore, finalMap, finalWorld,
-      CallableContract.call_callee_failure site.gates unknown evaluated,
-      reason, finalHeaps, maps, worlds, preserved, metadata⟩
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_callee_fault_for certified found childMeaning unknown result argumentCode
+    environments heaps locals layout child
 
 /-- The real Core gate follows a recursively staged callee prefix. The IH can
 itself contain nested argument/body guards; no plain child execution is used. -/
+theorem preserves_rejection_for {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
+    {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope} {context : SourceSemantics.Context}
+    {certificate : Certificate} {faults : FaultRep} {site : SourceCoreCallableContracts.Callsite}
+    {call callee : ExpressionId} {arguments : List ExpressionId} {scope : SourceCoreLocalCell.Scope}
+    {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (certified : certificate scope callee lowered) (found : frame.source.lookupExpression? callee = some node)
+    (childMeaning : PreservesFor model program registry frame context certificate faults)
+    (coverage : CallStageBoundary.CoversFor model frame.guards site call arguments node.type lowered.type)
+    (reasonMeaning : ∀ reason token, CallStageBoundary.ReasonRepresents site reason token →
+      faults (.stage frame call reason) token)
+    (unknown : Word) (result : Ty) (argumentCode : Expr)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {callable : Dynamic.Value} {reason : Staging.CallGuard.Fault}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (child : Staging.Recursive.Expression program registry frame context environment before callee (.value callable) after)
+    (rejected : Staging.CallBoundary.GuardRejects frame.guards call arguments callable reason) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (site.lower unknown result (lowered.expression.rename ξ) argumentCode)
+        (.inLeft result (.word token)) finalStore ∧
+      faults (.stage frame call reason) token ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
+  obtain ⟨carrier, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata⟩ :=
+    childMeaning certified found environments heaps locals layout child
+  cases represented with
+  | value payload =>
+    obtain ⟨contract, bound⟩ : ∃ contract, frame.guards.Binds callable contract := by
+      cases rejected with | contract bound _ => exact ⟨_, bound⟩
+    obtain ⟨dispatch⟩ := coverage payload bound
+    rw [dispatch.shape] at evaluated
+    exact ⟨dispatch.reason reason, finalStore, finalMap, finalWorld,
+      site.lower_stage_failure unknown dispatch.row _ dispatch.found (dispatch.rejected rejected) evaluated,
+      reasonMeaning reason _ (dispatch.reason_represents reason), finalHeaps, maps, worlds, preserved, metadata⟩
+
 theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : GenericHeap.PayloadModel catalog}
     {program : Program} {registry : Staging.Recursive.Registry} {frame : Staging.Recursive.Scope} {context : SourceSemantics.Context}
     {certificate : Certificate} {faults : FaultRep} {site : SourceCoreCallableContracts.Callsite}
@@ -216,17 +280,8 @@ theorem preserves_rejection {catalog : SourceCoreDataCatalog.Catalog} {model : G
       faults (.stage frame call reason) token ∧
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨carrier, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata⟩ :=
-    childMeaning certified found environments heaps locals layout child
-  cases represented with
-  | value payload =>
-    obtain ⟨contract, bound⟩ : ∃ contract, frame.guards.Binds callable contract := by
-      cases rejected with | contract bound _ => exact ⟨_, bound⟩
-    obtain ⟨dispatch⟩ := coverage payload bound
-    rw [dispatch.shape] at evaluated
-    exact ⟨dispatch.reason reason, finalStore, finalMap, finalWorld,
-      site.lower_stage_failure unknown dispatch.row _ dispatch.found (dispatch.rejected rejected) evaluated,
-      reasonMeaning reason _ (dispatch.reason_represents reason), finalHeaps, maps, worlds, preserved, metadata⟩
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
+  preserves_rejection_for certified found childMeaning coverage reasonMeaning unknown result argumentCode
+    environments heaps locals layout child rejected
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveStageMeaning
