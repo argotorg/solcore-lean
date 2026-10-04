@@ -1799,6 +1799,13 @@ import Solcore.Test.SourceCoreCallablePreparedMethodCatalogEntries
 import Solcore.Test.SourceCoreCallableIndexedStageOrigins
 import Solcore.Test.SourceCoreCallableMethodBodyTraceBounds
 
+import Solcore.Test.SourceCoreCallableRuntimeBodyKernel
+import Solcore.Test.SourceCoreCallablePreparedMethodCatalogBodyMeaning
+import Solcore.Test.SourceCoreCallableIndexedAppliedStageOrigins
+import Solcore.Test.SourceCoreCallablePreparedOperatorSourceBounds
+import Solcore.Test.SourceCoreCallableIndexedLambdaNamedRuntimeBodyMeaning
+import Solcore.Test.SourceCoreCallablePreparedMethodCatalogHookMeaning
+
 set_option autoImplicit false
 
 open Solcore
@@ -2944,6 +2951,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedCatalogRuntimeMutualMeaning.run
   SourceCoreRecursiveNamedPublicSpecializationMeaning.run
   SourceCoreCallableIndexedLambdaRuntimeBody.run
+  SourceCoreCallableIndexedLambdaNamedRuntimeBodyMeaning.run
   SourceCoreRecursiveNamedPreparedHeaderPolicies.run
   SourceRecursiveStagePrimitiveOperators.run
   SourceRecursiveStageTupleExpressions.run
