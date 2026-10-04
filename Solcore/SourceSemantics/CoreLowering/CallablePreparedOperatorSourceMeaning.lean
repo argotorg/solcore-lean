@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSourceBounds
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedOperatorSuffixMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourcePathMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableCallRequirementLayouts
@@ -191,22 +192,21 @@ private theorem unary_dispatch_unique {operator : Syntax.UnaryOp}
     {leftTrait leftMethod rightTrait rightMethod : String}
     (left : UnaryTraitDispatch operator leftTrait leftMethod)
     (right : UnaryTraitDispatch operator rightTrait rightMethod) :
-    leftTrait = rightTrait ∧ leftMethod = rightMethod := by
-  cases left <;> cases right
-  exact ⟨rfl, rfl⟩
+    leftTrait = rightTrait ∧ leftMethod = rightMethod :=
+  CallablePreparedOperatorSourceBounds.unary_dispatch_unique left right
 
 private theorem binary_dispatch_valid_left {operator : Syntax.BinaryOp}
     {traitName methodName : String} {value : Dynamic.Value}
     (dispatch : BinaryTraitDispatch operator traitName methodName)
-    (invalid : Dynamic.BinaryLeftOperandInvalid operator value) : False := by
-  cases dispatch <;> cases invalid
+    (invalid : Dynamic.BinaryLeftOperandInvalid operator value) : False :=
+  CallablePreparedOperatorSourceBounds.binary_dispatch_valid_left dispatch invalid
 
 private theorem binary_dispatch_unique {operator : Syntax.BinaryOp}
     {leftTrait leftMethod rightTrait rightMethod : String}
     (left : BinaryTraitDispatch operator leftTrait leftMethod)
     (right : BinaryTraitDispatch operator rightTrait rightMethod) :
-    leftTrait = rightTrait ∧ leftMethod = rightMethod := by
-  cases left <;> cases right <;> exact ⟨rfl, rfl⟩
+    leftTrait = rightTrait ∧ leftMethod = rightMethod :=
+  CallablePreparedOperatorSourceBounds.binary_dispatch_unique left right
 
 variable {checkedProgram : CheckedProgram} {project : Projector} {caller : Specialized}
   {compilation : SourceCoreFunctions.Context} {child : SourceCoreEvidence.Child} {fuel : Nat}
@@ -224,25 +224,19 @@ variable {checkedProgram : CheckedProgram} {project : Projector} {caller : Speci
 
 private theorem owned_eq {owned : List RequirementId}
     (layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions owned) :
-    owned = receipt.requirements := by
-  have original := CallableCallRequirementLayouts.ordinary_owned receipt.ordinary
-  exact List.append_cancel_right (layout.symm.trans original)
+    owned = receipt.requirements :=
+  CallablePreparedOperatorSourceBounds.owned_eq layout
 
 include selected catalog ledger selection in
 private theorem same_body {otherBody : Dynamic.BodyInstance} {otherDictionary : Dynamic.EvidenceEnvironment}
     (actual : Dynamic.OperatorMethodSelected program context evidence selected.traitName selected.methodName
-      receipt.requirements otherBody otherDictionary) : otherBody = sourceBody := by
-  have unique := CallableCoercionSelectionIdentity.primary_unique ledger selected.certificate.roots.primarySelected
-  apply CallableCoercionSelectionIdentity.body_eq catalog unique
-  · simpa only [selected.requirements] using actual
-  · simpa only [selected.requirements] using selection
+      receipt.requirements otherBody otherDictionary) : otherBody = sourceBody :=
+  CallablePreparedOperatorSourceBounds.same_body selected catalog ledger selection actual
 
 include selected ledger selection in
 private theorem requirement_safe {failed : RequirementId}
-    (fault : Dynamic.RequirementListFaults context evidence receipt.requirements failed) : False := by
-  apply CallableCoercionRequirementSafety.selected_safe_for ledger selected.certificate.roots
-  · simpa only [selected.requirements] using selection
-  · simpa only [selected.requirements] using fault
+    (fault : Dynamic.RequirementListFaults context evidence receipt.requirements failed) : False :=
+  CallablePreparedOperatorSourceBounds.requirement_safe selected ledger selection fault
 
 include selected catalog ledger selection in
 /-- Reverse the original raw source outcome, preserving each actual source
@@ -255,82 +249,14 @@ theorem OperatorSource.raw_inv {environment : Dynamic.Environment} {before after
         receipt.requirements sourceBody actualDictionary ∧
       NamedCalls.Arguments.Trace program context evidence actualDictionary source environment before
         receipt.arguments sourceBody outcome after := by
-  have dispatch := selected.dispatch
-  rcases receipt.form with ⟨operator, operand, form, arguments⟩ | ⟨operator, left, right, form, arguments⟩
-  · simp only [form] at dispatch
-    rw [arguments]
+  obtain ⟨size, measured⟩ : ∃ size,
+      CallablePreparedOperatorSourceBounds.RawOutcomeAt program size context evidence source environment before node outcome after := by
     cases outcome with
-    | value value =>
-      change Dynamic.ExpressionFormEvaluates _ _ _ _ _ _ _ _ _ _ _ at raw
-      rw [form] at raw
-      cases raw with
-      | unary layout operandEvaluated applied =>
-        rw [owned_eq (receipt := receipt) layout] at applied
-        rw [selected.requirements] at applied
-        cases applied with
-        | method actualDispatch actual invoked =>
-          rw [← selected.requirements] at actual
-          obtain ⟨sameTrait, sameMethod⟩ := unary_dispatch_unique dispatch actualDispatch
-          cases sameTrait
-          cases sameMethod
-          cases same_body selected catalog ledger selection actual
-          exact ⟨_, actual, .apply (.cons operandEvaluated .nil) (.value invoked)⟩
-    | fault reason =>
-      change Dynamic.ExpressionFormFaults _ _ _ _ _ _ _ _ _ _ _ at raw
-      rw [form] at raw
-      cases raw with
-      | unaryOperand _ failed => exact ⟨_, selection, .argumentFault (.head failed)⟩
-      | unaryApply layout operandEvaluated failed =>
-        rw [owned_eq (receipt := receipt) layout] at failed
-        rw [selected.requirements] at failed
-        cases failed with
-        | requirement fault => exact False.elim (requirement_safe selected ledger selection (by simpa only [selected.requirements] using fault))
-        | method actualDispatch actual failed =>
-          rw [← selected.requirements] at actual
-          obtain ⟨sameTrait, sameMethod⟩ := unary_dispatch_unique dispatch actualDispatch
-          cases sameTrait
-          cases sameMethod
-          cases same_body selected catalog ledger selection actual
-          exact ⟨_, actual, .apply (.cons operandEvaluated .nil) (.fault failed)⟩
-  · simp only [form] at dispatch
-    rw [arguments]
-    cases outcome with
-    | value value =>
-      change Dynamic.ExpressionFormEvaluates _ _ _ _ _ _ _ _ _ _ _ at raw
-      rw [form] at raw
-      cases raw with
-      | binaryShortCircuit layout _ _ empty =>
-        exact False.elim (receipt.nonempty ((owned_eq (receipt := receipt) layout).symm.trans empty))
-      | binaryEvaluateRight layout leftEvaluated _ rightEvaluated applied =>
-        rw [owned_eq (receipt := receipt) layout] at applied
-        rw [selected.requirements] at applied
-        cases applied with
-        | method actualDispatch actual invoked =>
-          rw [← selected.requirements] at actual
-          obtain ⟨sameTrait, sameMethod⟩ := binary_dispatch_unique dispatch actualDispatch
-          cases sameTrait
-          cases sameMethod
-          cases same_body selected catalog ledger selection actual
-          exact ⟨_, actual, .apply (.cons leftEvaluated (.cons rightEvaluated .nil)) (.value invoked)⟩
-    | fault reason =>
-      change Dynamic.ExpressionFormFaults _ _ _ _ _ _ _ _ _ _ _ at raw
-      rw [form] at raw
-      cases raw with
-      | binaryLeft _ failed => exact ⟨_, selection, .argumentFault (.head failed)⟩
-      | binaryLeftOperand _ _ invalid => exact False.elim (binary_dispatch_valid_left dispatch invalid)
-      | binaryRight _ leftEvaluated _ failed => exact ⟨_, selection, .argumentFault (.tail leftEvaluated (.head failed))⟩
-      | binaryApply layout leftEvaluated _ rightEvaluated failed =>
-        rw [owned_eq (receipt := receipt) layout] at failed
-        rw [selected.requirements] at failed
-        cases failed with
-        | requirement fault => exact False.elim (requirement_safe selected ledger selection (by simpa only [selected.requirements] using fault))
-        | method actualDispatch actual failed =>
-          rw [← selected.requirements] at actual
-          obtain ⟨sameTrait, sameMethod⟩ := binary_dispatch_unique dispatch actualDispatch
-          cases sameTrait
-          cases sameMethod
-          cases same_body selected catalog ledger selection actual
-          exact ⟨_, actual, .apply (.cons leftEvaluated (.cons rightEvaluated .nil)) (.fault failed)⟩
+    | value value => exact SourceExecutionSize.ExpressionFormEvaluates.has_size raw
+    | fault reason => exact SourceExecutionSize.ExpressionFormFaults.has_size raw
+  obtain ⟨actualDictionary, actual, traced⟩ :=
+    CallablePreparedOperatorSourceBounds.OperatorSource.raw_inv_sized selected catalog ledger selection measured
+  exact ⟨actualDictionary, actual, traced.sound⟩
 
 include selected catalog ledger selection in
 /-- Whole source outcomes retain the raw intermediate value and heap before
@@ -347,12 +273,11 @@ theorem OperatorSource.source_inv {environment : Dynamic.Environment} {before af
           receipt.arguments sourceBody rawOutcome rawHeap)
       (fun heap value => CallableCoercionExpressionMeaning.Path program context evidence heap node.coercions value)
       outcome after := by
-  have notLocal : ∀ name binder, node.form ≠ .reference name (.local binder) := by
-    intro name binder impossible
-    rcases receipt.form with ⟨_, _, form, _⟩ | ⟨_, _, _, form, _⟩ <;> rw [form] at impossible <;> cases impossible
-  cases CallableCoercionExpressionMeaning.source_inv receipt.found unique notLocal trace with
-  | rawFault raw => exact .rawFault (OperatorSource.raw_inv selected catalog ledger selection raw)
-  | path raw path => exact .path (OperatorSource.raw_inv selected catalog ledger selection raw) path
+  obtain ⟨size, measured⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size trace
+  exact (CallablePreparedOperatorSourceBounds.OperatorSource.source_inv_sized
+    selected catalog ledger selection unique measured).forget
+    (fun ⟨actualDictionary, actual, traced⟩ => ⟨actualDictionary, actual, traced.sound⟩)
+    CallablePreparedOperatorSourceBounds.PathAt.sound
 
 end SourceInversion
 
