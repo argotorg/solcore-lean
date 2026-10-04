@@ -162,6 +162,177 @@ theorem coercion_accepted {program : CheckedProgram} {caller : Specialized}
         extended, CallableCoercionPlanProvenance.complete_root extended⟩⟩⟩
 
 
+/-- Only the two forms traversed by the real operator preparation phase. -/
+def OperatorForm (node : ExpressionNode) : Prop :=
+  match node.form with
+  | .unary _ _ | .binary _ _ _ => True
+  | _ => False
+
+def operatorOwnedNode (node : ExpressionNode) (requirements : List RequirementId) : ExpressionNode :=
+  {node with type := node.rawType, requirements, coercions := []}
+
+/-- The complete actual operator visit survives later worklist growth. The
+owned requirements, staged boundary, materialized dictionary and complete
+selected body are all retained separately. -/
+structure OperatorVisit (program : CheckedProgram) (caller : Specialized)
+    (available : SourceTypedRuntime.RuntimeEvidenceEnvironment) (node : ExpressionNode) (final : Plan) where
+  requirements : List RequirementId
+  owned : SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements
+  nonempty : requirements ≠ []
+  selection : SourceCompilationPlan.CheckedRuntimeOperatorMethod
+  arguments : List ExpressionId
+  dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment
+  before : Plan
+  inserted : Plan
+  budget : Nat
+  selected : (match (operatorOwnedNode node requirements).form with
+    | .unary operator _ => SourceCompilationPlan.checkedUnaryOperatorMethod program caller
+        (operatorOwnedNode node requirements) available operator
+    | .binary _ operator _ => SourceCompilationPlan.checkedBinaryOperatorMethod program caller
+        (operatorOwnedNode node requirements) available operator
+    | _ => throw (.unsupportedRequirements requirements)
+    : Except SourceTypedRuntime.RuntimeError SourceCompilationPlan.CheckedRuntimeOperatorMethod) = .ok selection
+  argumentsSelected : (match (operatorOwnedNode node requirements).form with
+    | .unary _ operand => pure [operand]
+    | .binary left _ right => pure [left, right]
+    | _ => throw (.unsupportedRequirements requirements)
+    : Except SourceTypedRuntime.RuntimeError (List ExpressionId)) = .ok arguments
+  staged : SourceCompilationPlan.validateStagedCallBoundary caller (operatorOwnedNode node requirements)
+    arguments selection.method.specialized = .ok ()
+  materialized : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+    (operatorOwnedNode node requirements) selection = .ok dictionary
+  extended : extendCompletePlan program before selection.method.specialized
+    ⟨caller.key, node.id, selection.method.specialized.key⟩ budget = .ok (.complete inserted)
+  finalSelected : SourceCompilationPlan.exactSpecialization final selection.method.specialized.key =
+    .ok selection.method.specialized
+
+def OperatorVisit.later {program : CheckedProgram} {caller : Specialized}
+    {available : SourceTypedRuntime.RuntimeEvidenceEnvironment} {node : ExpressionNode} {before after : Plan}
+    (visit : OperatorVisit program caller available node before) (growth : Extends before after) :
+    OperatorVisit program caller available node after :=
+  {visit with finalSelected := growth.selected _ _ visit.finalSelected}
+
+def OperatorCovered (program : CheckedProgram) (caller : Specialized)
+    (available : SourceTypedRuntime.RuntimeEvidenceEnvironment) (node : ExpressionNode) (final : Plan) : Prop :=
+  ∀ requirements, SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements →
+    requirements ≠ [] → OperatorForm node → Nonempty (OperatorVisit program caller available node final)
+
+theorem OperatorCovered.later {program : CheckedProgram} {caller : Specialized}
+    {available : SourceTypedRuntime.RuntimeEvidenceEnvironment} {node : ExpressionNode} {before after : Plan}
+    (covered : OperatorCovered program caller available node before) (growth : Extends before after) :
+    OperatorCovered program caller available node after := by
+  intro requirements owned nonempty form
+  obtain ⟨visit⟩ := covered requirements owned nonempty form
+  exact ⟨visit.later growth⟩
+
+/-- Successful operator closure preserves the same carriers while the outer
+pass moves on to coercions. Its body is only unfolded in this proof premise. -/
+theorem operator_accepted_with_visit {program : CheckedProgram} {caller : Specialized}
+    {available : SourceTypedRuntime.RuntimeEvidenceEnvironment} {node : ExpressionNode}
+    {before after : Plan} {budget : Nat}
+    (accepted : (do
+  let requirements ← match SourceCompilationPlan.ordinaryOwnedRequirements? node with
+    | some requirements => pure requirements
+    | none => throw (.unsupportedRequirements node.requirements)
+  if requirements.isEmpty then
+    pure before
+  else
+    let ownedNode := {
+      node with
+      type := node.rawType
+      requirements
+      coercions := []
+    }
+    let selection ← match ownedNode.form with
+      | .unary operator _ =>
+          SourceCompilationPlan.checkedUnaryOperatorMethod program caller ownedNode available
+            operator
+      | .binary _ operator _ =>
+          SourceCompilationPlan.checkedBinaryOperatorMethod program caller ownedNode available
+            operator
+      | _ => throw (.unsupportedRequirements requirements)
+    let arguments ← match ownedNode.form with
+      | .unary _ operand => pure [operand]
+      | .binary left _ right => pure [left, right]
+      | _ => throw (.unsupportedRequirements requirements)
+    SourceCompilationPlan.validateStagedCallBoundary caller ownedNode arguments
+      selection.method.specialized
+    discard <| SourceCompilationPlan.operatorMethodRuntimeEvidence program caller ownedNode
+      selection
+    let outerEdge : SourceSpecializationWorklist.CallEdge := {
+      caller := caller.key
+      occurrence := node.id
+      callee := selection.method.specialized.key
+    }
+    let outcome ← match SourceSpecializationWorklist.extendCompletePlan program
+        before selection.method.specialized outerEdge budget with
+      | .ok outcome => pure outcome
+      | .error error => throw (.operatorMethodWorklist caller.key node.id
+          error)
+    match outcome with
+    | .complete extended => pure extended
+    | .budgetExhausted _ next pending =>
+        throw (.operatorMethodSpecializationBudgetExhausted caller.key
+          node.id next pending.length)
+
+      : Except SourceTypedRuntime.RuntimeError Plan) = .ok after) :
+    Extends before after ∧ OperatorCovered program caller available node after := by
+  cases owned : SourceCompilationPlan.ordinaryOwnedRequirements? node with
+  | none => simp only [owned, bind, Except.bind, pure, Except.pure] at accepted; cases accepted
+  | some requirements =>
+    simp only [owned] at accepted
+    obtain ⟨actualRequirements, sameRequirements, accepted⟩ := bind_ok accepted
+    have sameRequirements : actualRequirements = requirements := (Except.ok.inj sameRequirements).symm
+    subst actualRequirements
+    cases requirements with
+    | nil =>
+      simp only [List.isEmpty_nil, ite_true, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+      cases accepted
+      refine ⟨.refl _, ?_⟩
+      intro requirements selected nonempty _
+      have same := Option.some.inj (selected.symm.trans owned)
+      exact False.elim (nonempty same)
+    | cons primary remaining =>
+      try simp only [List.isEmpty_cons, Bool.false_eq_true, ite_false] at accepted
+      cases form : node.form <;> simp only [form] at accepted <;> try cases accepted
+      all_goals
+        obtain ⟨selection, selected, accepted⟩ := bind_ok accepted
+        obtain ⟨arguments, argumentsSelected, accepted⟩ := bind_ok accepted
+        obtain ⟨returned, staged, accepted⟩ := bind_ok accepted
+        cases returned
+        obtain ⟨returned, materialized, accepted⟩ := bind_ok accepted
+        cases returned
+        have materialized : ∃ dictionary, SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+            (operatorOwnedNode node (primary :: remaining)) selection = .ok dictionary := by
+          have materializedOwned : (discard (SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+              (operatorOwnedNode node (primary :: remaining)) selection) : Except SourceTypedRuntime.RuntimeError PUnit) = .ok PUnit.unit := by
+            simpa only [operatorOwnedNode, form] using materialized
+          cases result : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller
+              (operatorOwnedNode node (primary :: remaining)) selection with
+          | error error => rw [result] at materializedOwned; cases materializedOwned
+          | ok dictionary => exact ⟨dictionary, rfl⟩
+        obtain ⟨dictionary, materialized⟩ := materialized
+        cases extended : extendCompletePlan program before selection.method.specialized
+            ⟨caller.key, node.id, selection.method.specialized.key⟩ budget with
+        | error error => rw [extended] at accepted; cases accepted
+        | ok outcome =>
+          rw [extended] at accepted
+          cases outcome with
+          | budgetExhausted plan next pending => cases accepted
+          | complete inserted =>
+            cases accepted
+            refine ⟨extend extended, ?_⟩
+            intro _ _ _ _
+            refine ⟨{
+              requirements := primary :: remaining, owned := owned, nonempty := List.cons_ne_nil _ _
+              selection := selection, arguments := arguments, dictionary := dictionary
+              before := before, inserted := after, budget := budget
+              selected := ?_, argumentsSelected := ?_, staged := ?_, materialized := materialized
+              extended := extended, finalSelected := CallableCoercionPlanProvenance.complete_root extended }⟩
+            · simpa only [operatorOwnedNode, form] using selected
+            · simpa only [operatorOwnedNode, form] using argumentsSelected
+            · simpa only [operatorOwnedNode, form] using staged
+
 /-- Successful operator closure preserves the same carriers while the outer
 pass moves on to coercions. Its body is only unfolded in this proof premise. -/
 theorem operator_accepted {program : CheckedProgram} {caller : Specialized}
@@ -212,13 +383,7 @@ theorem operator_accepted {program : CheckedProgram} {caller : Specialized}
         throw (.operatorMethodSpecializationBudgetExhausted caller.key
           node.id next pending.length)
 
-      : Except SourceTypedRuntime.RuntimeError Plan) = .ok after) : Extends before after := by
-  simp only [bind, Except.bind, pure, Except.pure] at accepted
-  repeat' first
-    | exact Extends.refl _
-    | exact extend (outcome := .complete after) (by assumption)
-    | contradiction
-    | split at accepted
-    | cases accepted
+      : Except SourceTypedRuntime.RuntimeError Plan) = .ok after) : Extends before after :=
+  (operator_accepted_with_visit accepted).1
 
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparationSteps

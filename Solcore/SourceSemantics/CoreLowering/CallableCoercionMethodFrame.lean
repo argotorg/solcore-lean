@@ -53,6 +53,22 @@ private theorem roots_of_map {source : TypedSource} {statements : List Statement
         exact .cons (ih lowered)
 
 
+/-- Any actual source method selection supplies the same closure-shaped body
+view. The emitted compilation contributes its exact ordered statement roots. -/
+theorem of_selected {program : Program} {context : SourceSemantics.Context}
+    {caller dictionary : Dynamic.EvidenceEnvironment} {traitName methodName : String}
+    {requirements : List RequirementId} {body : Dynamic.BodyInstance}
+    (selected : Dynamic.OperatorMethodSelected program context caller traitName methodName
+      requirements body dictionary)
+    {checked : SourceCoreCompatibleCatalog.Checked} {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
+    {named : SourceCoreGeneralFunctions.Function} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Core.Expr}
+    (compiled : CallableIndexedNamedGeneration.Compilation prepared named diagnostics code)
+    (sameSource : CallableIndexedNamedGeneration.source named = body.source) :
+    Frame body (view body dictionary compiled.statements) := by
+  refine ⟨rfl, rfl, rfl, rfl, rfl, ?_, ?_⟩
+  · simpa only [sameSource, view] using roots_of_map compiled.roots
+  · cases selected with | intro _ _ _ _ _ _ _ _ _ _ _ _ _ covers => exact covers
+
 /-- The actual method selector and dictionary construct the source frame at
 its actual residual context. The compiled root traversal supplies the body. -/
 theorem of_compilation {loaded : LoadedProgram} {program : CheckedProgram}
@@ -78,10 +94,8 @@ theorem of_compilation {loaded : LoadedProgram} {program : CheckedProgram}
       (step.requirement :: step.methodRequirements) (bodyInstance program method) (environment dictionary) ∧
     Frame (bodyInstance program method) (view (bodyInstance program method) (environment dictionary) compiled.statements) := by
   have selected := receipt.selects loadedAccepted formed range signatures ledger assumptions resolved covered materialized
-  refine ⟨selected, rfl, rfl, rfl, rfl, rfl, ?_, ?_⟩
-  · have roots := roots_of_map compiled.roots
-    simpa only [CallableIndexedNamedGeneration.source, completeRecord, bodyInstance, view] using roots
-  · cases selected with | intro _ _ _ _ _ _ _ _ _ _ _ _ _ covers => exact covers
+  refine ⟨selected, of_selected selected compiled ?_⟩
+  simp only [CallableIndexedNamedGeneration.source, completeRecord, bodyInstance]
 
 variable {program : Program} {bodyInstance : Dynamic.BodyInstance} {function : Dynamic.Closure}
 

@@ -136,6 +136,65 @@ private theorem validated_requirements {program : CheckedProgram} {caller : Sour
       cases accepted
       exact .cons (validated_requirement headAccepted) (ih tailAccepted)
 
+/-- The actual selector fixes each complete evidence tree and its ordered
+requirement position. The trait arity and method name remain explicit. -/
+structure Roots (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : Dictionary) (primaryId : RequirementId)
+    (methodIds : List RequirementId) (arity : Nat) (name : String)
+    (method : ExecutableImplMethods.CheckedMethod) where
+  primary : RawEvidence
+  methodEvidence : Dictionary
+  primarySelected : SourceCompilationPlan.exactRuntimeRequirementEvidence program caller node available
+    primaryId (SourceCompilationPlan.runtimeEvidenceGoal primary) = .ok primary
+  methodsSelected : SourceCompilationPlan.exactRuntimeRequirementEvidenceList program caller node available
+    methodIds (methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal) = .ok methodEvidence
+  checked : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary methodEvidence arity name = .ok method
+  shape : ∃ goal implementation, primary = .byImpl goal implementation method.implementationPremises
+  methods : method.methodPremises = methodEvidence
+  primaryValid : EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal primary) (evidence primary)
+  methodsValid : Forall₂ (fun goal raw => EvidenceValid [] program.signatures.resolutionRules goal (evidence raw))
+    (methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal) methodEvidence
+
+/-- One common constructor consumes the actual primary and method selections;
+neither validity nor the returned evidence is inferred from a specialization key. -/
+def Roots.of_selected {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available : Dictionary} {primaryId : RequirementId}
+    {methodIds : List RequirementId} {arity : Nat} {name : String}
+    {method : ExecutableImplMethods.CheckedMethod} {goal : ProgramPredicate}
+    {goals : List ProgramPredicate} {primary : RawEvidence} {methodEvidence : Dictionary}
+    (primarySelected : SourceCompilationPlan.exactRuntimeRequirementEvidence program caller node available
+      primaryId goal = .ok primary)
+    (methodsSelected : SourceCompilationPlan.exactRuntimeRequirementEvidenceList program caller node available
+      methodIds goals = .ok methodEvidence)
+    (checked : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary methodEvidence arity name = .ok method) :
+    Roots program caller node available primaryId methodIds arity name method := {
+  primary := primary
+  methodEvidence := methodEvidence
+  primarySelected := by
+    have same := SourceCompilationPlan.exactRuntimeRequirementEvidence_success_goal _ _ _ _ _ _ _ primarySelected
+    rwa [same]
+  methodsSelected := by
+    have same := SourceCompilationPlan.exactRuntimeRequirementEvidenceList_success_matches _ _ _ _ _ _ _ methodsSelected
+    change methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal = _ at same
+    rwa [same]
+  checked := checked
+  shape := by
+    obtain ⟨goal, implementation, shape, _⟩ := method_fields checked
+    exact ⟨goal, implementation, shape⟩
+  methods := by
+    obtain ⟨_, _, _, methods⟩ := method_fields checked
+    exact methods
+  primaryValid := by
+    have same := SourceCompilationPlan.exactRuntimeRequirementEvidence_success_goal _ _ _ _ _ _ _ primarySelected
+    rw [same]
+    exact validated_requirement primarySelected
+  methodsValid := by
+    have same := SourceCompilationPlan.exactRuntimeRequirementEvidenceList_success_matches _ _ _ _ _ _ _ methodsSelected
+    change methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal = _ at same
+    rw [same]
+    exact validated_requirements methodsSelected
+}
+
 /-- Exact roots of the returned method dictionary, taken from the real
 selector. All validity facts concern complete evidence trees. -/
 structure Certificate (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)
@@ -153,6 +212,14 @@ structure Certificate (program : CheckedProgram) (caller : SourceSpecialization.
   primaryValid : EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal primary) (evidence primary)
   methodsValid : Forall₂ (fun goal raw => EvidenceValid [] program.signatures.resolutionRules goal (evidence raw))
     (methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal) methodEvidence
+
+def Certificate.roots {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available : Dictionary} {step : CoercionStep}
+    {method : ExecutableImplMethods.CheckedMethod}
+    (receipt : Certificate program caller node available step method) :
+    Roots program caller node available step.requirement step.methodRequirements 2 "coerce" method :=
+  ⟨receipt.primary, receipt.methodEvidence, receipt.primarySelected, receipt.methodsSelected,
+    receipt.checked, receipt.shape, receipt.methods, receipt.primaryValid, receipt.methodsValid⟩
 
 /-- No separate premise is required for an intermediate method selection. -/
 theorem of_accepted {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
@@ -172,13 +239,8 @@ theorem of_accepted {program : CheckedProgram} {caller : SourceSpecialization.Sp
   obtain ⟨primary, primarySelected, accepted⟩ := bind_ok accepted
   obtain ⟨methodEvidence, methodsSelected, accepted⟩ := bind_ok accepted
   have checked := mapError_ok accepted
-  obtain ⟨goal, implementation, shape, methods⟩ := method_fields checked
-  have primaryGoal := SourceCompilationPlan.exactRuntimeRequirementEvidence_success_goal _ _ _ _ _ _ _ primarySelected
-  have methodsGoals := SourceCompilationPlan.exactRuntimeRequirementEvidenceList_success_matches _ _ _ _ _ _ _ methodsSelected
-  change methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal = _ at methodsGoals
-  exact ⟨⟨primary, methodEvidence, by rwa [primaryGoal], by rwa [methodsGoals], checked,
-    ⟨goal, implementation, shape⟩, methods,
-    by rw [primaryGoal]; exact validated_requirement primarySelected,
-    by rw [methodsGoals]; exact validated_requirements methodsSelected⟩⟩
+  let roots := Roots.of_selected primarySelected methodsSelected checked
+  exact ⟨⟨roots.primary, roots.methodEvidence, roots.primarySelected, roots.methodsSelected,
+    roots.checked, roots.shape, roots.methods, roots.primaryValid, roots.methodsValid⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodCertificates

@@ -37,18 +37,19 @@ private theorem validate_goals (key : SourceCompilationPlan.Key) (raw : Dictiona
 /-- Invert the real materializer, retaining its fresh header resolver spine and
 the exact three-way concatenation. The discarded validation still supplies the
 full ordered assumption list. -/
-theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
-    {node : ExpressionNode} {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod}
+theorem materialized_operator {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {selection : SourceCompilationPlan.CheckedRuntimeOperatorMethod}
     {dictionary : Dictionary}
-    (accepted : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
-    ∃ headers, Resolved program method.traitPredicates headers ∧
-      dictionary = headers ++ method.implementationPremises ++ method.methodPremises ∧
-      dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = method.specialized.assumptions := by
+    (accepted : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller node selection = .ok dictionary) :
+    ∃ headers, Resolved program selection.method.traitPredicates headers ∧
+      dictionary = headers ++ selection.method.implementationPremises ++ selection.method.methodPremises ∧
+      dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = selection.method.specialized.assumptions := by
+  rcases selection with ⟨requirement, method⟩
   cases method with
   | mk id traitMethod predicates implementationPredicates implementationPremises methodPredicates methodPremises synthetic checked specialized =>
     induction predicates generalizing specialized dictionary with
     | nil =>
-      unfold SourceCompilationPlan.coercionMethodRuntimeEvidence at accepted
+      unfold SourceCompilationPlan.operatorMethodRuntimeEvidence at accepted
       obtain ⟨headers, headersAccepted, accepted⟩ := bind_ok accepted
       have empty : headers = [] := Except.ok.inj headersAccepted |>.symm
       subst headers
@@ -56,14 +57,14 @@ theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.S
       cases accepted
       exact ⟨[], .nil, rfl, SourceCompilationPlan.validateRuntimeEvidence_success_matches _ _ _ validated⟩
     | cons goal rest ih =>
-      unfold SourceCompilationPlan.coercionMethodRuntimeEvidence at accepted
+      unfold SourceCompilationPlan.operatorMethodRuntimeEvidence at accepted
       obtain ⟨headers, headersAccepted, accepted⟩ := bind_ok accepted
       change (match (TypedTraitResolution.resolve program.signatures.resolutionRules 32 goal).outcome with
-        | .noSolution => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionNoSolution caller.key node.id step.requirement goal)
-        | .inconclusive reason => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionInconclusive caller.key node.id step.requirement reason)
+        | .noSolution => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionNoSolution caller.key node.id requirement goal)
+        | .inconclusive reason => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionInconclusive caller.key node.id requirement reason)
         | .success raw => do
           let .byImpl actual _ _ := raw
-          if actual != goal then throw (SourceTypedRuntime.RuntimeError.callRequirementEvidenceGoalMismatch caller.key node.id step.requirement goal actual)
+          if actual != goal then throw (SourceTypedRuntime.RuntimeError.callRequirementEvidenceGoalMismatch caller.key node.id requirement goal actual)
           pure (raw :: (← _))) = .ok headers at headersAccepted
       split at headersAccepted <;> try contradiction
       split at headersAccepted <;> try contradiction
@@ -73,10 +74,10 @@ theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.S
       cases headersEq
       let tailDictionary := tail ++ implementationPremises ++ methodPremises
       let tailSpecialized := { specialized with assumptions := tailDictionary.map SourceCompilationPlan.runtimeEvidenceGoal }
-      have tailRun : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step
-          ⟨id, traitMethod, rest, implementationPredicates, implementationPremises, methodPredicates, methodPremises,
-            synthetic, checked, tailSpecialized⟩ = .ok tailDictionary := by
-        simp only [SourceCompilationPlan.coercionMethodRuntimeEvidence]
+      have tailRun : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller node
+          ⟨requirement, ⟨id, traitMethod, rest, implementationPredicates, implementationPremises, methodPredicates, methodPremises,
+            synthetic, checked, tailSpecialized⟩⟩ = .ok tailDictionary := by
+        simp only [SourceCompilationPlan.operatorMethodRuntimeEvidence]
         rw [tailAccepted]
         change (do SourceCompilationPlan.validateRuntimeEvidence specialized.key (tailDictionary.map SourceCompilationPlan.runtimeEvidenceGoal) tailDictionary; pure tailDictionary) = .ok tailDictionary
         rw [validate_goals]; rfl
@@ -87,6 +88,16 @@ theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.S
       refine ⟨.byImpl actual implementation premises :: tail, .cons resolution ?_, rfl, ?_⟩
       · simpa only [same, Resolved] using resolvedTail
       · exact SourceCompilationPlan.validateRuntimeEvidence_success_matches _ _ _ validated
+
+/-- Coercions use the same materializer and retain their actual primary requirement. -/
+theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod}
+    {dictionary : Dictionary}
+    (accepted : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
+    ∃ headers, Resolved program method.traitPredicates headers ∧
+      dictionary = headers ++ method.implementationPremises ++ method.methodPremises ∧
+      dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = method.specialized.assumptions :=
+  materialized_operator (selection := ⟨step.requirement, method⟩) accepted
 
 private theorem resolved_valid {program : CheckedProgram} {goal : ProgramPredicate} {raw : RawEvidence}
     (resolved : (TypedTraitResolution.resolve program.signatures.resolutionRules 32 goal).outcome = .success raw) :
@@ -196,18 +207,21 @@ assumptions. Implementation and method premises keep their selected roots. -/
 def CallerCovered (caller : SourceSpecialization.SpecializedFunction) (method : ExecutableImplMethods.CheckedMethod) : Prop :=
   ∀ goal ∈ method.traitPredicates, goal ∈ caller.assumptions
 
-theorem Certificate.origins {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
-    {node : ExpressionNode} {available dictionary : Dictionary} {step : CoercionStep}
+theorem roots_origins {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available dictionary : Dictionary} {primaryId : RequirementId}
+    {methodIds : List RequirementId} {arity : Nat} {name : String}
     {method : ExecutableImplMethods.CheckedMethod}
-    (selected : CallableCoercionMethodCertificates.Certificate program caller node available step method)
+    (selected : CallableCoercionMethodCertificates.Roots program caller node available primaryId methodIds arity name method)
     (covered : CallerCovered caller method)
     (callerAccepted : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available)
-    (accepted : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
+    (materialization : ∃ headers, Resolved program method.traitPredicates headers ∧
+      dictionary = headers ++ method.implementationPremises ++ method.methodPremises ∧
+      dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = method.specialized.assumptions) :
     EvidenceEnvironment.AssembledFrom (environment available)
         (evidence selected.primary :: selected.methodEvidence.map evidence) method.specialized.assumptions (environment dictionary) ∧
       (environment dictionary).Valid program.signatures.resolutionRules ∧
       (environment dictionary).map Prod.fst = method.specialized.assumptions := by
-  obtain ⟨headers, resolvedHeaders, shape, goals⟩ := materialized accepted
+  obtain ⟨headers, resolvedHeaders, shape, goals⟩ := materialization
   have callerResolved := caller_resolved callerAccepted
   have roots : ∀ item ∈ dictionary, EvidenceEntryOriginates (environment available)
       (evidence selected.primary :: selected.methodEvidence.map evidence)
@@ -245,6 +259,19 @@ theorem Certificate.origins {program : CheckedProgram} {caller : SourceSpecializ
     · rw [selected.methods] at member
       exact raw_valid_each selected.methodsValid item member
   exact ⟨goals ▸ assembled_each roots, dictionary_valid eachValid, by simpa only [environment, List.map_map, Function.comp_def] using goals⟩
+
+theorem Certificate.origins {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available dictionary : Dictionary} {step : CoercionStep}
+    {method : ExecutableImplMethods.CheckedMethod}
+    (selected : CallableCoercionMethodCertificates.Certificate program caller node available step method)
+    (covered : CallerCovered caller method)
+    (callerAccepted : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available)
+    (accepted : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
+    EvidenceEnvironment.AssembledFrom (environment available)
+        (evidence selected.primary :: selected.methodEvidence.map evidence) method.specialized.assumptions (environment dictionary) ∧
+      (environment dictionary).Valid program.signatures.resolutionRules ∧
+      (environment dictionary).map Prod.fst = method.specialized.assumptions :=
+  roots_origins selected.roots covered callerAccepted (materialized accepted)
 
 theorem Certificate.covers {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
     {node : ExpressionNode} {available dictionary : Dictionary} {step : CoercionStep}

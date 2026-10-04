@@ -169,6 +169,16 @@ theorem trait_name {program : CheckedProgram} {caller : SourceSpecialization.Spe
   exact guards.1
 
 
+/-- The shared method source receipt retains the actual primary and every
+ordered method requirement, independently of the expression that uses it. -/
+structure MethodCertificate (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)
+    (node : ExpressionNode) (available : SourceTypedRuntime.RuntimeEvidenceEnvironment)
+    (primaryId : RequirementId) (methodIds : List RequirementId) (arity : Nat)
+    (traitName methodName : String) (method : ExecutableImplMethods.CheckedMethod) where
+  roots : CallableCoercionMethodCertificates.Roots program caller node available primaryId methodIds arity methodName method
+  selected : Selection program roots.primary methodName method
+  traitName : selected.trait.name = traitName
+
 /-- Static source selection keeps the full implementation, declaration, trait,
 head match and checked body. It contains no source execution or closure law. -/
 structure Certificate (program : CheckedProgram) (caller : SourceSpecialization.SpecializedFunction)
@@ -187,15 +197,23 @@ theorem of_accepted {program : CheckedProgram} {caller : SourceSpecialization.Sp
   obtain ⟨selected⟩ := CallableCoercionMethodInstantiation.selection roots.checked
   exact ⟨⟨roots, selected, trait_name accepted selected⟩⟩
 
+def Certificate.toMethodCertificate {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
+    {node : ExpressionNode} {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod}
+    (receipt : Certificate program caller node available step method) :
+    MethodCertificate program caller node available step.requirement step.methodRequirements 2 "Coerce" "coerce" method :=
+  ⟨receipt.roots.roots, receipt.selected, receipt.traitName⟩
+
 /-- Actual selector, same-fuel retained body and returned dictionary determine
 an independent source selection. Range formation and caller coverage remain
 explicit; neither is inferred from a ground specialization key. -/
-theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
+theorem MethodCertificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
     (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
     {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
     {available dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment}
-    {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod} {context : Context}
-    (receipt : Certificate program caller node available step method)
+    {primaryId : RequirementId} {methodIds : List RequirementId} {arity : Nat}
+    {traitName methodName : String} {method : ExecutableImplMethods.CheckedMethod} {context : Context}
+    (receipt : MethodCertificate program caller node available primaryId methodIds arity traitName methodName method)
     (formed : Formation receipt.selected.implementation receipt.selected.declaration)
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
       (Context.ofSignatures program.signatures) method.specialized.parameterSubstitution)
@@ -204,9 +222,9 @@ theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
     (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
     (resolved : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available)
     (covered : CallableCoercionEvidenceOrigins.CallerCovered caller method)
-    (materialized : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
-    OperatorMethodSelected (Program.ofChecked program) context (environment available) "Coerce" "coerce"
-      (step.requirement :: step.methodRequirements) (bodyInstance program method) (environment dictionary) := by
+    (materialized : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller node ⟨primaryId, method⟩ = .ok dictionary) :
+    OperatorMethodSelected (Program.ofChecked program) context (environment available) traitName methodName
+      (primaryId :: methodIds) (bodyInstance program method) (environment dictionary) := by
   obtain ⟨definition, definitionMember, definitionId, instantiated⟩ :=
     receipt.selected.instantiates loadedAccepted formed.parameters range
   have determined := receipt.selected.determines formed
@@ -215,7 +233,7 @@ theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
   have produced := requirement_produces signatures ledger assumptions resolved
     receipt.roots.primarySelected receipt.roots.primaryValid
   have sourceSelected : EvidenceSelectsMethod (Program.ofChecked program)
-      (evidence receipt.roots.primary) "coerce" definition := by
+      (evidence receipt.roots.primary) methodName definition := by
     simpa only [receipt.selected.primaryShape, evidence] using
       (EvidenceSelectsMethod.source (premises := method.implementationPremises.map evidence)
         receipt.selected.implementationMember headTrait receipt.selected.methodMember
@@ -230,7 +248,8 @@ theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
         (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) := by
     rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.method_predicates formed]
   rw [methodsGoals] at methodsProduced
-  have assembled := (CallableCoercionEvidenceOrigins.Certificate.origins receipt.roots covered resolved materialized).1
+  have assembled := (CallableCoercionEvidenceOrigins.roots_origins receipt.roots covered resolved
+    (CallableCoercionEvidenceOrigins.materialized_operator materialized)).1
   have methodAssumptions : method.specialized.assumptions =
       (SourceSemantics.methodAssumptions receipt.selected.trait receipt.selected.implementation receipt.selected.declaration).map
         (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) :=
@@ -247,7 +266,30 @@ theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
   · exact ⟨method.implementationPremises.map evidence, by
       simpa only [evidence] using congrArg evidence receipt.selected.primaryShape⟩
   · simpa only [environment, List.map_map, Function.comp_def] using assembled
-  · exact CallableCoercionEvidenceOrigins.Certificate.covers receipt.roots covered resolved materialized rfl rfl
+  · obtain ⟨_, valid, goals⟩ := CallableCoercionEvidenceOrigins.roots_origins receipt.roots covered resolved
+      (CallableCoercionEvidenceOrigins.materialized_operator materialized)
+    refine ⟨valid, ?_⟩
+    intro goal member
+    exact EvidenceEnvironment.LooksUp.exists_of_key_mem (goals.symm ▸ member)
+
+theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
+    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+    {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
+    {available dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod} {context : Context}
+    (receipt : Certificate program caller node available step method)
+    (formed : Formation receipt.selected.implementation receipt.selected.declaration)
+    (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+      (Context.ofSignatures program.signatures) method.specialized.parameterSubstitution)
+    (signatures : context.signatures = program.signatures)
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
+    (resolved : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available)
+    (covered : CallableCoercionEvidenceOrigins.CallerCovered caller method)
+    (materialized : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
+    OperatorMethodSelected (Program.ofChecked program) context (environment available) "Coerce" "coerce"
+      (step.requirement :: step.methodRequirements) (bodyInstance program method) (environment dictionary) :=
+  receipt.toMethodCertificate.selects loadedAccepted formed range signatures ledger assumptions resolved covered materialized
 
 /-- Public preparation fixes the emitted complete carrier, and the actual
 spine step fixes the same source selection and dictionary. This is a static

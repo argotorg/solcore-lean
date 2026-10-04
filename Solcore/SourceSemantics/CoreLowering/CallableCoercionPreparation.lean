@@ -45,12 +45,37 @@ private theorem ended {entries : List Specialized} {next index : Nat} {caller : 
   have position := (List.getElem?_eq_some_iff.mp found).1
   omega
 
+/-- Actual operator visits are retained alongside every original coercion visit. -/
+def NodeCoveredWith (program : CheckedProgram) (caller : Specialized)
+    (available : SourceTypedRuntime.RuntimeEvidenceEnvironment) (node : ExpressionNode) (plan : Plan) : Prop :=
+  NodeCovered program caller available node plan ∧ OperatorCovered program caller available node plan
+
+def CoveredWith (program : CheckedProgram) (caller : Specialized) (plan : Plan) : Prop :=
+  ∃ available, SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available ∧
+    ∀ node, .expression node ∈ caller.function.typedBody.nodes → NodeCoveredWith program caller available node plan
+
+theorem NodeCoveredWith.later {program : CheckedProgram} {caller : Specialized}
+    {available : SourceTypedRuntime.RuntimeEvidenceEnvironment} {node : ExpressionNode} {before after : Plan}
+    (covered : NodeCoveredWith program caller available node before) (growth : Extends before after) :
+    NodeCoveredWith program caller available node after :=
+  ⟨covered.1.later growth, covered.2.later growth⟩
+
+theorem CoveredWith.later {program : CheckedProgram} {caller : Specialized} {before after : Plan}
+    (covered : CoveredWith program caller before) (growth : Extends before after) : CoveredWith program caller after := by
+  obtain ⟨available, resolved, covered⟩ := covered
+  exact ⟨available, resolved, fun node member => (covered node member).later growth⟩
+
+theorem CoveredWith.coercions {program : CheckedProgram} {caller : Specialized} {plan : Plan}
+    (covered : CoveredWith program caller plan) : Covered program caller plan := by
+  obtain ⟨available, resolved, covered⟩ := covered
+  exact ⟨available, resolved, fun node member => (covered node member).1⟩
+
 /-- The strengthened index invariant covers every returned position at or
 beyond `next`. Exact prefix growth makes newly appended methods part of this
 same actual traversal. -/
-theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : Plan}
+theorem aux_with {program : CheckedProgram} {budget fuel next : Nat} {before after : Plan}
     (accepted : SourceCompilationPlan.prepareExecutablePlanEvidenceAux program budget fuel next before = .ok after) :
-    Extends before after ∧ ∀ index caller, next ≤ index → after.specializations[index]? = some caller → Covered program caller after := by
+    Extends before after ∧ ∀ index caller, next ≤ index → after.specializations[index]? = some caller → CoveredWith program caller after := by
   induction fuel generalizing next before after with
   | zero =>
     unfold SourceCompilationPlan.prepareExecutablePlanEvidenceAux at accepted
@@ -71,9 +96,9 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
       obtain ⟨available, resolved, scan⟩ := bind_ok scan
       obtain ⟨loopFinal, loop, returned⟩ := bind_ok scan
       cases returned
-      have scanned : Extends before extended ∧ Covered program caller extended := by
+      have scanned : Extends before extended ∧ CoveredWith program caller extended := by
         have result := forIn_coverage
-          (done := fun (item : Node) (final : Plan) => ∀ (node : ExpressionNode), item = .expression node → NodeCovered program caller available node final)
+          (done := fun (item : Node) (final : Plan) => ∀ (node : ExpressionNode), item = .expression node → NodeCoveredWith program caller available node final)
           loop (by
             intro item previous final growth done node same
             exact (done node same).later growth) ?_
@@ -84,7 +109,7 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
           cases nodeAccepted
           exact ⟨current, rfl, .refl _, fun _ same => by cases same⟩
         | expression node =>
-          suffices ∃ final, outcome = .yield final ∧ Extends current final ∧ NodeCovered program caller available node final by
+          suffices ∃ final, outcome = .yield final ∧ Extends current final ∧ NodeCoveredWith program caller available node final by
             obtain ⟨final, same, growth, covered⟩ := this
             exact ⟨final, same, growth, fun other same => by cases same; exact covered⟩
           cases form : node.form <;> simp only [form] at nodeAccepted
@@ -93,9 +118,14 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
           all_goals
             first
             | (obtain ⟨opPlan, opAccepted, nodeAccepted⟩ := bind_ok nodeAccepted
-               have opGrowth := operator_accepted opAccepted)
+               have operatorReceipt := operator_accepted_with_visit opAccepted
+               have opGrowth := operatorReceipt.1
+               have opCovered := operatorReceipt.2)
             | (let opPlan := current
-               have opGrowth : Extends current opPlan := .refl _)
+               have opGrowth : Extends current opPlan := .refl _
+               have opCovered : OperatorCovered program caller available node opPlan := by
+                 intro _ _ _ impossible
+                 simp only [OperatorForm, form] at impossible)
           all_goals
             obtain ⟨outputPlan, outputLoop, nodeAccepted⟩ := bind_ok nodeAccepted
             have outputCovered := forIn_coverage
@@ -112,7 +142,8 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
             iterate 8 all_goals first
               | (have empty : argumentSteps node = [] := by simp only [argumentSteps, form]
                  exact ⟨outputPlan, (Except.ok.inj nodeAccepted).symm, opGrowth.trans outputCovered.1,
-                   by simpa only [NodeCovered, empty, List.append_nil] using outputCovered.2⟩)
+                   (by simpa only [NodeCovered, empty, List.append_nil] using outputCovered.2),
+                   opCovered.later outputCovered.1⟩)
               | (obtain ⟨argumentPlan, argumentLoop, nodeAccepted⟩ := bind_ok nodeAccepted
                  have argumentCovered := forIn_coverage
                    (done := fun step final => Nonempty (Visit program caller available node step final)) argumentLoop
@@ -123,7 +154,8 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
                      have head := coercion_accepted headAccepted
                      exact ⟨_, rfl, head.1, head.2⟩)
                  refine ⟨argumentPlan, (Except.ok.inj nodeAccepted).symm,
-                   opGrowth.trans (outputCovered.1.trans argumentCovered.1), ?_⟩
+                   opGrowth.trans (outputCovered.1.trans argumentCovered.1), ?_,
+                   opCovered.later (outputCovered.1.trans argumentCovered.1)⟩
                  intro step member
                  rcases List.mem_append.mp member with member | member
                  · obtain ⟨visit⟩ := outputCovered.2 step member
@@ -146,17 +178,46 @@ theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : 
 
 /-- Public preparation success inspects every final carrier, including those
 that were absent from the original input vector. -/
-theorem of_accepted {program : CheckedProgram} {before after : Plan} {fuel budget : Nat}
+theorem of_accepted_with {program : CheckedProgram} {before after : Plan} {fuel budget : Nat}
     (accepted : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before fuel budget = .ok after) :
-    Extends before after ∧ ∀ caller ∈ after.specializations, Covered program caller after := by
+    Extends before after ∧ ∀ caller ∈ after.specializations, CoveredWith program caller after := by
   obtain ⟨prepared, inspected, accepted⟩ := bind_ok accepted
   obtain ⟨_, _, returned⟩ := bind_ok accepted
   cases returned
-  obtain ⟨growth, covered⟩ := aux inspected
+  obtain ⟨growth, covered⟩ := aux_with inspected
   refine ⟨growth, ?_⟩
   intro caller member
   obtain ⟨index, found⟩ := List.mem_iff_getElem?.mp member
   exact covered index caller (Nat.zero_le _) found
+
+/-- Legacy coercion coverage projects the same preparation traversal. -/
+theorem aux {program : CheckedProgram} {budget fuel next : Nat} {before after : Plan}
+    (accepted : SourceCompilationPlan.prepareExecutablePlanEvidenceAux program budget fuel next before = .ok after) :
+    Extends before after ∧ ∀ index caller, next ≤ index → after.specializations[index]? = some caller → Covered program caller after := by
+  obtain ⟨growth, covered⟩ := aux_with accepted
+  exact ⟨growth, fun index caller bound found => (covered index caller bound found).coercions⟩
+
+theorem of_accepted {program : CheckedProgram} {before after : Plan} {fuel budget : Nat}
+    (accepted : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before fuel budget = .ok after) :
+    Extends before after ∧ ∀ caller ∈ after.specializations, Covered program caller after := by
+  obtain ⟨growth, covered⟩ := of_accepted_with accepted
+  exact ⟨growth, fun caller member => (covered caller member).coercions⟩
+
+/-- The returned plan retains the original operator selection and full row,
+including operators in helpers appended during this same actual scan. -/
+theorem operator_visit {program : CheckedProgram} {before after : Plan} {fuel budget : Nat}
+    (accepted : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before fuel budget = .ok after)
+    {caller : Specialized} (member : caller ∈ after.specializations)
+    {node : ExpressionNode} (nodeMember : .expression node ∈ caller.function.typedBody.nodes)
+    (form : OperatorForm node) {requirements : List RequirementId}
+    (owned : SourceCompilationPlan.ordinaryOwnedRequirements? node = some requirements) (nonempty : requirements ≠ [])
+    {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    (resolved : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available) :
+    Nonempty (OperatorVisit program caller available node after) := by
+  obtain ⟨actual, actualResolved, covered⟩ := (of_accepted_with accepted).2 caller member
+  have same := Except.ok.inj (actualResolved.symm.trans resolved)
+  subst actual
+  exact (covered node nodeMember).2 requirements owned nonempty form
 
 /-- A supplied emitter dictionary must be the actual caller resolver result.
 The full node and step position remain tied to that same final caller. -/
@@ -183,6 +244,11 @@ private theorem call_key {plan : Plan} {caller target selected : SourceSpecializ
   have same := (List.mem_filter.mp member).2
   simp only [Bool.and_eq_true, decide_eq_true_eq] at same
   exact same.2
+
+/-- The exact edge is the same action used by the actual emitter. -/
+theorem exact_call_key {plan : Plan} {caller target selected : SourceSpecialization.SpecializationKey} {id : ExpressionId}
+    (accepted : SourceCompilationPlan.exactCallKey plan caller id target = .ok selected) : selected = target :=
+  call_key accepted
 
 /-- The outer preparation supplies the former per-method extension premise.
 Both selectors are compared as the same action on complete caller/node data. -/
