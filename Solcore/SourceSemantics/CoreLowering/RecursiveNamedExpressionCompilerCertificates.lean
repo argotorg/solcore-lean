@@ -78,6 +78,23 @@ theorem RuntimeAdmission.to_for {source : TypedSource} {admitted : ExpressionId 
   shape := fun id node allowed found => (admission.shape id node allowed found).imp (fun fragment => fragment) (fun form => .inl form)
   children := admission.children
 
+/-- Extra compiler child positions have their own admission receipt. Ordinary
+positions keep the existing definition and its original admission proof. -/
+structure AdmissionWith (extra : ExpressionForm → Prop)
+    (extraChildren : ExpressionForm → List ExpressionId) (source : TypedSource)
+    (admitted : ExpressionId → Prop) : Prop where
+  base : AdmissionFor extra source admitted
+  extra_children : ∀ id node, admitted id → source.lookupExpression? id = some node →
+    extra node.form → ∀ child ∈ extraChildren node.form, admitted child
+
+/-- An existing leaf extension retains its empty extra child positions. -/
+theorem AdmissionFor.with_empty {extra : ExpressionForm → Prop}
+    {source : TypedSource} {admitted : ExpressionId → Prop}
+    (admission : AdmissionFor extra source admitted) :
+    AdmissionWith extra (fun _ => []) source admitted where
+  base := admission
+  extra_children := by simp
+
 abbrev RuntimeExpressionsFor (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
     (fuel : Nat) (values : ValuesContext) (source : TypedSource) (context : SourceSemantics.Context)
     (solved : List SolvedRequirement) (reasonAt : ExpressionId → Word) :=
@@ -784,9 +801,43 @@ private theorem ordinary_call {callerEvidence : Option Dynamic.EvidenceEnvironme
   | none => exact head
   | some evidence => exact .ordinary head
 
+/-- Keep the existing arithmetic declaration's two historical internal binder
+names. The general arity proof below consumes this same declaration. -/
+local syntax "retain_legacy_arity" : command
+macro_rules
+  | `(retain_legacy_arity) => do
+    let declaration := Lean.mkIdent `tree_of_functions_at_runtime_with_calls._proof_1_33
+    let checked := Lean.mkIdent `checked
+    let base := Lean.mkIdent `base
+    let prepared := Lean.mkIdent `prepared
+    let values := Lean.mkIdent `values
+    let ambient := Lean.mkIdent `ambient
+    let program := Lean.mkIdent `program
+    let arguments := Lean.mkIdent `arguments
+    let index := Lean.mkIdent `index
+    let specialized := Lean.mkIdent `specialized
+    let header := Lean.mkIdent `header
+    let count := Lean.mkIdent `count
+    let left := Lean.mkIdent (Lean.Name.mkNum (Lean.Name.mkStr (Lean.Name.mkStr (Lean.Name.mkNum `left.«_@».Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompilerCertificates 1386745371) "_hygCtx") "_hyg") 3410)
+    let different := Lean.mkIdent (Lean.Name.mkNum (Lean.Name.mkStr (Lean.Name.mkStr (Lean.Name.mkNum (Lean.Name.mkStr (Lean.Name.mkStr (Lean.Name.mkStr (Lean.Name.mkStr (Lean.Name.mkNum `a.«_@»._internal 0) "Solcore") "SourceSemantics") "CoreLowering") "RecursiveNamedExpressionCompilerCertificates") 1386745371) "_hygCtx") "_hyg") 3710)
+    `(theorem $declaration
+        {$checked : Checked} {$base : Base $checked}
+        {$prepared : SourceCoreCallableIndexedAncestry.Prepared $base}
+        {$values : ValuesContext}
+        {$ambient : AmbientDefinitions ($values).checked.catalog.definitions}
+        {$program : Program}
+        ($arguments : List ExpressionId) ($index : Nat)
+        ($specialized : SourceSpecialization.SpecializedFunction)
+        ($left : ($arguments).length = ($specialized).function.typedBody.inputs.length)
+        ($header : Header $prepared $values ($ambient).definitions $program)
+        ($count : ($arguments).length = ($header).bindings.length)
+        ($different : ¬ @List.length (TypedBinder × Ty) ($header).bindings = ($arguments).length) : False := by
+      omega)
+retain_legacy_arity
+
 /-- The existing Tree is extracted by the actual compiler's fuel induction.
 Each child keeps its original compiler result and source type. -/
-theorem tree_of_functions_at_runtime_with_calls
+theorem tree_of_functions_at_runtime_with_children
     {source : TypedSource} {context : SourceSemantics.Context}
     (callerEvidence : Option Dynamic.EvidenceEnvironment)
     (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
@@ -795,11 +846,11 @@ theorem tree_of_functions_at_runtime_with_calls
       calls children scope id lowered)
     (projectedCall : ∀ {children scope id lowered node}, calls children scope id lowered →
       source.lookupExpression? id = some node → values.checked.catalog.project node.type = .ok lowered.type)
-    (extra : ExpressionForm → Prop)
+    (extra : ExpressionForm → Prop) (extraChildren : ExpressionForm → List ExpressionId)
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {scope : Scope} {reasonAt : ExpressionId → Word}
     {admitted : ExpressionId → Prop}
-    (admission : AdmissionFor extra source admitted) (coverage : ReachedCoverage headers compilation source admitted)
+    (admission : AdmissionWith extra extraChildren source admitted) (coverage : ReachedCoverage headers compilation source admitted)
     (sourceTypes : RecursiveNamedCallEvidenceHeads.SourceTypes headers context)
     (emptyEvidence : SelectedEmptyEvidence headers compilation source admitted)
     (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
@@ -815,10 +866,16 @@ theorem tree_of_functions_at_runtime_with_calls
     (profile : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (fragmentCoercions : ∀ id node, CompatibleExpressionBuiltins.Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
     (coercions : ∀ id node, admitted id → source.lookupExpression? id = some node → node.coercions = [])
-    (extraReceipt : ∀ fuel id node lowered, admitted id → source.lookupExpression? id = some node →
+    (extraReceipt : ∀ childFuel id node lowered, admitted id → source.lookupExpression? id = some node →
       extra node.form → ExpressionHasType source context id node.type →
-      SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered →
-      calls (CompatibleExpressionCalls.Entries scope []) scope id lowered)
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body (childFuel + 1) compilation source scope id reasonAt = .ok lowered →
+      ∃ entries : List (ExpressionId × SourceCoreBasic.LoweredExpr),
+        calls (CompatibleExpressionCalls.Entries scope entries) scope id lowered ∧
+        entries.map Prod.fst = extraChildren node.form ∧
+        ∀ child code, (child, code) ∈ entries → ∃ childNode,
+          source.lookupExpression? child = some childNode ∧
+          ExpressionHasType source context child childNode.type ∧
+          SourceCoreFunctions.lowerExpressionWithPolicy policy body childFuel compilation source scope child reasonAt = .ok code)
     {fuel : Nat} {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (allowed : admitted id) (found : source.lookupExpression? id = some node)
     (typed : ExpressionHasType source context id node.type)
@@ -827,19 +884,26 @@ theorem tree_of_functions_at_runtime_with_calls
   induction fuel generalizing id node lowered with
   | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
   | succ fuel ih =>
-    rcases admission.shape id node allowed found with fragment | composition
+    rcases admission.base.shape id node allowed found with fragment | composition
     · obtain ⟨tree, sites⟩ := CompatibleExpressionBuiltinRuntime.of_functions unique declarations signatures fragmentValid
         policyFor.fragment native active profile fragmentCoercions fragment found typed accepted
       exact ⟨.fragment tree, .fragment tree sites⟩
     rcases composition with composition | additional
     case inr =>
-      exact runtime_node_for (entries := []) (.call (extraReceipt (fuel + 1) id node lowered allowed found additional typed accepted)) (by simp)
+      obtain ⟨entries, head, positions, generated⟩ := extraReceipt fuel id node lowered allowed found additional typed accepted
+      apply runtime_node_for (.call head)
+      intro child code member
+      obtain ⟨childNode, childFound, childTyped, childAccepted⟩ := generated child code member
+      have position : child ∈ extraChildren node.form := by
+        rw [← positions]
+        exact List.mem_map.mpr ⟨(child, code), member, rfl⟩
+      exact ih (admission.extra_children id node allowed found additional child position) childFound childTyped childAccepted
     have owner : id.occurrence.owner = source.owner := by
       by_cases same : id.occurrence.owner = source.owner
       · exact same
       · rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
         simp [same, throw, throwThe, MonadExceptOf.throw, bind, Except.bind] at accepted
-    have children := admission.children id node allowed found
+    have children := admission.base.children id node allowed found
     rcases policyFor.route id node allowed found with special | ⟨evidence, mode, ⟨site⟩⟩
     case inr =>
       subst callerEvidence
@@ -1023,7 +1087,7 @@ theorem tree_of_functions_at_runtime_with_calls
             have metadata := CompatibleExpressionReads.metadata_of_read compatibleRead
             have same := Option.some.inj (metadata.found.symm.trans found)
             subst actualNode
-            obtain ⟨index, signature, specialized, codes, selected, exactRecord, _, argumentsAccepted, _, resultType, emitted, nativeTypeEq⟩ :=
+            obtain ⟨index, signature, specialized, codes, selected, exactRecord, originalArity, argumentsAccepted, _, resultType, emitted, nativeTypeEq⟩ :=
               NamedCalls.Arguments.call_of_accepted metadata.owner found read form bypass accepted
             obtain ⟨header, member, slot, signatureEq, instantiationEq, headerRecord⟩ :=
               RecursiveNamedCallSelectionCertificates.selected_at coverage allowed found form (order id callee arguments instantiation node allowed found form) selected
@@ -1043,7 +1107,13 @@ theorem tree_of_functions_at_runtime_with_calls
             subst loweredType'
             have sequence := sequence_of_nodes (certificate := CompatibleExpressionCalls.Entries scope (arguments.zip codes)) count nodes
               (fun child code member => ⟨rfl, member⟩)
-            have arity : header.function.parameters.length = arguments.length := by rw [header.parameters]; simp only [List.length_map] at count ⊢; omega
+            have arity : header.function.parameters.length = arguments.length := by
+              rw [header.parameters]
+              simp only [List.length_map] at count ⊢
+              apply Classical.byContradiction
+              intro different
+              exact tree_of_functions_at_runtime_with_calls._proof_1_33
+                arguments index specialized originalArity header count different
             have evidenceEmpty := emptyEvidence id node callee arguments header.instantiation header policy index signature
               allowed found form selected member rfl slot signatureEq
             have predicates : header.instantiation.predicates = [] := header.predicates_of_empty evidenceEmpty
@@ -1094,6 +1164,54 @@ theorem tree_of_functions_at_runtime_with_calls
             simp only [owner, ne_eq, not_false_eq_true, ↓reduceIte] at accepted
             cases accepted
       | literal | integerLiteral | reference | lambda | proxy => simp [runtimeCompositionForm, compositionForm, form] at composition
+
+/-- The existing Tree is extracted by the actual compiler's fuel induction.
+Each child keeps its original compiler result and source type. -/
+theorem tree_of_functions_at_runtime_with_calls
+    {source : TypedSource} {context : SourceSemantics.Context}
+    (callerEvidence : Option Dynamic.EvidenceEnvironment)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (includeCall : ∀ {children scope id lowered},
+      RecursiveNamedCallEvidenceHeads.Calls callerEvidence headers compilation source context children scope id lowered →
+      calls children scope id lowered)
+    (projectedCall : ∀ {children scope id lowered node}, calls children scope id lowered →
+      source.lookupExpression? id = some node → values.checked.catalog.project node.type = .ok lowered.type)
+    (extra : ExpressionForm → Prop)
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {admitted : ExpressionId → Prop}
+    (admission : AdmissionFor extra source admitted) (coverage : ReachedCoverage headers compilation source admitted)
+    (sourceTypes : RecursiveNamedCallEvidenceHeads.SourceTypes headers context)
+    (emptyEvidence : SelectedEmptyEvidence headers compilation source admitted)
+    (order : ∀ id callee arguments instantiation node, admitted id → source.lookupExpression? id = some node →
+      node.form = .call callee arguments (.declaration instantiation) → Ordered compilation.plan instantiation)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (signatures : context.signatures = values.checked.signatures)
+    (constructorValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context admitted)
+    (fragmentValid : CompatibleExpressionInstantiationLaws.ConstructorLaw source context (CompatibleExpressionBuiltins.Syntax source))
+    (selectedValid : SelectedDeclarationLaw headers compilation source context admitted)
+    (policyFor : PolicyForWith (headers := headers) callerEvidence policy compilation readFuel values source context scope reasonAt admitted)
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (profile : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (fragmentCoercions : ∀ id node, CompatibleExpressionBuiltins.Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    (coercions : ∀ id node, admitted id → source.lookupExpression? id = some node → node.coercions = [])
+    (extraReceipt : ∀ fuel id node lowered, admitted id → source.lookupExpression? id = some node →
+      extra node.form → ExpressionHasType source context id node.type →
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered →
+      calls (CompatibleExpressionCalls.Entries scope []) scope id lowered)
+    {fuel : Nat} {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (allowed : admitted id) (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok lowered) :
+    RuntimeExpressionsFor calls readFuel values source context compilation.solvedRequirements reasonAt scope id lowered := by
+  apply tree_of_functions_at_runtime_with_children callerEvidence calls includeCall projectedCall
+    extra (fun _ => []) admission.with_empty coverage sourceTypes emptyEvidence order unique declarations signatures
+    constructorValid fragmentValid selectedValid policyFor native active profile fragmentCoercions coercions
+    _ allowed found typed accepted
+  intro childFuel child childNode childLowered childAllowed childFound additional childTyped childAccepted
+  exact ⟨[], extraReceipt (childFuel + 1) child childNode childLowered childAllowed childFound additional childTyped childAccepted,
+    rfl, by simp⟩
 
 theorem tree_of_functions_at_runtime_evidence (callerEvidence : Option Dynamic.EvidenceEnvironment)
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
