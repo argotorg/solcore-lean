@@ -298,15 +298,47 @@ private def TemplateSource {checked : Checked} (base : Base checked)
     original.function.typedBody.lookupExpression? template.id = some template.original ∧
     template.node = template.original.applySubstitution template.active
 
-private theorem template_source {checked : Checked} {base : Base checked}
-    {candidates : List SourceCoreLocalPolymorphism.Instance}
-    (contexts : SourceCoreStageCodebook.prepareContexts base.sourceProgram base.plan candidates = .ok base.contexts)
+/-- Every field comes from the same successful template preparation. The
+ordered parent witnesses and both source views are retained without rewriting
+or discarding any row. -/
+def PreparedTemplate {checked : Checked} (base : Base checked)
+    (template : SourceCoreLambdaTemplates.Lambda) : Prop :=
+  ∃ (receipts : SourceCoreAllocationContexts.Inventory base.plan base.contexts)
+    (metadata : SourceCoreAllocationDiscovery.Prepared)
+    (callable : SourceCoreGeneralFunctions.CallableContext)
+    (entry : SourceCoreStageCodebook.Entry)
+    (original : SourceSpecialization.SpecializedFunction)
+    (parameters : List TypedBinder) (result : TypeSystem.Ty) (body : List StatementId),
+    SourceCoreAllocationContexts.fromPrepared base.plan base.contexts = .ok receipts ∧
+    SourceCoreAllocationDiscovery.prepare checked.catalog.definitions receipts.contexts = .ok metadata ∧
+    base.callableContext = some callable ∧ entry ∈ callable.table.entries ∧
+    entry.origin = .lambda template.owner template.id template.active ∧
+    entry.id = template.descriptor ∧
+    metadata.metadata.contextAt? template.owner template.active = some template.context ∧
+    SourceCompilationPlan.exactSpecialization base.plan template.owner = .ok original ∧
+    original.function.typedBody.lookupExpression? template.id = some template.original ∧
+    template.originalSource = original.function.typedBody ∧
+    template.principalSource = SourceTypedRuntime.rewriteLocalRequirements
+      (((base.contexts.find? (fun parent => decide
+        (parent.caller.key = template.owner ∧ parent.substitution = template.active))).map
+          (·.witnesses)).getD [])
+      (original.function.typedBody.applySubstitution template.active) ∧
+    template.context.inventory.source.lookupExpression? template.id = some template.node ∧
+    template.node.form = .lambda parameters result body ∧
+    checked.catalog.project (TypeSystem.Ty.productMany (parameters.map (·.scheme.body))) =
+      .ok template.parameterType ∧
+    checked.catalog.project result = .ok template.resultType
+
+/-- The sole preparation fold retains the actual selected table row and all
+source and native header fields. -/
+theorem prepared_template {checked : Checked} {base : Base checked}
     {inventory : SourceCoreLambdaTemplates.Inventory checked}
     (accepted : SourceCoreLambdaTemplates.prepare base = .ok inventory)
     {template : SourceCoreLambdaTemplates.Lambda} (member : template ∈ inventory.lambdas) :
-    TemplateSource base template := by
+    PreparedTemplate base template := by
   unfold SourceCoreLambdaTemplates.prepare at accepted
-  obtain ⟨receipts, _, accepted⟩ := bind_ok accepted
+  obtain ⟨receipts, receiptsPrepared, accepted⟩ := bind_ok accepted
+  have receiptsPrepared := mapError_ok receiptsPrepared
   obtain ⟨metadata, compiled, accepted⟩ := bind_ok accepted
   have compiled := mapError_ok compiled
   split at accepted
@@ -314,10 +346,10 @@ private theorem template_source {checked : Checked} {base : Base checked}
     simp only [bind, Except.bind, pure, Except.pure] at accepted
     obtain ⟨lambdas, loop, accepted⟩ := bind_ok accepted
     cases accepted
-    have invariant : ∀ value ∈ lambdas, TemplateSource base value := by
-      apply forIn_invariant (invariant := fun values => ∀ value ∈ values, TemplateSource base value) loop
+    have invariant : ∀ value ∈ lambdas, PreparedTemplate base value := by
+      apply forIn_invariant (invariant := fun values => ∀ value ∈ values, PreparedTemplate base value) loop
       · intro value member; cases member
-      · intro entry _ state outcome previous iteration
+      · intro entry entryMember state outcome previous iteration
         cases origin : entry.origin with
         | named key =>
           simp only [origin] at iteration
@@ -341,26 +373,43 @@ private theorem template_source {checked : Checked} {base : Base checked}
               · next node nodeFound =>
                 try simp only [bind, Except.bind, pure, Except.pure] at iteration
                 split at iteration
-                · obtain ⟨parameterType, _, iteration⟩ := bind_ok iteration
-                  obtain ⟨resultType, _, iteration⟩ := bind_ok iteration
+                · next parameters result body shape =>
+                  obtain ⟨parameterType, parameterProjected, iteration⟩ := bind_ok iteration
+                  obtain ⟨resultType, resultProjected, iteration⟩ := bind_ok iteration
                   cases iteration
                   refine ⟨_, rfl, ?_⟩
                   intro value member
                   rcases List.mem_append.mp member with old | fresh
                   · exact previous value old
                   · cases List.mem_singleton.mp fresh
-                    refine ⟨original, selected, originalFound, ?_⟩
-                    have source := discovered_source contexts receipts compiled found selected
-                    have substituted := Frontend.SourceTypedRuntime.TypedSource.lookupExpression?_applySubstitution
-                      original.function.typedBody active id originalNode originalFound
-                    rw [source] at nodeFound
-                    exact Option.some.inj (nodeFound.symm.trans substituted)
+                    exact ⟨receipts, metadata, callable, entry, original, _, _, _,
+                      receiptsPrepared, compiled, callableFound, entryMember, origin, rfl,
+                      found, selected, originalFound, rfl, rfl, nodeFound, shape,
+                      mapError_ok parameterProjected, mapError_ok resultProjected⟩
                 · cases iteration
               · cases iteration
             · cases iteration
           · cases iteration
     exact invariant template member
   · cases accepted
+
+
+private theorem template_source {checked : Checked} {base : Base checked}
+    {candidates : List SourceCoreLocalPolymorphism.Instance}
+    (contexts : SourceCoreStageCodebook.prepareContexts base.sourceProgram base.plan candidates = .ok base.contexts)
+    {inventory : SourceCoreLambdaTemplates.Inventory checked}
+    (accepted : SourceCoreLambdaTemplates.prepare base = .ok inventory)
+    {template : SourceCoreLambdaTemplates.Lambda} (member : template ∈ inventory.lambdas) :
+    TemplateSource base template := by
+  obtain ⟨receipts, metadata, callable, entry, original, parameters, result, body,
+    _, compiled, _, _, _, _, found, selected, originalFound, _, _, nodeFound, _, _, _⟩ :=
+    prepared_template accepted member
+  refine ⟨original, selected, originalFound, ?_⟩
+  have source := discovered_source contexts receipts compiled found selected
+  have substituted := Frontend.SourceTypedRuntime.TypedSource.lookupExpression?_applySubstitution
+    original.function.typedBody template.active template.id template.original originalFound
+  rw [source] at nodeFound
+  exact Option.some.inj (nodeFound.symm.trans substituted)
 
 
 private theorem sidecar_lookup {plan : SourceCompilationPlan.Plan} {key : SourceCompilationPlan.Key}
