@@ -3527,3 +3527,32 @@ theorem final_context_of_typing
 end StatementExecutes
 
 end Solcore.SourceSemantics.Dynamic
+
+namespace Solcore.SourceSemantics.Dynamic
+open Frontend SourceInference TypeSystem
+
+namespace ForItemsExecute
+
+/-- The original for-item preservation core applies to this exact Source
+prefix, including its final context and allocated local environment. -/
+theorem preserved
+    {program : Program} (wellFormed : ProgramWellFormed program)
+    {context staticFinalContext runtimeFinalContext : Context}
+    {evidence : EvidenceEnvironment} {source : TypedSource}
+    {environment finalEnvironment : Environment} {before after : Heap}
+    {items : List ForItemForm} {control : ControlContext}
+    (runtime : SourceRuntimeValid program context source)
+    (covers : evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment)
+    (heap : HeapWellTyped context before)
+    (typing : ForItemsHaveType source control context items staticFinalContext)
+    (execution : ForItemsExecute program context evidence source environment
+      before items runtimeFinalContext finalEnvironment after) :
+    runtimeFinalContext = staticFinalContext ∧ HeapWellTyped context after ∧
+      HeapTypesExtend before after ∧
+        EnvironmentAgrees after staticFinalContext.locals finalEnvironment :=
+  preserveForItemsRec wellFormed runtime covers locals heap typing execution
+
+end ForItemsExecute
+
+end Solcore.SourceSemantics.Dynamic

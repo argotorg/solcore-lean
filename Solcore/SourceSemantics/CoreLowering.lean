@@ -744,6 +744,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMatchAdmission
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForReady
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForReadiness
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedForItemsAdmission
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
