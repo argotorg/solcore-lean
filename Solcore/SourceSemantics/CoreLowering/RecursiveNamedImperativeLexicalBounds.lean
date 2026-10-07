@@ -1,4 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalContracts
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalGate
 
 /-! Lexical bodies embed into the five-way imperative contract without changing
 an execution, heap, lexical context, caller entry or size. The only converted
@@ -67,5 +69,42 @@ theorem reflects_at
       (globals := globals) (scope := scope) size mode statements expected type code := by
   exact reflects_at_for (functions := functions) (program := program) (evidence := evidence)
     (validity := fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) correct
+
+namespace Stateful
+universe u v
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+  (condition : Location → CallableIndexedHistory.NativeFrame → Prop)
+
+theorem preserves_at_for (validity : SourceSemantics.Context → Prop)
+    (correct : RecursiveNamedLexicalContracts.Stateful.PreservesAtFor protocol condition functions program evidence validity
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode statements expected type code) :
+    ProtectedStateTransition.Lexical.Gated.PreservesAtFor protocol condition functions program evidence validity
+      (administrative := administrative) (source := source) (context := context)
+      (registry := registry) (faults := faults) (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size mode statements expected type code := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped initial gate trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preserved, metadata, lexical, transition⟩ :=
+    correct valid environments heaps locals agrees actualTyped reference read unmapped initial gate trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, FlowRep.of_lexical represented,
+    finalHeaps, maps, worlds, preserved, metadata, lexical, transition⟩
+
+theorem reflects_at_for (validity : SourceSemantics.Context → Prop)
+    (correct : RecursiveNamedLexicalContracts.Stateful.ReflectsAtFor protocol condition functions program evidence validity
+      (source := source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode statements expected type code) :
+    ProtectedStateTransition.Lexical.Gated.ReflectsAtFor protocol condition functions program evidence validity
+      (administrative := administrative) (source := source) (context := context)
+      (registry := registry) (faults := faults) (frameLayout := frameLayout)
+      (globals := globals) (scope := scope) size mode statements expected type code := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped initial gate evaluated
+  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preserved, metadata, lexical, transition⟩ :=
+    correct valid environments heaps locals agrees actualTyped reference read unmapped initial gate evaluated
+  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, FlowRep.of_lexical represented,
+    finalHeaps, maps, worlds, preserved, metadata, lexical, transition⟩
+
+end Stateful
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBounds
