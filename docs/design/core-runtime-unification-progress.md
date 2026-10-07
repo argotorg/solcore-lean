@@ -1,6 +1,6 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
@@ -20,7 +20,7 @@ In the progress response to the user on 2026-10-04, the second objective was est
 
 In the progress response to the user on 2026-10-05, the second objective was estimated at about 70% by amount of work. This reflects semantic preservation and completion reflection for integer functions with staging, preservation of reference authority in the catalog, derivation of lambda permissions from actual compiler receipts, and connection of additional child expressions to the sole compiler induction. The first objective remains 100%, and the overall estimate with equal weighting is about 85%. The final main theorem connecting general functions, lambda, indirect calls, method, and all passes is incomplete; the percentages do not estimate remaining time.
 
-## Current status (2026-10-07)
+## Current status (2026-10-08)
 
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `630e4710`. Selected indirect call posts and closed builtin method invocations are committed in `24324374`; a closed anonymous invocation consumer in `d8127a73`; per-origin state protocols in the shared measured body family in `b2e1b111`; and actual named/method Source admission in `630e4710`. Earlier actual method invocation and lambda admission are committed in `51fdc73f` and `66eff5aa`. Source capture validity comes from real Source formation, typing or execution in `2bc4aa1d`.
+The latest implementation commit is `a38df598`. Actual lambda parameter entries and canonical body continuations are committed in `93fc5076`; outer selected indirect Source adapters in `1cef05b1`; genuine method bootstrap captures in `2e4cfa23`; selected canonical indirect body entries in `21e510d4`; and a complete indirect expression consumer in `a38df598`.
 
-The normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5079 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **2063 declarations** against the three permitted standard axioms. All five original shared Mutual declarations retained exactly matching raw types and axiom sets after the per-origin protocol factor. The 11 original parameter-typing declarations also matched exactly after the two insertion wrappers; the earlier six low producer modules retained 206 named declarations. These are separate retained API comparisons, rather than one combined declaration count. The semantic kernel policy and whitespace checks passed.
+The normal integrated build passed **5151 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **2190 declarations** against the three permitted standard axioms. All 65 original selected indirect declarations retained exactly matching raw types and axiom sets; the previous lambda factor retained all 81 original declarations. These include generated declarations. Earlier separate comparisons for the five shared Mutual declarations, 11 parameter-typing declarations and 206 named low producer declarations remain recorded below. The semantic kernel policy and whitespace checks passed.
 
-Records: `/private/tmp/solcore-owned-functions-resume-20261007/`, particularly `owned-body-family-source-admission-validation.json` and `owned-indirect-builtin-anonymous-validation.json`. The final preservation check found **5021 original files** outside the explicit owned changes unchanged. Unrelated inference/parser work remains outside these commits.
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/`, particularly `owned-indirect-canonical-parent-validation.json` and `owned-lambda-canonical-source-method-capture-validation.json`. The preservation check found **5021 original files** outside explicit owned changes unchanged. Unrelated inference/parser work remains outside these commits.
 
 ### Implementation in progress
 
@@ -48,15 +48,19 @@ Named invocation retains the selected pool through frame installation, genuine m
 
 Actual ordinary/direct call heads pass the ordered argument post to live Capture acquisition and owned invocation. Their proof domain pairs the concrete pool with the original canonical-slot receipt. Lexical prepend/restore, administrative transport and the real marked allocator preserve that proof wrapper while forwarding the exact underlying pool. Constructor/member/index, builtin and tuple producers now compose their actual children through the unchanged expression Tree fold. The closed named family supplies strict callee body callbacks internally and accepts genuine static compilation/profile receipts, with no external expression or body execution law. Runtime mode retains the full evidence and requirement ledger. Anonymous invocation also retains its actual selected installation, parameter post, strict body post and restored caller pool; general lambda/indirect dispatch is still being connected.
 
-The selected indirect adapter recovers the immutable owner, complete closure captures, original dictionary, code, history and ranked static origin from the actual owned callee relation. Real argument effects preserve the selected row's own stable history. Successful application and argument faults keep the actual callee and argument posts; native reflection retains the original strict argument/body grades. These are selected accepted-lambda consumers. The arbitrary callee dispatcher and original outer Source call adapters are still being connected.
+The selected indirect adapter recovers the immutable owner, complete closure captures, original dictionary, code, history and ranked static origin from the actual owned callee relation. Real argument effects preserve the selected row's own stable history. Successful application and argument faults keep the actual callee and argument posts; native reflection retains the original strict argument/body grades. The original outer Source adapters now retain the actual accepted-lambda callee, ordered argument suffix and independent call trace. A complete consumer closes its callee read, Boolean argument, real parameter append and nil body internally. Arbitrary callee dispatch and general indirect bodies remain unfinished.
 
 The actual method hook and marked parameters feed the origin-neutral body and restore the caller from that body’s actual post. Builtin method profiles close through the same measured family without an external body or expression meaning premise. The anonymous empty-Unit consumer also closes its body internally and observes every returned row, retained snapshot and old-record membership. Neither consumer proves all general function bodies.
 
 The shared family now accepts dependent record types and a state protocol for each origin. It reuses the original sole measured closer and keeps the uniform API unchanged. Authentic named instantiation and operator-method selection derive the original Source body certificate at the actual parameter heap. Full raw argument typing and the initial Source heap remain genuine Source inputs. The complete body typing, dictionary coverage and control summary are transported to the actual parameter context; Core typing supplies none of them.
 
+Actual anonymous source/native parameter entries now retain their complete canonical spine in pointwise body continuations. Original captured global slots wrap that exact entry; the body returns the same reached pool after the wrapper is projected away. The selected indirect body can therefore use its own owner and capture prefix. Its caller argument protocol still needs a separate connection; those two owners and prefixes need not coincide.
+
+The fresh method bootstrap factory recovers the installed capture, every original global slot and physical frame from the actual recipe, prepared cache and genuine Source method selector. It currently exposes the empty Source-heap initialization boundary. Typed bootstrap heap receipts, live caller transport and nonempty initial Source prefixes are being connected separately.
+
 ### Next implementation units and remaining obligations
 
-1. Feed the actual lambda/method parameter entry into its own canonical protocol in the shared body family. A complete captured Globals receipt is required; arbitrary body Entry or pool authority alone cannot reconstruct it.
+1. Complete the distinct caller protocol connection for selected indirect calls. Connect actual method parameter entries and genuine lambda formation receipts to their own protocols in the shared family. A pool alone cannot reconstruct canonical slots, Source captures or formation frame/bundle receipts.
 2. Complete the original outer Source adapters and arbitrary indirect callee dispatch, then connect general lambda, methods/coercions and local instantiation to the same mutual body family. Retain original Source receipts, complete captures, dictionaries, type-substitution rows and all records created during the body.
 3. Extract the required profile, source typing, owner and canonical-slot associations from actual compiler and public initialization receipts. Keep internally measured child callbacks inside the closed mutual proof.
 4. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
@@ -1890,3 +1894,16 @@ Validation: 5070 normal jobs, all registered execution tests, 1785 strict kernel
 | `630e4710` | Derives full named/method Source admission at the real parameter allocation from authentic Source instantiation/selection and whole-program validity. Keeps the exact dictionary, raw types, roots and control facts. | Initial Source heap/raw argument validity and actual public admission extraction remain independent obligations. |
 
 Validation: 5079 normal jobs, all registered execution tests, 2063 strict kernel declarations, exact raw types/axioms for all five original shared Mutual declarations, semantic policy and whitespace checks. The separate earlier 11- and 206-declaration low API comparisons remain valid. No Core instruction or new execution induction was added. Actual ordered row prefixes retain old records; fresh append or membership claims still require the same genuine allocator receipt.
+
+
+### 2026-10-08: actual canonical entries and complete selected indirect expressions verified at `a38df598`
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `93fc5076` | Factors the same anonymous invocation proof cores for pointwise actual parameter entries. Wraps authentic captured globals at that exact entry and returns the same underlying body post. | General body families and all genuine canonical factory extraction remain. |
+| `1cef05b1` | Connects original complete selected indirect Source traces to actual callee, arguments, parameters, body and caller restoration. | Arbitrary callee dispatch and coercion paths remain. |
+| `2e4cfa23` | Recovers complete method bootstrap captures, original global slots and physical reads from the actual initialization recipe and Source method selector. | Fresh empty Source heap only; live caller transport and nonempty Source prefixes remain. |
+| `21e510d4` | Specializes selected indirect body continuations to the authentic captured owner and canonical prefix, retaining the actual post pool. | A distinct caller protocol must be connected separately. |
+| `a38df598` | Closes a full indirect parent expression: real callee read, Boolean argument, actual singleton parameter allocation and original nil body. Source/native meanings and returned pool observations require no external expression/body law. | The consumer covers a concrete accepted fragment. |
+
+Validation: 5151 normal jobs, all registered execution tests, 2190 strict kernel declarations, exact raw types and axiom sets for all 65 original indirect declarations, policy and whitespace checks, and 5021 protected original files unchanged. The preceding lambda factor retained all 81 original declarations. No Core instruction or new execution induction was added.
