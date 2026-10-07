@@ -697,6 +697,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCallerPr
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionCallsHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedNamedFamilyClosure
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
