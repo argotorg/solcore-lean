@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceReflection
 
@@ -11,8 +12,84 @@ open Core Frontend SourceInference GeneralHeap DataPatternValues GenericExpressi
 open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDataPlaces DataPlaceExecution
 open CompatiblePlaceKeyReflection CompatibleRenamedPlace
 
-/-- Completed emitted code supplies the key runs to the protected reflection
+/- Completed emitted code supplies the key runs to the protected reflection
 theorem. No source projection trace or child runtime execution is an input. -/
+namespace Stateful
+universe u v
+
+theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {scope : Scope}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
+    (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel checked registry functions) program context evidence source certificate faults size))
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    {environment : Dynamic.Environment} {canonical coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
+    {location : Dynamic.Location} {initialCell : Dynamic.Cell} {index : Nat}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    (lookup : Dynamic.Environment.LooksUp environment place.root location)
+    (initialRead : Dynamic.Heap.Reads before location initialCell)
+    {rhs next : Expr} {outputType : Ty} {operator : Option BinaryOp} {bitNot : Bool} {invalid : Word} {result : Value}
+    {size : Nat} (completed : CoreProof.EvaluationSize size coreEnvironment store
+      (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
+    ProtectedStatePlaceAssignmentContracts.KeyResultAt protocol size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
+      coreEnvironment before store mapping world scope canonical initialState (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
+  obtain ⟨target, selected, reference⟩ := environments.lookup_visible lookup slot
+  have reflectKeys := fun {keySize : Nat} {keyValue : Value} {keyStore : Store}
+      (evaluated : CoreProof.EvaluationSize keySize (referenceEnvironment prepared.route.rootType target coreEnvironment) store
+        (shift 1 (SourceCoreCalls.packArguments (renamedCodes codes ξ)).expression) keyValue keyStore) (keyBound : keySize < size) =>
+    ProtectedPlaceKeys.Stateful.reflects_bounded budget protocol children meaning environments heaps locals
+      (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
+      (.cons (.cellRef reference.typed) actualTyped) initialState
+      (by simpa only [DataPlaceChildExpressions.rename_prefix, packed_renamed_expression, List.length_cons, List.length_nil,
+        List.cons_append, List.nil_append, referenceEnvironment, SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated) (Nat.lt_of_lt_of_le keyBound bounded)
+  cases completed with
+  | letE referenceEvaluated tail =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic referenceEvaluated.sound (Evaluates.var (agrees selected))
+    cases tail with
+    | caseLeft keysEvaluated failed =>
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, post⟩ := reflectKeys keysEvaluated (by omega)
+      cases represented with
+      | fault tokenRep =>
+        cases sourceTrace with
+        | fault sourceTrace =>
+          cases failed with
+          | inLeft valueEvaluated =>
+            cases valueEvaluated with
+            | var found =>
+              simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+              subst_vars
+              exact .fault (.projectionExpression lookup initialRead sourceTrace) rfl tokenRep finalHeaps maps worlds frame metadata post
+    | caseRight keysEvaluated tail =>
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, post⟩ := reflectKeys keysEvaluated (by omega)
+      cases represented with
+      | @values sources values related =>
+        cases sourceTrace with
+        | @values _ resolved _ shaped sourceTrace =>
+          obtain ⟨scheme, staticLookup, _, _, bodyEq⟩ := rootTyped.scheme
+          obtain ⟨staticLocation, staticCell, staticLookupRuntime, staticRead, staticCellType, _⟩ := locals.lookup staticLookup
+          have locationEq := lookup.functional staticLookupRuntime
+          subst staticLocation
+          have cellEq := initialRead.functional staticRead
+          subst staticCell
+          obtain ⟨cell, read, type, _⟩ := metadata _ _ initialRead
+          exact .keys lookup sourceTrace
+            ⟨target, sources, values, _, finalMap, finalWorld, cell, read,
+              type.trans (staticCellType.trans bodyEq), reference.extend maps worlds, agrees selected, shaped,
+              keysEvaluated.sound, by simpa only [renamedCodes_types] using related, finalHeaps, maps, worlds, frame, metadata⟩ (by omega) tail post
+
+end Stateful
+
 theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
     {functions : FunctionModel checked.catalog ambient} {program : Program} {context : SourceSemantics.Context}
@@ -40,49 +117,9 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     RecursiveNamedPlaceAssignmentContracts.KeyResultAt size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
       coreEnvironment before store mapping world (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
-  obtain ⟨target, selected, reference⟩ := environments.lookup_visible lookup slot
-  have reflectKeys := fun {keySize : Nat} {keyValue : Value} {keyStore : Store}
-      (evaluated : CoreProof.EvaluationSize keySize (referenceEnvironment prepared.route.rootType target coreEnvironment) store
-        (shift 1 (SourceCoreCalls.packArguments (renamedCodes codes ξ)).expression) keyValue keyStore) (keyBound : keySize < size) =>
-    ProtectedPlaceKeys.reflects_bounded budget transport children meaning environments heaps locals
-      (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
-      (.cons (.cellRef reference.typed) actualTyped) installed
-      (by simpa only [DataPlaceChildExpressions.rename_prefix, packed_renamed_expression, List.length_cons, List.length_nil,
-        List.cons_append, List.nil_append, referenceEnvironment, SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated) (Nat.lt_of_lt_of_le keyBound bounded)
-  cases completed with
-  | letE referenceEvaluated tail =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic referenceEvaluated.sound (Evaluates.var (agrees selected))
-    cases tail with
-    | caseLeft keysEvaluated failed =>
-      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata⟩ := reflectKeys keysEvaluated (by omega)
-      cases represented with
-      | fault tokenRep =>
-        cases sourceTrace with
-        | fault sourceTrace =>
-          cases failed with
-          | inLeft valueEvaluated =>
-            cases valueEvaluated with
-            | var found =>
-              simp only [List.getElem?_cons_zero, Option.some.injEq] at found
-              subst_vars
-              exact .fault (.projectionExpression lookup initialRead sourceTrace) rfl tokenRep finalHeaps maps worlds frame metadata
-    | caseRight keysEvaluated tail =>
-      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata⟩ := reflectKeys keysEvaluated (by omega)
-      cases represented with
-      | @values sources values related =>
-        cases sourceTrace with
-        | @values _ resolved _ shaped sourceTrace =>
-          obtain ⟨scheme, staticLookup, _, _, bodyEq⟩ := rootTyped.scheme
-          obtain ⟨staticLocation, staticCell, staticLookupRuntime, staticRead, staticCellType, _⟩ := locals.lookup staticLookup
-          have locationEq := lookup.functional staticLookupRuntime
-          subst staticLocation
-          have cellEq := initialRead.functional staticRead
-          subst staticCell
-          obtain ⟨cell, read, type, _⟩ := metadata _ _ initialRead
-          exact .keys lookup sourceTrace
-            ⟨target, sources, values, _, finalMap, finalWorld, cell, read,
-              type.trans (staticCellType.trans bodyEq), reference.extend maps worlds, agrees selected, shaped,
-              keysEvaluated.sound, by simpa only [renamedCodes_types] using related, finalHeaps, maps, worlds, frame, metadata⟩ (by omega) tail
+  exact (Stateful.reflects_bounded budget children (ProtectedStatePlaceAssignment.legacyProtocol entry)
+    (fun size smaller => ProtectedStatePlaceAssignment.legacy_reflects transport (meaning size smaller))
+    environments heaps locals agrees actualTyped ⟨installed⟩ slot rootTyped lookup initialRead completed bounded).forget
 
 theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}

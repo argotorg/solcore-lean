@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedAssignmentHeadContracts
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallMeaning
@@ -59,21 +60,13 @@ theorem preserves_prefix_bounded (budget : Nat)
       entry scope finalMap finalWorld after finalStore canonical ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
-  cases shape with
-  | bare empty layout =>
-    obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation⟩ :=
-      ProtectedBareAssignment.preserves_prefix_bounded budget layout empty extension boundedMeaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace bounded invalid
-    exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
-      by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
-        Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
-      transport.extend installed maps worlds preservation metadata, continuation⟩
-  | projected layout ordinary =>
-    obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation⟩ :=
-      ProtectedPlaceAssignmentSuccess.preserves_prefix_bounded budget layout ordinary extension transport boundedMeaning faithful observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace bounded invalid
-    exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
+  obtain ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, post, continuation⟩ :=
+    Stateful.Head.preserves_prefix_bounded functions extension program evidence
+      (ProtectedStatePlaceAssignment.legacyProtocol entry) (ProtectedStatePlaceAssignment.legacyTransport transport)
+      faithful observations head environments heaps locals agrees actualTyped ⟨installed⟩ budget
+      (fun size smaller => ProtectedStatePlaceAssignment.legacy_preserves transport (boundedMeaning size smaller)) trace bounded
+  obtain ⟨reached, _⟩ := post
+  exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, reached.down, continuation⟩
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}

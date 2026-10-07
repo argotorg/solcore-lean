@@ -1,0 +1,67 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentPreservation
+import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentPreservation
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
+
+/-! Successful bare and projected Heads return the actual written-prefix state.
+The projected branch relays real keys, getter, RHS and latest-root write stages.
+Seven temporary slots and continuation agreement remain the original receipts. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads.Stateful.Head
+open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleEquality CompatibleHeap CoreProof
+open SourceCoreCompatibleDataPlaces GenericExpressionMeaning
+universe u v
+variable {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+  {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {scope : Scope} {administrative : Core.Context}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep}
+  {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (observations : FunctionObservations values.checked.catalog functions identities)
+  {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+  (head : GenericAssignmentStatements.Head values source context certificate scope administrative ambient.definitions assignment operator rhs)
+  {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
+  {canonical actual : Environment} {before : Dynamic.Heap} {store : Store} {actualContext : Core.Context} {ξ : Renaming}
+  (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog values.checked.catalog)
+    mapping world administrative scope environment canonical)
+  (heaps : HeapRepresents values.checked registry functions mapping world before store)
+  (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+  (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+  (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+  (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+
+
+include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
+theorem preserves_prefix_bounded (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
+    ∃ finalStore finalMap finalWorld slots,
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
+      ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
+        (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  cases shape with
+  | bare empty layout =>
+    obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation, post⟩ :=
+      ProtectedBareAssignment.Stateful.preserves_prefix_bounded protocol transport budget initialState layout empty extension boundedMeaning observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped slot writable trace bounded invalid
+    exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
+      by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
+        Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
+      post, continuation⟩
+  | projected layout ordinary =>
+    obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation, post⟩ :=
+      ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded budget layout ordinary extension protocol transport boundedMeaning faithful observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped initialState slot writable trace bounded invalid
+    exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, post, continuation⟩
+
+end Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads.Stateful.Head
