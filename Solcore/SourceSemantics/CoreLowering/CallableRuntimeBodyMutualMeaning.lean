@@ -76,6 +76,96 @@ theorem reflects_at
 
 end Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning
 
+namespace Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning.Stateful.Family
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableRuntimeBodyOrigins
+universe u v
+variable {values : SourceCoreCompatibleValues.Context}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {ι : Type} {Records : ι → Type v}
+  (origins : ι → StaticOrigin values ambient registry faults)
+  (functions : FunctionModel values.checked.catalog ambient)
+  (extension : SourceCoreRawMetadata.Extends values.registry registry)
+  (program : Program) {identities : Dynamic.Value → Word → Prop}
+  (faithful : DataEquality.IdentityFaithful identities)
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  (functionTypes : FunctionRuntimeViews functions)
+  (protocols : ∀ i, ProtectedStateTransition.Protocol.{u, v} (Records i))
+  (conditionGate : ι → Location → CallableIndexedHistory.NativeFrame → Prop)
+  (producers : ∀ i, ProtectedStateTransition.MarkedAllocation.Producer (protocols i)
+    (origins i).layouts (origins i).frameLayout (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+  (acquire : ∀ i location native, conditionGate i location native →
+    ProtectedStateTransition.OrdinaryAllocation.ReadyAt (producers i).toOrdinary location native)
+  (stateTransport : ∀ i, ProtectedStateTransition.AdministrativeTransport (protocols i))
+  (stateBindings : ∀ i, ProtectedStateTransition.Bindings (protocols i))
+
+include extension faithful observations producers acquire stateTransport stateBindings in
+/-- Each genuine origin uses its own state protocol and record observation.
+The same measured fold supplies only strictly smaller actual callee meanings. -/
+theorem preserves_at
+    (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
+      (∀ callee, RecursiveNamedBoundedContracts.Below budget
+        (CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocols callee) (conditionGate callee) functions program (origins callee))) →
+      ProtectedStateTransition.PreservesAt (protocols i) (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context (origins i).function.evidence (origins i).function.source
+        ((origins i).certificates context) faults child)
+    (size : Nat) : ∀ i,
+    CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocols i) (conditionGate i) functions program (origins i) size := by
+  apply close_sized (fun i => CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocols i) (conditionGate i) functions program (origins i))
+  intro size below i entry outcome after trace
+  have children : ∀ context, (origins i).validity context → RecursiveNamedHeaderContracts.AtMost size
+      (fun child => ProtectedStateTransition.PreservesAt (protocols i)
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context
+        (origins i).function.evidence (origins i).function.source ((origins i).certificates context)
+        faults child) := by
+    intro context valid child within
+    exact expressionMeaning i context valid size child within below
+  exact CallableRuntimeBodyKernel.Stateful.BodyFor.preserves_sized
+    (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
+    (registered := (origins i).registered) (extension := extension) (program := program)
+    (faithful := faithful) (observations := observations) (escapedFault := (origins i).escapedFault)
+    (extend := (origins i).extend) (runtimeOf := (origins i).runtimeOf)
+    (protocol := protocols i) (producer := producers i) (conditionGate := conditionGate i)
+    (acquire := acquire i) (stateTransport := stateTransport i) (stateBindings := stateBindings i)
+    size size (Nat.le_refl size) children
+    entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped entry.reference entry.read
+    entry.unmapped entry.initial entry.gate trace
+
+include extension faithful observations functionTypes producers acquire stateTransport stateBindings in
+/-- Original native completions choose strict callees at their own protocols.
+The same measured closer returns independent source grades and actual posts. -/
+theorem reflects_at
+    (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
+      (∀ callee, RecursiveNamedBoundedContracts.Below budget
+        (CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocols callee) (conditionGate callee) functions program (origins callee))) →
+      ProtectedStateTransition.ReflectsAt (protocols i) (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context (origins i).function.evidence (origins i).function.source
+        ((origins i).certificates context) faults child)
+    (size : Nat) : ∀ i,
+    CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocols i) (conditionGate i) functions program (origins i) size := by
+  apply close_sized (fun i => CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocols i) (conditionGate i) functions program (origins i))
+  intro size below i entry value finalStore completed
+  have children : ∀ context, (origins i).validity context → RecursiveNamedBoundedContracts.Below size
+      (fun child => ProtectedStateTransition.ReflectsAt (protocols i)
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context
+        (origins i).function.evidence (origins i).function.source ((origins i).certificates context)
+        faults child) := by
+    intro context valid child smaller
+    exact expressionMeaning i context valid size child (Nat.le_of_lt smaller) below
+  exact CallableRuntimeBodyKernel.Stateful.BodyFor.reflects_sized
+    (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
+    (registered := (origins i).registered) (extension := extension) (program := program)
+    (faithful := faithful) (observations := observations) (functionTypes := functionTypes)
+    (escapedFault := (origins i).escapedFault) (extend := (origins i).extend) (runtimeOf := (origins i).runtimeOf)
+    (protocol := protocols i) (producer := producers i) (conditionGate := conditionGate i)
+    (acquire := acquire i) (stateTransport := stateTransport i) (stateBindings := stateBindings i)
+    size size (Nat.le_refl size) children
+    entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped entry.reference entry.read
+    entry.unmapped entry.initial entry.gate completed
+
+end Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning.Stateful.Family
+
 namespace Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning.Stateful
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableRuntimeBodyOrigins
@@ -112,25 +202,9 @@ theorem preserves_at
         ((origins i).certificates context) faults child)
     (size : Nat) : ∀ i,
     CallableRuntimeBodyOrigins.Stateful.PreservesAt protocol (conditionGate i) functions program (origins i) size := by
-  apply close_sized (fun i => CallableRuntimeBodyOrigins.Stateful.PreservesAt protocol (conditionGate i) functions program (origins i))
-  intro size below i entry outcome after trace
-  have children : ∀ context, (origins i).validity context → RecursiveNamedHeaderContracts.AtMost size
-      (fun child => ProtectedStateTransition.PreservesAt protocol
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context
-        (origins i).function.evidence (origins i).function.source ((origins i).certificates context)
-        faults child) := by
-    intro context valid child within
-    exact expressionMeaning i context valid size child within below
-  exact CallableRuntimeBodyKernel.Stateful.BodyFor.preserves_sized
-    (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
-    (registered := (origins i).registered) (extension := extension) (program := program)
-    (faithful := faithful) (observations := observations) (escapedFault := (origins i).escapedFault)
-    (extend := (origins i).extend) (runtimeOf := (origins i).runtimeOf)
-    (protocol := protocol) (producer := producers i) (conditionGate := conditionGate i)
-    (acquire := acquire i) (stateTransport := stateTransport) (stateBindings := stateBindings)
-    size size (Nat.le_refl size) children
-    entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped entry.reference entry.read
-    entry.unmapped entry.initial entry.gate trace
+  exact Family.preserves_at origins functions extension program faithful observations
+    (fun _ => protocol) conditionGate producers acquire
+    (fun _ => stateTransport) (fun _ => stateBindings) expressionMeaning size
 
 include extension faithful observations functionTypes producers acquire stateTransport stateBindings in
 /-- The actual native family consumes original completions and returns
@@ -144,24 +218,8 @@ theorem reflects_at
         ((origins i).certificates context) faults child)
     (size : Nat) : ∀ i,
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt protocol (conditionGate i) functions program (origins i) size := by
-  apply close_sized (fun i => CallableRuntimeBodyOrigins.Stateful.ReflectsAt protocol (conditionGate i) functions program (origins i))
-  intro size below i entry value finalStore completed
-  have children : ∀ context, (origins i).validity context → RecursiveNamedBoundedContracts.Below size
-      (fun child => ProtectedStateTransition.ReflectsAt protocol
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context
-        (origins i).function.evidence (origins i).function.source ((origins i).certificates context)
-        faults child) := by
-    intro context valid child smaller
-    exact expressionMeaning i context valid size child (Nat.le_of_lt smaller) below
-  exact CallableRuntimeBodyKernel.Stateful.BodyFor.reflects_sized
-    (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
-    (registered := (origins i).registered) (extension := extension) (program := program)
-    (faithful := faithful) (observations := observations) (functionTypes := functionTypes)
-    (escapedFault := (origins i).escapedFault) (extend := (origins i).extend) (runtimeOf := (origins i).runtimeOf)
-    (protocol := protocol) (producer := producers i) (conditionGate := conditionGate i)
-    (acquire := acquire i) (stateTransport := stateTransport) (stateBindings := stateBindings)
-    size size (Nat.le_refl size) children
-    entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped entry.reference entry.read
-    entry.unmapped entry.initial entry.gate completed
+  exact Family.reflects_at origins functions extension program faithful observations functionTypes
+    (fun _ => protocol) conditionGate producers acquire
+    (fun _ => stateTransport) (fun _ => stateBindings) expressionMeaning size
 
 end Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyMutualMeaning.Stateful
