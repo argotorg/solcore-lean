@@ -56,6 +56,48 @@ structure BodyState (headers : Inventory prepared values ambient.definitions pro
   catalog_ghost : catalog.authority.ghost = ghost
 
 
+/-- Assemble a body state only from its complete static and reached runtime receipts. -/
+def BodyState.of_receipts {headers : Inventory prepared values ambient.definitions program}
+    {locations : Locations} {capturePrefix : Nat}
+    {functions : FunctionModel values.checked.catalog ambient} {registry : SourceCoreRawMetadata.Registry}
+    {header : Header prepared values ambient.definitions program}
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
+    (environment : Dynamic.Environment)
+    (heap : Dynamic.Heap)
+    (canonical : Environment)
+    (actualBody : Environment)
+    (store : Store)
+    (mapping : LocationMap)
+    (world : StoreTyping)
+    (embedding : Renaming)
+    (allocation : Dynamic.BindersAllocate [] before header.function.parameters arguments environment heap)
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog) mapping world
+    (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store)
+    (locals : Dynamic.EnvironmentAgrees heap header.context.locals environment)
+    (maps : LocationMap.Extends initialMap mapping)
+    (worlds : WorldExtends initialWorld world)
+    (frame : AdministrativePreserved initialMap initialStore mapping store)
+    (metadata : Dynamic.HeapMetadataExtend before heap)
+    (lookups : EnvironmentsAgree embedding canonical actualBody)
+    (actualTyped : RuntimeEnvironmentHasTypes world actualBody
+    (CallableIndexedParameterTyped.prefixContext header.bindings actualContext) ambient.definitions)
+    (catalog : Entry headers locations capturePrefix (capturePrefix + 1)
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) mapping world heap store canonical)
+    (reference : canonical[header.bindings.length + 1 + header.globals]? =
+    some (.cellRef prepared.layout.frame.type frameLocation))
+    (state : CellState prepared.graph.inputs prepared.graph.table prepared.layout.frame frameLocation current ghost store)
+    (catalog_frame : catalog.authority.frameLocation = frameLocation)
+    (catalog_current : catalog.authority.current = current)
+    (catalog_ghost : catalog.authority.ghost = ghost) :
+    BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost :=
+  ⟨environment, heap, canonical, actualBody, store, mapping, world, embedding, allocation, environments, heaps, locals, maps, worlds, frame, metadata, lookups, actualTyped, catalog, reference, state, catalog_frame, catalog_current, catalog_ghost⟩
+
+
 def BodyState.of_entry
     {functions : FunctionModel values.checked.catalog ambient} {registry : SourceCoreRawMetadata.Registry}
     {header : Header prepared values ambient.definitions program} {arguments : List Dynamic.Value}
@@ -333,6 +375,55 @@ def BodyReflectsAtWith (condition : BodyCondition (headers := headers) (location
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
       AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after
+
+namespace Stateful
+universe u v
+
+def BodyPreservesAtWith {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (condition : BodyCondition (headers := headers) (locations := locations)
+    (capturePrefix := capturePrefix) functions registry header) (size : Nat) : Prop :=
+  ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost}
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    (initial : protocol.State ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩)
+    {outcome after}, condition entry →
+    RecursiveNamedCallBounds.BodyTrace program size header.function header.context entry.environment entry.heap outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      ProtectedStateTransition.Transition protocol initial
+        ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+          finalMap, finalWorld, after, finalStore, entry.canonical⟩
+
+/-- Reflection consumes the original body subderivation. Its independent source
+cost is an output and is never compared with the native input cost. -/
+def BodyReflectsAtWith {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (condition : BodyCondition (headers := headers) (locations := locations)
+    (capturePrefix := capturePrefix) functions registry header) (size : Nat) : Prop :=
+  ∀ {arguments before initialStore initialMap initialWorld administrative actualContext actual ξ frameLocation current ghost}
+    (entry : BodyState headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    (initial : protocol.State ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩)
+    {value finalStore}, condition entry →
+    EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore →
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyTrace program sourceSize header.function header.context entry.environment entry.heap outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      ProtectedStateTransition.Transition protocol initial
+        ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+          finalMap, finalWorld, after, finalStore, entry.canonical⟩
+
+end Stateful
 
 variable {functions registry header faults}
 
