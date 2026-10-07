@@ -687,6 +687,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceAd
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodCaptureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaViewHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerProtocol
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
