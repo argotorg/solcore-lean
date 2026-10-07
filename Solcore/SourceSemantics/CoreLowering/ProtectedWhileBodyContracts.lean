@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileEdges
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalControl
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
 
 /-! One guarded five-way body interface for finite loops. The actual environment
@@ -161,17 +163,13 @@ theorem condition_preserves_at {size : Nat}
       Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
       State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
         contextLocation location type (conditionCode.rename ξ) body selfReason finalMap finalWorld after finalStore := by
-  have actualAgrees : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)) canonical
-      (Core.LoopExecution.entryEnvironment type location actual) := GenericExpressionMeaning.agree_prefix
-    (GenericExpressionMeaning.agree_prefix agrees (.cellRef (OptionalCell.cellType (LocalLoop.functionType type)) location)) .unit
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, related, heaps, maps, worlds, preserved, metadata⟩ :=
-    meaning tree found state.1.environments state.1.heaps state.1.locals actualAgrees
-      (.cons .unit (.cons (.cellRef state.1.selfTyped) state.1.actualTyped)) state.2 trace
-  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-    ⟨heaps, maps, worlds, preserved, metadata⟩
-  exact ⟨value, finalStore, finalMap, finalWorld,
-    by simpa only [GenericExpressionMeaning.rename_prefix, Core.LoopExecution.conditionCode, Core.LoopExecution.entryEnvironment] using evaluated,
-    related, progress, state.advance transport progress⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, related, progress, reached, _retained⟩ :=
+    Stateful.condition_preserves_at (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry)
+      functions program evidence
+      (RecursiveNamedLexicalContracts.Stateful.legacy_expression_preserves
+        (expressions := fun _ => certificate) functions program evidence transport meaning)
+      tree found agrees ⟨state.1, ⟨state.2⟩⟩ trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, related, progress, reached.live, reached.retained.down⟩
 
 include transport in
 /-- Actual completed condition code recovers the independent source outcome
@@ -195,16 +193,13 @@ theorem condition_reflects_at {size : Nat}
       Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
       State entry values registry functions context scope administrative actualContext frameLayout environment canonical actual
         contextLocation location type (conditionCode.rename ξ) body selfReason finalMap finalWorld after finalStore := by
-  have actualAgrees : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)) canonical
-      (Core.LoopExecution.entryEnvironment type location actual) := GenericExpressionMeaning.agree_prefix
-    (GenericExpressionMeaning.agree_prefix agrees (.cellRef (OptionalCell.cellType (LocalLoop.functionType type)) location)) .unit
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, heaps, maps, worlds, preserved, metadata⟩ :=
-    reflection tree found state.1.environments state.1.heaps state.1.locals actualAgrees
-      (.cons .unit (.cons (.cellRef state.1.selfTyped) state.1.actualTyped)) state.2
-      (by simpa only [GenericExpressionMeaning.rename_prefix, Core.LoopExecution.conditionCode, Core.LoopExecution.entryEnvironment] using evaluated)
-  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-    ⟨heaps, maps, worlds, preserved, metadata⟩
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, progress, state.advance transport progress⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, progress, reached, _retained⟩ :=
+    Stateful.condition_reflects_at (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry)
+      functions program evidence
+      (RecursiveNamedLexicalContracts.Stateful.legacy_expression_reflects
+        (expressions := fun _ => certificate) functions program evidence transport reflection)
+      tree found agrees ⟨state.1, ⟨state.2⟩⟩ evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, progress, reached.live, reached.retained.down⟩
 
 include transport in
 /-- The body contract is an internal composition interface. Recursive statement
@@ -231,21 +226,14 @@ theorem body_preserves_at_for (validity : SourceSemantics.Context → Prop) {siz
       TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after := by
   obtain ⟨native, read⟩ := state.1.contextRead
-  have bodyAgrees : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)))
-      canonical (Core.LoopExecution.bodyEnvironment type location actual) := GenericExpressionMeaning.agree_prefix
-    (GenericExpressionMeaning.agree_prefix
-      (GenericExpressionMeaning.agree_prefix agrees (.cellRef (OptionalCell.cellType (LocalLoop.functionType type)) location)) .unit) (.bool true)
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds, preserved, metadata, lexical⟩ :=
-    correct valid state.1.environments state.1.heaps state.1.locals bodyAgrees
-      (.cons .bool (.cons .unit (.cons (.cellRef state.1.selfTyped) state.1.actualTyped)))
-      reference read state.1.contextUnmapped state.2 trace
-  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-    ⟨heaps, maps, worlds, preserved, metadata⟩
-  exact ⟨value, finalStore, finalMap, finalWorld,
-    by simpa only [GenericExpressionMeaning.rename_prefix, Core.LoopExecution.bodyCode,
-      Core.LoopExecution.bodyEnvironment, Core.LoopExecution.entryEnvironment] using evaluated,
-    represented, progress, state.advance transport progress, lexical⟩
-
+  have lifted := ProtectedStateTransition.Lexical.legacy_preserves functions program evidence transport correct
+  have guarded := ProtectedStateTransition.Lexical.Gated.preserves_of_unguarded
+    (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True) functions program evidence lifted
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress, reached, _retained, lexical⟩ :=
+    Stateful.body_preserves_at_for (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry)
+      (guard := fun _ _ => True) functions program evidence validity guarded valid agrees reference
+      ⟨state.1, ⟨state.2⟩⟩ read True.intro trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress, ⟨reached.live, reached.retained.down⟩, lexical⟩
 
 include transport in
 theorem body_preserves_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
@@ -296,20 +284,14 @@ theorem body_reflects_at_for (validity : SourceSemantics.Context → Prop) {size
       TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
         context scope environment finalContext after := by
   obtain ⟨native, read⟩ := state.1.contextRead
-  have bodyAgrees : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)))
-      canonical (Core.LoopExecution.bodyEnvironment type location actual) := GenericExpressionMeaning.agree_prefix
-    (GenericExpressionMeaning.agree_prefix
-      (GenericExpressionMeaning.agree_prefix agrees (.cellRef (OptionalCell.cellType (LocalLoop.functionType type)) location)) .unit) (.bool true)
-  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, heaps, maps, worlds, preserved, metadata, lexical⟩ :=
-    correct valid state.1.environments state.1.heaps state.1.locals bodyAgrees
-      (.cons .bool (.cons .unit (.cons (.cellRef state.1.selfTyped) state.1.actualTyped)))
-      reference read state.1.contextUnmapped state.2
-      (by simpa only [GenericExpressionMeaning.rename_prefix, Core.LoopExecution.bodyCode,
-        Core.LoopExecution.bodyEnvironment, Core.LoopExecution.entryEnvironment] using evaluated)
-  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-    ⟨heaps, maps, worlds, preserved, metadata⟩
-  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace,
-    represented, progress, state.advance transport progress, lexical⟩
+  have lifted := ProtectedStateTransition.Lexical.legacy_reflects functions program evidence transport correct
+  have guarded := ProtectedStateTransition.Lexical.Gated.reflects_of_unguarded
+    (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True) functions program evidence lifted
+  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, progress, reached, _retained, lexical⟩ :=
+    Stateful.body_reflects_at_for (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry)
+      (guard := fun _ _ => True) functions program evidence validity guarded valid agrees reference
+      ⟨state.1, ⟨state.2⟩⟩ read True.intro evaluated
+  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, progress, ⟨reached.live, reached.retained.down⟩, lexical⟩
 
 include transport in
 theorem body_reflects_at {size : Nat} {statements : List StatementId} {expected : TypeSystem.Ty}
