@@ -3,6 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceKeyContracts
 import Solcore.SourceSemantics.CoreLowering.NamedCallExpressionMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionCallTree
 
+import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignment
+
 /-! The existing contracted builtin Head composes only finite argument
 obligations within the fixed outer bound. It does not close the full recursive
 expression Tree; source and native sizes remain independent. -/
@@ -69,15 +71,16 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
 variable {certificate : GenericExpressionMeaning.Certificate}
-  {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
-include transport
+namespace Stateful
+universe u v
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
 
 include functionLeaves unique in
 theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
-    (argumentMeaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source certificate faults entry) :
-    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Head values source certificate) faults entry := by
+    (argumentMeaning : ∀ child, child ≤ budget → ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults child) :
+    ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults size := by
   intro scope id lowered tree
   cases tree with
   | @contracted callee arguments function node codes identity contract unknown metadata form sourceType children nativeTypes =>
@@ -89,24 +92,24 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         canonical (.unit :: contractedValue function identity contract actual :: actual) := agree_prefix (agree_prefix agrees (contractedValue function identity contract actual)) .unit
     have prefixedTyped := RuntimeEnvironmentHasTypes.cons (RuntimeValueHasType.unit (definitions := ambient.definitions))
       (.cons (contracted_typed actualTyped function identity contract) actualTyped)
-    have childrenMeaning : ∀ child, child < budget + 1 → ProtectedDataExpressionSequence.ExpressionPreservesAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults entry := by
+    have childrenMeaning : ∀ child, child < budget + 1 → ProtectedDataExpressionSequence.Stateful.ExpressionPreservesAt protocol child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults := by
       intro child within
-      exact RecursiveNamedPlaceKeyContracts.preserves_at (argumentMeaning child (by omega))
+      exact ProtectedStateTransition.SequenceBridge.preserves_at protocol (argumentMeaning child (by omega))
     have sourceTrace := RecursiveNamedBuiltinCallBounds.source_inv metadata form unique trace
     cases sourceTrace with
     | argumentsFault failed smaller =>
-      obtain ⟨token, finalStore, finalMap, finalWorld, argumentEval, matched, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-        ProtectedDataExpressionSequence.preserves_fault_bounded transport (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry failed (by omega)
+      obtain ⟨token, finalStore, finalMap, finalWorld, argumentEval, matched, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
+        ProtectedDataExpressionSequence.Stateful.preserves_fault_bounded protocol (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry failed (by omega)
       rw [rename_prefix, rename_prefix] at argumentEval
       refine ⟨.inLeft _ (.word token), finalStore, finalMap, finalWorld, ?_, .fault matched,
-        finalHeaps, maps, worlds, frame, heapMetadata⟩
+        finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
       rw [call_rename]
       exact CallableContract.call_argument_failure [⟨contract, none, none⟩] unknown
         (contracted_evaluates function identity contract actual store) (gates_accept contract unknown .beforeArguments) argumentEval
     | apply argumentsEvaluated application smaller =>
-      obtain ⟨payloads, argumentStore, finalMap, finalWorld, argumentEval, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-        ProtectedDataExpressionSequence.preserves_values_bounded transport (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry argumentsEvaluated (by omega)
+      obtain ⟨payloads, argumentStore, finalMap, finalWorld, argumentEval, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
+        ProtectedDataExpressionSequence.Stateful.preserves_values_bounded protocol (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry argumentsEvaluated (by omega)
       have related := values_rep represented
       rw [nativeTypes] at related
       have inputs := CompatibleBuiltinMeaning.input_of_values functionLeaves related
@@ -119,17 +122,17 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
           have same := appliedAgain.functional applied
           subst sourceResult
           refine ⟨.inRight .word nativeResult, argumentStore, finalMap, finalWorld, ?_, ?_,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
           · rw [call_rename]; exact completed
           · rw [sourceType]; exact .value (CompatibleBuiltinMeaning.result_represents inputs applied resultRep)
       | fault failed => exact False.elim (InputRep.excludes_callable_fault inputs failed)
 
 include functionLeaves in
 theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
-    (argumentMeaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source certificate faults entry) :
-    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Head values source certificate) faults entry := by
+    (argumentMeaning : ∀ child, child ≤ budget → ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults child) :
+    ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults size := by
   intro scope id lowered tree
   cases tree with
   | @contracted callee arguments function node codes identity contract unknown metadata form sourceType children nativeTypes =>
@@ -146,13 +149,13 @@ theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
         canonical (.unit :: contractedValue function identity contract actual :: actual) := agree_prefix (agree_prefix agrees (contractedValue function identity contract actual)) .unit
     have prefixedTyped := RuntimeEnvironmentHasTypes.cons (RuntimeValueHasType.unit (definitions := ambient.definitions))
       (.cons (contracted_typed actualTyped function identity contract) actualTyped)
-    have childrenMeaning : ∀ child, child < budget + 1 → ProtectedDataExpressionSequence.ExpressionReflectsAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults entry := by
+    have childrenMeaning : ∀ child, child < budget + 1 → ProtectedDataExpressionSequence.Stateful.ExpressionReflectsAt protocol child
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults := by
       intro child within
-      exact RecursiveNamedPlaceKeyContracts.reflects_at (argumentMeaning child (by omega))
+      exact ProtectedStateTransition.SequenceBridge.reflects_at protocol (argumentMeaning child (by omega))
     obtain ⟨argumentSourceSize, argumentOutcome, middle, finalMap, finalWorld, argumentTrace, represented, finalHeaps,
-      maps, worlds, frame, heapMetadata⟩ :=
-      ProtectedDataExpressionSequence.reflects_bounded transport (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry shifted (by omega)
+      maps, worlds, frame, heapMetadata, transition⟩ :=
+      ProtectedDataExpressionSequence.Stateful.reflects_bounded protocol (budget + 1) children childrenMeaning environments heaps locals prefixedLayout prefixedTyped installedEntry shifted (by omega)
     cases represented with
     | values represented =>
       cases argumentTrace with
@@ -166,7 +169,7 @@ theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
         obtain ⟨sourceSize, sourceTrace⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
           (BuiltinCalls.source_intro metadata form (.apply sourceArgs.sound (.value (.builtin applied))))
         refine ⟨sourceSize, .value sourceResult, middle, finalMap, finalWorld, sourceTrace, ?_,
-          finalHeaps, maps, worlds, frame, heapMetadata⟩
+          finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
         rw [sourceType]; exact .value (CompatibleBuiltinMeaning.result_represents inputs applied resultRep)
     | fault matched =>
       cases argumentTrace with
@@ -178,6 +181,39 @@ theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
         obtain ⟨sourceSize, sourceTrace⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
           (BuiltinCalls.source_intro metadata form (.argumentsFault sourceArgs.sound))
         exact ⟨sourceSize, .fault _, middle, finalMap, finalWorld, sourceTrace,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
+
+end Stateful
+
+variable {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+include transport
+
+include functionLeaves unique in
+theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
+    (argumentMeaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults entry := by
+  intro scope id lowered tree node found mapping world administrative environment canonical actual actualContext before store ξ outcome after
+    environments heaps locals agrees actualTyped installedEntry trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.Head.preserves_at functions functionLeaves program evidence unique (ProtectedStatePlaceAssignment.legacyProtocol entry) budget size bounded
+      (fun child bound => ProtectedStatePlaceAssignment.legacy_preserves transport (argumentMeaning child bound))
+      tree found environments heaps locals agrees actualTyped (PLift.up installedEntry) trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
+
+include functionLeaves in
+theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    (argumentMeaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults entry) :
+    RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults entry := by
+  intro scope id lowered tree node found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
+    environments heaps locals agrees actualTyped installedEntry evaluated
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.Head.reflects_at functions functionLeaves program evidence (ProtectedStatePlaceAssignment.legacyProtocol entry) budget size bounded
+      (fun child bound => ProtectedStatePlaceAssignment.legacy_reflects transport (argumentMeaning child bound))
+      tree found environments heaps locals agrees actualTyped (PLift.up installedEntry) evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedBuiltinHeadBounds
