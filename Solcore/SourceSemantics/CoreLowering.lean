@@ -757,6 +757,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeade
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeaderBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyTypedFacts
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeCatalogReady
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
