@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreClosedReadyNamedWhile
 import Solcore.Test.SourceCoreClosedAdmittedWhile
 import Solcore.Test.SourceCoreClosedAdmittedFor
 import Solcore.Test.SourceCoreClosedAdmittedNamedReceipt
