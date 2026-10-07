@@ -684,6 +684,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyEntryContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceAdapters
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodCaptureReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
