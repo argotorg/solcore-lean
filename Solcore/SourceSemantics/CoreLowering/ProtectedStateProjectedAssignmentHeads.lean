@@ -1,11 +1,14 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentReflection
+import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentReflection
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateAssignmentHeadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentPreservation
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementCertificates
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentReachableDiagnostics
 
-/-! Successful bare and projected Heads return the actual written-prefix state.
-The projected branch relays real keys, getter, RHS and latest-root write stages.
-Seven temporary slots and continuation agreement remain the original receipts. -/
+/-! Bare and projected Heads return the actual fault or written-prefix state.
+Projected branches relay real keys, getter, RHS and latest-root write stages.
+Seven temporary slots and measured continuation bounds remain the original receipts. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads.Stateful.Head
 open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleEquality CompatibleHeap CoreProof
@@ -63,5 +66,63 @@ theorem preserves_prefix_bounded (budget : Nat)
       ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded budget layout ordinary extension protocol transport boundedMeaning faithful observations right found rightView rightType profile
         environments heaps locals agrees actualTyped initialState slot writable trace bounded invalid
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, post, continuation⟩
+
+include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
+theorem preserves_fault_reachable_bounded (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (errors : head.ReachableErrors registry faults)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
+    (next : Expr) (output : Ty) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((head.emit next output).rename ξ) (.inLeft output (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  cases shape with
+  | bare empty layout =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩ :=
+      ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initialState layout empty extension boundedMeaning observations right found rightView rightType profile
+        environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
+    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
+      post⟩
+  | projected layout ordinary =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+      ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded budget layout ordinary extension protocol transport boundedMeaning faithful observations
+      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped initialState slot writable trace bounded next output invalid
+    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
+      post⟩
+
+include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
+theorem reflects_reachable_bounded (budget : Nat)
+    (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)
+    {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
+    ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
+      scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
+      before store mapping world initialState (next.rename ξ) output value finalStore := by
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
+  cases shape with
+  | bare empty layout =>
+    have result := ProtectedBareAssignment.Stateful.reflects_reachable_bounded protocol transport budget initialState layout empty extension boundedReflection observations right found rightView rightType profile
+      environments heaps locals agrees actualTyped slot writable errors.operands completed bounded
+    cases result with
+    | fault trace same matched finalHeaps maps worlds preservation metadata post =>
+      exact .fault trace same matched finalHeaps maps worlds preservation metadata
+        post
+    | success trace _ finalHeaps maps worlds preservation metadata count typed strict remaining post =>
+      exact .success trace finalHeaps maps worlds preservation metadata count
+        (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
+          Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
+        post strict remaining
+  | projected layout ordinary =>
+    have result := ProtectedPlaceAssignmentReflection.Stateful.reflects_bounded budget layout ordinary extension protocol transport boundedReflection functionTypes faithful observations
+      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped initialState locals slot writable completed bounded
+    cases result with
+    | fault trace same matched finalHeaps maps worlds frame metadata post =>
+      exact .fault trace same matched finalHeaps maps worlds frame metadata post
+    | committed trace finalHeaps maps worlds frame metadata count typed post strict remaining =>
+      exact .success trace finalHeaps maps worlds frame metadata count typed post strict remaining
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads.Stateful.Head

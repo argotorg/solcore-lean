@@ -97,20 +97,12 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
-  cases shape with
-  | bare empty layout =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩ :=
-      ProtectedBareAssignment.preserves_fault_reachable_bounded budget layout empty extension boundedMeaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace bounded next output invalid errors.operands
-    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
-      transport.extend installed maps worlds preservation metadata⟩
-  | projected layout ordinary =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      ProtectedPlaceAssignmentFaults.preserves_bounded budget layout ordinary extension transport boundedMeaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped installed slot writable trace bounded next output invalid
-    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
-      transport.extend installed maps worlds frame metadata⟩
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    Stateful.Head.preserves_fault_reachable_bounded functions extension program evidence (ProtectedStatePlaceAssignment.legacyProtocol entry) (ProtectedStatePlaceAssignment.legacyTransport transport) faithful observations head
+      environments heaps locals agrees actualTyped ⟨installed⟩ budget
+      (fun size smaller => ProtectedStatePlaceAssignment.legacy_preserves transport (boundedMeaning size smaller)) errors trace bounded next output
+  obtain ⟨reached, _⟩ := post
+  exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, reached.down⟩
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults)
@@ -151,28 +143,16 @@ theorem reflects_reachable_bounded (budget : Nat)
     RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
       entry scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
       before store mapping world (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile⟩
-  cases shape with
-  | bare empty layout =>
-    have result := ProtectedBareAssignment.reflects_reachable_bounded budget layout empty extension boundedReflection observations right found rightView rightType profile
-      environments heaps locals agrees actualTyped installed slot writable errors.operands completed bounded
-    cases result with
-    | fault trace same matched finalHeaps maps worlds preservation metadata =>
-      exact .fault trace same matched finalHeaps maps worlds preservation metadata
-        (transport.extend installed maps worlds preservation metadata)
-    | success trace _ finalHeaps maps worlds preservation metadata count typed strict remaining =>
-      exact .success trace finalHeaps maps worlds preservation metadata count
-        (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
-          Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
-        (transport.extend installed maps worlds preservation metadata) strict remaining
-  | projected layout ordinary =>
-    have result := ProtectedPlaceAssignmentReflection.reflects_bounded budget layout ordinary extension transport boundedReflection functionTypes faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped installed locals slot writable completed bounded
-    cases result with
-    | fault trace same matched finalHeaps maps worlds frame metadata =>
-      exact .fault trace same matched finalHeaps maps worlds frame metadata (transport.extend installed maps worlds frame metadata)
-    | committed trace finalHeaps maps worlds frame metadata count typed strict remaining =>
-      exact .success trace finalHeaps maps worlds frame metadata count typed (transport.extend installed maps worlds frame metadata) strict remaining
+  have result := Stateful.Head.reflects_reachable_bounded functions extension program evidence (ProtectedStatePlaceAssignment.legacyProtocol entry) (ProtectedStatePlaceAssignment.legacyTransport transport) faithful observations head
+    environments heaps locals agrees actualTyped ⟨installed⟩ budget
+    (fun size smaller => ProtectedStatePlaceAssignment.legacy_reflects transport (boundedReflection size smaller)) functionTypes errors completed bounded
+  cases result with
+  | fault trace same matched finalHeaps maps worlds frame metadata post =>
+    obtain ⟨reached, _⟩ := post
+    exact .fault trace same matched finalHeaps maps worlds frame metadata reached.down
+  | success trace finalHeaps maps worlds frame metadata count typed post strict remaining =>
+    obtain ⟨reached, _⟩ := post
+    exact .success trace finalHeaps maps worlds frame metadata count typed reached.down strict remaining
 
 include transport extension meaning reflection faithful observations environments heaps locals agrees actualTyped installed in
 theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (errors : head.ReachableErrors registry faults)

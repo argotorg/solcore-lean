@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateProjectedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderControl
 
-/-! The actual successful assignment Head supplies the header callback for
-both bare and projected targets, retaining the real written-prefix state. -/
+/-! Actual assignment Heads supply all three header callbacks for bare and
+projected targets, retaining the reached success or fault state. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreProjectedAssignmentHeader
 open Solcore
@@ -37,5 +37,30 @@ theorem full_successful_head_discharges_header :
   exact ProtectedAssignmentHeads.Stateful.Head.preserves_prefix_bounded functions extension program evidence
     protocol transport faithful observations head environments heaps locals agrees actualTyped initial
     budget meaning trace bounded
+
+include extension transport faithful observations meaning in
+theorem full_fault_head_discharges_header :
+    ProtectedForHeader.Stateful.AssignmentFaultPreservesAt protocol functions (registry := registry)
+      program evidence source certificate context administrative faults budget := by
+  intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
+    environments heaps locals agrees actualTyped initial errors reason after size trace bounded next output
+  exact ProtectedAssignmentHeads.Stateful.Head.preserves_fault_reachable_bounded functions extension program evidence
+    protocol transport faithful observations head environments heaps locals agrees actualTyped initial
+    budget meaning errors trace bounded next output
+
+include extension transport faithful observations in
+theorem full_reflected_head_discharges_header
+    (functionTypes : FunctionRuntimeViews functions)
+    (reflection : RecursiveNamedBoundedContracts.Below budget (fun size =>
+      ProtectedStateTransition.ReflectsAt protocol (payloadModel values.checked registry functions)
+        program context evidence source certificate faults size)) :
+    ProtectedForHeader.Stateful.AssignmentReflectsAt protocol functions (registry := registry)
+      program evidence source certificate context administrative faults budget := by
+  intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
+    environments heaps locals agrees actualTyped initial errors next output value finalStore size completed bounded
+  exact ProtectedAssignmentHeads.Stateful.Head.reflects_reachable_bounded functions extension program evidence
+    protocol transport faithful observations head environments heaps locals agrees actualTyped initial
+    budget reflection functionTypes errors completed bounded
+
 
 end Tests.SourceCoreProjectedAssignmentHeader
