@@ -654,6 +654,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaNestedStageOrig
 import Solcore.SourceSemantics.CoreLowering.SourceStagedIntegerResidualMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedAuthorityPool
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaTemplatePermission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionValues
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFunctionEntries
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

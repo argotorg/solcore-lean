@@ -307,33 +307,39 @@ structure ParameterEntry (headers : Inventory prepared values ambient.definition
   agreement : ContinuationAgreement actual initialStore (header.parameterCode.rename ξ)
     actualBody store (header.body.rename embedding)
 
-/-- The actual marked prefix constructs all source binders and preserves every
-shared global reference. Its real suffix and packed-argument slot fix the body
-catalog indices; no final environment typing or catalog entry is assumed. -/
-theorem parameters (authority : Authority headers locations capturePrefix mapping world heap store)
-    {header : Header prepared values ambient.definitions program} (_member : header ∈ headers)
-    (capture : Capture headers locations capturePrefix authority.frameLocation header mapping world heap store)
+/-- Parameter allocation depends on the captured layout and independent
+source locals, so callers can retain their represented closure's exact payload
+without replacing it with a separately read catalogue closure. -/
+theorem parameters_of_layout (authority : Authority headers locations capturePrefix mapping world heap store)
+    {header : Header prepared values ambient.definitions program}
+    {administrative : Core.Context} {canonical : Environment}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative [] [] canonical ambient.definitions)
+    (locals : Dynamic.EnvironmentAgrees heap header.function.context.locals [])
+    (reference : canonical[header.globals]? = some (.cellRef prepared.layout.frame.type authority.frameLocation))
+    (coherent : ∀ target, target ∈ headers → canonical[capturePrefix + target.slot]? = some
+      (.cellRef (OptionalCell.cellType target.named.signature.functionType) (locations target)))
     {functions : FunctionModel values.checked.catalog ambient} {registry : SourceCoreRawMetadata.Registry}
     {arguments : List Dynamic.Value} {payloads : List Value}
     (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       mapping world header.bindings arguments payloads)
     (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store)
     {actual actualContext ξ}
-    (agrees : EnvironmentsAgree ξ (DataPatternValues.packValues payloads :: capture.canonical) actual)
+    (agrees : EnvironmentsAgree ξ (DataPatternValues.packValues payloads :: canonical) actual)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions) :
     Nonempty (ParameterEntry headers locations capturePrefix functions registry header arguments heap store mapping world
-      capture.administrative actualContext actual ξ authority.frameLocation authority.current authority.ghost) := by
+      administrative actualContext actual ξ authority.frameLocation authority.current authority.ghost) := by
   have tree := CallableIndexedParameterCertificates.of_accepted header.onError header.acceptedPrefix
-  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) capture.canonical
-      (DataPatternValues.packValues payloads :: capture.canonical) := by
+  have sourceLayout : EnvironmentsAgree (Renaming.insertion 0) canonical
+      (DataPatternValues.packValues payloads :: canonical) := by
     intro index value found; exact found
   have length : (header.bindings.map Prod.snd).length = payloads.length := by simpa using represented.length.2
   obtain ⟨environment, finalHeap, finalCanonical, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding,
     allocated, finalEnvironments, finalHeaps, maps, worlds, preservation, _, lookups, spine, finalTyped, agreement⟩ :=
-    CallableIndexedParameterTyped.prefix_typed tree header.definitions_eq header.registered represented capture.environments heaps
+    CallableIndexedParameterTyped.prefix_typed tree header.definitions_eq header.registered represented environments heaps
       sourceLayout agrees actualTyped (allTypes := header.bindings.map Prod.snd) (named := true) rfl (by simp) length
       (fun {_ _} found => by simpa using found) (CallableIndexedParameters.inputKinds header.inputs)
-      (by simpa using capture.reference) authority.frame.read authority.unmapped
+      (by simpa using reference) authority.frame.read authority.unmapped
   obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
   have bundleTyped := (CallableIndexedParameters.Arguments.pack_typed represented).weaken worlds
   have finalWithBundle := insert_administrative finalEnvironments bundleTyped
@@ -353,21 +359,40 @@ theorem parameters (authority : Authority headers locations capturePrefix mappin
     have index : header.bindings.length + (capturePrefix + 1) + target.slot =
         added.length + (capturePrefix + target.slot + 1) := by omega
     rw [index, List.getElem?_append_right (by omega)]
-    simpa using capture.coherent target targetMember
+    simpa using coherent target targetMember
   have finalReference : finalLogical[header.bindings.length + 1 + header.globals]? =
       some (.cellRef prepared.layout.frame.type authority.frameLocation) := by
     rw [logicalEq]
     have index : header.bindings.length + 1 + header.globals = added.length + (header.globals + 1) := by omega
     rw [index, List.getElem?_append_right (by omega)]
-    simpa using capture.reference
+    simpa using reference
   have current := CallableIndexedBodyFrames.body_current authority.unmapped authority.frame preservation
   have mono := FunctionCallBody.mono_binders header.extended
   exact ⟨⟨environment, finalHeap, finalLogical, finalActual, finalStore, finalMap, finalWorld, embedding,
     allocated, by simpa using finalWithBundle, finalHeaps,
-    GenericLexicalContext.binders_agree mono.1 mono.2 capture.locals allocated,
+    GenericLexicalContext.binders_agree mono.1 mono.2 locals allocated,
     maps, worlds, preservation, metadata, lookups, finalTyped, catalog, finalReference, current, (by rfl), (by rfl), (by
       change (authority.extend maps worlds preservation metadata).ghost = authority.ghost
       rfl), agreement⟩⟩
+
+/-- The actual marked prefix constructs all source binders and preserves every
+shared global reference. Its real suffix and packed-argument slot fix the body
+catalog indices; no final environment typing or catalog entry is assumed. -/
+theorem parameters (authority : Authority headers locations capturePrefix mapping world heap store)
+    {header : Header prepared values ambient.definitions program} (_member : header ∈ headers)
+    (capture : Capture headers locations capturePrefix authority.frameLocation header mapping world heap store)
+    {functions : FunctionModel values.checked.catalog ambient} {registry : SourceCoreRawMetadata.Registry}
+    {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world header.bindings arguments payloads)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world heap store)
+    {actual actualContext ξ}
+    (agrees : EnvironmentsAgree ξ (DataPatternValues.packValues payloads :: capture.canonical) actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions) :
+    Nonempty (ParameterEntry headers locations capturePrefix functions registry header arguments heap store mapping world
+      capture.administrative actualContext actual ξ authority.frameLocation authority.current authority.ghost) := by
+  exact parameters_of_layout authority capture.environments capture.locals capture.reference capture.coherent
+    represented heaps agrees actualTyped
 
 /-- The named hook and the real marked parameter prefix together produce a
 body entry for the whole catalog. The saved caller frame and write-result Unit

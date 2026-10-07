@@ -1824,6 +1824,7 @@ import Solcore.Test.SourceCoreStagedIntegerResidualMeaning
 import Solcore.Test.SourceCoreCallableIndexedAuthorityPool
 import Solcore.Test.SourceCoreCallableIndexedLambdaTemplatePermission
 import Solcore.Test.SourceCoreRecursiveNamedExpressionExtraChildren
+import Solcore.Test.SourceCoreCallableIndexedOwnedFunctions
 set_option autoImplicit false
 
 open Solcore
