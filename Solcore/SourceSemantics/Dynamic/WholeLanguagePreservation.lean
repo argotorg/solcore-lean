@@ -3507,4 +3507,23 @@ theorem preserved
 
 end FunctionStatementsExecute
 
+namespace StatementExecutes
+
+/-- The original context proof applies to this actual Source statement and its
+independent static typing receipt. -/
+theorem final_context_of_typing
+    {program : Program} {context staticFinalContext runtimeFinalContext : Context}
+    {evidence : EvidenceEnvironment} {source : TypedSource}
+    {environment : Environment} {before after : Heap}
+    {statement : StatementId} {outcome : ControlOutcome}
+    {control : ControlContext} {facts : StatementFacts}
+    (graph : OccurrenceGraphWellFormed source)
+    (typing : StatementHasType source control context statement staticFinalContext facts)
+    (execution : StatementExecutes program context evidence source environment
+      before statement runtimeFinalContext outcome after) :
+    runtimeFinalContext = staticFinalContext :=
+  statementFinalContext_eq graph typing execution
+
+end StatementExecutes
+
 end Solcore.SourceSemantics.Dynamic
