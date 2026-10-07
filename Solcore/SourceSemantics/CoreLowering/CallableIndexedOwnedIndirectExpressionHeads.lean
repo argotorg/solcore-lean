@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaCanonicalEntries
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallSourceBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
@@ -16,11 +17,60 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open CallableIndexedHistory SourceCoreCallableIndexedFrames CallableIndexedLambdaValues
 open CallableIndexedOwnedFunctionState
 open RecursiveNamedCatalogInvocationBounds (Below)
+open CallableIndexedOwnedExpressionHeads (argumentProtocol)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+
+/-- Compatibility adds only the already authentic global-slot proof beside
+one actual base entry and its same returned pool. -/
+private theorem body_preserves_to_canonical
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys) (callerPrefix : Nat)
+    (origin : CallableRuntimeBodyOrigins.StaticOrigin (.initial compiled.compatible.checked)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed) registry faults)
+    {size : Nat}
+    (meaning : CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size) :
+    CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (argumentProtocol (headers := headers) owner callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size := by
+  intro entry outcome after trace
+  let baseEntry : CallableRuntimeBodyOrigins.Stateful.Entry (protocol headers keys)
+      (CallableIndexedOwnedAllocationProducer.StableOwner keys) origin
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) :=
+    { entry with initial := entry.initial.val }
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+      frame, metadata, exit, reached, related⟩ := meaning baseEntry trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+    frame, metadata, exit, ⟨reached, entry.initial.property⟩, related⟩
+
+/-- Native compatibility retains its independently obtained Source grade and
+adds the same slot proof to the actual reached pool. -/
+private theorem body_reflects_to_canonical
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys) (callerPrefix : Nat)
+    (origin : CallableRuntimeBodyOrigins.StaticOrigin (.initial compiled.compatible.checked)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed) registry faults)
+    {size : Nat}
+    (meaning : CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size) :
+    CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (argumentProtocol (headers := headers) owner callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size := by
+  intro entry value finalStore completed
+  let baseEntry : CallableRuntimeBodyOrigins.Stateful.Entry (protocol headers keys)
+      (CallableIndexedOwnedAllocationProducer.StableOwner keys) origin
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) :=
+    { entry with initial := entry.initial.val }
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds,
+      frame, metadata, exit, reached, related⟩ := meaning baseEntry completed
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds,
+    frame, metadata, exit, ⟨reached, entry.initial.property⟩, related⟩
 
 /-- Stable histories concern the actual selected rows, rather than arbitrary
 native type tags. Temporary reading frames do not satisfy this receipt. -/
@@ -390,13 +440,13 @@ include receipt children nativeTypes escaped environments heaps locals capturesV
 /-- The selected lambda's arguments run in their actual two-guard environment.
 Their reached pool supplies the caller for the real parameter/body invocation.
 The input Source closure retains its full dictionary and capture validity. -/
-theorem arguments_preserves_bounded (budget : Nat)
+theorem arguments_preserves_bounded_canonical (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       program context evidence source certificate faults))
     (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.PreservesAt
-      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (argumentProtocol (headers := headers) receipt.owner receipt.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
     {argumentsSize callSize : Nat} {arguments : List Dynamic.Value} {middle after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
@@ -431,18 +481,26 @@ theorem arguments_preserves_bounded (budget : Nat)
       environments heaps locals (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix agrees carrier) .unit)
       (.cons .unit (.cons receipt.typed typed)) initial evaluated argumentsWithin
   rw [nativeTypes] at represented
-  have arguments := values_arguments receipt.code.receipt.loweredParameters represented
+  have parameterArguments := values_arguments receipt.code.receipt.loweredParameters represented
   let future := receipt.extend argumentMaps argumentWorlds
   have futureStable := StableRows.after_administrative initial argumentState stable argumentFrame
   obtain ⟨currentMetadata, currentCarried⟩ := futureStable receipt.owner.position
+  let actualMeaning := CallableIndexedOwnedLambdaCanonicalEntries.source_continuation_of_canonical (arguments := arguments) (nativeArguments := payloads)
+    future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
+    (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) argumentState (future.bodyOrigin escaped) budget
+    (fun entry added length spine reached child strict => bodyMeaning child strict
+      (CallableIndexedOwnedLambdaCanonicalEntries.source_entry (arguments := arguments) (nativeArguments := payloads)
+        future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) argumentState (future.bodyOrigin escaped)
+        entry added length spine reached))
   obtain ⟨value, finalStore, finalMap, finalWorld, bodyEval, result, finalHeaps,
       maps, worlds, frame, metadata, finalState, related⟩ :=
-    CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_with
+    CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_at
       future.captured future.code future.history future.inputs
-      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) arguments
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) parameterArguments
       future.owner argumentState middleHeaps (capturesValid.extend argumentMetadata) future.reference currentCarried
       (CallableIndexedLambdaTemplatePermission.lambda_allowed future.code future.history)
-      (future.bodyOrigin escaped) budget bodyMeaning called callWithin
+      (future.bodyOrigin escaped) budget actualMeaning called callWithin
   rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentsEval
   exact ⟨payloads, middleStore, value, finalStore, finalMap, finalWorld, argumentsEval, bodyEval, result, finalHeaps,
     argumentMaps.trans maps, argumentWorlds.trans worlds, argumentFrame.trans frame, argumentMetadata.trans metadata,
@@ -450,16 +508,52 @@ theorem arguments_preserves_bounded (budget : Nat)
 
 
 include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
+theorem arguments_preserves_bounded (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
+    {argumentsSize callSize : Nat} {arguments : List Dynamic.Value} {middle after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (evaluated : SourceExecutionSize.ExpressionsEvaluate program argumentsSize context evidence source environment before ids arguments middle)
+    (argumentsWithin : argumentsSize ≤ budget)
+    (called : RecursiveNamedCallBounds.CallOutcome program callSize context evidence function.evidence middle
+      (.closure function) arguments outcome after) (callWithin : callSize ≤ budget) :
+    ∃ payloads middleStore value finalStore finalMap finalWorld,
+      Evaluates (.unit :: carrier :: actual) store
+        (((SourceCoreCalls.packArguments codes).expression.rename ξ).weakenAt 0 |>.weakenAt 0)
+        (.inRight .word (DataPatternValues.packValues payloads)) middleStore ∧
+      Evaluates (DataPatternValues.packValues payloads ::
+          encode compiled.indexed.ancestry.layout.frame receipt.history.native :: receipt.capturedActual)
+        middleStore (receipt.code.body.rename receipt.captured.embedding.lift.lift) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld function.resultType receipt.code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) initial
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact arguments_preserves_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
+    budget argumentMeaning (fun child strict => body_preserves_to_canonical profile receipt.owner receipt.callerPrefix
+      (receipt.bodyOrigin escaped).origin (bodyMeaning child strict)) evaluated argumentsWithin called callWithin
+
+
+include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
 /-- Successful original argument and body children are reflected independently.
 The ordered sequence's actual post is the real invocation input; the resulting
 Source argument and call grades remain independent of the native children. -/
-theorem arguments_reflects_bounded (budget : Nat)
+theorem arguments_reflects_bounded_canonical (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       program context evidence source certificate faults))
     (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.ReflectsAt
-      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (argumentProtocol (headers := headers) receipt.owner receipt.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
     {argumentsSize bodySize : Nat} {argumentInput : Ty} {argument value : Value} {middleStore finalStore : Store}
     (evaluated : EvaluationSize argumentsSize (.unit :: carrier :: actual) store
@@ -494,22 +588,30 @@ theorem arguments_reflects_bounded (budget : Nat)
       environments heaps locals (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix agrees carrier) .unit)
       (.cons .unit (.cons receipt.typed typed)) initial evaluated argumentsWithin
   cases represented with
-  | values represented =>
+  | @values sources payloads represented =>
     cases argumentTrace with
     | values argumentsTrace =>
       rw [nativeTypes] at represented
-      have arguments := values_arguments receipt.code.receipt.loweredParameters represented
+      have parameterArguments := values_arguments receipt.code.receipt.loweredParameters represented
       let future := receipt.extend argumentMaps argumentWorlds
       have futureStable := StableRows.after_administrative initial argumentState stable argumentFrame
       obtain ⟨currentMetadata, currentCarried⟩ := futureStable receipt.owner.position
+      let actualMeaning := CallableIndexedOwnedLambdaCanonicalEntries.native_continuation_of_canonical (arguments := sources)
+        future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) argumentState (future.bodyOrigin escaped) budget
+        (fun entry reached child strict => bodyMeaning child strict
+          (CallableIndexedOwnedLambdaCanonicalEntries.native_entry (arguments := sources)
+            future.captured future.code future.owner future.callerPrefix future.globals future.history future.inputs
+            (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) argumentState (future.bodyOrigin escaped)
+            entry reached))
       obtain ⟨sourceCallSize, outcome, after, finalMap, finalWorld, callTrace, result, finalHeaps,
           maps, worlds, frame, metadata, finalState, related⟩ :=
-        CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_with
+        CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_at
           future.captured future.code future.history future.inputs
-          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) arguments
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) parameterArguments
           future.owner argumentState middleHeaps (capturesValid.extend argumentMetadata) future.reference currentCarried
           (CallableIndexedLambdaTemplatePermission.lambda_allowed future.code future.history)
-          (future.bodyOrigin escaped) budget bodyMeaning completed bodyWithin
+          (future.bodyOrigin escaped) budget actualMeaning completed bodyWithin
       exact ⟨sourceArgumentsSize, sourceCallSize, _, middle, outcome, after, finalMap, finalWorld,
         argumentsTrace, callTrace, result, finalHeaps,
         argumentMaps.trans maps, argumentWorlds.trans worlds, argumentFrame.trans frame, argumentMetadata.trans metadata,
@@ -517,8 +619,91 @@ theorem arguments_reflects_bounded (budget : Nat)
 
 
 include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
+theorem arguments_reflects_bounded (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt (protocol headers keys)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
+    {argumentsSize bodySize : Nat} {argumentInput : Ty} {argument value : Value} {middleStore finalStore : Store}
+    (evaluated : EvaluationSize argumentsSize (.unit :: carrier :: actual) store
+      (((SourceCoreCalls.packArguments codes).expression.rename ξ).weakenAt 0 |>.weakenAt 0)
+      (.inRight argumentInput argument) middleStore) (argumentsWithin : argumentsSize < budget)
+    (completed : EvaluationSize bodySize
+      (argument :: encode compiled.indexed.ancestry.layout.frame receipt.history.native :: receipt.capturedActual)
+      middleStore (receipt.code.body.rename receipt.captured.embedding.lift.lift) value finalStore)
+    (bodyWithin : bodySize ≤ budget) :
+    ∃ sourceArgumentsSize sourceCallSize arguments middle outcome after finalMap finalWorld,
+      SourceExecutionSize.ExpressionsEvaluate program sourceArgumentsSize context evidence source environment before ids arguments middle ∧
+      RecursiveNamedCallBounds.CallOutcome program sourceCallSize context evidence function.evidence middle
+        (.closure function) arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld function.resultType receipt.code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) initial
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact arguments_reflects_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
+    budget argumentMeaning (fun child strict => body_reflects_to_canonical profile receipt.owner receipt.callerPrefix
+      (receipt.bodyOrigin escaped).origin (bodyMeaning child strict)) evaluated argumentsWithin completed bodyWithin
+
+
+include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
 /-- The accepted two-guard call composes the real callee post with ordered
 arguments and the restored body post. Its input records are never rebuilt. -/
+theorem call_preserves_bounded_canonical (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (argumentProtocol (headers := headers) receipt.owner receipt.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
+    {firstMap : LocationMap} {firstWorld : StoreTyping} {firstHeap : Dynamic.Heap} {firstStore : Store}
+    (first : State headers keys ⟨callerScope, firstMap, firstWorld, firstHeap, firstStore, canonical⟩)
+    (calleeRelated : Relates first initial)
+    (calleeMaps : LocationMap.Extends firstMap mapping) (calleeWorlds : WorldExtends firstWorld world)
+    (calleeFrame : AdministrativePreserved firstMap firstStore mapping store)
+    (calleeMetadata : Dynamic.HeapMetadataExtend firstHeap before)
+    {callee : Expr} {gates : List CallableContract.Gate} {unknown : Word}
+    (calleeEvaluation : Evaluates actual firstStore callee (.inRight .word carrier) store)
+    (stageAccepted : CallableContract.decision gates .beforeArguments unknown receipt.code.descriptor.id = none)
+    (arityAccepted : CallableContract.decision gates .beforeApplication unknown receipt.code.descriptor.id = none)
+    {argumentsSize callSize : Nat} {arguments : List Dynamic.Value} {middle after : Dynamic.Heap}
+    {outcome : Dynamic.ExpressionOutcome}
+    (evaluated : SourceExecutionSize.ExpressionsEvaluate program argumentsSize context evidence source environment before ids arguments middle)
+    (argumentsWithin : argumentsSize ≤ budget)
+    (called : RecursiveNamedCallBounds.CallOutcome program callSize context evidence function.evidence middle
+      (.closure function) arguments outcome after) (callWithin : callSize ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual firstStore (CallableContract.call gates unknown receipt.code.receipt.resultCore callee
+        ((SourceCoreCalls.packArguments codes).expression.rename ξ)) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld function.resultType receipt.code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+      AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) first
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨payloads, middleStore, value, finalStore, finalMap, finalWorld, argumentEvaluation, bodyEvaluation,
+      result, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
+    arguments_preserves_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid
+      agrees typed initial stable budget argumentMeaning bodyMeaning evaluated argumentsWithin called callWithin
+  rw [receipt.value_eq] at calleeEvaluation argumentEvaluation
+  exact ⟨value, finalStore, finalMap, finalWorld,
+    CallableContract.call_success gates unknown calleeEvaluation stageAccepted argumentEvaluation arityAccepted bodyEvaluation,
+    result, finalHeaps, calleeMaps.trans maps, calleeWorlds.trans worlds,
+    calleeFrame.trans frame, calleeMetadata.trans metadata, reached, calleeRelated.trans related⟩
+
+
+include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
 theorem call_preserves_bounded (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
@@ -555,15 +740,10 @@ theorem call_preserves_bounded (budget : Nat)
       AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) first
         ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  obtain ⟨payloads, middleStore, value, finalStore, finalMap, finalWorld, argumentEvaluation, bodyEvaluation,
-      result, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
-    arguments_preserves_bounded profile receipt children nativeTypes escaped environments heaps locals capturesValid
-      agrees typed initial stable budget argumentMeaning bodyMeaning evaluated argumentsWithin called callWithin
-  rw [receipt.value_eq] at calleeEvaluation argumentEvaluation
-  exact ⟨value, finalStore, finalMap, finalWorld,
-    CallableContract.call_success gates unknown calleeEvaluation stageAccepted argumentEvaluation arityAccepted bodyEvaluation,
-    result, finalHeaps, calleeMaps.trans maps, calleeWorlds.trans worlds,
-    calleeFrame.trans frame, calleeMetadata.trans metadata, reached, calleeRelated.trans related⟩
+  exact call_preserves_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
+    budget argumentMeaning (fun child strict => body_preserves_to_canonical profile receipt.owner receipt.callerPrefix
+      (receipt.bodyOrigin escaped).origin (bodyMeaning child strict)) first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
+    calleeEvaluation stageAccepted arityAccepted evaluated argumentsWithin called callWithin
 
 
 include receipt children environments heaps locals agrees typed in
@@ -617,13 +797,13 @@ include receipt children nativeTypes escaped environments heaps locals capturesV
 /-- Native accepted-call completion uses its original measured children. The
 actual callee post feeds the argument post, then the same real body post and
 restoration. Source argument fault and call grades remain independent. -/
-theorem call_reflects_bounded (budget : Nat)
+theorem call_reflects_bounded_canonical (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
         (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
       program context evidence source certificate faults))
     (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.ReflectsAt
-      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (argumentProtocol (headers := headers) receipt.owner receipt.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
     {firstMap : LocationMap} {firstWorld : StoreTyping} {firstHeap : Dynamic.Heap} {firstStore : Store}
     (first : State headers keys ⟨callerScope, firstMap, firstWorld, firstHeap, firstStore, canonical⟩)
@@ -674,11 +854,52 @@ theorem call_reflects_bounded (budget : Nat)
   | applied argumentsTrace bodyTrace argumentsSmaller bodySmaller =>
     obtain ⟨sourceArgumentsSize, sourceCallSize, arguments, middle, outcome, after, finalMap, finalWorld,
         sourceArguments, sourceCall, result, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
-      arguments_reflects_bounded profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
+      arguments_reflects_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
         budget argumentMeaning bodyMeaning argumentsTrace argumentsSmaller bodyTrace (Nat.le_of_lt bodySmaller)
     exact ⟨sourceArgumentsSize, sourceCallSize, outcome, after, finalMap, finalWorld, .called sourceArguments sourceCall,
       result, finalHeaps, calleeMaps.trans maps, calleeWorlds.trans worlds,
       calleeFrame.trans frame, calleeMetadata.trans metadata, reached, calleeRelated.trans related⟩
+
+
+include receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed stable in
+theorem call_reflects_bounded (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt (protocol headers keys)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (receipt.bodyOrigin escaped).origin))
+    {firstMap : LocationMap} {firstWorld : StoreTyping} {firstHeap : Dynamic.Heap} {firstStore : Store}
+    (first : State headers keys ⟨callerScope, firstMap, firstWorld, firstHeap, firstStore, canonical⟩)
+    (calleeRelated : Relates first initial)
+    (calleeMaps : LocationMap.Extends firstMap mapping) (calleeWorlds : WorldExtends firstWorld world)
+    (calleeFrame : AdministrativePreserved firstMap firstStore mapping store)
+    (calleeMetadata : Dynamic.HeapMetadataExtend firstHeap before)
+    {callee : Expr} {gates : List CallableContract.Gate} {unknown : Word}
+    (calleeEvaluation : Evaluates actual firstStore callee (.inRight .word carrier) store)
+    (stageAccepted : CallableContract.decision gates .beforeArguments unknown receipt.code.descriptor.id = none)
+    (arityAccepted : CallableContract.decision gates .beforeApplication unknown receipt.code.descriptor.id = none)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual firstStore
+      (CallableContract.call gates unknown receipt.code.receipt.resultCore callee
+        ((SourceCoreCalls.packArguments codes).expression.rename ξ)) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceArgumentsSize sourceCallSize outcome after finalMap finalWorld,
+      SourceSuffix program context evidence source environment before ids function sourceArgumentsSize sourceCallSize outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld function.resultType receipt.code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+      AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) first
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact call_reflects_bounded_canonical profile receipt children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
+    budget argumentMeaning (fun child strict => body_reflects_to_canonical profile receipt.owner receipt.callerPrefix
+      (receipt.bodyOrigin escaped).origin (bodyMeaning child strict)) first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
+    calleeEvaluation stageAccepted arityAccepted completed within
 
 end Selected
 
