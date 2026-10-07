@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchSourceBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalGate
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeControl
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchPrefix
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchReady
 
 /-! The bounded match child interfaces keep the actual selected-arm state and
 fixed frame gate. Source selection and typing stay independent static receipts;
@@ -151,3 +152,115 @@ theorem legacy_expression_reflects (transport : ProtectedExpressionMeaning.Trans
 end ExpressionAdapters
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedStateMatchBodyContracts
+
+namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchSourceBounds.Stateful.WithReady
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
+open SourceCoreCompatibleDataMatches CompatibleMatchCertificates
+open CompatibleMatchSelectionPrefix DataMatchBranchPrefix
+universe u v
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+  (readiness : RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness protocol)
+  (guard : Location → CallableIndexedHistory.NativeFrame → Prop)
+
+variable {compilation : SourceCoreCompatibleDataMatches.Context}
+  {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+  (functions : FunctionModel compilation.checked.catalog ambient)
+  {registry : SourceCoreRawMetadata.Registry} {source : TypedSource}
+  (program : Program) (parent : SourceSemantics.Context) (control : ControlContext)
+  (evidence : Dynamic.EvidenceEnvironment) (resolution : MatchResolution)
+  (bodyCertificate : BodyCertificate) (expected : TypeSystem.Ty) (type : Ty)
+  {solved : List SolvedRequirement} {administrative : Core.Context}
+  {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {faults : FunctionCalls.FaultRep} (budget : Nat)
+
+def ArmPreservesBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
+    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {armContext staticFinal facts},
+    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
+    StatementsHaveType source control armContext statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness guard (fun _ _ _ _ => True) functions program evidence (validity := validity) (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) child false statements expected type body
+
+def ArmReflectsBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.arm statements bindings) →
+    SelectedBody bodyCertificate scope environment heap type (.arm statements bindings)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {armContext staticFinal facts},
+    BindersExtend source.owner parent (bindings.map Prod.fst) armContext →
+    StatementsHaveType source control armContext statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith protocol readiness guard (fun _ _ _ _ => True) functions program evidence (validity := validity) (values := compilation.values)
+      (source := source) (context := armContext) (registry := registry)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) child false statements expected type body
+
+def DefaultPreservesBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
+    SelectedBody bodyCertificate scope environment heap type (.default statements)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness guard (fun _ _ _ _ => True) functions program evidence (validity := validity) (values := compilation.values)
+      (source := source) (context := parent) (registry := registry)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) child false statements expected type body
+
+def DefaultReflectsBelowFor (validity : SourceSemantics.Context → Prop) (outerScope : Scope) : Prop :=
+  ∀ {sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body},
+    scope.map Prod.fst = resolution.hiddenScrutinee :: outerScope.map Prod.fst →
+    Dynamic.MatchCasesSelect parent sourceValue resolution.cases resolution.defaultBody (.default statements) →
+    SelectedBody bodyCertificate scope environment heap type (.default statements)
+      finalScope finalEnvironment finalHeap body →
+    ∀ {staticFinal facts}, StatementsHaveType source control parent statements staticFinal facts →
+    ∀ child, child < budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith protocol readiness guard (fun _ _ _ _ => True) functions program evidence (validity := validity) (values := compilation.values)
+      (source := source) (context := parent) (registry := registry)
+      (administrative := administrative) (frameLayout := frame) (globals := globals)
+      (faults := faults) (scope := finalScope) child false statements expected type body
+
+variable {validity : SourceSemantics.Context → Prop} {outerScope : Scope}
+
+theorem ArmPreservesBelowFor.of_true
+    (old : RecursiveNamedMatchSourceBounds.Stateful.ArmPreservesBelowFor protocol guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) :
+    ArmPreservesBelowFor protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body scopeEq selected selectedBody armContext staticFinal facts extended typed child smaller
+  exact RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith.of_true
+    protocol guard functions program evidence (old scopeEq selected selectedBody extended typed child smaller)
+
+theorem ArmReflectsBelowFor.of_true
+    (old : RecursiveNamedMatchSourceBounds.Stateful.ArmReflectsBelowFor protocol guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) :
+    ArmReflectsBelowFor protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements bindings finalScope finalEnvironment finalHeap body scopeEq selected selectedBody armContext staticFinal facts extended typed child smaller
+  exact RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith.of_true
+    protocol guard functions program evidence (old scopeEq selected selectedBody extended typed child smaller)
+
+theorem DefaultPreservesBelowFor.of_true
+    (old : RecursiveNamedMatchSourceBounds.Stateful.DefaultPreservesBelowFor protocol guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) :
+    DefaultPreservesBelowFor protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body scopeEq selected selectedBody staticFinal facts typed child smaller
+  exact RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith.of_true
+    protocol guard functions program evidence (old scopeEq selected selectedBody typed child smaller)
+
+theorem DefaultReflectsBelowFor.of_true
+    (old : RecursiveNamedMatchSourceBounds.Stateful.DefaultReflectsBelowFor protocol guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults)) :
+    DefaultReflectsBelowFor protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) guard functions program parent control evidence resolution bodyCertificate expected type budget validity outerScope
+      (source := source) (administrative := administrative) (frame := frame) (globals := globals) (registry := registry) (faults := faults) := by
+  intro sourceValue scope environment heap statements finalScope finalEnvironment finalHeap body scopeEq selected selectedBody staticFinal facts typed child smaller
+  exact RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith.of_true
+    protocol guard functions program evidence (old scopeEq selected selectedBody typed child smaller)
+
+end Solcore.SourceSemantics.CoreLowering.RecursiveNamedMatchSourceBounds.Stateful.WithReady
