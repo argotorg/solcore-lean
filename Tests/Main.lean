@@ -1820,6 +1820,10 @@ import Solcore.Test.SourceCoreStagedIntegerLetMeaning
 import Solcore.Test.SourceCoreCallableIndirectCallSourceBounds
 import Solcore.Test.SourceCoreCallableIndexedLambdaNestedStageOrigins
 
+import Solcore.Test.SourceCoreStagedIntegerResidualMeaning
+import Solcore.Test.SourceCoreCallableIndexedAuthorityPool
+import Solcore.Test.SourceCoreCallableIndexedLambdaTemplatePermission
+import Solcore.Test.SourceCoreRecursiveNamedExpressionExtraChildren
 set_option autoImplicit false
 
 open Solcore
@@ -2971,6 +2975,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreStagedIntegerStatementsMeaning.run
   SourceCoreCallableIndirectCallBounds.run
   SourceCoreStagedIntegerLetMeaning.run
+  SourceCoreStagedIntegerResidualMeaning.run
   SourceCoreRecursiveNamedPreparedHeaderPolicies.run
   SourceRecursiveStagePrimitiveOperators.run
   SourceRecursiveStageTupleExpressions.run
