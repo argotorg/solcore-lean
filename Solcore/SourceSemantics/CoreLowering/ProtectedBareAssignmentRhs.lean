@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignmentCommit
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBareAssignmentContracts
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateBareAssignment
 
 /-! Guarded RHS transport uses the actual three saved native values and their
 typing. The canonical installed entry remains unchanged; only actual variable
@@ -29,8 +29,89 @@ private theorem latest_of_heap {nextMap : LocationMap} {nextWorld : StoreTyping}
   obtain ⟨optional, nativeRead, represented⟩ := heaps.read_at reference read
   exact ⟨⟨cell, optional, read, sameType.trans snapshot.type, reference, nativeRead, represented⟩⟩
 
+universe u v
+
 variable {scope : Scope} {administrativeContext actualContext : Core.Context} {canonical : Environment}
   {certificate : Certificate} {entry : ProtectedExpressionMeaning.Entry}
+
+/-- Assemble the original native RHS receipt and its actual protected post. -/
+theorem rhs_of_expression {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap} {value : Value}
+    {finalStore : Store} {finalMap : LocationMap} {finalWorld : StoreTyping}
+    (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment heap id outcome after)
+    (evaluated : Evaluates (snapshotEnvironment prepared.route.rootType snapshot.target .unit snapshot.value actual)
+      store (shift 3 (lowered.expression.rename ξ)) value finalStore)
+    (represented : ResultRepresents (payloadModel checked registry functions) finalMap finalWorld node.type lowered.type faults outcome value)
+    (heaps : HeapRepresents checked registry functions finalMap finalWorld after finalStore)
+    (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
+    (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend heap after)
+    (post : ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
+    RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot outcome after value finalStore finalMap finalWorld ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ :=
+  ⟨⟨trace, evaluated, represented, heaps, maps, worlds, frame, metadata,
+    latest_of_heap snapshot heaps maps worlds metadata⟩, post⟩
+
+namespace Stateful
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+
+theorem rhs_preserves_at (size : Nat)
+    (meaning : ProtectedStateTransition.PreservesAt protocol (payloadModel checked registry functions) program context evidence source certificate faults size)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents checked registry functions mapping world heap store)
+    (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment heap id outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+        (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot outcome after value finalStore finalMap finalWorld ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds, frame, metadata, post⟩ :=
+    meaning generated found environments heaps locals
+      (DataPlaceChildExpressions.prefix_agrees agrees
+        [snapshot.value, .unit, .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target])
+      (snapshot.runtimeTyped actualTyped) initial trace
+  refine ⟨value, finalStore, finalMap, finalWorld, rhs_of_expression snapshot protocol initial trace.sound ?_ represented heaps maps worlds frame metadata post⟩
+  simpa only [DataPlaceChildExpressions.rename_prefix, List.length_cons, List.length_nil,
+    List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
+    SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated
+
+theorem rhs_reflects_at (size : Nat)
+    (meaning : ProtectedStateTransition.ReflectsAt protocol (payloadModel checked registry functions) program context evidence source certificate faults size)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents checked registry functions mapping world heap store)
+    (locals : Dynamic.EnvironmentAgrees heap context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (initial : protocol.State ⟨scope, mapping, world, heap, store, canonical⟩)
+    {value : Value} {finalStore : Store}
+    (evaluated : CoreProof.EvaluationSize size (snapshotEnvironment prepared.route.rootType snapshot.target .unit snapshot.value actual)
+      store (shift 3 (lowered.expression.rename ξ)) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment heap id outcome after ∧
+      RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+        (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot outcome after value finalStore finalMap finalWorld ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, heaps, maps, worlds, frame, metadata, post⟩ :=
+    meaning generated found environments heaps locals
+      (DataPlaceChildExpressions.prefix_agrees agrees
+        [snapshot.value, .unit, .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target])
+      (snapshot.runtimeTyped actualTyped) initial
+      (by simpa only [DataPlaceChildExpressions.rename_prefix, List.length_cons, List.length_nil,
+        List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
+        SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace,
+    rhs_of_expression snapshot protocol initial trace.sound evaluated.sound represented heaps maps worlds frame metadata post⟩
+
+end Stateful
 
 theorem rhs_preserves_at (size : Nat)
     (meaning : RecursiveNamedBoundedContracts.PreservesAt size (payloadModel checked registry functions) program context evidence source certificate faults entry)
@@ -52,11 +133,12 @@ theorem rhs_preserves_at (size : Nat)
       (DataPlaceChildExpressions.prefix_agrees agrees
         [snapshot.value, .unit, .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target])
       (snapshot.runtimeTyped actualTyped) installed trace
-  refine ⟨value, finalStore, finalMap, finalWorld, trace.sound, ?_, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap snapshot heaps maps worlds metadata⟩
-  simpa only [DataPlaceChildExpressions.rename_prefix, List.length_cons, List.length_nil,
-    List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
-    SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated
+  have receipt := rhs_of_expression (scope := scope) (canonical := canonical) snapshot ProtectedStateBareAssignment.unitProtocol () trace.sound
+    (by simpa only [DataPlaceChildExpressions.rename_prefix, List.length_cons, List.length_nil,
+      List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
+      SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
+    represented heaps maps worlds frame metadata (show ProtectedStateTransition.Transition ProtectedStateBareAssignment.unitProtocol (initial := ⟨scope, mapping, world, heap, store, canonical⟩) () ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ from ⟨(), trivial⟩)
+  exact ⟨value, finalStore, finalMap, finalWorld, receipt.1⟩
 
 theorem rhs_reflects_at (size : Nat)
     (meaning : RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel checked registry functions) program context evidence source certificate faults entry)
@@ -83,8 +165,9 @@ theorem rhs_reflects_at (size : Nat)
       (by simpa only [DataPlaceChildExpressions.rename_prefix, List.length_cons, List.length_nil,
         List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
         SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, trace.sound, evaluated.sound, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap snapshot heaps maps worlds metadata⟩
+  have receipt := rhs_of_expression (scope := scope) (canonical := canonical) snapshot ProtectedStateBareAssignment.unitProtocol () trace.sound evaluated.sound
+    represented heaps maps worlds frame metadata (show ProtectedStateTransition.Transition ProtectedStateBareAssignment.unitProtocol (initial := ⟨scope, mapping, world, heap, store, canonical⟩) () ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ from ⟨(), trivial⟩)
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, receipt.1⟩
 
 theorem rhs_preserves
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel checked registry functions) program context evidence source certificate faults entry)

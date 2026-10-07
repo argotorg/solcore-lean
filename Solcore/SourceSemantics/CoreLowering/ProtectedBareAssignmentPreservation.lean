@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AssignmentOperandDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignmentRhs
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateBareAssignment
 
 /-! Forward finite meaning of bare assignments. These laws preserve the exact
 independent source trace, including a fault after RHS effects. The returned
@@ -9,6 +10,7 @@ namespace Solcore.SourceSemantics.CoreLowering.ProtectedBareAssignment
 open Core Frontend SourceInference GeneralHeap DataPatternValues GenericExpressionMeaning
 open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDataPlaces DataPlaceExecution CoreProof
 open CompatibleBareAssignment
+universe u v
 
 variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions compilation.checked.catalog.definitions} {functions : FunctionModel compilation.checked.catalog ambient}
@@ -35,6 +37,127 @@ private theorem writes_functional {heap left right : Dynamic.Heap} {location : D
       have same := firstRead.functional secondRead
       cases same
       exact congrArg Dynamic.Heap.mk (cells firstWrite secondWrite)
+
+namespace Stateful
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+
+include transport in
+theorem preserves_prefix_bounded_with_rhs (budget : Nat)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (rhsMeaning : ∀ (snapshot : Snapshot compilation.checked registry functions prepared place environment actual before store mapping world (ξ index))
+      (child : Nat), child < budget → ∀ {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap},
+      RecursiveNamedCallBounds.ExpressionOutcome program child context evidence source environment before id outcome after →
+      ∃ value finalStore finalMap finalWorld,
+        RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+          (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot outcome after value finalStore finalMap finalWorld ∧
+        ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {updated : Dynamic.Value} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before place id updated after) (bounded : size ≤ budget) (invalid : Word) :
+    ∃ updatedValue finalStore finalMap finalWorld slots,
+      ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
+      (∀ next outputType, ContinuationAgreement actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
+  cases trace with
+  | intro resolved evaluated written =>
+    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolved.sound
+    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result, rhsPost⟩ :=
+      rhsMeaning snapshot _
+        (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.value evaluated)
+    cases related : result.represented with
+    | @value _ rightValue payload =>
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
+        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      have saved := snapshot.represented.extend result.maps result.worlds
+      cases written with
+      | intro read sameType initial update written =>
+        cases update with
+        | leaf applied =>
+          rcases modifier_total observations profile saved rightRep
+            (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
+            (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
+            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, generatedApply, modified⟩
+          · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
+          · have same := DataPlaceModifier.assignment_functional generatedApply applied
+            subst replacement
+            obtain ⟨generatedHeap, finalStore, _, generatedWrite, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, agreement⟩ :=
+              commit_with_write layout snapshot bare result rightRep replacementRep applied (by simpa only [layout.sameType] using modified) actualTyped
+            have same := writes_functional generatedWrite written
+            subst generatedHeap
+            obtain ⟨rhsState, rhsRelated⟩ := rhsPost
+            exact ⟨updatedValue, finalStore, rhsMap, rhsWorld,
+              [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
+                .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target],
+              replacementRep, finalHeaps, result.maps, result.worlds, frame, metadata, rfl, typed, agreement,
+              transport.extend rhsState (.refl _) (.refl _) writeFrame writeMetadata,
+              protocol.trans rhsRelated (transport.related rhsState (.refl _) (.refl _) writeFrame writeMetadata)⟩
+
+include transport in
+theorem preserves_prefix_bounded (budget : Nat)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
+      ProtectedStateTransition.PreservesAt protocol (payloadModel compilation.checked registry functions) program context evidence source certificate faults size))
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {updated : Dynamic.Value} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before place id updated after) (bounded : size ≤ budget) (invalid : Word) :
+    ∃ updatedValue finalStore finalMap finalWorld slots,
+      ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
+      (∀ next outputType, ContinuationAgreement actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact preserves_prefix_bounded_with_rhs protocol transport budget initial layout bare extension
+    (fun snapshot child smaller {_ _} expressionTrace =>
+      Stateful.rhs_preserves_at snapshot protocol child (meaning child smaller) generated found
+        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
+
+end Stateful
 
 theorem preserves_prefix_bounded (budget : Nat)
     (layout : Layout compilation prepared) (bare : place.projections = [])
@@ -69,37 +192,13 @@ theorem preserves_prefix_bounded (budget : Nat)
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
           (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
-  cases trace with
-  | intro resolved evaluated written =>
-    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolved.sound
-    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ :=
-      ProtectedBareAssignment.rhs_preserves_at snapshot _
-        (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) generated found environments heaps locals agrees actualTyped installed (.value evaluated)
-    cases related : result.represented with
-    | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      have saved := snapshot.represented.extend result.maps result.worlds
-      cases written with
-      | intro read sameType initial update written =>
-        cases update with
-        | leaf applied =>
-          rcases modifier_total observations profile saved rightRep
-            (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
-            (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, generatedApply, modified⟩
-          · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-          · have same := DataPlaceModifier.assignment_functional generatedApply applied
-            subst replacement
-            obtain ⟨generatedHeap, finalStore, _, generatedWrite, finalHeaps, frame, metadata, typed, agreement⟩ :=
-              commit layout snapshot bare result rightRep replacementRep applied (by simpa only [layout.sameType] using modified) actualTyped
-            have same := writes_functional generatedWrite written
-            subst generatedHeap
-            exact ⟨updatedValue, finalStore, rhsMap, rhsWorld,
-              [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
-                .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target],
-              replacementRep, finalHeaps, result.maps, result.worlds, frame, metadata, rfl, typed, agreement⟩
+  obtain ⟨updatedValue, finalStore, finalMap, finalWorld, slots, represented, finalHeaps, maps, worlds, frame, metadata, count, typed, agreement, _⟩ :=
+    Stateful.preserves_prefix_bounded_with_rhs (scope := scope) (canonical := canonical) ProtectedStateBareAssignment.unitProtocol ProtectedStateBareAssignment.unitTransport budget () layout bare extension
+    (fun snapshot child smaller {_ _} expressionTrace => by
+      obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ := rhs_preserves_at snapshot child (meaning child smaller)
+        generated found environments heaps locals agrees actualTyped installed expressionTrace
+      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
+  exact ⟨updatedValue, finalStore, finalMap, finalWorld, slots, represented, finalHeaps, maps, worlds, frame, metadata, count, typed, agreement⟩
 
 theorem preserves_prefix
     (layout : Layout compilation prepared) (bare : place.projections = [])
@@ -164,9 +263,129 @@ private theorem no_target_fault
     cases evaluated
     exact nonempty rfl
 
-/-- All independently specified bare assignment faults retain RHS prefix
+/- All independently specified bare assignment faults retain RHS prefix
 state. A target fault or structural traversal fault contradicts the empty
 path and live lexical reference, rather than being silently reclassified. -/
+namespace Stateful
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+  (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+
+theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (rhsMeaning : ∀ (snapshot : Snapshot compilation.checked registry functions prepared place environment actual before store mapping world (ξ index))
+      (child : Nat), child < budget → ∀ {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap},
+      RecursiveNamedCallBounds.ExpressionOutcome program child context evidence source environment before id outcome after →
+      ∃ value finalStore finalMap finalWorld,
+        RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+          (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot outcome after value finalStore finalMap finalWorld ∧
+        ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (_actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator id reason after) (bounded : size ≤ budget)
+    (next : Expr) (outputType : Ty) (invalid : Word)
+    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
+  have phase := snapshot_prefix layout snapshot lowered.expression next outputType
+    (binaryOperator (prepared.route.leafType = .integer) operator) invalid
+  cases trace with
+  | target fault => exact (no_target_fault snapshot bare fault.sound).elim
+  | rhs resolve fault =>
+    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
+    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result, rhsPost⟩ :=
+      rhsMeaning snapshot _
+        (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.fault fault)
+    cases represented : result.represented with
+    | fault token =>
+      exact ⟨_, rhsStore, rhsMap, rhsWorld, phase.wrap (LanguageResult.bind_failure outputType result.evaluated), token,
+        result.heaps, result.maps, result.worlds, result.frame, result.metadata, rhsPost⟩
+  | operands resolve evaluated _ _ _ _ invalidOperands =>
+    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
+    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result, rhsPost⟩ :=
+      rhsMeaning snapshot _
+        (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.value evaluated)
+    cases represented : result.represented with
+    | @value _ rightValue payload =>
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
+        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
+        (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
+        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
+          ⟨_, failed⟩ | ⟨_, _, _, applied, _⟩
+      · have failed : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
+            (modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+            (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by simpa only [layout.sameType] using failed
+        exact ⟨invalid, rhsStore, rhsMap, rhsWorld,
+          phase.wrap (LanguageResult.bind_success outputType result.evaluated (LanguageResult.bind_failure outputType failed)),
+          invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata, rhsPost⟩
+      · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
+  | structuralUpdate resolve _ _ _ _ fault =>
+    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
+    cases fault
+
+theorem preserves_fault_reachable_bounded (budget : Nat)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (layout : Layout compilation prepared) (bare : place.projections = [])
+    (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
+      ProtectedStateTransition.PreservesAt protocol (payloadModel compilation.checked registry functions) program context evidence source certificate faults size))
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCore : lowered.type = prepared.route.leafType)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
+      mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator id reason after) (bounded : size ≤ budget)
+    (next : Expr) (outputType : Ty) (invalid : Word)
+    (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact preserves_fault_reachable_bounded_with_rhs protocol budget initial layout bare extension
+    (fun snapshot child smaller {_ _} expressionTrace =>
+      Stateful.rhs_preserves_at snapshot protocol child (meaning child smaller) generated found
+        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
+
+end Stateful
+
 theorem preserves_fault_reachable_bounded (budget : Nat)
     (layout : Layout compilation prepared) (bare : place.projections = [])
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
@@ -199,43 +418,13 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
-  have phase := snapshot_prefix layout snapshot lowered.expression next outputType
-    (binaryOperator (prepared.route.leafType = .integer) operator) invalid
-  cases trace with
-  | target fault => exact (no_target_fault snapshot bare fault.sound).elim
-  | rhs resolve fault =>
-    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
-    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ :=
-      ProtectedBareAssignment.rhs_preserves_at snapshot _
-        (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) generated found environments heaps locals agrees actualTyped installed (.fault fault)
-    cases represented : result.represented with
-    | fault token =>
-      exact ⟨_, rhsStore, rhsMap, rhsWorld, phase.wrap (LanguageResult.bind_failure outputType result.evaluated), token,
-        result.heaps, result.maps, result.worlds, result.frame, result.metadata⟩
-  | operands resolve evaluated _ _ _ _ invalidOperands =>
-    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
-    obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ :=
-      ProtectedBareAssignment.rhs_preserves_at snapshot _
-        (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) generated found environments heaps locals agrees actualTyped installed (.value evaluated)
-    cases represented : result.represented with
-    | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
-        (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
-        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-          ⟨_, failed⟩ | ⟨_, _, _, applied, _⟩
-      · have failed : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
-            (modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
-            (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by simpa only [layout.sameType] using failed
-        exact ⟨invalid, rhsStore, rhsMap, rhsWorld,
-          phase.wrap (LanguageResult.bind_success outputType result.evaluated (LanguageResult.bind_failure outputType failed)),
-          invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata⟩
-      · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-  | structuralUpdate resolve _ _ _ _ fault =>
-    obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
-    cases fault
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.preserves_fault_reachable_bounded_with_rhs (scope := scope) (canonical := canonical) ProtectedStateBareAssignment.unitProtocol budget () layout bare extension
+    (fun snapshot child smaller {_ _} expressionTrace => by
+      obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ := rhs_preserves_at snapshot child (meaning child smaller)
+        generated found environments heaps locals agrees actualTyped installed expressionTrace
+      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
+  exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩
 
 theorem preserves_fault_reachable
     (layout : Layout compilation prepared) (bare : place.projections = [])

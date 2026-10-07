@@ -73,6 +73,62 @@ variable {program : Program} {context : SourceSemantics.Context} {evidence : Dyn
 
 /-- A successful RHS and modifier produce an exact whole-prefix agreement,
 including typed seven slots for the real renamed continuation. -/
+theorem commit_with_write {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {ambient : AmbientDefinitions compilation.checked.catalog.definitions} {functions : FunctionModel compilation.checked.catalog ambient}
+    (layout : Layout compilation prepared)
+    (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
+    (bare : place.projections = [])
+    {right updated : Dynamic.Value} {rightValue updatedValue : Value} {rhsHeap : Dynamic.Heap}
+    {rhsStore : Store} {rhsMap : LocationMap} {rhsWorld : StoreTyping} {operator : Syntax.ValueAssignOp} {invalid : Word}
+    (rhs : RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot (.value right) rhsHeap
+        (.inRight .word rightValue) rhsStore rhsMap rhsWorld)
+    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType)
+    (replacement : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
+    (applied : Dynamic.AssignmentValueApplies operator snapshot.initial right updated)
+    (modified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
+      (modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+      (.inRight .word updatedValue) rhsStore)
+    {actualContext : Core.Context} (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions) :
+    ∃ after finalStore,
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+        environment heap place id updated after ∧
+      Dynamic.Heap.Writes rhsHeap snapshot.location (some updated) after ∧
+      HeapRepresents compilation.checked registry functions rhsMap rhsWorld after finalStore ∧
+      AdministrativePreserved mapping store rhsMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+      RuntimeEnvironmentHasTypes rhsWorld
+        (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue updatedValue updatedValue actual)
+        (writtenContext prepared actualContext) ambient.definitions ∧
+      AdministrativePreserved rhsMap rhsStore rhsMap finalStore ∧
+      Dynamic.HeapMetadataExtend rhsHeap after ∧
+      ∀ next outputType, ContinuationAgreement actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue updatedValue updatedValue actual)
+        finalStore (shift 7 (next.rename ξ)) := by
+  obtain ⟨latest⟩ := rhs.latest
+  obtain ⟨initial, initialValue⟩ := cell_initial latest.related
+  have written := DataPlaceCommitReflection.source_writes latest.read updated
+  obtain ⟨finalStore, coreWritten, finalHeaps, writeFrame⟩ :=
+    rhs.heaps.write_initialized latest.reference latest.read (latest.type.symm ▸ replacement) written
+  have trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment heap place id updated
+        ⟨rhsHeap.cells.set snapshot.location.index {latest.cell with value := some updated}⟩ := by
+    cases rhs.trace with
+    | value right =>
+      exact .intro (snapshot.resolves bare) right
+        (.intro latest.read (latest.type.trans snapshot.type.symm) initialValue (.leaf applied) written)
+  refine ⟨_, finalStore, trace, written, finalHeaps, rhs.frame.trans writeFrame, rhs.metadata.trans (.of_write written), ?_, writeFrame, .of_write written, ?_⟩
+  · exact .cons .unit (.cons replacement.runtime_hasType (.cons replacement.runtime_hasType
+      (.cons rightRep.runtime_hasType (.cons (snapshot.represented.extend rhs.maps rhs.worlds).runtime_hasType
+        (.cons .unit (.cons (.cellRef latest.reference.typed) (actualTyped.weaken rhs.worlds)))))))
+  · intro next outputType
+    exact (snapshot_prefix layout snapshot _ _ _ _ _).trans
+      ((ContinuationAgreement.bind rhs.evaluated).trans
+        ((ContinuationAgreement.bind modified).trans
+          ((ContinuationAgreement.bind (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)).trans
+            (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten)))))
+
 theorem commit {compilation : SourceCoreCompatibleDataPlaces.Context}
     {ambient : AmbientDefinitions compilation.checked.catalog.definitions} {functions : FunctionModel compilation.checked.catalog ambient}
     (layout : Layout compilation prepared)
@@ -104,27 +160,8 @@ theorem commit {compilation : SourceCoreCompatibleDataPlaces.Context}
           (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
         (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue updatedValue updatedValue actual)
         finalStore (shift 7 (next.rename ξ)) := by
-  obtain ⟨latest⟩ := rhs.latest
-  obtain ⟨initial, initialValue⟩ := cell_initial latest.related
-  have written := DataPlaceCommitReflection.source_writes latest.read updated
-  obtain ⟨finalStore, coreWritten, finalHeaps, writeFrame⟩ :=
-    rhs.heaps.write_initialized latest.reference latest.read (latest.type.symm ▸ replacement) written
-  have trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment heap place id updated
-        ⟨rhsHeap.cells.set snapshot.location.index {latest.cell with value := some updated}⟩ := by
-    cases rhs.trace with
-    | value right =>
-      exact .intro (snapshot.resolves bare) right
-        (.intro latest.read (latest.type.trans snapshot.type.symm) initialValue (.leaf applied) written)
-  refine ⟨_, finalStore, trace, written, finalHeaps, rhs.frame.trans writeFrame, rhs.metadata.trans (.of_write written), ?_, ?_⟩
-  · exact .cons .unit (.cons replacement.runtime_hasType (.cons replacement.runtime_hasType
-      (.cons rightRep.runtime_hasType (.cons (snapshot.represented.extend rhs.maps rhs.worlds).runtime_hasType
-        (.cons .unit (.cons (.cellRef latest.reference.typed) (actualTyped.weaken rhs.worlds)))))))
-  · intro next outputType
-    exact (snapshot_prefix layout snapshot _ _ _ _ _).trans
-      ((ContinuationAgreement.bind rhs.evaluated).trans
-        ((ContinuationAgreement.bind modified).trans
-          ((ContinuationAgreement.bind (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)).trans
-            (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten)))))
+  obtain ⟨after, finalStore, trace, written, heaps, frame, metadata, typed, _, _, agreement⟩ :=
+    commit_with_write layout snapshot bare rhs rightRep replacement applied modified actualTyped
+  exact ⟨after, finalStore, trace, written, heaps, frame, metadata, typed, agreement⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignment
