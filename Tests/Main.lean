@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreOwnedSelectedLiteralCall
 import Solcore.Test.SourceCoreClosedOwnedMethodPrincipalBuiltin
 import Solcore.Test.SourceCoreCompatiblePayload
 import Solcore.Test.SourceCoreCompatibleMappings
