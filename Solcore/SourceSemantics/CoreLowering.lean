@@ -663,6 +663,12 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadin
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateBareAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMarkedAllocation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyStaticOrigins
+import Solcore.SourceSemantics.CoreLowering.CallableRuntimeNamedBodyFamily
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedHeaderReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCanonicalState
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
