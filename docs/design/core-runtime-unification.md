@@ -10,8 +10,8 @@ Created: 2026-09-30. Updated: 2026-10-08.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest implementation commit | `c9f7c27b`. Authentic nested packets run through the original expression Tree and closed named family. Anonymous parameter entries retain those packets, and closed actual method steps compose ordered coercion paths. |
-| Latest verification of all registered modules | Verified on 2026-10-08 at `c9f7c27b`: normal build (5169 jobs), all registered `lake test` executions, a strict audit of 2644 declarations, exact retained API comparisons, and the semantic kernel policy. Earlier units have separate kernel audits. |
+| Latest implementation commit | `96ff5942`. Nested anonymous bodies now close internally at authentic parameter entries. Indirect body continuations use actual argument posts, and the original lambda producer retains full selection receipts. |
+| Latest verification of all registered modules | Verified on 2026-10-08 at `96ff5942`: proof umbrella and Tests.Main build (5106 jobs), all registered `lake test` executions, a strict audit of 2744 declarations, exact retained API comparisons, and the semantic kernel policy. Earlier units have separate kernel audits. |
 | Working implementation | Connect actual selected indirect calls to closed anonymous bodies and the shared family, preserve authentic formation receipts through value storage, complete live method dispatch, and extract all static factories. Source admission at public entry points, all pass composition and the final public compiler theorem remain incomplete. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
