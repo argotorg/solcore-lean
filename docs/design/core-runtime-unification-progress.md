@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `978dba8b`. The original finite for proofs now thread readiness through actual condition, body, normalized post and recursive states, preserving the real self-cell read. Native activation keeps the original Source heap and includes the actual post code. Genuine ForItems execution supplies admission at both the original restored context and the actual static final context. Function finish retains the same reached flow state and separate fault history. A literal-false while consumer constructs both Source and native completions internally, including genuine final self-cell/frame reads.
+The latest implementation commit is `0d4fc1ba`. The same match preservation and reflection cores retain actual scrutinee, selection, body and restored states. Source hidden and pattern allocations establish deep heap typing at the single combined selection post, with no intermediate protocol state. Genuine selected-body typing remains separate from the compiler certificate. Restoration retains the exact returned pool; faults retain stable row histories.
 
-The latest normal build of the proof umbrella and `Tests.Main` passed **5155 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **3834 declarations** against the three permitted standard axioms. All **130** original declarations in the five modified modules retain identical raw types and axiom sets. The same three measured for folds and two finite function-finish cores are reused. Every final source passed independent exact-hash reviews. Earlier original-expression comparisons remain recorded below. The semantic kernel policy and whitespace checks passed; **5019 protected original files** remain unchanged.
+The latest normal build of the proof umbrella and `Tests.Main` passed **5158 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **3862 declarations** against the three permitted standard axioms. All **56** original match declarations retain identical raw types and axiom sets. The same three finite match cores are reused. Every final source passed independent exact-hash reviews. Earlier API and original-expression comparisons remain recorded below. The semantic kernel policy and whitespace checks passed; **5019 protected original files** remain unchanged.
 
-Records: `/private/tmp/solcore-owned-functions-resume-20261007/for-finish-while-ten-validation.json` and its build, test, kernel and API logs. For initializer/post header readiness and full match execution are being connected to the original CatalogSites fold. General body closure, selected indirect/method closure, staging/pass composition and the public compiler theorem remain incomplete.
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/match-ready-six-validation.json` and its build, test, kernel and API logs. High match endpoints, for initializer/post headers and actual Source facts are being connected to the original CatalogSites fold. General body closure, selected indirect/method closure, staging/pass composition and the public compiler theorem remain incomplete.
 
 ### Implementation in progress
 
@@ -2118,3 +2118,14 @@ Next: connect authentic for initializer/post contexts and match selected-prefix/
 Validation: proof umbrella plus Tests.Main 5155 jobs, all registered execution tests, 3834 strict kernel declarations, all 130 original raw types and axiom sets exact, semantic policy and whitespace checks, and 5019 protected original files unchanged. Final sources passed exact-hash independent reviews. The original three measured for folds and two finite finish cores are reused; no Core instruction or execution induction was added.
 
 Next: finish actual for header/post and match selected-body readiness; thread their genuine Source facts through the original CatalogSites fold and body kernel. Close their strict child obligations inside the existing shared measured family before connecting the final compiler and public-entry theorem.
+
+### 2026-10-08: actual match selection and restoration verified at `0d4fc1ba`
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `dd3fbc4d` | The same preservation and reflection cores retain actual scrutinee, combined selection, body and restored states. Genuine Source selected-body typing and compiler certificates feed strict body callbacks separately. Successful posts retain readiness; faults retain their actual row history. | High parent Source facts and the existing CatalogSites fold must supply and internally discharge the strict child callbacks. |
+| `0d4fc1ba` | Real Source hidden and pattern allocations establish admission at the single actual selected state. Original pattern typing supplies raw binding types; genuine binder extension aligns the Source context. The same body post is restored without rebuilding its pool. | General mixed body closure and final pass/public compiler integration remain in progress. |
+
+Validation: proof umbrella plus Tests.Main 5158 jobs, all registered execution tests, 3862 strict kernel declarations, all 56 original raw types and axiom sets exact, semantic policy and whitespace checks, and 5019 protected original files unchanged. All six final sources passed independent exact-hash reviews. The same three finite match cores are reused; no Core instruction or execution induction was added.
+
+Next: complete high match and for header/post providers from genuine Source typing at actual states; compose them inside the original CatalogSites and general body kernel. Internal shared-family closure and final compiler/public-entry integration remain necessary.
