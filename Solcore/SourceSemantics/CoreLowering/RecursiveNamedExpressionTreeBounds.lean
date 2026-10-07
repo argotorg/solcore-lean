@@ -5,6 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositions
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionHeadBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
 
 /-! The existing recursive expression Tree closes its child obligations within
 one inclusive budget. All catalog body obligations remain explicit below that
@@ -17,6 +18,8 @@ namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBound
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open CallableAncestryPairedLookup RecursiveNamedCatalog
 open RecursiveNamedCatalogInvocationBounds
+
+universe u v
 
 variable {checked : Checked} {base : Base checked}
   {prepared : SourceCoreCallableIndexedAncestry.Prepared base} {values : SourceCoreCompatibleValues.Context}
@@ -40,6 +43,123 @@ variable {checked : Checked} {base : Base checked}
   (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
   {certificate : GenericExpressionMeaning.Certificate}
+
+private def pointCertificate (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
+    (lowered : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
+  fun current expression code => current = scope ∧ expression = id ∧ code = lowered
+
+/-- One support fold serves every pointwise meaning family. Child membership
+retains the original ordered Entries certificate and the same inclusive budget. -/
+theorem fold_at_with_literals
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (Meaning : Nat → SourceCoreLocalCell.Scope → ExpressionId → SourceCoreBasic.LoweredExpr → Prop)
+    (budget : Nat)
+    (fragments : ∀ size, size ≤ budget → ∀ {scope id lowered}
+      (child : CompatibleExpressionBuiltins.Tree fuel values source context solved reasonAt scope id lowered),
+      child.LiteralSites literals → Meaning size scope id lowered)
+    (heads : ∀ certificate size, size ≤ budget →
+      (∀ child, child ≤ budget → ∀ {scope id lowered}, certificate scope id lowered → Meaning child scope id lowered) →
+      ∀ {scope id lowered}, CompatibleExpressionCalls.Head calls values source context reasonAt certificate scope id lowered →
+        Meaning size scope id lowered)
+    {size : Nat} (within : size ≤ budget) {scope id lowered}
+    (tree : CompatibleExpressionCalls.Tree calls fuel values source context solved reasonAt scope id lowered)
+    (sites : tree.LiteralSites literals) : Meaning size scope id lowered := by
+  induction sites generalizing size with
+  | fragment child childSites => exact fragments size within child childSites
+  | @node id lowered entries head children childSites ih =>
+    have meanings : ∀ child, child ≤ budget → ∀ {current expression code},
+        CompatibleExpressionCalls.Entries scope entries current expression code → Meaning child current expression code := by
+      intro child childWithin current expression code certified
+      obtain ⟨rfl, member⟩ := certified
+      exact ih expression code member childWithin
+    exact heads _ size within meanings head
+
+/-- Certificate selection and gathering adapt the same support fold to a
+bounded contract. These operations change only its static certificate premise. -/
+theorem fold_contract_at_with_literals
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (Meaning : Nat → GenericExpressionMeaning.Certificate → Prop)
+    (select : ∀ {size certificate}, Meaning size certificate → ∀ {scope id lowered},
+      certificate scope id lowered → Meaning size (pointCertificate scope id lowered))
+    (gather : ∀ {size certificate},
+      (∀ {scope id lowered}, certificate scope id lowered → Meaning size (pointCertificate scope id lowered)) →
+      Meaning size certificate)
+    (budget size : Nat) (within : size ≤ budget)
+    (fragments : ∀ child, child ≤ budget → Meaning child
+      (CompatibleExpressionBuiltins.Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals))
+    (heads : ∀ certificate child, child ≤ budget →
+      (∀ smaller, smaller ≤ budget → Meaning smaller certificate) →
+      Meaning child (CompatibleExpressionCalls.Head calls values source context reasonAt certificate)) :
+    Meaning size (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls)
+      (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved)
+      (reasonAt := reasonAt) literals) := by
+  apply gather
+  intro scope id lowered supported
+  obtain ⟨tree, sites⟩ := supported
+  exact fold_at_with_literals calls (fun child scope id lowered => Meaning child (pointCertificate scope id lowered))
+    budget (fun child childWithin _ _ _ fragment sites => select (fragments child childWithin) ⟨fragment, sites⟩)
+    (fun certificate child childWithin children _ _ _ head =>
+      select (heads certificate child childWithin (fun smaller smallerWithin => gather (children smaller smallerWithin))) head)
+    within tree sites
+
+/-- Stateful fragments and heads return their actual post-witnesses. The same
+support fold supplies each ordered child at the original inclusive budget. -/
+theorem preserves_at_with_state {Records : Type v}
+    (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (budget size : Nat) (within : size ≤ budget)
+    (fragments : ∀ child, child ≤ budget → ProtectedStateTransition.PreservesAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (CompatibleExpressionBuiltins.Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults child)
+    (heads : ∀ certificate child, child ≤ budget →
+      (∀ smaller, smaller ≤ budget → ProtectedStateTransition.PreservesAt protocol
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults smaller) →
+      ProtectedStateTransition.PreservesAt protocol
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Head calls values source context reasonAt certificate) faults child) :
+    ProtectedStateTransition.PreservesAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls) (fuel := fuel) (values := values)
+        (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults size := by
+  exact fold_contract_at_with_literals calls
+    (fun child certificate => ProtectedStateTransition.PreservesAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults child)
+    (fun meaning _ _ _ certified _ _ _ point => by
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact meaning certified)
+    (fun meanings scope id lowered certified => meanings certified ⟨rfl, rfl, rfl⟩)
+    budget size within fragments heads
+
+/-- Original Core grades choose the stateful child contracts; Source grades
+and the concrete reached witnesses are returned by those same contracts. -/
+theorem reflects_at_with_state {Records : Type v}
+    (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (calls : GenericExpressionMeaning.Certificate → GenericExpressionMeaning.Certificate)
+    (budget size : Nat) (within : size ≤ budget)
+    (fragments : ∀ child, child ≤ budget → ProtectedStateTransition.ReflectsAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (CompatibleExpressionBuiltins.Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults child)
+    (heads : ∀ certificate child, child ≤ budget →
+      (∀ smaller, smaller ≤ budget → ProtectedStateTransition.ReflectsAt protocol
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults smaller) →
+      ProtectedStateTransition.ReflectsAt protocol
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+        (CompatibleExpressionCalls.Head calls values source context reasonAt certificate) faults child) :
+    ProtectedStateTransition.ReflectsAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
+      (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls) (fuel := fuel) (values := values)
+        (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults size := by
+  exact fold_contract_at_with_literals calls
+    (fun child certificate => ProtectedStateTransition.ReflectsAt protocol
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults child)
+    (fun meaning _ _ _ certified _ _ _ point => by
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact meaning certified)
+    (fun meanings scope id lowered certified => meanings certified ⟨rfl, rfl, rfl⟩)
+    budget size within fragments heads
 
 include extension faithful functionLeaves functionTypes unique missing in
 /-- Every existing head uses child obligations at the same inclusive budget;
@@ -286,26 +406,22 @@ theorem preserves_at_with_literals_with_for (calls : GenericExpressionMeaning.Ce
     RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls)
-        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
       P := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites generalizing size with
-  | fragment child childSites =>
-    intro root found
+  apply fold_contract_at_with_literals calls
+    (fun child certificate => RecursiveNamedBoundedContracts.PreservesAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P)
+    (fun meaning _ _ _ certified _ _ _ point => by
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact meaning certified)
+    (fun meanings scope id lowered certified => meanings certified ⟨rfl, rfl, rfl⟩)
+    budget size within
+  · intro child childWithin
     exact RecursiveNamedBoundedContracts.preserves_at_of_unbounded
       (ProtectedExpressionMeaning.preserves_of_typed P
         (CompatibleExpressionBuiltins.preserves_with_literals functions extension faithful functionLeaves functionTypes
-          program evidence unique uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
-  | @node id lowered entries head children childSites ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.PreservesAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
-        (CompatibleExpressionCalls.Entries scope entries) faults
-        P := by
-      intro child childWithin current expression code certified
-      obtain ⟨rfl, member⟩ := certified
-      exact ih expression code member child childWithin
-    intro root found
-    exact heads _ size within meaning head found
+          program evidence unique uninitialized missing literalMeaning)) child
+  · exact heads
 
 include extension faithful functionLeaves functionTypes unique owners uninitialized missing in
 theorem preserves_at_with_literals_with (authenticated : Bool)
@@ -408,26 +524,22 @@ theorem reflects_at_with_literals_with_for (calls : GenericExpressionMeaning.Cer
     RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Tree.WithLiterals (calls := calls)
-        (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
+      (fuel := fuel) (values := values) (source := source) (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults
       P := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites generalizing size with
-  | fragment child childSites =>
-    intro root found
+  apply fold_contract_at_with_literals calls
+    (fun child certificate => RecursiveNamedBoundedContracts.ReflectsAt child
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source certificate faults P)
+    (fun meaning _ _ _ certified _ _ _ point => by
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact meaning certified)
+    (fun meanings scope id lowered certified => meanings certified ⟨rfl, rfl, rfl⟩)
+    budget size within
+  · intro child childWithin
     exact RecursiveNamedBoundedContracts.reflects_at_of_unbounded
       (ProtectedExpressionMeaning.reflects_of_typed P
         (CompatibleExpressionBuiltins.reflects_with_literals functions extension faithful functionLeaves functionTypes
-          program evidence uninitialized missing literalMeaning)) size ⟨child, childSites⟩ found
-  | @node id lowered entries head children childSites ih =>
-    have meaning : ∀ child, child ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt child
-        (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source
-        (CompatibleExpressionCalls.Entries scope entries) faults
-        P := by
-      intro child childWithin current expression code certified
-      obtain ⟨rfl, member⟩ := certified
-      exact ih expression code member child childWithin
-    intro root found
-    exact heads _ size within meaning head found
+          program evidence uninitialized missing literalMeaning)) child
+  · exact heads
 
 include extension faithful functionLeaves functionTypes uninitialized missing in
 theorem reflects_at_with_literals_with (authenticated : Bool)
