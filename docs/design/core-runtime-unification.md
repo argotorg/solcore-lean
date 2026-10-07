@@ -10,9 +10,9 @@ Created: 2026-09-30. Updated: 2026-10-07.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest implementation commit | `0bb0c9ee`. Includes staged Integer functions, AuthorityPool, actual template permission, and the connection of additional child expressions to compiler induction. |
-| Latest verification of all registered modules | Verified on 2026-10-05 with 8 uncommitted shared registration lines based on `0bb0c9ee`. Checked the umbrella build with 2083 jobs, all tests with 10018 jobs and all executions, 38 Main declarations, artifacts and imports for 5008 modules, axioms, and the kernel. |
-| Temporary implementations | The first isolated compilation of Values with owner keys, an uncompiled Entry fragment, and a proposal for general lambda bodies. These are excluded from the repository implementation and completed proofs. |
+| Latest implementation commit | `b5ba23a4`. Includes owned values/call entries, ordered expression state, actual snapshot-producing ordinary allocation, binder restoration and function finish. |
+| Latest verification of all registered modules | Verified on 2026-10-07 at `b5ba23a4`: normal umbrella and test-entry build (5022 jobs), all registered `lake test` executions, strict audit of 410 declarations and the semantic kernel policy. |
+| Working implementation | Lexical Tree and imperative producers are being connected to actual allocation and reached-state contracts. General bodies and the full compiler theorem remain incomplete. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Anyone resuming implementation should first read the current status and the handoff at the end of the [implementation record](core-runtime-unification-progress.md). Public API users should consult the [API migration record](core-runtime-unification-api.md); see the [T0 audit](core-runtime-unification-audit.md) for the initial compatibility and semantics investigation.
@@ -972,8 +972,8 @@ Tests may be renamed or split, but removing tests from imports alone does not co
 ## 12. Procedure for Resuming Implementation
 
 1. Check this document's current implementation status, the opening and latest additions of the [implementation record](core-runtime-unification-progress.md), applicable AGENTS.md, and `git status`. Preserve other inference/parser work.
-2. Reconcile the implementation verification baseline `0bb0c9ee` with the 8 uncommitted shared registration lines. The latest full-test verification concerns the 2026-10-05 working tree; do not apply it unchanged to new source changes.
-3. Complete and verify the 3 planned files for Values with owner keys, Entries, and formal Test in an isolated environment. Distinguish the first successful compilation of temporary Values from the uncompiled Entry fragment.
+2. Start from the committed verification point `b5ba23a4` and inspect current proof changes. Shared registrations and owned Values/Entries/State are committed; rerun appropriate checks for later changes.
+3. Thread the concrete reached state through ordered expressions, actual marked allocations, lexical tails and five-way imperative flow. Reuse the existing static Tree/CatalogSites and Source/Core size proofs.
 4. Retain actual SourceReceipt, complete type substitution and capturePrefix, and the same Source/Core value model and Entry. Do not force actual general captures of nested lambdas into existing theorems limited to prefix0.
 5. Call restoration installs saved frames in the reached AuthorityPool. Preserve records added during callee, argument, or body evaluation, shared and distinct frames, all captures, and snapshots.
 6. Connect the actual lowerer's callee and ordered arguments, original Source derivations, and strict child sizes in original Core to the existing single mutual induction. Static child-expression authentication and template permission do not replace body meaning preservation.

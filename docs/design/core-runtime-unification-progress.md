@@ -30,28 +30,26 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified working tree point
+### Latest committed verification point
 
-The implementation verification baseline is `0bb0c9ee`. The verified working tree contains **8 uncommitted shared registration lines**: 3 import lines in `SourceSemantics/CoreLowering.lean`, and 4 import lines plus 1 runner line in `Tests/Main.lean`. These register the residual integer function proof from `618cd059`, AuthorityPool from `85da3f04`, template permission from `a3e0f4ab`, and formal tests for additional child expressions from `0bb0c9ee`. The only new runtime runner is `SourceCoreStagedIntegerResidualMeaning.run`; existing declarations and execution order are preserved.
+The shared staged-function, authority-pool, template-permission and additional-child registrations are committed in `f0d6b5c2`. The owned function relation and live call-entry/restoration adapters are committed in `6afb5d58`. The dependent protected-state protocol, ordered record-prefix relation, actual snapshot/restore transitions and shared expression Tree fold are committed in `375cdd53`. Function finish forwards the actual flow state in `c4d02229`; ordered expressions and primitive/control heads do so in `28c302a8`. Actual ordinary allocation and binder removal retain registered snapshots in `b5ba23a4`.
 
-This working tree was verified on 2026-10-05.
+The latest normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5022 jobs**, and `lake test` passed all registered executions. A strict `--trust=0` audit checked all **410 declarations** in the expression, allocation, finish and formal-consumer modules against the three permitted standard axioms. The preceding state/Tree unit passed a 5016-job integrated build, all registered executions and a 144-declaration audit. The preceding owned-value/call-entry unit passed a 5012-job integrated build, all registered executions, and a strict audit of 247 declarations. The retained public parameter and Tree theorem types are unchanged; generated helpers moved or disappeared when their shared proofs were factored.
 
-- CoreLowering umbrella: **2083 jobs**.
-- `lake test`: **10018 jobs and all registered runtime tests** passed.
-- The complete names, raw type ASTs, displayed types, and axioms of 38 Main-owned declarations matched across 5 artifacts: the historical artifact, the artifact immediately before integration, recompilation from the same source, isolated, and normal.
-- For the current **5008 modules**, actual artifacts, canonical module names, and complete import sequences including order and attributes were compared. Kernel, fixed cache, and protected 5076 files also matched.
-- Umbrella, all tests, and the final audit actually exited 0. Ownership of the normal cache has been released (`NONE`).
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/`. Unrelated inference/parser work remains outside these commits.
 
-Records are in `/private/tmp/solcore-runtime-owned-callable-integration/`. On 2026-10-07 the documentation was updated and the records rechecked; this was not a rerun of all tests. Registration changes are verified but must not be treated as committed. The earlier committed overall verification point `20751d99` had umbrella 2079 jobs, all tests 10004 jobs, and 5001 current modules; it remains in the history below.
+### Implementation in progress
+
+The next unit connects the actual allocation producer to the existing lexical Tree and imperative CatalogSites proofs. Block, sequence and conditional producers must forward the reached witness. A static physical-owner/stable-frame receipt supplies allocation readiness at each reached state through the actual retained frame read; it contains no body execution law.
+
+These changes do not yet close the general body or full compiler theorem. Existing imperative producers still need to return actual reached state through lexical lets, assignments, loops, matches and five-way control flow before the body kernel can consume it.
 
 ### Next implementation units and remaining obligations
 
-1. Complete the representation in which function values retain their capture owner's key, and Entry in the same model. Retain actual named/lambda receipts, complete Source captures, and type substitution rows.
-2. Connect callee, ordered arguments, general bodies, and return to the same mutual induction as preservation of the active AuthorityPool. On return from a call, install the saved caller frame into the reached pool, preserving records added during the body.
-3. Compose practical views for nested lambda, indirect calls, method/coercion, and local instantiation into the same value and heap relations. Do not infer body semantic preservation from static template permission or acceptance of child expressions.
-4. Connect the actual specialization, evidence, and staging passes, and close preservation of normal results, language failures, and all state, together with reflection of finite completion, from Source before pre-evaluation to the actual public Core path. Do not leave external unproved body/pass laws as final premises.
-
-For the temporary implementation status and restart point, see “2026-10-07: Next proof for function values and call frames” at the end.
+1. Thread initializer post-state into the actual allocation producer, feed its registered post-state into the lexical tail, and remove binders from the tail's reached witness. Reuse the existing lexical Tree and CatalogSites proofs.
+2. Connect callee, ordered arguments, general bodies and return to the same mutual induction. On return, install the saved caller frame into the reached pool, retaining every ordered record list created during the body.
+3. Connect nested lambda, indirect calls, method/coercion and local instantiation to the same value/heap relations. Retain actual Source receipts, complete captures, dictionaries and type-substitution rows.
+4. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
 
 ## History by commit
 
@@ -1793,18 +1791,19 @@ Normal focused 3 was 1,668/1,670/1,847 jobs. 58768/19210/45030 and Root final 98
 Records: `/private/tmp/solcore-recursive-named-expression-extra-children/refresh/`. Documentation is uncommitted. Shared registration/all tests are complete through verification of the 8 uncommitted lines above. Connections of actual catalog authority to callees/arguments/bodies retaining the same function representation continue.
 
 
-## 2026-10-07: next proof for function values and call frames
+## 2026-10-07: owned values, call frames and reached state
 
-This section hands over work in temporary directories; do not count it as implementation already added to the repository or completed main theorems.
-
-| Work | Actually confirmed status | Restart point |
+| Commit | Completed scope | Remaining boundary |
 | --- | --- | --- |
-| Function values with owner keys | The 518-line temporary Values implementation passed its first isolated compilation. Covers named/lambda captures, original Source provenance, and reads of initialized code. Verification/registration/commit of all 3 planned files including Entries/formal Test have not been performed. | `/private/tmp/solcore-callable-indexed-owned-functions/values-first-review.lean`. Planned modules: `CallableIndexedOwnedFunctionValues`, `CallableIndexedOwnedFunctionEntries`, and corresponding formal Test. |
-| Pool helper proofs for restoring call frames | The 205-line fragment is **source-only/uncompiled**. Designed to retain reached records and restore saved caller frames through actual restore. Do not use it as a completed proof. | `/private/tmp/solcore-owned-functions-entry-fragment/OwnedPoolEntriesFragment.lean` and `handoff.json`. |
-| General lambda body connections | Design proposal only. Retains actual SourceReceipt and complete capturePrefix. Rejects proofs that forget existing weak value relations and then return only results to stronger relations. | `/private/tmp/solcore-owned-functions-body-design/proposal.txt`. |
+| `f0d6b5c2` | Registers the existing staged Integer proof, authority pool, template permission and additional-child formal consumers in the shared umbrella and test entry. | The full compiler theorem remains incomplete. |
+| `6afb5d58` | Introduces owned named/lambda values retaining actual Source receipts, ordered dictionaries and complete captures; selects live call authority; retains parameter prefixes and restores saved frames into the reached pool. | General body execution must return that reached pool. |
+| `375cdd53` | Introduces concrete protected-state witnesses and ordered record-prefix relations, proves actual snapshot and restore transitions, and factors the same static expression Tree fold for legacy and stateful contracts. | Body producers and the mutual call proof still need to consume these contracts. |
+| `c4d02229` | Reuses the measured finish proof to return the flow's actual reached state for return, unit, fault, break and continue. | The general flow producer remains an internal induction premise. |
+| `28c302a8` | Reuses ordered-sequence and bounded primitive/control head proofs to thread real child post-witnesses through success, failure and short-circuit paths. Formal consumers use real lazy mapping initialization, repeated children and original native completion. | General body and call induction remain unfinished. |
+| `b5ba23a4` | Retains exact capture selection in ordinary allocation, registers its actual snapshot in the selected live row, and removes the source binder from the reached witness without losing new records. | Lexical Tree and imperative producers still need this allocation result. |
 
-These temporary files may move or disappear. On resuming, recheck actual sources/hashes/actual exit records/dependency artifacts and verify all planned files before introduction into normal caches. Successful isolated compilation of minimal interfaces does not guarantee semantic preservation of general bodies.
+Restoration uses `reached.install selected savedRow.frame.history`. Every reached record list survives in order with duplicates; rows sharing the selected physical frame receive the saved current/history, and distinct frames retain their reached history. Complete captures and actual snapshot reads remain intact.
 
-Existing restore lemmas in `CallableIndexedAuthorityPool` alone cannot connect preservation of all records added during bodies to final calls. New consumers use `reached.install selected savedRow.frame.history` as their baseline, retaining all rows sharing the same physical frame, all rows in different frames, complete captures, and snapshot reads. Use actual body Source/original Core child sizes and reuse the sole existing induction.
+The original temporary Values and Entry fragments have been replaced by the committed modules above. They are historical scratch work, not the current restart point. The current sources are `CallableIndexedOwnedFunctionValues`, `CallableIndexedOwnedFunctionEntries`, `CallableIndexedOwnedFunctionState`, `ProtectedState` and `ProtectedStateTransition`.
 
-The 8 uncommitted shared registration lines are complete at the verification point above. Following instructions on 2026-10-07, commit README and the main design/audit/API/implementation log together as documentation updates. Exclude the 8 shared registration lines and other inference/parser work from this documentation commit.
+Ordered expression, allocation and function-finish proofs now retain concrete post-witnesses. Formal consumers verify actual state changes and snapshot retention. Administrative transport preserves the input's records and cannot substitute for dynamic registration. The next lexical/imperative integration and the final general-body/compiler theorems remain unfinished.
