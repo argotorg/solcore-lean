@@ -1,8 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
 
 /-! Selected indirect-call Source adapters retain the actual compiler receipt,
-original parent node and prepared callsite. Source suffix construction uses
-original measured children; argument counts follow existing Source preservation
+original parent node and prepared callsite. Caller protocols carry their same
+actual pools separately from the selected closure capture protocol. Source suffix
+construction uses original measured children; argument counts follow existing Source preservation
 under real Source admission. -/
 set_option autoImplicit false
 set_option maxHeartbeats 1600000
@@ -11,6 +12,64 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open CallableIndexedOwnedFunctionState CallableIndexedHistory CallableIndexedLambdaValues
 open CallableIndexedOwnedIndirectExpressionHeads
 open RecursiveNamedCatalogInvocationBounds (Below)
+open CallableIndexedOwnedExpressionHeads (argumentProtocol)
+
+universe u
+
+section LegacyBody
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+/-- Compatibility adds only the already authentic global-slot proof beside
+one actual base entry and its same returned pool. -/
+private theorem body_preserves_to_canonical
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys) (callerPrefix : Nat)
+    (origin : CallableRuntimeBodyOrigins.StaticOrigin (.initial compiled.compatible.checked)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed) registry faults)
+    {size : Nat}
+    (meaning : CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size) :
+    CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (argumentProtocol (headers := headers) owner callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size := by
+  intro entry outcome after trace
+  let baseEntry : CallableRuntimeBodyOrigins.Stateful.Entry (protocol headers keys)
+      (CallableIndexedOwnedAllocationProducer.StableOwner keys) origin
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) :=
+    { entry with initial := entry.initial.val }
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+      frame, metadata, exit, reached, related⟩ := meaning baseEntry trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+    frame, metadata, exit, ⟨reached, entry.initial.property⟩, related⟩
+
+/-- Native compatibility retains its independently obtained Source grade and
+adds the same slot proof to the actual reached pool. -/
+private theorem body_reflects_to_canonical
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys) (callerPrefix : Nat)
+    (origin : CallableRuntimeBodyOrigins.StaticOrigin (.initial compiled.compatible.checked)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed) registry faults)
+    {size : Nat}
+    (meaning : CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (protocol headers keys) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size) :
+    CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (argumentProtocol (headers := headers) owner callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program origin size := by
+  intro entry value finalStore completed
+  let baseEntry : CallableRuntimeBodyOrigins.Stateful.Entry (protocol headers keys)
+      (CallableIndexedOwnedAllocationProducer.StableOwner keys) origin
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) :=
+    { entry with initial := entry.initial.val }
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds,
+      frame, metadata, exit, reached, related⟩ := meaning baseEntry completed
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, heaps, maps, worlds,
+    frame, metadata, exit, ⟨reached, entry.initial.property⟩, related⟩
+
+end LegacyBody
 
 section Source
 variable {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -257,10 +316,63 @@ private theorem parent_result {finalMap : LocationMap} {finalWorld : StoreTyping
   | fault matched => exact .fault matched
 
 include prepared parent children nativeTypes escaped rawResult nativeResult environments heaps locals capturesValid agrees typed
-  stable wellFormed runtime covers heapTyped sourceArguments sourceCount in
+  wellFormed runtime covers heapTyped sourceArguments sourceCount in
 /-- Reflection of this accepted selected parent uses the actual callee post,
 original argument/body grades and the same returned pool. Source reconstruction
 uses the original parent node and independently graded child traces. -/
+theorem reflects_bounded_with_caller
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedCallerProtocol.Carrier (headers := headers) callerProtocol)
+    (callerInitial : callerProtocol.State ⟨callerScope, mapping, world, calleeHeap, store, canonical⟩)
+    (callerStable : StableRows (callerBridge.pool callerInitial)) (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt callerProtocol
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.ReflectsAt
+      (argumentProtocol (headers := headers) closure.owner closure.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (closure.bodyOrigin escaped).origin))
+    {firstMap : LocationMap} {firstWorld : StoreTyping} {firstHeap : Dynamic.Heap} {firstStore : Store}
+    (first : callerProtocol.State ⟨callerScope, firstMap, firstWorld, firstHeap, firstStore, canonical⟩)
+    (calleeRelated : callerProtocol.Relates first callerInitial)
+    (calleeMaps : LocationMap.Extends firstMap mapping) (calleeWorlds : WorldExtends firstWorld world)
+    (calleeFrame : AdministrativePreserved firstMap firstStore mapping store)
+    (calleeMetadata : Dynamic.HeapMetadataExtend firstHeap calleeHeap)
+    {calleeSize : Nat}
+    (calleeTrace : SourceExecutionSize.ExpressionEvaluates program calleeSize context evidence source environment firstHeap callee
+      (.closure function) calleeHeap)
+    (calleeEvaluation : Evaluates actual firstStore (compiler.calleeCode.expression.rename ξ) (.inRight .word carrier) store)
+    (stageAccepted : CallableContract.decision prepared.site.gates .beforeArguments native.diagnostics.unknown closure.code.descriptor.id = none)
+    (arityAccepted : CallableContract.decision prepared.site.gates .beforeApplication native.diagnostics.unknown closure.code.descriptor.id = none)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual firstStore (lowered.expression.rename ξ) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment firstHeap id outcome after ∧
+      GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld compiler.original.type lowered.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+      AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
+      ProtectedStateTransition.Transition callerProtocol first
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  have emitted := prepared.lowered_rename compiler ξ
+  rw [emitted, nativeResult] at completed
+  obtain ⟨argumentsSize, callSize, outcome, after, finalMap, finalWorld, suffix, represented, finalHeaps,
+      maps, worlds, frame, metadata, reached, related⟩ :=
+    call_reflects_bounded_with_caller profile closure children nativeTypes escaped environments heaps locals capturesValid agrees typed callerBridge callerInitial callerStable
+      budget argumentMeaning bodyMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
+      calleeEvaluation stageAccepted arityAccepted completed within
+  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
+    compiler.argumentCoercions parent.arity wellFormed runtime covers locals heapTyped sourceArguments sourceCount calleeTrace suffix
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, original,
+    parent_result profile compiler closure rawResult nativeResult represented, finalHeaps,
+    maps, worlds, frame, metadata, reached, related⟩
+
+include prepared parent children nativeTypes escaped rawResult nativeResult environments heaps locals capturesValid agrees typed
+  stable wellFormed runtime covers heapTyped sourceArguments sourceCount in
 theorem reflects_bounded (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.ReflectsAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
@@ -295,24 +407,86 @@ theorem reflects_bounded (budget : Nat)
       AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) first
         ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  have emitted := prepared.lowered_rename compiler ξ
-  rw [emitted, nativeResult] at completed
-  obtain ⟨argumentsSize, callSize, outcome, after, finalMap, finalWorld, suffix, represented, finalHeaps,
-      maps, worlds, frame, metadata, reached, related⟩ :=
-    call_reflects_bounded profile closure children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
-      budget argumentMeaning bodyMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
-      calleeEvaluation stageAccepted arityAccepted completed within
-  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
-    compiler.argumentCoercions parent.arity wellFormed runtime covers locals heapTyped sourceArguments sourceCount calleeTrace suffix
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, original,
-    parent_result profile compiler closure rawResult nativeResult represented, finalHeaps,
-    maps, worlds, frame, metadata, reached, related⟩
+  exact reflects_bounded_with_caller profile compiler prepared parent closure children nativeTypes escaped rawResult nativeResult
+    environments heaps locals capturesValid agrees typed wellFormed runtime covers heapTyped sourceArguments sourceCount
+    CallableIndexedOwnedCallerProtocol.base initial stable budget argumentMeaning
+    (fun child strict => body_reflects_to_canonical profile closure.owner closure.callerPrefix
+      (closure.bodyOrigin escaped).origin (bodyMeaning child strict))
+    first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata calleeTrace calleeEvaluation
+    stageAccepted arityAccepted completed within
 
 include prepared parent children nativeTypes escaped rawResult nativeResult environments heaps locals capturesValid agrees typed
-  stable wellFormed runtime covers heapTyped sourceArguments sourceCount in
+  wellFormed runtime covers heapTyped sourceArguments sourceCount in
 /-- Source callee and suffix receipts produce this actual emitted parent.
 Arguments and called-body grades are the original inclusive Source children;
 argument faults retain their reached pool without constructing a body state. -/
+theorem preserves_bounded_with_caller
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedCallerProtocol.Carrier (headers := headers) callerProtocol)
+    (callerInitial : callerProtocol.State ⟨callerScope, mapping, world, calleeHeap, store, canonical⟩)
+    (callerStable : StableRows (callerBridge.pool callerInitial)) (budget : Nat)
+    (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt callerProtocol
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (bodyMeaning : Below budget (CallableRuntimeBodyOrigins.Stateful.PreservesAt
+      (argumentProtocol (headers := headers) closure.owner closure.callerPrefix) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) program (closure.bodyOrigin escaped).origin))
+    {firstMap : LocationMap} {firstWorld : StoreTyping} {firstHeap : Dynamic.Heap} {firstStore : Store}
+    (first : callerProtocol.State ⟨callerScope, firstMap, firstWorld, firstHeap, firstStore, canonical⟩)
+    (calleeRelated : callerProtocol.Relates first callerInitial)
+    (calleeMaps : LocationMap.Extends firstMap mapping) (calleeWorlds : WorldExtends firstWorld world)
+    (calleeFrame : AdministrativePreserved firstMap firstStore mapping store)
+    (calleeMetadata : Dynamic.HeapMetadataExtend firstHeap calleeHeap)
+    {calleeSize : Nat}
+    (calleeTrace : SourceExecutionSize.ExpressionEvaluates program calleeSize context evidence source environment firstHeap callee
+      (.closure function) calleeHeap)
+    (calleeEvaluation : Evaluates actual firstStore (compiler.calleeCode.expression.rename ξ) (.inRight .word carrier) store)
+    (stageAccepted : CallableContract.decision prepared.site.gates .beforeArguments native.diagnostics.unknown closure.code.descriptor.id = none)
+    (arityAccepted : CallableContract.decision prepared.site.gates .beforeApplication native.diagnostics.unknown closure.code.descriptor.id = none)
+    {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (suffix : SourceSuffix program context evidence source environment calleeHeap ids function argumentsSize callSize outcome after)
+    (argumentsWithin : argumentsSize ≤ budget) (callWithin : callSize ≤ budget) :
+    ∃ sourceSize value finalStore finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment firstHeap id outcome after ∧
+      Evaluates actual firstStore (lowered.expression.rename ξ) value finalStore ∧
+      GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+        finalMap finalWorld compiler.original.type lowered.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+      AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
+      ProtectedStateTransition.Transition callerProtocol first
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
+    compiler.argumentCoercions parent.arity wellFormed runtime covers locals heapTyped sourceArguments sourceCount calleeTrace suffix
+  have emitted := prepared.lowered_rename compiler ξ
+  rw [nativeResult] at emitted
+  cases suffix with
+  | argumentFault failed =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps,
+        maps, worlds, frame, metadata, reached, related⟩ :=
+      call_argument_fault_preserves_bounded_with_caller profile closure children environments heaps locals agrees typed callerInitial
+        budget argumentMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata calleeEvaluation stageAccepted
+        failed argumentsWithin
+    refine ⟨sourceSize, .inLeft closure.code.receipt.resultCore (.word token), finalStore, finalMap, finalWorld, original, ?_, ?_, finalHeaps,
+      maps, worlds, frame, metadata, reached, related⟩
+    · rw [emitted]; exact evaluated
+    · exact parent_result profile compiler closure rawResult nativeResult (.fault matched)
+  | called argumentsTrace called =>
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, reached, related⟩ :=
+      call_preserves_bounded_with_caller profile closure children nativeTypes escaped environments heaps locals capturesValid agrees typed callerBridge callerInitial callerStable
+        budget argumentMeaning bodyMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
+        calleeEvaluation stageAccepted arityAccepted argumentsTrace argumentsWithin called callWithin
+    refine ⟨sourceSize, value, finalStore, finalMap, finalWorld, original, ?_,
+      parent_result profile compiler closure rawResult nativeResult represented, finalHeaps,
+      maps, worlds, frame, metadata, reached, related⟩
+    rw [emitted]; exact evaluated
+
+include prepared parent children nativeTypes escaped rawResult nativeResult environments heaps locals capturesValid agrees typed
+  stable wellFormed runtime covers heapTyped sourceArguments sourceCount in
 theorem preserves_bounded (budget : Nat)
     (argumentMeaning : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
@@ -348,31 +522,13 @@ theorem preserves_bounded (budget : Nat)
       AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend firstHeap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) first
         ⟨callerScope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
-    compiler.argumentCoercions parent.arity wellFormed runtime covers locals heapTyped sourceArguments sourceCount calleeTrace suffix
-  have emitted := prepared.lowered_rename compiler ξ
-  rw [nativeResult] at emitted
-  cases suffix with
-  | argumentFault failed =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps,
-        maps, worlds, frame, metadata, reached, related⟩ :=
-      call_argument_fault_preserves_bounded profile closure children environments heaps locals agrees typed initial
-        budget argumentMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata calleeEvaluation stageAccepted
-        failed argumentsWithin
-    refine ⟨sourceSize, .inLeft closure.code.receipt.resultCore (.word token), finalStore, finalMap, finalWorld, original, ?_, ?_, finalHeaps,
-      maps, worlds, frame, metadata, reached, related⟩
-    · rw [emitted]; exact evaluated
-    · exact parent_result profile compiler closure rawResult nativeResult (.fault matched)
-  | called argumentsTrace called =>
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata, reached, related⟩ :=
-      call_preserves_bounded profile closure children nativeTypes escaped environments heaps locals capturesValid agrees typed initial stable
-        budget argumentMeaning bodyMeaning first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata
-        calleeEvaluation stageAccepted arityAccepted argumentsTrace argumentsWithin called callWithin
-    refine ⟨sourceSize, value, finalStore, finalMap, finalWorld, original, ?_,
-      parent_result profile compiler closure rawResult nativeResult represented, finalHeaps,
-      maps, worlds, frame, metadata, reached, related⟩
-    rw [emitted]; exact evaluated
+  exact preserves_bounded_with_caller profile compiler prepared parent closure children nativeTypes escaped rawResult nativeResult
+    environments heaps locals capturesValid agrees typed wellFormed runtime covers heapTyped sourceArguments sourceCount
+    CallableIndexedOwnedCallerProtocol.base initial stable budget argumentMeaning
+    (fun child strict => body_preserves_to_canonical profile closure.owner closure.callerPrefix
+      (closure.bodyOrigin escaped).origin (bodyMeaning child strict))
+    first calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata calleeTrace calleeEvaluation
+    stageAccepted arityAccepted suffix argumentsWithin callWithin
 
 end SelectedParent
 
@@ -406,10 +562,45 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   (initial : State headers keys ⟨callerScope, mapping, world, before, store, canonical⟩)
   (stable : StableRows initial)
 
-include certified found environments heaps locals agrees typed stable in
+include certified found environments heaps locals agrees typed in
 /-- Callee evaluation keeps its real post pool together with the Source heap
 and lexical admission needed to type the original parent's actual arguments.
 The policy-read callee node is not substituted for its original Source node. -/
+theorem callee_preserves_admitted_bounded_with_caller
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedCallerProtocol.Carrier (headers := headers) callerProtocol)
+    (callerInitial : callerProtocol.State ⟨callerScope, mapping, world, before, store, canonical⟩)
+    (callerStable : StableRows (callerBridge.pool callerInitial)) (budget : Nat)
+    (children : Below budget (ProtectedStateTransition.PreservesAt callerProtocol
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile))
+      program context evidence source certificate faults))
+    (wellFormed : ProgramWellFormed program) (runtime : Dynamic.SourceRuntimeValid program context source)
+    (covers : evidence.Covers context) (heapTyped : Dynamic.HeapWellTyped context before)
+    {parameter result : TypeSystem.Ty} (sourceTyped : ExpressionHasType source context callee (.function parameter result))
+    {size : Nat}
+    (executed : SourceExecutionSize.ExpressionEvaluates program size context evidence source environment before callee
+      (.closure function) calleeHeap) (smaller : size < budget) :
+    ∃ carrier calleeStore calleeMap calleeWorld,
+      Evaluates actual store (compiler.calleeCode.expression.rename ξ) (.inRight .word carrier) calleeStore ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        (CallableIndexedOwnedFunctionValues.model headers keys registry faults profile) calleeMap calleeWorld calleeHeap calleeStore ∧
+      LocationMap.Extends mapping calleeMap ∧ WorldExtends world calleeWorld ∧
+      AdministrativePreserved mapping store calleeMap calleeStore ∧ Dynamic.HeapMetadataExtend before calleeHeap ∧
+      ∃ reached : callerProtocol.State ⟨callerScope, calleeMap, calleeWorld, calleeHeap, calleeStore, canonical⟩,
+        callerProtocol.Relates callerInitial reached ∧ StableRows (callerBridge.pool reached) ∧
+        Nonempty (ClosureAt (headers := headers) (keys := keys) (registry := registry) (faults := faults)
+          calleeMap calleeWorld function calleeNode.type carrier compiler.calleeCode.type) ∧
+        FunctionValues.SourceCapturesValid calleeHeap (.closure function) ∧
+        Dynamic.EnvironmentAgrees calleeHeap context.locals environment ∧ Dynamic.HeapWellTyped context calleeHeap := by
+  obtain ⟨carrier, calleeStore, calleeMap, calleeWorld, evaluated, finalHeaps, maps, worlds, frame, metadata,
+      reached, related, reachedStable, closure⟩ :=
+    callee_preserves_bounded_with_caller profile certified found environments heaps locals agrees typed callerBridge callerInitial callerStable budget children executed smaller
+  obtain ⟨captures, reachedTyped, sourceMetadata⟩ := CallableIndexedOwnedCaptureExecutionValidity.captures_of_expression
+    wellFormed runtime covers locals heapTyped sourceTyped executed.sound
+  exact ⟨carrier, calleeStore, calleeMap, calleeWorld, evaluated, finalHeaps, maps, worlds, frame, metadata,
+    reached, related, reachedStable, closure, captures, Dynamic.EnvironmentAgrees.mono sourceMetadata locals, reachedTyped⟩
+include certified found environments heaps locals agrees typed stable in
 theorem callee_preserves_admitted_bounded (budget : Nat)
     (children : Below budget (ProtectedStateTransition.PreservesAt (protocol headers keys)
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
@@ -433,13 +624,9 @@ theorem callee_preserves_admitted_bounded (budget : Nat)
           calleeMap calleeWorld function calleeNode.type carrier compiler.calleeCode.type) ∧
         FunctionValues.SourceCapturesValid calleeHeap (.closure function) ∧
         Dynamic.EnvironmentAgrees calleeHeap context.locals environment ∧ Dynamic.HeapWellTyped context calleeHeap := by
-  obtain ⟨carrier, calleeStore, calleeMap, calleeWorld, evaluated, finalHeaps, maps, worlds, frame, metadata,
-      reached, related, reachedStable, closure⟩ :=
-    callee_preserves_bounded profile certified found environments heaps locals agrees typed initial stable budget children executed smaller
-  obtain ⟨captures, reachedTyped, sourceMetadata⟩ := CallableIndexedOwnedCaptureExecutionValidity.captures_of_expression
-    wellFormed runtime covers locals heapTyped sourceTyped executed.sound
-  exact ⟨carrier, calleeStore, calleeMap, calleeWorld, evaluated, finalHeaps, maps, worlds, frame, metadata,
-    reached, related, reachedStable, closure, captures, Dynamic.EnvironmentAgrees.mono sourceMetadata locals, reachedTyped⟩
+  exact callee_preserves_admitted_bounded_with_caller profile compiler certified found environments heaps locals agrees typed
+    CallableIndexedOwnedCallerProtocol.base initial stable budget children wellFormed runtime covers heapTyped sourceTyped executed smaller
+
 end AdmittedCallee
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectSourceAdapters
