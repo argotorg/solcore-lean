@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCanonicalState
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionCallsHeads
 
 /-! The original static expression Tree fold composes actual child states.
 Every call receives the real argument post pool and original canonical slots.
@@ -84,40 +84,10 @@ theorem head_preserves_at_with_calls
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Head calls (.initial compiled.compatible.checked) source context reasonAt certificate) faults size := by
-  intro scope id lowered head
-  cases head with
-  | primitive head =>
-    exact RecursiveNamedExpressionCompositionsBounds.Stateful.Head.preserves_at functions program evidence
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within unique children head
-  | constructor receipt form accepted sequence =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.preserves_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
-  | member metadata baseMetadata form layout certified =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.preserves_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
-  | index header found form sourceType first second =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.preserves_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence unique missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
-  | builtin head =>
-    exact RecursiveNamedBuiltinHeadBounds.Stateful.Head.preserves_at functions functionLeaves program evidence unique
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within children head
-  | tuple receipt sequence =>
-    exact RecursiveNamedTupleHeadBounds.Stateful.preserves_at functions program evidence
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within unique children
-      ⟨_, _, _, _, rfl, receipt, sequence⟩
-  | call head => exact callMeaning head
+  exact ProtectedStateExpressionCallsHeads.head_preserves_at_with_calls functions extension faithful functionLeaves functionTypes evidence unique missing calls
+    (argumentProtocol (headers := headers) owner callerPrefix)
+    (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix)
+    budget size within children callMeaning
 
 include extension faithful functionLeaves functionTypes missing in
 /-- Reflection uses the same actual child posts at their native grades. -/
@@ -136,40 +106,10 @@ theorem head_reflects_at_with_calls
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
       program context evidence source
       (CompatibleExpressionCalls.Head calls (.initial compiled.compatible.checked) source context reasonAt certificate) faults size := by
-  intro scope id lowered head
-  cases head with
-  | primitive head =>
-    exact RecursiveNamedExpressionCompositionsBounds.Stateful.Head.reflects_at functions program evidence
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within children head
-  | constructor receipt form accepted sequence =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.reflects_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.constructor receipt form accepted sequence, .constructor receipt form accepted sequence⟩
-  | member metadata baseMetadata form layout certified =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.reflects_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.member metadata baseMetadata form layout certified, .member metadata baseMetadata form layout certified⟩
-  | index header found form sourceType first second =>
-    exact RecursiveNamedDataExpressionHeadBounds.Stateful.reflects_at (calls := calls)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (context := context) (source := source) (certificate := certificate) functions extension faithful functionLeaves functionTypes
-      program evidence missing (argumentProtocol (headers := headers) owner callerPrefix)
-      (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix) budget size within children
-      ⟨.index header found form sourceType first second, .index header found form sourceType first second⟩
-  | builtin head =>
-    exact RecursiveNamedBuiltinHeadBounds.Stateful.Head.reflects_at functions functionLeaves program evidence
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within children head
-  | tuple receipt sequence =>
-    exact RecursiveNamedTupleHeadBounds.Stateful.reflects_at functions program evidence
-      (argumentProtocol (headers := headers) owner callerPrefix) budget size within children
-      ⟨_, _, _, _, rfl, receipt, sequence⟩
-  | call head => exact callMeaning head
+  exact ProtectedStateExpressionCallsHeads.head_reflects_at_with_calls functions extension faithful functionLeaves functionTypes evidence missing calls
+    (argumentProtocol (headers := headers) owner callerPrefix)
+    (CallableIndexedOwnedCanonicalState.administrativeTransport owner callerPrefix)
+    budget size within children callMeaning
 
 variable
   (sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts)
