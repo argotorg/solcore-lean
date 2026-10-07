@@ -462,6 +462,10 @@ Method lambda sites now retain original Source provenance, graph uniqueness, gen
 
 Verification at `ed314136` passed the 5190-job normal build, all registered tests, strict kernel audit of 4375 declarations, fresh inventories of 71 declarations in six new modules, 37 signature probes and the kernel policy. No original proof module changed in this unit, and the 5019 protected original files are unchanged. General named closure, joint origin factories, mixed dispatch and the compiler/public theorem remain unfinished.
 
+The general ordinary/direct named family now closes its own body and recursive expression obligations through the existing measured family and original admitted expression Tree. The runtime expression endpoints assume only the genuine static and Source receipts, deriving literal meanings internally. They carry no outside completed expression or body execution law. Actual lambda and method entries construct the matching dependent family index at their original parameter post; strict continuations return the identical underlying pool and full exit. Genuine method occurrence typing now proves the exact lambda closure frame without an ordinary Header.
+
+Verification at `6d4bfd65` passed the 5195-job normal build, all registered tests, strict kernel audit of 4474 declarations, fresh inventories of 99 declarations in five new modules, 29 signature probes and the unchanged kernel policy. No original proof module changed in this unit, and the 5019 protected original files are unchanged. Joint origin factories and expression dispatch, method-generated lambda support, static public extraction and the compiler/public theorem remain unfinished.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
