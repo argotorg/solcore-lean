@@ -32,25 +32,24 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `6840f01c`. The allocation readiness and lexical body units are committed in `3f524792` and `84a8863d`; while edges and the shared finite folds in `5a15ff5b` and `ac01b3b1`; bare assignment in `8dbef2f0`; for header completion/faults in `6462af2a`; and five-way imperative control in `ad0f8673`. Closed lexical and while consumers derive their child meaning from static receipts and the actual owned allocator.
+The latest implementation commit is `a0944a7d`. Actual-state for activation and the shared finite folds are committed in `faf940c3` and `5c32af3c`; source-type-preserving marked allocation in `b2c948b1`; projected assignment prefixes in `cded577c`; selected match prefixes in `9981f688`; measured for heads in `651a4854`; complete projected assignment outcomes in `a9601e80`; and closed owned for consumers in `a28db01b`. The latest match unit connects actual scrutinee, selected prefix and body states, then restores the lexical scope from the body’s reached state.
 
-The normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5039 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **344 declarations** in the assignment, header, while, control, and closed while modules against the three permitted standard axioms. All 11 original header APIs and 65 retained declarations from the imperative For modules have byte-identical raw types and axiom lists; relocated generated proof helpers are excluded from that retained API count. Earlier units separately audited 145 allocation/readiness declarations, 158 lexical/finish declarations, and 220 assignment/header/while declarations. The semantic kernel policy and whitespace checks passed.
+The normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5053 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **743 declarations** in the combined assignment, header, loop, control, selected match and closed-consumer group against the three permitted standard axioms. Retained named declaration types and axiom sets matched their prechange artifacts exactly for the latest selected-prefix, for-head, full-assignment and match-parent units. Generated proof and simplifier helpers are excluded when they move into the shared proofs. Earlier allocation/readiness and lexical/finish audits remain recorded below. The semantic kernel policy and whitespace checks passed.
 
 Records: `/private/tmp/solcore-owned-functions-resume-20261007/`. Unrelated inference/parser work remains outside these commits.
 
 ### Implementation in progress
 
-The reached state now passes through the existing lexical Tree, actual allocation, lexical restoration, shared finite while proofs, bare assignment, for header folds, and block/sequence/conditional producers. A static physical-owner/stable-frame receipt supplies allocation readiness from each actual retained frame read; it asserts no body execution law. Source and Core grades remain independent, including an empty for header whose remaining native grade equals its inclusive budget.
+The reached state now passes through the existing lexical Tree, actual allocation, lexical restoration, shared finite while and for folds, all bare/projected assignment outcomes, block/sequence/conditional producers, and selected match bodies. A static physical-owner/stable-frame receipt supplies allocation readiness from each actual retained frame read; it asserts no body execution law. Source and Core grades remain independent, including an empty for header whose remaining native grade equals its inclusive budget.
 
-For activation and loop edges are being connected to the actual initialized header tail. A structural restoration receipt must remove the header's introduced binders from the eventual body/post state, preserving records added after initialization. Projected assignment must pass the actual state from index evaluation through the getter, RHS, latest-root reread, writeback, and each failure path. These connections are still in progress.
+Projected assignment passes actual index state through the getter, RHS, latest-root reread, writeback and every failure path. Match restores outer binders from the actual arm/default body state, preserving records added after branch selection. Closed Boolean-loop consumers derive their expression and body callbacks from static receipts and construct actual finite completions. The outer imperative CatalogSites folds and origin-neutral body kernel are being connected to these producers.
 
 ### Next implementation units and remaining obligations
 
-1. Complete actual-state for activation, condition/body/post edges and finite folds, including restoration after later body/post effects. Complete projected assignment success, fault and original native completion reflection.
-2. Thread scrutinee, hidden-cell allocation, selected-arm binder allocation and restoration through match. Connect these producers to the existing imperative CatalogSites folds and body kernel.
-3. Connect callee, ordered arguments, general bodies and return to the same mutual induction. On return, install the saved caller frame into the reached pool, retaining every ordered record list created during the body.
-4. Connect nested lambda, indirect calls, method/coercion and local instantiation to the same value/heap relations. Retain actual Source receipts, complete captures, dictionaries and type-substitution rows.
-5. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
+1. Connect the actual assignment, loop, control and match producers to the same imperative CatalogSites folds and body kernel. Keep their expression callbacks internal to the mutual induction.
+2. Connect callee, ordered arguments, general bodies and return to that mutual induction. On return, install the saved caller frame into the reached pool, retaining every ordered record list created during the body.
+3. Connect nested lambda, indirect calls, method/coercion and local instantiation to the same value/heap relations. Retain actual Source receipts, complete captures, dictionaries and type-substitution rows.
+4. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
 
 ## History by commit
 
@@ -1826,3 +1825,20 @@ Ordered expression, allocation and function-finish proofs now retain concrete po
 The latest combined verification passed 5039 normal build jobs, all registered executions, and a strict 344-declaration kernel audit. Existing header and imperative For APIs retain their raw types and axiom lists. These proof changes add no Core instruction or runtime recursion. The same original finite folds perform the work.
 
 Administrative transport preserves its input record lists exactly. A generic transition proves ordered prefix retention but does not alone prove membership of a fresh allocation snapshot. Exact append claims use the concrete allocator's selected-row receipt for that same execution. Whole-body semantic preservation and completion reflection remain incomplete.
+
+
+## 2026-10-07: complete assignment, for and selected match state producers
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `faf940c3` | Installs the real for self closure, connects condition/body/post edges, and makes header restoration applicable after later body/post effects. | The finite folds were connected in `5c32af3c`. |
+| `5c32af3c` | Reuses the same three measured for folds and endpoints. Condition, body, post and recursive loop steps receive the preceding actual state. | General body callbacks remain internal induction interfaces. |
+| `b2c948b1` | Keeps the independent raw Source cell type through marked allocation, including match’s hidden cell. The owned producer retains authentic captures and exact snapshot registration. | A generic relation does not prove a fresh snapshot’s membership. |
+| `cded577c` | Threads real index/getter/RHS/write states through successful projected assignments and reflects measured key completion. | Full fault and assignment reflection were completed in `a9601e80`. |
+| `9981f688` | Retains actual scrutinee, hidden-cell and selected-arm allocation states, with restoration applicable to later body effects. | The parent match meaning was connected in `a0944a7d`. |
+| `651a4854` | Connects actual initialized header tails, loop completions and restoration in measured for heads. Empty initializer reflection uses the inclusive original budget. | The outer imperative fold remains. |
+| `a9601e80` | Completes projected assignment preservation for keys/getter/RHS/setter faults and original native completion reflection. Success carries the state at the written prefix before the native continuation. Registers exact success, fault and reflection header consumers. | The general expression and body mutual proof remains. |
+| `a28db01b` | Derives closed owned for callbacks from Boolean literal receipts, the lexical Tree and authentic nil headers/posts. Constructs a real false-condition completion and proves exact all-row record retention. | This consumer covers its static fragment. |
+| `a0944a7d` | Connects match scrutinee, selected marked prefix and actual arm/default body state; restoration retains the body’s new records. Scrutinee faults and no-branch exits keep their reached states. | Runtime wrappers and the outer imperative fold are being connected. |
+
+The latest combined verification passed 5053 normal build jobs, all registered executions, and a strict 743-declaration kernel audit. All retained named types and axiom sets in the latest units matched exactly. These changes reuse the original measured inductions and add no Core instructions.
