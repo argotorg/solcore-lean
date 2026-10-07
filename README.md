@@ -9,8 +9,11 @@ unfinished work.
 External users should normally import an umbrella module instead of a leaf
 implementation or proof module. The typical executable flow is
 `Workspace / Syntax` → `Frontend.Current` (using `TypeSystem` and `Resolved`)
-→ `Core` or the typed-source runtime → `ContractRuntime`. `SourceSemantics`
-is the independent, proof-facing specification of resolved source programs.
+→ the common `SourceCompiler` / `SourceCoreExecution` API → `Core` execution.
+`ContractRuntime` executes checked Core over accounts and world state; connecting
+source contract members, persistent storage, and external calls is a later phase.
+`SourceSemantics` is the independent, proof-facing specification of resolved
+source programs.
 
 | Module | Responsibility |
 | --- | --- |
@@ -21,7 +24,7 @@ is the independent, proof-facing specification of resolved source programs.
 | [`Solcore.Syntax`](Solcore/Syntax.lean) | Source-preserving AST, lexer, parser, diagnostics, declarative grammars, and parser correctness properties. |
 | [`Solcore.Resolved`](Solcore/Resolved.lean) | Small already-resolved local-expression semantics with scope, typing, evaluation, renaming, lowering, and Core correspondence. It is not the whole-program name resolver. |
 | [`Solcore.TypeSystem`](Solcore/TypeSystem.lean) | Source types, substitutions, first-order unification, rank-1 schemes, inference state, and their basic properties. |
-| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, reusable compilation, root discovery, backend selection, execution, and backend-native/deep result certificates. |
+| [`Solcore.Frontend.Current`](Solcore/Frontend/Current.lean) | Preferred executable whole-program entry: loading, resolution, inference, staging, specialization, linking, reusable compilation, root discovery, Core compilation, and execution through common artifacts, values, sessions, and checkpoints. |
 | [`Solcore.Frontend`](Solcore/Frontend.lean) | Compatibility facade containing `Frontend.Current` and the older focused adapters under `Frontend.Fragments`. |
 | [`Solcore.SourceSemantics`](Solcore/SourceSemantics.lean) | Algorithm-independent static, staging, dynamic, fault, and substitution judgments for resolved typed source, including constructive whole-language preservation for successful declarative executions. |
 | [`Solcore.Core`](Solcore/Core.lean) | Typed Semantic Core syntax, stores, evaluator and machines, primitives, checker, runners, safety, and correspondence theorems. |
@@ -35,20 +38,19 @@ Umbrella files are the navigation and import boundaries for downstream code.
 Leaf files, `*Properties` modules, parser grammar/trace units, and
 `Frontend.Fragments` are focused implementation or proof units.
 
-The two preservation boundaries are intentionally distinct.
-[`WholeLanguagePreservation`](Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean)
-is the constructive, algorithm-independent mutual preservation proof for
-declarative resolved-source evaluation, and
-[`ProgramEvaluates.preserves`](Solcore/SourceSemantics/Dynamic/Program.lean)
+The independent source specification and executable Core safety have separate
+proofs. [`WholeLanguagePreservation`](Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean)
+is the constructive mutual preservation proof for declarative resolved-source
+evaluation; [`ProgramEvaluates.preserves`](Solcore/SourceSemantics/Dynamic/Program.lean)
 lifts it to the whole-program entry judgment.
-[`SourceTypedRuntimeDeepSafety`](Solcore/Frontend/SourceTypedRuntimeDeepSafety.lean)
-is the executable typed-source boundary certificate: a normal public run
-certifies deeply typed initial/final heaps, inputs/results, readable captures,
-heap type-layout extension, checked-plan substitution-image code provenance,
-and authenticated evidence. [`SourceCompiler`](Solcore/Frontend/SourceCompiler.lean)
-exposes both the complete pre/post certificate and its final-result projection.
-Correspondence between this executable pipeline and the independent
-declarative judgments remains future work.
+[`SourceCompiler`](Solcore/Frontend/SourceCompiler.lean) reexports the common
+[`SourceCoreExecution`](Solcore/Frontend/SourceCoreExecution.lean) API.
+[`Core.BoundedSafety`](Solcore/Core/BoundedSafety.lean) proves finite Core
+execution safety, while the public API authenticates inputs, heaps, code, and
+handle ownership. The runtime typed-source evaluator has been removed.
+Source-to-Core result and state correspondence is being developed under
+[`CoreLowering`](Solcore/SourceSemantics/CoreLowering.lean); the complete public
+compiler pipeline's meaning preservation proof remains unfinished.
 
 ## Contributor map
 
@@ -60,33 +62,32 @@ declarative judgments remains future work.
 - Run `lake build`, `lake test`, and `node scripts/check-kernel.mjs` before
   submitting a change. Warnings are errors, and the kernel-policy check rejects
   proof escape hatches in semantic modules.
+- The [Core runtime unification design](docs/design/core-runtime-unification.md)
+  records the agreed migration scope, implementation tasks, and semantic
+  preservation proof goals. Runtime unification is complete; the full meaning
+  preservation proof is in progress. See the [implementation record](docs/design/core-runtime-unification-progress.md)
+  and [public API guide](docs/design/core-runtime-unification-api.md) for the
+  current boundaries and validation results.
 
 ## Remaining work
 
-The typed-source backend now executes the closed specialization slice end to
-end: constrained generic calls and first-class function values carry checked
-trait evidence, selected unary/binary operator and `Coerce.coerce` bodies run
-with their complete helper frontier, and closures share mutable locals,
-mappings, and proxy values through one runtime heap. Ground constrained roots
-resolve their own evidence before entry. `comptime<T>` is recursively erased
-to `T` at the runtime representation boundary, while direct and first-class
-calls still enforce marked parameter/result staging. Closed staged functions
-can combine closures, mutation, and mappings, and arbitrary-precision Integer
-values execute arithmetic, comparisons, complement, and bitwise operations.
-Public result typing uses the complete prepared plan, including first-class
-globals discovered only inside a selected operator or coercion method.
-The safe typed-source entry also replays caller-supplied specialization plans
-against the checked program before execution, rejecting altered generic
-operator requirements even when the specialized operands are builtin types.
+The public source compiler executes the closed specialization slice through Core:
+constrained generic calls and first-class function values carry checked trait
+evidence, selected unary/binary operator and `Coerce.coerce` bodies include their
+helper frontier, and closures share mutable locals, mappings, and proxy values
+through one heap. Ground constrained roots resolve their evidence before entry.
+The runtime representation recursively erases `comptime<T>` to `T`, while calls
+retain marked parameter/result staging checks. Closed staged functions support
+closures, mutation, mappings, and arbitrary-precision Integer operations.
+Compilation revalidates specialization plans against the checked program and
+includes first-class globals discovered inside selected methods.
 
-The public source compiler now owns the initial orchestration policy. Automatic
-selection tries direct Semantic Core first and the typed-source runtime second;
-the obsolete finite call-graph backend and its legacy fallback have been
-removed. A backend preference can force either remaining backend, and automatic
-exhaustion and explicit-backend rejection use one backend-tagged diagnostic
-carrier. Raw-workspace helpers can select the conventional `main` entry
-automatically, while ordered compile-many preserves the requested root order
-and permits different roots to select different backends.
+All public roots use cached Core code and one artifact/value/session API.
+Backend preferences and fallback have been removed. Raw-workspace helpers can
+select the conventional `main` entry, and ordered compile-many preserves the
+requested root order. Existing comptime evaluation remains in the preparation
+layer. Its backend unification is a later phase; proving the transformations
+actually used by the compiler is part of the meaning preservation work below.
 
 Initial Static Word ABI discovery is also executable. Every function explicitly
 exported by the workspace entry module is treated as an intended endpoint and
@@ -106,8 +107,8 @@ boundary.
   that access path. The current upstream source syntax has no general value
   member projection; the latent typed-IR member form is therefore not exposed
   as invented source syntax.
-- Add stable serialization for source values, closures, heaps, backend-tagged
-  results, and the reusable compiler boundary.
+- Add stable serialization for common public values, snapshots, and reusable
+  compiler artifacts.
 - Integrate ABI discovery with true contract public-member declarations and
   visibility. The current Static Word scan deliberately covers only executable
   top-level functions explicitly exported by the entry module.
@@ -116,19 +117,18 @@ boundary.
 
 - Add declarative raw-source parsing, module/import, and name-resolution
   semantics before the existing resolved-source layer.
-- Prove end-to-end correspondence between executable checking, inference,
-  staging, specialization, and each runtime, and the independent declarative
+- Complete end-to-end correspondence between executable checking, inference,
+  staging, specialization, and Core execution and the independent declarative
   `SourceSemantics` judgments; include unification, trait solving, and module
   resolution.
-- Replace the typed-source runtime's checked pre/post execution certificate
-  with, or supplement it by, an inductive preservation proof for the evaluator
-  itself. The removed call-graph backend had this narrower guarantee for its
-  recursion/closure fragment; typed-source covers more language features but
-  currently validates deep safety at the executable boundary.
+- Connect the remaining general closure, indirect-call, method/coercion, and
+  allocation/restoration proofs under one value and heap model. Compose the
+  actual compiler passes into result and state preservation and finite Core
+  completion reflection through the public compiler API.
 - Complete general progress and determinism results, exhaustive fault
   classification, divergence/fuel correspondence, plan-validator completeness,
-  aggregate work bounds, and—if useful—a single backend-independent
-  formulation combining the existing backend-native preservation results.
+  and aggregate work bounds. Current finite execution safety does not require
+  every checker-accepted program to terminate normally.
 
 ## Optional scope extensions
 
