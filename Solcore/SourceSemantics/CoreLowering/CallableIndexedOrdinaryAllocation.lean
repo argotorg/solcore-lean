@@ -95,6 +95,62 @@ theorem heap_allocate {mapping : LocationMap} {world : StoreTyping}
 /-- The exact callback receipts, actual lexical environment and independent
 ordinary source allocation imply the whole native execution and heap relation.
 The source cell keeps its raw declaration type and has no generalized metadata. -/
+theorem preserves_with_captures {layouts : SourceCoreAllocationLayouts.Prepared}
+    {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
+    {request : SourceCoreSourceCells.Request} {layout : SourceCoreCallableIndexedFrames.Layout}
+    {globals : Nat} {allocate : SourceCoreSourceCells.Allocator}
+    (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active request)
+    (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated layout globals allocate request)
+    (same : annotation.original = allocation.expression)
+    (definitions : layouts.definitions = nativeDefinitions)
+    (frameRegistered : layout.Registered nativeDefinitions)
+    {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {contextLocation : Location} {native : NativeFrame}
+    {payload : Option Value} {sourceValue : Option Dynamic.Value} {sourceLocation : Dynamic.Location}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrative request.scope environment canonical nativeDefinitions)
+    (agrees : EnvironmentsAgree request.references canonical actual)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (reference : actual[SourceCoreCallableIndexedAllocationFrames.referenceIndex globals request]? =
+      some (.cellRef layout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode layout native))
+    (payloadAt : PayloadAt request actual payload)
+    (cell : GenericHeap.CellRepresents model mapping world
+      ⟨request.binder.scheme.body, sourceValue, none⟩ (optionalValue request.payloadType payload) request.payloadType)
+    (allocated : Dynamic.Heap.Allocates before request.binder.scheme.body sourceValue sourceLocation after) :
+    ∃ captured,
+      Captures actual request.references request.scope captured ∧
+      RuntimeValueHasType world captured (SourceCoreSourceCells.captureType request.scope) nativeDefinitions ∧
+      Evaluates actual store annotation.expression
+        (.cellRef (OptionalCell.cellType request.payloadType) (store.length + 2))
+        (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) ∧
+      GenericHeap.HeapRepresents model (mapping ++ [store.length + 2])
+        (world ++ [layout.type, allocation.entry.layout.type, OptionalCell.cellType request.payloadType])
+        after (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) ∧
+      ReferenceRepresents (mapping ++ [store.length + 2])
+        (world ++ [layout.type, allocation.entry.layout.type, OptionalCell.cellType request.payloadType])
+        sourceLocation (store.length + 2) request.payloadType ∧
+      AdministrativePreserved mapping store (mapping ++ [store.length + 2])
+        (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
+          SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) := by
+  obtain ⟨captured, selected, typed⟩ := captures_typed environments agrees
+  have captureType : allocation.entry.layout.captureType = SourceCoreSourceCells.captureType request.scope := by
+    change SourceCoreSourceCells.captureType allocation.entry.key.scope = SourceCoreSourceCells.captureType request.scope
+    rw [allocation.keyExact]
+    rfl
+  have markerRegistered : allocation.entry.layout.Registered nativeDefinitions := definitions ▸ allocation.registered
+  have markerTyped : RuntimeValueHasType world (SourceCoreHeapMarkers.markerValue allocation.entry.layout captured)
+      allocation.entry.layout.type nativeDefinitions :=
+    .constructed markerRegistered.payloadLookup (captureType.symm ▸ typed)
+  obtain ⟨afterHeaps, afterReference⟩ := heap_allocate heaps
+    (SourceCoreCallableIndexedFrames.encode_runtime_typed world frameRegistered native) markerTyped cell allocated
+  exact ⟨captured, selected, typed, evaluates allocation annotation same reference read selected payloadAt,
+    afterHeaps, afterReference, allocation_frame _ _ _ _ _⟩
+
+/-- The compatibility result forgets only the exact captured value receipts.
+The common producer retains them for snapshot registration. -/
 theorem preserves {layouts : SourceCoreAllocationLayouts.Prepared}
     {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
     {request : SourceCoreSourceCells.Request} {layout : SourceCoreCallableIndexedFrames.Layout}
@@ -133,19 +189,10 @@ theorem preserves {layouts : SourceCoreAllocationLayouts.Prepared}
       AdministrativePreserved mapping store (mapping ++ [store.length + 2])
         (store ++ [SourceCoreCallableIndexedFrames.encode layout native,
           SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload]) := by
-  obtain ⟨captured, selected, typed⟩ := captures_typed environments agrees
-  have captureType : allocation.entry.layout.captureType = SourceCoreSourceCells.captureType request.scope := by
-    change SourceCoreSourceCells.captureType allocation.entry.key.scope = SourceCoreSourceCells.captureType request.scope
-    rw [allocation.keyExact]
-    rfl
-  have markerRegistered : allocation.entry.layout.Registered nativeDefinitions := definitions ▸ allocation.registered
-  have markerTyped : RuntimeValueHasType world (SourceCoreHeapMarkers.markerValue allocation.entry.layout captured)
-      allocation.entry.layout.type nativeDefinitions :=
-    .constructed markerRegistered.payloadLookup (captureType.symm ▸ typed)
-  obtain ⟨afterHeaps, afterReference⟩ := heap_allocate heaps
-    (SourceCoreCallableIndexedFrames.encode_runtime_typed world frameRegistered native) markerTyped cell allocated
-  exact ⟨captured, evaluates allocation annotation same reference read selected payloadAt,
-    afterHeaps, afterReference, allocation_frame _ _ _ _ _⟩
+  obtain ⟨captured, _, _, evaluated, finalHeaps, finalReference, frame⟩ :=
+    preserves_with_captures allocation annotation same definitions frameRegistered
+      environments agrees heaps reference read payloadAt cell allocated
+  exact ⟨captured, evaluated, finalHeaps, finalReference, frame⟩
 
 /-- The returned payload reference extends the lexical relation in the usual
 source order; the two administrative references never become source binders. -/

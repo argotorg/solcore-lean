@@ -345,7 +345,9 @@ private def addRecord (entry : EntryValid headers key mapping world heap store)
         simpa only [entry.frame_eq] using separate }
   frame_eq := entry.frame_eq
 
-private def registerRecord (pool : Pool headers keys mapping world heap store)
+/-- Register one authenticated snapshot in its selected ordered row. Every
+physical frame remains separated from the record's actual snapshot cell. -/
+def Pool.record_snapshot (pool : Pool headers keys mapping world heap store)
     (selected : Fin keys.length) (record : CallableIndexedSnapshots.Record)
     (holds : CallableIndexedSnapshots.Holds prepared.graph.inputs prepared.graph.table prepared.layout.frame mapping store record)
     (separate : ∀ i : Fin keys.length, record.location ≠ keys[i.val].frameLocation) :
@@ -359,6 +361,24 @@ private def registerRecord (pool : Pool headers keys mapping world heap store)
       · have equal := List.mem_singleton.mp fresh; subst item; exact separate j
     · simp only [same, ↓reduceIte] at member
       exact pool.separated i j item member
+
+theorem Pool.record_snapshot_selected (pool : Pool headers keys mapping world heap store)
+    (selected : Fin keys.length) (record : CallableIndexedSnapshots.Record)
+    (holds : CallableIndexedSnapshots.Holds prepared.graph.inputs prepared.graph.table prepared.layout.frame mapping store record)
+    (separate : ∀ i : Fin keys.length, record.location ≠ keys[i.val].frameLocation) :
+    ((pool.record_snapshot selected record holds separate).rows selected).authority.records =
+      (pool.rows selected).authority.records ++ [record] := by
+  simp only [Pool.record_snapshot, ↓reduceIte]
+  rfl
+
+theorem Pool.record_snapshot_other (pool : Pool headers keys mapping world heap store)
+    (selected : Fin keys.length) (record : CallableIndexedSnapshots.Record)
+    (holds : CallableIndexedSnapshots.Holds prepared.graph.inputs prepared.graph.table prepared.layout.frame mapping store record)
+    (separate : ∀ i : Fin keys.length, record.location ≠ keys[i.val].frameLocation)
+    (i : Fin keys.length) (different : i ≠ selected) :
+    ((pool.record_snapshot selected record holds separate).rows i).authority.records =
+      (pool.rows i).authority.records := by
+  simp only [Pool.record_snapshot, different, ↓reduceIte]
 
 /-- Actual three-cell source allocation registers its preceding snapshot.
 The snapshot is separated from every old frame by original read bounds;
@@ -404,11 +424,10 @@ theorem Pool.completed_snapshot (pool : Pool headers keys mapping world heap sto
     have bound := (List.getElem?_eq_some_iff.mp (pool.rows i).authority.frame.read).1
     rw [(pool.rows i).frame_eq] at bound
     exact Nat.ne_of_gt bound
-  refine ⟨captured, evaluated, registerRecord extended selected record holds separate, ?_, ?_⟩
-  · simp only [registerRecord, ↓reduceIte]; rfl
+  refine ⟨captured, evaluated, extended.record_snapshot selected record holds separate, ?_, ?_⟩
+  · exact Pool.record_snapshot_selected _ _ _ _ _
   · intro i different
-    simp only [registerRecord, different, ↓reduceIte]
-    rfl
+    exact Pool.record_snapshot_other _ _ _ _ _ i different
 
 /-- Equal keys and shared physical frames are retained as separate ordered
 rows. The duplicate is registered through the ordinary frame-reuse producer. -/
