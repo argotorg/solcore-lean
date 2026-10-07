@@ -80,7 +80,7 @@ theorem Tree.reflects_reachable_bounded_for
   induction errors generalizing mapping world actualContext environment canonical actual before store ξ contextLocation native value finalStore size with
   | @nil context scope code next =>
     exact .continues ⟨⟨scope, code, mapping, world, canonical, actual, actualContext, ξ, store, next, valid,
-      environments, heaps, locals, agrees, actualTyped, reference, read, unmapped⟩, state, gate⟩ .nil (.refl _) (.refl _) (.refl _ _) (.refl _) (protocol.refl state) evaluated (Nat.le_refl _)
+      environments, heaps, locals, agrees, actualTyped, reference, read, unmapped⟩, state, gate⟩ .nil (.refl _) (.refl _) (.refl _ _) (.refl _) (protocol.refl state) ⟨ReturnTo.refl protocol _ canonical⟩ evaluated (Nat.le_refl _)
   | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
     obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation, allocationTransition⟩ :=
       TypedLexicalControl.Stateful.allocate_absent functions definitions registered protocol producer mono extended ordinary projected allocation annotation same

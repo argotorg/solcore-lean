@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalGate
-import Solcore.SourceSemantics.CoreLowering.ProtectedStateBindings
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateScopeReturn
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateTransition
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateAssignmentHeadContracts
 
@@ -50,6 +50,16 @@ def TailFor.index (tail : TailFor protocol condition validity registry functions
 def TailFor.records (tail : TailFor protocol condition validity registry functions source solved evidence
     administrative frame globals contextLocation native continuation context environment heap) : Records :=
   protocol.records tail.state
+
+/-- Apply the prefix's binder receipt to its actual later reached state. -/
+theorem TailFor.return_reached {scope : Scope} {canonical : Environment}
+    (tail : TailFor protocol condition validity registry functions source solved evidence administrative frame globals
+      contextLocation native continuation context environment heap)
+    (receipt : ReturnTo protocol scope canonical tail.scope tail.canonical)
+    {mapping world after store}
+    (reached : protocol.State ⟨tail.scope, mapping, world, after, store, tail.canonical⟩) :
+    Transition protocol reached ⟨scope, mapping, world, after, store, canonical⟩ :=
+  receipt.transition reached
 
 /-- The original guarded view can forget the concrete state safely. -/
 def TailFor.toProtected (tail : TailFor protocol condition validity registry functions source solved evidence
@@ -125,6 +135,7 @@ inductive ResultAtFor (protocol : Protocol.{u, v} Records) (condition : Location
       (preservation : AdministrativePreserved index.mapping index.store tail.mapping tail.store)
       (metadata : Dynamic.HeapMetadataExtend index.heap after)
       (related : protocol.Relates initial tail.state)
+      (returnTo : Nonempty (ReturnTo protocol index.scope index.canonical tail.scope tail.canonical))
       (remaining : EvaluationSize remainingSize tail.actual tail.store (tail.code.rename tail.embedding) value finalStore)
       (bounded : remainingSize ≤ headerSize) :
       ResultAtFor protocol condition validity headerSize registry functions program source solved evidence administrative
@@ -153,7 +164,7 @@ theorem ResultAtFor.toProtected {headerSize : Nat}
       registry functions program source solved evidence administrative frame globals contextLocation native type faults
       continuation context environment index.heap items index.mapping index.world index.store value finalStore := by
   cases result with
-  | continues tail trace maps worlds preservation metadata _related remaining bounded =>
+  | continues tail trace maps worlds preservation metadata _related _returnTo remaining bounded =>
     exact .continues tail.toProtected trace maps worlds preservation metadata remaining bounded
   | fault trace same matched heaps maps worlds preservation metadata _transition =>
     exact .fault trace same matched heaps maps worlds preservation metadata
@@ -165,7 +176,7 @@ theorem ResultAtFor.nil {size : Nat}
     (evaluated : EvaluationSize size tail.actual tail.store (tail.code.rename tail.embedding) value finalStore) :
     ResultAtFor protocol condition validity size registry functions program source solved evidence administrative frame globals
       contextLocation native type faults continuation context environment tail.index tail.state [] value finalStore :=
-  .continues tail .nil (.refl _) (.refl _) (.refl _ _) (.refl _) (protocol.refl tail.state) evaluated (Nat.le_refl _)
+  .continues tail .nil (.refl _) (.refl _) (.refl _ _) (.refl _) (protocol.refl tail.state) ⟨ReturnTo.refl protocol tail.scope tail.canonical⟩ evaluated (Nat.le_refl _)
 
 /-- The shared assignment child must return its genuine reached witness along
 with the existing seven slots and actual continuation agreement. Projected
@@ -218,9 +229,10 @@ theorem ResultAtFor.prepend {headerSize childSize headSize : Nat}
       administrative frame globals contextLocation native type faults continuation context environment index initial
       (item :: items) value finalStore := by
   cases tail with
-  | continues tail trace lastMaps lastWorlds lastFrame lastMetadata tailRelated remaining remainingBound =>
+  | continues tail trace lastMaps lastWorlds lastFrame lastMetadata tailRelated returnReceipt remaining remainingBound =>
+    obtain ⟨tailReturn⟩ := returnReceipt
     exact .continues tail (.cons head trace) (maps.trans lastMaps) (worlds.trans lastWorlds)
-      (preservation.trans lastFrame) (metadata.trans lastMetadata) (protocol.trans related tailRelated)
+      (preservation.trans lastFrame) (metadata.trans lastMetadata) (protocol.trans related tailRelated) ⟨tailReturn⟩
       remaining (Nat.le_trans remainingBound bounded)
   | fault trace same matched heaps lastMaps lastWorlds lastFrame lastMetadata transition =>
     obtain ⟨reached, lastRelated⟩ := transition
@@ -249,9 +261,11 @@ theorem ResultAtFor.prepend_binding {headerSize childSize headSize : Nat}
       administrative frame globals contextLocation native type faults continuation context environment index initial
       (item :: items) value finalStore := by
   cases tail with
-  | continues tail trace lastMaps lastWorlds lastFrame lastMetadata tailRelated remaining remainingBound =>
+  | continues tail trace lastMaps lastWorlds lastFrame lastMetadata tailRelated returnReceipt remaining remainingBound =>
+    obtain ⟨tailReturn⟩ := returnReceipt
     exact .continues tail (.cons head trace) (maps.trans lastMaps) (worlds.trans lastWorlds)
       (preservation.trans lastFrame) (metadata.trans lastMetadata) (protocol.trans related tailRelated)
+      ⟨ReturnTo.then (ReturnTo.binding bindings index.scope index.canonical id binderType binderValue) tailReturn⟩
       remaining (Nat.le_trans remainingBound bounded)
   | @fault sourceSize finalContext reason token after finalMap finalWorld trace same matched heaps lastMaps lastWorlds lastFrame lastMetadata transition =>
     have restored := bindings.restore_reached (reached := ⟨index.scope, finalMap, finalWorld, after, finalStore, index.canonical⟩)
@@ -270,7 +284,7 @@ theorem ResultAtFor.toLegacy {entry : ProtectedExpressionMeaning.Entry} {headerS
       administrative frame globals contextLocation native type faults continuation context environment index.heap
       items index.mapping index.world index.store value finalStore := by
   cases result with
-  | continues tail trace maps worlds preservation metadata _related remaining bounded =>
+  | continues tail trace maps worlds preservation metadata _related _returnTo remaining bounded =>
     exact .continues tail.toLegacy trace maps worlds preservation metadata remaining bounded
   | fault trace same matched heaps maps worlds preservation metadata _transition =>
     exact .fault trace same matched heaps maps worlds preservation metadata
