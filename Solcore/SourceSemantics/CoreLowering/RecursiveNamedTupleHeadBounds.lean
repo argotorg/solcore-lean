@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
 
 import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignment
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
 
 /-! Pointwise finite tuple correspondence consumes the original sequence trace
 and original native children. The source cost reconstructed by reflection is
@@ -20,6 +21,98 @@ namespace Stateful
 universe u v
 variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
 
+/-- The original tuple Source proof consumes one real whole-sequence
+producer; no child admission is erased to arbitrary sequence input. -/
+theorem preserves_after_sequence_bounded (budget size : Nat) (within : size ≤ budget)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {ids : List ExpressionId} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
+    (receipt : Header values source id node ids types codes)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
+    {canonical actual : Environment} {before : Dynamic.Heap} {store : Store} {ξ : Renaming}
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequence : ProtectedStateExpressionSequenceProducer.Preserves
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (environment := environment) (actual := actual) (ξ := ξ) (ids := ids) (sourceTypes := types)
+      (codes := codes) (faults := faults) (CompatibleAmbientHeap.payloadModel values.checked registry functions) initial (budget + 1))
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (sequenceSize : Nat) {sourceOutcome : DataExpressionSequence.Outcome}
+    (sourceTrace : ProtectedDataExpressionSequence.TraceAt program sequenceSize context evidence source environment before ids sourceOutcome after)
+    (packed : CompatibleExpressionProducts.PacksOutcome sourceOutcome outcome)
+    (sequenceSmaller : sequenceSize < size) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore ∧
+      GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld node.type (SourceCoreCalls.packArguments codes).type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
+    sequence sourceTrace (by omega)
+  obtain ⟨actualOutcome, actualPacked, payload⟩ := sequence_result represented
+  have sameOutcome := actualPacked.functional packed
+  subst outcome
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated,
+    by simpa only [receipt.sourceType] using payload, finalHeaps, maps, worlds, frame, metadata, transition⟩
+
+theorem preserves_bounded_with_sequence (budget size : Nat) (within : size ≤ budget)
+    (unique : NodeOccurrencesUnique source)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {ids : List ExpressionId} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
+    (receipt : Header values source id node ids types codes)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
+    {canonical actual : Environment} {before : Dynamic.Heap} {store : Store} {ξ : Renaming}
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequence : ProtectedStateExpressionSequenceProducer.Preserves
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (environment := environment) (actual := actual) (ξ := ξ) (ids := ids) (sourceTypes := types)
+      (codes := codes) (faults := faults) (CompatibleAmbientHeap.payloadModel values.checked registry functions) initial (budget + 1))
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : ExpressionOutcome program size context evidence source environment before id outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore ∧
+      GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld node.type (SourceCoreCalls.packArguments codes).type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨sequenceSize, sourceOutcome, sourceTrace, packed, sequenceSmaller⟩ :=
+    source_inv_at receipt.metadata receipt.form unique trace
+  exact preserves_after_sequence_bounded functions program evidence protocol budget size within receipt initial
+    sequence sequenceSize sourceTrace packed sequenceSmaller
+
+/-- Reflection retains the sequence's exact reached state and original
+native strict budget, then reconstructs an independent whole Source grade. -/
+theorem reflects_bounded_with_sequence (budget size : Nat) (within : size ≤ budget)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    {ids : List ExpressionId} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
+    (receipt : Header values source id node ids types codes)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
+    {canonical actual : Environment} {before : Dynamic.Heap} {store : Store} {ξ : Renaming}
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequence : ProtectedStateExpressionSequenceProducer.Reflects
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (environment := environment) (actual := actual) (ξ := ξ) (ids := ids) (sourceTypes := types)
+      (codes := codes) (faults := faults) (CompatibleAmbientHeap.payloadModel values.checked registry functions) initial (budget + 1))
+    {value : Value} {finalStore : Store}
+    (evaluated : EvaluationSize size actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      ExpressionOutcome program sourceSize context evidence source environment before id outcome after ∧
+      GenericExpressionMeaning.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld node.type (SourceCoreCalls.packArguments codes).type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨sequenceSize, sourceOutcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
+    sequence evaluated (by omega)
+  obtain ⟨outcome, packed, payload⟩ := sequence_result represented
+  have trace := source_intro receipt.metadata receipt.form sourceTrace.sound packed
+  obtain ⟨sourceSize, measured⟩ := ExpressionOutcome.has_size trace
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, measured,
+    by simpa only [receipt.sourceType] using payload, finalHeaps, maps, worlds, frame, metadata, transition⟩
+
 theorem preserves_at (budget size : Nat) (within : size ≤ budget)
     (unique : NodeOccurrencesUnique source)
     (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.PreservesAt protocol
@@ -36,15 +129,10 @@ theorem preserves_at (budget size : Nat) (within : size ≤ budget)
   subst root
   obtain ⟨sequenceSize, sourceOutcome, sourceTrace, packed, sequenceSmaller⟩ :=
     source_inv_at receipt.metadata receipt.form unique trace
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
-    ProtectedDataExpressionSequence.Stateful.preserves_bounded protocol (budget + 1) sequence
+  exact preserves_after_sequence_bounded functions program evidence protocol budget size within receipt installed
+    (ProtectedStateExpressionSequenceProducer.Preserves.of_uniform installed (budget + 1) sequence
       (fun n bound => ProtectedStateTransition.SequenceBridge.preserves_at protocol (meaning n (by omega)))
-      environments heaps locals agrees actualTyped installed sourceTrace (by omega)
-  obtain ⟨actualOutcome, actualPacked, payload⟩ := sequence_result represented
-  have sameOutcome := actualPacked.functional packed
-  subst outcome
-  exact ⟨value, finalStore, finalMap, finalWorld, evaluated,
-    by simpa only [receipt.sourceType] using payload, finalHeaps, maps, worlds, frame, metadata, transition⟩
+      environments heaps locals agrees actualTyped) sequenceSize sourceTrace packed sequenceSmaller
 
 theorem reflects_at (budget size : Nat) (within : size ≤ budget)
     (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol
@@ -59,15 +147,10 @@ theorem reflects_at (budget size : Nat) (within : size ≤ budget)
     environments heaps locals agrees actualTyped installed evaluated
   have same := Option.some.inj (receipt.metadata.found.symm.trans found)
   subst root
-  obtain ⟨sequenceSize, sourceOutcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
-    ProtectedDataExpressionSequence.Stateful.reflects_bounded protocol (budget + 1) sequence
+  exact reflects_bounded_with_sequence functions program evidence protocol budget size within receipt installed
+    (ProtectedStateExpressionSequenceProducer.Reflects.of_uniform installed (budget + 1) sequence
       (fun n bound => ProtectedStateTransition.SequenceBridge.reflects_at protocol (meaning n (by omega)))
-      environments heaps locals agrees actualTyped installed evaluated (by omega)
-  obtain ⟨outcome, packed, payload⟩ := sequence_result represented
-  have trace := source_intro receipt.metadata receipt.form sourceTrace.sound packed
-  obtain ⟨sourceSize, measured⟩ := ExpressionOutcome.has_size trace
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, measured,
-    by simpa only [receipt.sourceType] using payload, finalHeaps, maps, worlds, frame, metadata, transition⟩
+      environments heaps locals agrees actualTyped) evaluated
 
 end Stateful
 
