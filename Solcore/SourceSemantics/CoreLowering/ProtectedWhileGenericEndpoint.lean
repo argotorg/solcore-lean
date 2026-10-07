@@ -258,6 +258,145 @@ theorem initial_state {mapping : LocationMap} {world : StoreTyping} {before : Dy
     ProtectedStateTransition.While.install_related transport environments heaps locals actualTyped actualCode read unmapped initial,
     ProtectedStateTransition.While.install_records transport environments heaps locals actualTyped actualCode read unmapped initial⟩
 
+end Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful
+
+namespace Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful.WithReady
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open RecursiveNamedLoopContracts (Below)
+open TypedLexicalWhile (Scope ValuesContext Progress FlowRep Restored restored restore_rep)
+open ProtectedStateTransition
+universe u v
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  (guard : Location → CallableIndexedHistory.NativeFrame → Prop)
+variable {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {administrative : Core.Context} {type : Ty} {conditionCode code : Expr} {selfReason : Word} {scope : Scope}
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment) {faults : FunctionCalls.FaultRep}
+  (transport : AdministrativeTransport protocol)
+
+open RecursiveNamedLexicalContracts.Stateful.WithReady
+variable (readiness : Readiness protocol)
+  (exprFacts : SourceSemantics.Context → ExpressionId → ExpressionNode → Prop)
+  (facts : SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop)
+  (activation : ActivationTransfers protocol readiness)
+
+private theorem post_restore {index : Index} (readiness : Readiness protocol)
+    (environment : Dynamic.Environment) (outcome : Dynamic.ControlOutcome) {reached : protocol.State index}
+    (post : PostReady readiness context outcome reached) :
+    PostReady readiness context (Dynamic.restoreControl environment outcome) reached := by
+  cases outcome <;> exact post
+
+include transport activation in
+theorem while_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (meaningB : Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
+      program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size)) {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionFacts : exprFacts context condition conditionNode)
+    (bodyFacts : facts context false statements expected)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.whileLoop type conditionCode code selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (unique : NodeOccurrencesUnique source)
+    (correct : Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness guard facts (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code)) :
+    ∀ size, size ≤ budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.HeadPreservesAtWith protocol readiness guard (fun _ _ _ => True) (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
+  intro size bounded valid _headFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped installed guarded ready trace
+  obtain ⟨protectedState, installedProgress, installedRelated, _installedRecords⟩ :=
+    ProtectedWhile.Body.Stateful.initial_state (protocol := protocol) functions transport environments heaps locals agrees actualTyped read unmapped typed installed
+  have activated := activation.ready installed protectedState.retained installedProgress.2.2.2.1
+    installedRelated _installedRecords ready
+  have installedRead := (TypedLexicalWhile.retain unmapped read installedProgress.2.2.2.1).2
+  cases trace with
+  | control sourceTrace =>
+    obtain ⟨rfl, child, _, innerOutcome, rfl, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_control unique (lookupStatement?_sound found) form sourceTrace
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress, reached, related, post⟩ :=
+      iterations_success_bounded_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (exprFacts := exprFacts) (facts := facts) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) meaningB conditionTree conditionFound valid unique agrees reference correct conditionFacts bodyFacts protectedState installedRead guarded activated
+    exact ⟨rfl, restored environment innerOutcome, value, finalStore, finalMap, finalWorld,
+      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
+      restore_rep represented environment, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      ⟨reached.retained, protocol.trans installedRelated related, post_restore protocol readiness environment innerOutcome post⟩⟩
+  | fault failed =>
+    obtain ⟨child, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_fault unique (lookupStatement?_sound found) form failed
+    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress, reached, related, post⟩ :=
+      iterations_fault_bounded_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (exprFacts := exprFacts) (facts := facts) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) meaningB conditionTree conditionFound valid unique agrees reference correct conditionFacts bodyFacts protectedState installedRead guarded activated
+    exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
+      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
+      represented, (installedProgress.trans progress).1,
+      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+      ⟨reached.retained, protocol.trans installedRelated related, post⟩⟩
+
+include transport activation in
+theorem while_reflects_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
+    (reflectionB : Below budget (fun size => ExpressionReflectsAt protocol readiness (context := context) (source := source) (faults := faults)
+      program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size)) {id : StatementId} {node : StatementNode} {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition statements)
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionFacts : exprFacts context condition conditionNode)
+    (bodyFacts : facts context false statements expected)
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.whileLoop type conditionCode code selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (correct : Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith protocol readiness guard facts (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ∀ size, size ≤ budget → RecursiveNamedImperativeFor.Control.Stateful.WithReady.HeadReflectsAtWith protocol readiness guard (fun _ _ _ => True) (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
+  intro size bounded valid _headFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped installed guarded ready evaluated
+  obtain ⟨protectedState, installedProgress, installedRelated, _installedRecords⟩ :=
+    ProtectedWhile.Body.Stateful.initial_state (protocol := protocol) functions transport environments heaps locals agrees actualTyped read unmapped typed installed
+  have activated := activation.ready installed protectedState.retained installedProgress.2.2.2.1
+    installedRelated _installedRecords ready
+  have installedRead := (TypedLexicalWhile.retain unmapped read installedProgress.2.2.2.1).2
+  rw [LoopRenaming.whileLoop] at evaluated
+  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress, reached, related, post⟩ :=
+    iterations_reflect_bounded_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (exprFacts := exprFacts) (facts := facts) functions program evidence reflectionB conditionTree conditionFound conditionFacts bodyFacts valid agrees reference correct
+      bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState installedRead guarded activated nativeEntry
+  have statementTrace : RecursiveNamedLoopContracts.StatementOutcome program (SourceExecutionSize.stepSize [sourceSize])
+      context evidence source environment before id context (Dynamic.restoreControl environment outcome) after := by
+    cases trace with
+    | control sourceLoop => exact .control (.whileLoop (lookupStatement?_sound found) form sourceLoop)
+    | fault sourceLoop => exact .fault (.whileIteration (lookupStatement?_sound found) form sourceLoop)
+  exact ⟨SourceExecutionSize.stepSize [sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
+    statementTrace, restored environment outcome, restore_rep represented environment, (installedProgress.trans progress).1,
+    (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
+    (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
+    ⟨reached.retained, protocol.trans installedRelated related, post_restore protocol readiness environment outcome post⟩⟩
+
+end Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful.WithReady
+
+namespace Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open RecursiveNamedLoopContracts (Below)
+open TypedLexicalWhile (Scope ValuesContext Progress FlowRep Restored restored restore_rep)
+open ProtectedStateTransition
+universe u v
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  (guard : Location → CallableIndexedHistory.NativeFrame → Prop)
+variable {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {administrative : Core.Context} {type : Ty} {conditionCode code : Expr} {selfReason : Word} {scope : Scope}
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment) {faults : FunctionCalls.FaultRep}
+  (transport : AdministrativeTransport protocol)
+
 include transport in
 theorem while_preserves_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
     (meaningB : Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -277,30 +416,19 @@ theorem while_preserves_bounded_for (validity : SourceSemantics.Context → Prop
       (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
   intro size bounded valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed guarded trace
-  obtain ⟨protectedState, installedProgress, installedRelated, _installedRecords⟩ :=
-    initial_state (protocol := protocol) functions transport environments heaps locals agrees actualTyped read unmapped typed installed
-  have installedRead := (TypedLexicalWhile.retain unmapped read installedProgress.2.2.2.1).2
-  cases trace with
-  | control sourceTrace =>
-    obtain ⟨rfl, child, _, innerOutcome, rfl, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_control unique (lookupStatement?_sound found) form sourceTrace
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress, reached, related⟩ :=
-      iterations_success_bounded_for (protocol := protocol) (guard := guard) (validity := validity) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) meaningB conditionTree conditionFound valid unique agrees reference correct protectedState installedRead guarded
-    exact ⟨rfl, restored environment innerOutcome, value, finalStore, finalMap, finalWorld,
-      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
-      restore_rep represented environment, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      ⟨reached.retained, protocol.trans installedRelated related⟩⟩
-  | fault failed =>
-    obtain ⟨child, sourceLoop, smaller⟩ := RecursiveNamedLoopContracts.statement_while_fault unique (lookupStatement?_sound found) form failed
-    obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, represented, progress, reached, related⟩ :=
-      iterations_fault_bounded_for (protocol := protocol) (guard := guard) (validity := validity) sourceLoop budget (Nat.le_trans (Nat.le_of_lt smaller) bounded) meaningB conditionTree conditionFound valid unique agrees reference correct protectedState installedRead guarded
-    exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
-      by simpa only [LoopRenaming.whileLoop] using nativeTrace.whileLoop_evaluates,
-      represented, (installedProgress.trans progress).1,
-      (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-      (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-      ⟨reached.retained, protocol.trans installedRelated related⟩⟩
+  obtain ⟨sameContext, restored, value, finalStore, finalMap, finalWorld, evaluated, represented,
+    finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    WithReady.while_preserves_bounded_for (protocol := protocol) (guard := guard) (validity := validity)
+      (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
+      (exprFacts := fun _ _ _ => True) (facts := fun _ _ _ _ => True)
+      (activation := WithReady.ActivationTransfers.trivial protocol)
+      functions program evidence transport budget
+      (fun child strict => WithReady.expression_preserves_trivial protocol (meaningB child strict))
+      found form conditionFound True.intro True.intro conditionTree typed unique
+      (fun child strict => WithReady.body_preserves_trivial protocol guard functions program evidence validity (correct child strict))
+      size bounded valid True.intro environments heaps locals agrees actualTyped reference read unmapped installed guarded True.intro trace
+  exact ⟨sameContext, restored, value, finalStore, finalMap, finalWorld, evaluated, represented,
+    finalHeaps, maps, worlds, frame, metadata, post.forget⟩
 
 include transport in
 theorem while_reflects_bounded_for (validity : SourceSemantics.Context → Prop) (budget : Nat)
@@ -322,24 +450,19 @@ theorem while_reflects_bounded_for (validity : SourceSemantics.Context → Prop)
       (scope := scope) size id expected type (LocalLoop.whileLoop type conditionCode code selfReason) := by
   intro size bounded valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed guarded evaluated
-  obtain ⟨protectedState, installedProgress, installedRelated, _installedRecords⟩ :=
-    initial_state (protocol := protocol) functions transport environments heaps locals agrees actualTyped read unmapped typed installed
-  have installedRead := (TypedLexicalWhile.retain unmapped read installedProgress.2.2.2.1).2
-  rw [LoopRenaming.whileLoop] at evaluated
-  obtain ⟨entrySize, entrySmaller, nativeEntry⟩ := evaluated.iterate_entry
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, progress, reached, related⟩ :=
-    iterations_reflect_bounded_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence reflectionB conditionTree conditionFound valid agrees reference correct
-      bodyCannotFault entrySize (Nat.le_trans (Nat.le_of_lt entrySmaller) bounded) protectedState installedRead guarded nativeEntry
-  have statementTrace : RecursiveNamedLoopContracts.StatementOutcome program (SourceExecutionSize.stepSize [sourceSize])
-      context evidence source environment before id context (Dynamic.restoreControl environment outcome) after := by
-    cases trace with
-    | control sourceLoop => exact .control (.whileLoop (lookupStatement?_sound found) form sourceLoop)
-    | fault sourceLoop => exact .fault (.whileIteration (lookupStatement?_sound found) form sourceLoop)
-  exact ⟨SourceExecutionSize.stepSize [sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
-    statementTrace, restored environment outcome, restore_rep represented environment, (installedProgress.trans progress).1,
-    (installedProgress.trans progress).2.1, (installedProgress.trans progress).2.2.1,
-    (installedProgress.trans progress).2.2.2.1, (installedProgress.trans progress).2.2.2.2,
-    ⟨reached.retained, protocol.trans installedRelated related⟩⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, restored, represented,
+    finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    WithReady.while_reflects_bounded_for (protocol := protocol) (guard := guard) (validity := validity)
+      (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
+      (exprFacts := fun _ _ _ => True) (facts := fun _ _ _ _ => True)
+      (activation := WithReady.ActivationTransfers.trivial protocol)
+      functions program evidence transport budget
+      (fun child strict => WithReady.expression_reflects_trivial protocol (reflectionB child strict))
+      found form conditionFound True.intro True.intro conditionTree typed
+      (fun child strict => WithReady.body_reflects_trivial protocol guard functions program evidence validity (correct child strict))
+      bodyCannotFault size bounded valid True.intro environments heaps locals agrees actualTyped reference read unmapped installed guarded True.intro evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, restored, represented,
+    finalHeaps, maps, worlds, frame, metadata, post.forget⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful
 

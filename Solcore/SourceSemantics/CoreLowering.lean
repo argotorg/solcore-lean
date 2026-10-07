@@ -734,6 +734,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBareAssi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPlaceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedNamedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeTypedSourceSites
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileReady
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

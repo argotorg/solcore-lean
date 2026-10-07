@@ -19,6 +19,394 @@ inductive SourceLoop (program : Program) (context : SourceSemantics.Context)
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedWhile
 
+namespace Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful.WithReady
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open TypedLexicalWhile (Scope ValuesContext Progress FlowRep)
+open CompatibleExpressionPrimitives (bool_fields)
+open RecursiveNamedLoopContracts (Below)
+open ProtectedStateTransition
+universe u v
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  (guard : Location → CallableIndexedHistory.NativeFrame → Prop)
+
+open RecursiveNamedLexicalContracts.Stateful.WithReady
+variable (readiness : Readiness protocol)
+  (exprFacts : SourceSemantics.Context → ExpressionId → ExpressionNode → Prop)
+  (facts : SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop)
+
+theorem iterations_success_bounded_for (validity : SourceSemantics.Context → Prop)
+    {program : Program} {size : Nat} {context finalContext : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {condition : ExpressionId} {statements : List StatementId} {outcome : Dynamic.ControlOutcome}
+    (trace : SourceExecutionSize.WhileExecutes program size context evidence source environment before condition statements finalContext outcome after) :
+    ∀ (budget : Nat), size ≤ budget →
+    ∀ {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {scope : Scope}
+      {ambient : AmbientDefinitions values.checked.catalog.definitions} {functions : FunctionModel values.checked.catalog ambient}
+      {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+      {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
+      {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
+        program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size) →
+      certificate scope condition ⟨.bool, conditionCode⟩ →
+      source.lookupExpression? condition = some node →
+      validity context → NodeOccurrencesUnique source →
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness guard facts (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+        (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        (scope := scope) size false statements expected type code) →
+      exprFacts context condition node → facts context false statements expected →
+      ∀ state : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason mapping world before store,
+      store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native) →
+      guard contextLocation native → readiness.Ready context state.retained →
+      ∃ value finalStore finalMap finalWorld,
+        Core.LoopExecution.WhileTrace type (conditionCode.rename ξ) (code.rename ξ) selfReason location actual store value finalStore ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ PostReady readiness context outcome reached.retained := by
+  induction size using Nat.strongRecOn generalizing context finalContext evidence source environment before after condition statements outcome with
+  | ind size ih =>
+    intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+      contextLocation location expected type conditionCode code selfReason mapping world store node native faults
+      meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts state fixedRead guarded ready
+    cases trace with
+      | done conditionEvaluation =>
+        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases represented with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          exact ⟨_, nextStore, nextMap, nextWorld, .done evaluated, .fallthrough environment, progress, conditionState, conditionRetained, conditionPost.1⟩
+      | nextFallthrough conditionEvaluation bodyEvaluation next =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | fallthrough _ =>
+            have progress := conditionProgress.trans bodyProgress
+            let nextState := bodyState
+            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained, finalPost⟩ :=
+              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+                meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts nextState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost
+            exact ⟨result, finalStore, finalMap, finalWorld,
+              .nextFallthrough conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+      | nextContinue conditionEvaluation bodyEvaluation next =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | continuing _ =>
+            have progress := conditionProgress.trans bodyProgress
+            let nextState := bodyState
+            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained, finalPost⟩ :=
+              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+                meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts nextState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost
+            exact ⟨result, finalStore, finalMap, finalWorld,
+              .nextContinue conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+      | breaks conditionEvaluation bodyEvaluation =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | breaking _ =>
+            exact ⟨_, bodyStore, bodyMap, bodyWorld, .breaks conditionEval bodyEval, .fallthrough environment, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+      | returns conditionEvaluation bodyEvaluation =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | returned payload =>
+            exact ⟨_, bodyStore, bodyMap, bodyWorld, .returns conditionEval bodyEval, .returned payload, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+
+theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Prop)
+    {program : Program} {size : Nat} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {condition : ExpressionId} {statements : List StatementId} {reason : Dynamic.SemanticFault}
+    (trace : SourceExecutionSize.WhileFaults program size context evidence source environment before condition statements reason after) :
+    ∀ (budget : Nat), size ≤ budget →
+    ∀ {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {scope : Scope}
+      {ambient : AmbientDefinitions values.checked.catalog.definitions} {functions : FunctionModel values.checked.catalog ambient}
+      {registry : SourceCoreRawMetadata.Registry} {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+      {administrative actualContext : Core.Context} {canonical actual : Environment} {ξ : Renaming}
+      {contextLocation location : Location} {expected : TypeSystem.Ty} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
+      {mapping : LocationMap} {world : StoreTyping} {store : Store} {node : ExpressionNode} {native : CallableIndexedHistory.NativeFrame} {faults : FunctionCalls.FaultRep},
+      Below budget (fun size => ExpressionPreservesAt protocol readiness (context := context) (source := source) (faults := faults)
+        program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size) →
+      certificate scope condition ⟨.bool, conditionCode⟩ →
+      source.lookupExpression? condition = some node →
+      validity context → NodeOccurrencesUnique source →
+      EnvironmentsAgree ξ canonical actual →
+      canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation) →
+      Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness guard facts (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+        (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        (scope := scope) size false statements expected type code) →
+      exprFacts context condition node → facts context false statements expected →
+      ∀ state : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason mapping world before store,
+      store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native) →
+      guard contextLocation native → readiness.Ready context state.retained →
+      ∃ value finalStore finalMap finalWorld,
+        Core.LoopExecution.WhileTrace type (conditionCode.rename ξ) (code.rename ξ) selfReason location actual store value finalStore ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type (.fault reason) value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ PostReady readiness context (.fault reason) reached.retained := by
+  induction size using Nat.strongRecOn generalizing context evidence source environment before after condition statements reason with
+  | ind size ih =>
+    intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+      contextLocation location expected type conditionCode code selfReason mapping world store node native faults
+      meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts state fixedRead guarded ready
+    cases trace with
+      | condition conditionFault =>
+        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.fault conditionFault)
+        cases represented with
+        | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, .conditionFault evaluated, .fault matched, progress, conditionState, conditionRetained, conditionPost⟩
+      | conditionType conditionEvaluation notBoolean runtimeType =>
+        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases represented with
+        | value payload =>
+          obtain ⟨boolean, rfl, _⟩ := bool_fields payload
+          exact False.elim (notBoolean trivial)
+      | body conditionEvaluation bodyFault =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.fault bodyFault)
+          cases bodyRelated with
+          | fault matched => exact ⟨_, bodyStore, bodyMap, bodyWorld, .bodyFault conditionEval bodyEval, .fault matched, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+      | nextFallthrough conditionEvaluation bodyEvaluation next =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | fallthrough _ =>
+            have progress := conditionProgress.trans bodyProgress
+            let nextState := bodyState
+            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained, finalPost⟩ :=
+              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+                meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts nextState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost
+            exact ⟨result, finalStore, finalMap, finalWorld,
+              .nextFallthrough conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+      | nextContinue conditionEvaluation bodyEvaluation next =>
+        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence
+            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found conditionFacts agrees state ready (.value conditionEvaluation)
+        cases conditionRelated with
+        | value payload =>
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 (.control bodyEvaluation)
+          cases bodyRelated with
+          | continuing _ =>
+            have progress := conditionProgress.trans bodyProgress
+            let nextState := bodyState
+            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained, finalPost⟩ :=
+              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+                meaning conditionTree found valid unique agrees reference correct conditionFacts bodyFacts nextState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost
+            exact ⟨result, finalStore, finalMap, finalWorld,
+              .nextContinue conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+
+variable {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+  {solved : List SolvedRequirement}
+  {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient) {registry : SourceCoreRawMetadata.Registry}
+  {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
+  {ξ : Renaming} {contextLocation location : Location} {type : Ty} {conditionCode code : Expr} {selfReason : Word}
+  {scope : Scope}
+  (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep}
+  {native : CallableIndexedHistory.NativeFrame}
+  {budget : Nat}
+  (reflection : Below budget (fun size => ExpressionReflectsAt protocol readiness (context := context) (source := source) (faults := faults)
+    program evidence (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts certificate size))
+
+
+include reflection in
+theorem iterations_reflect_bounded_for (validity : SourceSemantics.Context → Prop) {condition : ExpressionId} {node : ExpressionNode}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (conditionTree : certificate scope condition ⟨.bool, conditionCode⟩)
+    (found : source.lookupExpression? condition = some node)
+    (conditionFacts : exprFacts context condition node)
+    (bodyFacts : facts context false statements expected)
+    (valid : validity context)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (correct : Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith protocol readiness guard facts (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults) (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      (scope := scope) size false statements expected type code))
+    (bodyCannotFault : ∀ {before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ∀ (size : Nat), size ≤ budget → ∀ {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store finalStore : Store} {value : Value},
+      ∀ state : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason mapping world before store,
+      store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native) →
+      guard contextLocation native → readiness.Ready context state.retained →
+      EvaluationSize size (Core.LoopExecution.entryEnvironment type location actual) store
+        (LocalLoop.loopBody type (conditionCode.rename ξ) (code.rename ξ) (LocalLoop.fallthrough type) selfReason) value finalStore →
+      ∃ sourceSize outcome after finalMap finalWorld,
+        RecursiveNamedLoopContracts.WhileOutcome program sourceSize context evidence source environment before condition statements outcome after ∧
+        FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+        Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ PostReady readiness context outcome reached.retained := by
+  intro size
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    intro bounded mapping world before store finalStore value state fixedRead guarded ready evaluation
+    obtain ⟨conditionSize, conditionStore, conditionValue, conditionSmaller, conditionEval⟩ := evaluation.bind_computation
+    obtain ⟨conditionSourceSize, conditionOutcome, conditionHeap, conditionMap, conditionWorld, conditionTrace, conditionRelated, conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+      condition_reflects_at (protocol := protocol) (readiness := readiness) (exprFacts := exprFacts) functions program evidence (reflection _ (Nat.lt_of_lt_of_le conditionSmaller bounded)) conditionTree found conditionFacts agrees state ready conditionEval
+    cases conditionRelated with
+    | fault matched =>
+      cases conditionTrace with
+      | fault failed =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound (Core.LoopExecution.condition_failure conditionEval.sound)
+        exact ⟨_, _, conditionHeap, conditionMap, conditionWorld, .fault (.condition failed), .fault matched, conditionProgress, conditionState, conditionRetained, conditionPost⟩
+    | value payload =>
+      obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+      subst sameSource
+      subst sameCore
+      cases conditionTrace with
+      | value conditionTrace =>
+        cases boolean with
+        | false =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound (Core.LoopExecution.condition_false conditionEval.sound)
+          exact ⟨_, _, conditionHeap, conditionMap, conditionWorld, .control (.done conditionTrace), .fallthrough environment, conditionProgress, conditionState, conditionRetained, conditionPost.1⟩
+        | true =>
+          obtain ⟨branchSize, branchSmaller, branch⟩ := evaluation.loop_true_branch conditionEval.sound
+          obtain ⟨bodySize, bodyStore, bodyValue, bodySmaller, bodyEval⟩ := branch.bind_computation
+          obtain ⟨bodySourceSize, bodyContext, bodyOutcome, bodyHeap, bodyMap, bodyWorld, bodyTrace, bodyRelated, bodyProgress, bodyState, bodyRetained, bodyPost, _lexical⟩ :=
+            body_reflects_at_for (protocol := protocol) (guard := guard) (validity := validity) (readiness := readiness) (facts := facts) functions program evidence
+              (correct _ (Nat.lt_of_lt_of_le bodySmaller (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded)))
+              valid bodyFacts agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded conditionPost.1 bodyEval
+          have progress := conditionProgress.trans bodyProgress
+          cases bodyRelated with
+          | fault matched =>
+            cases bodyTrace with
+            | control impossible => exact False.elim (bodyCannotFault impossible.sound)
+            | fault failed =>
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+                (Core.LoopExecution.body_failure conditionEval.sound bodyEval.sound)
+              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .fault (.body conditionTrace failed), .fault matched, progress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+          | returned payload =>
+            cases bodyTrace with
+            | control bodyTrace =>
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+                (Core.LoopExecution.body_returned conditionEval.sound bodyEval.sound)
+              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .control (.returns conditionTrace bodyTrace), .returned payload, progress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+          | breaking bodyEnvironment =>
+            cases bodyTrace with
+            | control bodyTrace =>
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+                (Core.LoopExecution.body_breaking conditionEval.sound bodyEval.sound)
+              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .control (.breaks conditionTrace bodyTrace), .fallthrough environment, progress, bodyState, protocol.trans conditionRetained bodyRetained, bodyPost⟩
+          | fallthrough bodyEnvironment =>
+            cases bodyTrace with
+            | control bodyTrace =>
+              let nextState := bodyState
+              obtain ⟨nextSize, smaller, nextEval⟩ := branch.loop_next_fallthrough bodyEval.sound nextState.live.selfRead
+              obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress, finalState, finalRetained, finalPost⟩ :=
+                ih nextSize (Nat.lt_trans smaller branchSmaller)
+                  (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) nextState
+                  (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost nextEval
+              cases nextTrace with
+              | control nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .control (.nextFallthrough conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+              | fault nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .fault (.nextFallthrough conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+          | continuing bodyEnvironment =>
+            cases bodyTrace with
+            | control bodyTrace =>
+              let nextState := bodyState
+              obtain ⟨nextSize, smaller, nextEval⟩ := branch.loop_next_continuing bodyEval.sound nextState.live.selfRead
+              obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress, finalState, finalRetained, finalPost⟩ :=
+                ih nextSize (Nat.lt_trans smaller branchSmaller)
+                  (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) nextState
+                  (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded bodyPost nextEval
+              cases nextTrace with
+              | control nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .control (.nextContinue conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+              | fault nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .fault (.nextContinue conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+
+end Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful.WithReady
+
 namespace Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
 open TypedLexicalWhile (Scope ValuesContext Progress FlowRep)
@@ -62,102 +450,18 @@ theorem iterations_success_bounded_for (validity : SourceSemantics.Context → P
       ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
         contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
         protocol.Relates state.retained reached.retained := by
-  induction size using Nat.strongRecOn generalizing context finalContext evidence source environment before after condition statements outcome with
-  | ind size ih =>
-    intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node native faults
-      meaning conditionTree found valid unique agrees reference correct state fixedRead guarded
-    cases trace with
-      | done conditionEvaluation =>
-        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases represented with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          exact ⟨_, nextStore, nextMap, nextWorld, .done evaluated, .fallthrough environment, progress, conditionState, conditionRetained⟩
-      | nextFallthrough conditionEvaluation bodyEvaluation next =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | fallthrough _ =>
-            have progress := conditionProgress.trans bodyProgress
-            let nextState := bodyState
-            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained⟩ :=
-              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
-                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-                meaning conditionTree found valid unique agrees reference correct nextState
-                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded
-            exact ⟨result, finalStore, finalMap, finalWorld,
-              .nextFallthrough conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-      | nextContinue conditionEvaluation bodyEvaluation next =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | continuing _ =>
-            have progress := conditionProgress.trans bodyProgress
-            let nextState := bodyState
-            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained⟩ :=
-              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
-                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-                meaning conditionTree found valid unique agrees reference correct nextState
-                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded
-            exact ⟨result, finalStore, finalMap, finalWorld,
-              .nextContinue conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-      | breaks conditionEvaluation bodyEvaluation =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | breaking _ =>
-            exact ⟨_, bodyStore, bodyMap, bodyWorld, .breaks conditionEval bodyEval, .fallthrough environment, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained⟩
-      | returns conditionEvaluation bodyEvaluation =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | returned payload =>
-            exact ⟨_, bodyStore, bodyMap, bodyWorld, .returns conditionEval bodyEval, .returned payload, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained⟩
+  intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+    contextLocation location expected type conditionCode code selfReason mapping world store node native faults
+    meaning conditionTree found valid unique agrees reference correct state fixedRead guarded
+  obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained, _post⟩ :=
+    WithReady.iterations_success_bounded_for (protocol := protocol) (guard := guard) (validity := validity)
+      (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
+      (exprFacts := fun _ _ _ => True) (facts := fun _ _ _ _ => True) trace budget bounded
+      (fun child strict => WithReady.expression_preserves_trivial protocol (meaning child strict))
+      conditionTree found valid unique agrees reference
+      (fun child strict => WithReady.body_preserves_trivial protocol guard functions program evidence validity (correct child strict))
+      True.intro True.intro state fixedRead guarded True.intro
+  exact ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained⟩
 
 theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Prop)
     {program : Program} {size : Nat} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -192,89 +496,18 @@ theorem iterations_fault_bounded_for (validity : SourceSemantics.Context → Pro
       ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
         contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
         protocol.Relates state.retained reached.retained := by
-  induction size using Nat.strongRecOn generalizing context evidence source environment before after condition statements reason with
-  | ind size ih =>
-    intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
-      contextLocation location expected type conditionCode code selfReason mapping world store node native faults
-      meaning conditionTree found valid unique agrees reference correct state fixedRead guarded
-    cases trace with
-      | condition conditionFault =>
-        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.fault conditionFault)
-        cases represented with
-        | fault matched => exact ⟨_, nextStore, nextMap, nextWorld, .conditionFault evaluated, .fault matched, progress, conditionState, conditionRetained⟩
-      | conditionType conditionEvaluation notBoolean runtimeType =>
-        obtain ⟨value, nextStore, nextMap, nextWorld, evaluated, represented, progress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases represented with
-        | value payload =>
-          obtain ⟨boolean, rfl, _⟩ := bool_fields payload
-          exact False.elim (notBoolean trivial)
-      | body conditionEvaluation bodyFault =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.fault bodyFault)
-          cases bodyRelated with
-          | fault matched => exact ⟨_, bodyStore, bodyMap, bodyWorld, .bodyFault conditionEval bodyEval, .fault matched, conditionProgress.trans bodyProgress, bodyState, protocol.trans conditionRetained bodyRetained⟩
-      | nextFallthrough conditionEvaluation bodyEvaluation next =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | fallthrough _ =>
-            have progress := conditionProgress.trans bodyProgress
-            let nextState := bodyState
-            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained⟩ :=
-              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
-                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-                meaning conditionTree found valid unique agrees reference correct nextState
-                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded
-            exact ⟨result, finalStore, finalMap, finalWorld,
-              .nextFallthrough conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-      | nextContinue conditionEvaluation bodyEvaluation next =>
-        obtain ⟨value, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-          condition_preserves_at (protocol := protocol) functions program evidence
-            (meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) conditionTree found agrees state (.value conditionEvaluation)
-        cases conditionRelated with
-        | value payload =>
-          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-          cases sameSource
-          subst sameCore
-          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_preserves_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded)) valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded (.control bodyEvaluation)
-          cases bodyRelated with
-          | continuing _ =>
-            have progress := conditionProgress.trans bodyProgress
-            let nextState := bodyState
-            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress, finalState, finalRetained⟩ :=
-              ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next budget
-                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-                meaning conditionTree found valid unique agrees reference correct nextState
-                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded
-            exact ⟨result, finalStore, finalMap, finalWorld,
-              .nextContinue conditionEval bodyEval nextState.live.selfRead nativeTrace, related, progress.trans finalProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
+  intro budget bounded certificate values scope ambient functions registry frameLayout globals administrative actualContext canonical actual ξ
+    contextLocation location expected type conditionCode code selfReason mapping world store node native faults
+    meaning conditionTree found valid unique agrees reference correct state fixedRead guarded
+  obtain ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained, _post⟩ :=
+    WithReady.iterations_fault_bounded_for (protocol := protocol) (guard := guard) (validity := validity)
+      (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
+      (exprFacts := fun _ _ _ => True) (facts := fun _ _ _ _ => True) trace budget bounded
+      (fun child strict => WithReady.expression_preserves_trivial protocol (meaning child strict))
+      conditionTree found valid unique agrees reference
+      (fun child strict => WithReady.body_preserves_trivial protocol guard functions program evidence validity (correct child strict))
+      True.intro True.intro state fixedRead guarded True.intro
+  exact ⟨value, finalStore, finalMap, finalWorld, nativeTrace, related, progress, reached, retained⟩
 
 variable {certificate : GenericExpressionMeaning.Certificate} {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
   {solved : List SolvedRequirement}
@@ -319,83 +552,16 @@ theorem iterations_reflect_bounded_for (validity : SourceSemantics.Context → P
       ∃ reached : ProtectedStateTransition.While.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
         contextLocation location type (conditionCode.rename ξ) (code.rename ξ) selfReason finalMap finalWorld after finalStore,
         protocol.Relates state.retained reached.retained := by
-  intro size
-  induction size using Nat.strongRecOn with
-  | ind size ih =>
-    intro bounded mapping world before store finalStore value state fixedRead guarded evaluation
-    obtain ⟨conditionSize, conditionStore, conditionValue, conditionSmaller, conditionEval⟩ := evaluation.bind_computation
-    obtain ⟨conditionSourceSize, conditionOutcome, conditionHeap, conditionMap, conditionWorld, conditionTrace, conditionRelated, conditionProgress, conditionState, conditionRetained⟩ :=
-      condition_reflects_at (protocol := protocol) functions program evidence (reflection _ (Nat.lt_of_lt_of_le conditionSmaller bounded)) conditionTree found agrees state conditionEval
-    cases conditionRelated with
-    | fault matched =>
-      cases conditionTrace with
-      | fault failed =>
-        obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound (Core.LoopExecution.condition_failure conditionEval.sound)
-        exact ⟨_, _, conditionHeap, conditionMap, conditionWorld, .fault (.condition failed), .fault matched, conditionProgress, conditionState, conditionRetained⟩
-    | value payload =>
-      obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
-      subst sameSource
-      subst sameCore
-      cases conditionTrace with
-      | value conditionTrace =>
-        cases boolean with
-        | false =>
-          obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound (Core.LoopExecution.condition_false conditionEval.sound)
-          exact ⟨_, _, conditionHeap, conditionMap, conditionWorld, .control (.done conditionTrace), .fallthrough environment, conditionProgress, conditionState, conditionRetained⟩
-        | true =>
-          obtain ⟨branchSize, branchSmaller, branch⟩ := evaluation.loop_true_branch conditionEval.sound
-          obtain ⟨bodySize, bodyStore, bodyValue, bodySmaller, bodyEval⟩ := branch.bind_computation
-          obtain ⟨bodySourceSize, bodyContext, bodyOutcome, bodyHeap, bodyMap, bodyWorld, bodyTrace, bodyRelated, bodyProgress, bodyState, bodyRetained, _lexical⟩ :=
-            body_reflects_at_for (protocol := protocol) (guard := guard) (validity := validity) functions program evidence
-              (correct _ (Nat.lt_of_lt_of_le bodySmaller (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded)))
-              valid agrees reference conditionState
-              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2 guarded bodyEval
-          have progress := conditionProgress.trans bodyProgress
-          cases bodyRelated with
-          | fault matched =>
-            cases bodyTrace with
-            | control impossible => exact False.elim (bodyCannotFault impossible.sound)
-            | fault failed =>
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
-                (Core.LoopExecution.body_failure conditionEval.sound bodyEval.sound)
-              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .fault (.body conditionTrace failed), .fault matched, progress, bodyState, protocol.trans conditionRetained bodyRetained⟩
-          | returned payload =>
-            cases bodyTrace with
-            | control bodyTrace =>
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
-                (Core.LoopExecution.body_returned conditionEval.sound bodyEval.sound)
-              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .control (.returns conditionTrace bodyTrace), .returned payload, progress, bodyState, protocol.trans conditionRetained bodyRetained⟩
-          | breaking bodyEnvironment =>
-            cases bodyTrace with
-            | control bodyTrace =>
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
-                (Core.LoopExecution.body_breaking conditionEval.sound bodyEval.sound)
-              exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .control (.breaks conditionTrace bodyTrace), .fallthrough environment, progress, bodyState, protocol.trans conditionRetained bodyRetained⟩
-          | fallthrough bodyEnvironment =>
-            cases bodyTrace with
-            | control bodyTrace =>
-              let nextState := bodyState
-              obtain ⟨nextSize, smaller, nextEval⟩ := branch.loop_next_fallthrough bodyEval.sound nextState.live.selfRead
-              obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress, finalState, finalRetained⟩ :=
-                ih nextSize (Nat.lt_trans smaller branchSmaller)
-                  (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) nextState
-                  (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded nextEval
-              cases nextTrace with
-              | control nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .control (.nextFallthrough conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-              | fault nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .fault (.nextFallthrough conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-          | continuing bodyEnvironment =>
-            cases bodyTrace with
-            | control bodyTrace =>
-              let nextState := bodyState
-              obtain ⟨nextSize, smaller, nextEval⟩ := branch.loop_next_continuing bodyEval.sound nextState.live.selfRead
-              obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress, finalState, finalRetained⟩ :=
-                ih nextSize (Nat.lt_trans smaller branchSmaller)
-                  (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) nextState
-                  (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2 guarded nextEval
-              cases nextTrace with
-              | control nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .control (.nextContinue conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-              | fault nextTrace => exact ⟨_, _, after, finalMap, finalWorld, .fault (.nextContinue conditionTrace bodyTrace nextTrace), related, progress.trans nextProgress, finalState, protocol.trans (protocol.trans conditionRetained bodyRetained) finalRetained⟩
-
+  intro size bounded mapping world before store finalStore value state fixedRead guarded evaluation
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, progress, reached, retained, _post⟩ :=
+    WithReady.iterations_reflect_bounded_for (protocol := protocol) (guard := guard) (validity := validity)
+      (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
+      (exprFacts := fun _ _ _ => True) (facts := fun _ _ _ _ => True) functions program evidence
+      (fun child strict => WithReady.expression_reflects_trivial protocol (reflection child strict))
+      conditionTree found True.intro True.intro valid agrees reference
+      (fun child strict => WithReady.body_reflects_trivial protocol guard functions program evidence validity (correct child strict))
+      bodyCannotFault size bounded state fixedRead guarded True.intro evaluation
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, related, progress, reached, retained⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedWhile.Body.Stateful
 
