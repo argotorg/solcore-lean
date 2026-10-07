@@ -1832,6 +1832,8 @@ import Solcore.Test.SourceCoreOwnedAllocationReadiness
 import Solcore.Test.SourceCoreClosedOwnedLexicalBody
 import Solcore.Test.SourceCoreClosedOwnedBodyKernel
 import Solcore.Test.SourceCoreOwnedParametersRestoration
+import Solcore.Test.SourceCoreClosedOwnedExpressionHead
+import Solcore.Test.SourceCoreClosedOwnedExpressionTree
 import Solcore.Test.SourceCoreClosedOwnedWhile
 import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
