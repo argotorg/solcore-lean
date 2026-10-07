@@ -799,6 +799,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedJointRea
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedJointLambdaReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMethodLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedJointReadyContinuations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedJointLambdaReadyContinuations
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
