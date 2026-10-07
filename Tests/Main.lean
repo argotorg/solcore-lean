@@ -1826,6 +1826,7 @@ import Solcore.Test.SourceCoreCallableIndexedLambdaTemplatePermission
 import Solcore.Test.SourceCoreRecursiveNamedExpressionExtraChildren
 import Solcore.Test.SourceCoreCallableIndexedOwnedFunctions
 import Solcore.Test.SourceCoreCallableIndexedOwnedFunctionState
+import Solcore.Test.SourceCoreProtectedStateSequence
 set_option autoImplicit false
 
 open Solcore

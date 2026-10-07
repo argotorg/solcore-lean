@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
+import Solcore.SourceSemantics.CoreLowering.ProtectedState
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
 
 /-! Recursive expression meanings with a protected administrative entry.
@@ -188,6 +189,384 @@ def ExpressionReflectsAt (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} 
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
+/-! Ordered composition threads actual protected-state witnesses through the
+same source/native children and the existing static sequence tree. -/
+namespace Stateful
+open ProtectedStateTransition (Protocol Transition)
+universe u v
+
+def ExpressionPreservesAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
+  ∀ {scope id lowered}, certificate scope id lowered →
+  ∀ {node}, source.lookupExpression? id = some node →
+  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ outcome after},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment →
+    EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+  ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
+    ExpressionTraceAt program size context evidence source environment before id outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
+      GenericExpressionMeaning.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩
+
+def ExpressionReflectsAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (certificate : Certificate) (faults : FaultRep) : Prop :=
+  ∀ {scope id lowered}, certificate scope id lowered →
+  ∀ {node}, source.lookupExpression? id = some node →
+  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ value finalStore},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment →
+    EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+  ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
+    EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore →
+    ∃ sourceSize outcome after finalMap finalWorld,
+      ExpressionTraceAt program sourceSize context evidence source environment before id outcome after ∧
+      GenericExpressionMeaning.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩
+
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects definitions}
+  {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+  {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
+  {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
+  {codes : List SourceCoreBasic.LoweredExpr}
+
+theorem preserves_values_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt protocol size model program context evidence source certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    {size : Nat}
+    (execution : SourceExecutionSize.ExpressionsEvaluate program size context evidence source environment before ids sources after) (bounded : size ≤ budget) :
+    ∃ values finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inRight .word (packValues values)) finalStore ∧
+      Values model finalMap finalWorld sourceTypes (codes.map (·.type)) sources values ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  induction tree generalizing size mapping world actual actualContext before store ξ sources after with
+  | nil =>
+    cases execution
+    exact ⟨[], store, mapping, world, .inRight .unit, .nil, heaps,
+      .refl _, .refl _, .refl _ _, .refl _, Transition.refl protocol initial⟩
+  | single found generated =>
+    cases execution with
+    | cons head tail =>
+      cases tail
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped initial (.value head)
+      cases represented with
+      | value payload =>
+        exact ⟨[_], finalStore, finalMap, finalWorld, evaluated, .cons payload .nil,
+          finalHeaps, maps, worlds, frame, metadata, transition⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    cases execution with
+    | cons head rest =>
+      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
+        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped initial (.value head)
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        obtain ⟨middleState, firstRelated⟩ := firstTransition
+        obtain ⟨values, finalStore, finalMap, finalWorld, second, restRep, finalHeaps,
+          maps, worlds, frame, metadata, lastTransition⟩ := ih
+            (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix layout coreValue)
+            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+            middleState rest
+            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+        obtain ⟨finalState, lastRelated⟩ := lastTransition
+        have nonempty : values ≠ [] := by
+          intro absent
+          have lengths := restRep.length.2
+          simp [absent] at lengths
+        refine ⟨coreValue :: values, finalStore, finalMap, finalWorld, ?_,
+          .cons (model.extend payload maps worlds) restRep, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+          ⟨finalState, protocol.trans firstRelated lastRelated⟩⟩
+        rw [rename_prefix] at second
+        have combined := LocalSequence.pair_success lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+        simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
+
+theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt protocol size model program context evidence source certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {reason : Dynamic.SemanticFault}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    {size : Nat}
+    (execution : SourceExecutionSize.ExpressionsFault program size context evidence source environment before ids reason after) (bounded : size ≤ budget) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  induction tree generalizing size mapping world actual actualContext before store ξ after with
+  | nil => cases execution
+  | single found generated =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped initial (.fault failed)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
+          finalHeaps, maps, worlds, frame, metadata, transition⟩
+    | tail _ failed => cases failed
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped initial (.fault failed)
+      cases represented with
+      | fault matched =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata, transition⟩
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
+    | tail head failed =>
+      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
+        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped initial (.value head)
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        obtain ⟨middleState, firstRelated⟩ := firstTransition
+        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
+          maps, worlds, frame, metadata, lastTransition⟩ := ih
+            (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix layout coreValue)
+            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+            middleState failed
+            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+        obtain ⟨finalState, lastRelated⟩ := lastTransition
+        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+          ⟨finalState, protocol.trans firstRelated lastRelated⟩⟩
+        rw [rename_prefix] at second
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+
+theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionReflectsAt protocol size model program context evidence source certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    {size : Nat}
+    (evaluated : EvaluationSize size actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) (bounded : size < budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      TraceAt program sourceSize context evidence source environment before ids outcome after ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  induction tree generalizing size mapping world actual actualContext before store ξ value finalStore with
+  | nil =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (show Evaluates actual store
+      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
+    exact ⟨_, .ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
+      .refl _, .refl _, .refl _ _, .refl _, Transition.refl protocol initial⟩
+  | single found generated =>
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+      maps, worlds, frame, metadata, transition⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped initial evaluated
+    cases represented with
+    | value payload =>
+      cases execution with
+      | value trace => exact ⟨_, .ok [_], after, finalMap, finalWorld,
+          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata, transition⟩
+    | fault matched =>
+      cases execution with
+      | fault trace => exact ⟨_, .error _, after, finalMap, finalWorld,
+          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata, transition⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    change EvaluationSize size actual store ((LocalSequence.pair lowered.type
+      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
+      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
+    rw [pair_rename] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft first _ =>
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped initial first
+      cases represented with
+      | fault matched =>
+        cases execution with
+        | fault trace =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.pair_left_failure lowered.type
+            (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound)
+          exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
+            finalHeaps, maps, worlds, frame, metadata, transition⟩
+    | caseRight first continuation =>
+      obtain ⟨sourceSize, outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
+        meaning _ (by omega) generated found environments heaps locals layout actualTyped initial first
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        rename_i middleStore coreValue
+        obtain ⟨middleState, firstRelated⟩ := firstTransition
+        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
+            (coreValue :: actual) := agree_prefix layout coreValue
+        cases execution with
+        | value firstSource =>
+          cases continuation with
+          | caseLeft second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata, lastTransition⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                middleState shifted (by omega)
+            obtain ⟨finalState, lastRelated⟩ := lastTransition
+            cases result with
+            | fault matched =>
+              cases sourceTrace with
+              | fault tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_right_failure lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
+                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata,
+                  ⟨finalState, protocol.trans firstRelated lastRelated⟩⟩
+          | caseRight second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata, lastTransition⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                middleState shifted (by omega)
+            obtain ⟨finalState, lastRelated⟩ := lastTransition
+            cases result with
+            | @values sources values restRep =>
+              cases sourceTrace with
+              | values tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_success lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                have nonempty : values ≠ [] := by
+                  intro absent
+                  have lengths := restRep.length.2
+                  simp [absent] at lengths
+                refine ⟨_, .ok (sourceValue :: sources), after, finalMap, finalWorld,
+                  .values (.cons firstSource tailSource), ?_, finalHeaps,
+                  firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata,
+                  ⟨finalState, protocol.trans firstRelated lastRelated⟩⟩
+                simpa [packValues, nonempty] using
+                  Result.values (codes := lowered :: nextCode :: codes)
+                    (.cons (model.extend payload maps worlds) restRep)
+
+theorem preserves_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ size, size < budget → ExpressionPreservesAt protocol size model program context evidence source certificate faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Outcome}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    {size : Nat}
+    (execution : TraceAt program size context evidence source environment before ids outcome after) (bounded : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  cases execution with
+  | values execution =>
+    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata, transition⟩ := preserves_values_bounded protocol budget tree meaning environments heaps locals layout actualTyped initial execution bounded
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
+      finalHeaps, maps, worlds, frame, metadata, transition⟩
+  | fault execution =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata, transition⟩ := preserves_fault_bounded protocol budget tree meaning environments heaps locals layout actualTyped initial execution bounded
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
+      finalHeaps, maps, worlds, frame, metadata, transition⟩
+
+end Stateful
+
+/-- Legacy entries have a proof-only lifted witness and no record data. -/
+private def legacyProtocol (entry : ProtectedExpressionMeaning.Entry) :
+    ProtectedStateTransition.Protocol Unit where
+  State index := PLift (entry index.scope index.mapping index.world index.heap index.store index.canonical)
+  records _ := ()
+  Relates _ _ := True
+  refl _ := True.intro
+  trans _ _ := True.intro
+
+private theorem lift_preserves_at
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects definitions} {program : Program} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
+    {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry) {size : Nat}
+    (meaning : ExpressionPreservesAt size model program context evidence source certificate faults entry) :
+    Stateful.ExpressionPreservesAt (legacyProtocol entry) size model program context evidence source certificate faults := by
+  intro scope id lowered generated node found mapping world admin environment canonical actual actualContext before store ξ outcome after
+    environments heaps locals agrees typed initial trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals agrees typed initial.down trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata,
+    ⟨PLift.up (transport.extend initial.down maps worlds frame metadata), True.intro⟩⟩
+
+private theorem lift_reflects_at
+    {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+    {model : GenericHeap.PayloadModel catalog projects definitions} {program : Program} {context : SourceSemantics.Context}
+    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
+    {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry) {size : Nat}
+    (meaning : ExpressionReflectsAt size model program context evidence source certificate faults entry) :
+    Stateful.ExpressionReflectsAt (legacyProtocol entry) size model program context evidence source certificate faults := by
+  intro scope id lowered generated node found mapping world admin environment canonical actual actualContext before store ξ value finalStore
+    environments heaps locals agrees typed initial evaluated
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩ := meaning generated found environments heaps locals agrees typed initial.down evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata,
+    ⟨PLift.up (transport.extend initial.down maps worlds frame metadata), True.intro⟩⟩
+
 variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
   {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
   {source : TypedSource} {certificate : Certificate} {faults : FaultRep}
@@ -235,47 +614,12 @@ theorem preserves_values_bounded (budget : Nat) (tree : Tree source certificate 
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing size mapping world actual actualContext before store ξ sources after with
-  | nil =>
-    cases execution
-    exact ⟨[], store, mapping, world, .inRight .unit, .nil, heaps,
-      .refl _, .refl _, .refl _ _, .refl _⟩
-  | single found generated =>
-    cases execution with
-    | cons head tail =>
-      cases tail
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | value payload =>
-        exact ⟨[_], finalStore, finalMap, finalWorld, evaluated, .cons payload .nil,
-          finalHeaps, maps, worlds, frame, metadata⟩
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    cases execution with
-    | cons head rest =>
-      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        obtain ⟨values, finalStore, finalMap, finalWorld, second, restRep, finalHeaps,
-          maps, worlds, frame, metadata⟩ := ih
-            (environments.extend firstMaps firstWorlds) middleHeaps
-            (locals.mono firstMetadata) (agree_prefix layout coreValue)
-            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) rest
-            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-        have nonempty : values ≠ [] := by
-          intro absent
-          have lengths := restRep.length.2
-          simp [absent] at lengths
-        refine ⟨coreValue :: values, finalStore, finalMap, finalWorld, ?_,
-          .cons (model.extend payload maps worlds) restRep, finalHeaps,
-          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
-        rw [rename_prefix] at second
-        have combined := LocalSequence.pair_success lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
-        simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
+  obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, _⟩ := Stateful.preserves_values_bounded (legacyProtocol entry) budget tree
+      (fun size bounded => lift_preserves_at transport (meaning size bounded))
+      environments heaps locals layout actualTyped (PLift.up installedEntry) execution bounded
+  exact ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩
 
 theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ size, size < budget → ExpressionPreservesAt size model program context evidence source certificate faults entry)
@@ -296,45 +640,12 @@ theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate s
       faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing size mapping world actual actualContext before store ξ after with
-  | nil => cases execution
-  | single found generated =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
-      cases represented with
-      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
-          finalHeaps, maps, worlds, frame, metadata⟩
-    | tail _ failed => cases failed
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.fault failed)
-      cases represented with
-      | fault matched =>
-        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata⟩
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
-    | tail head failed =>
-      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) generated found environments heaps locals layout actualTyped installedEntry (.value head)
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
-          maps, worlds, frame, metadata⟩ := ih
-            (environments.extend firstMaps firstWorlds) middleHeaps
-            (locals.mono firstMetadata) (agree_prefix layout coreValue)
-            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-            (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) failed
-            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
-          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
-        rw [rename_prefix] at second
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, _⟩ := Stateful.preserves_fault_bounded (legacyProtocol entry) budget tree
+      (fun size bounded => lift_preserves_at transport (meaning size bounded))
+      environments heaps locals layout actualTyped (PLift.up installedEntry) execution bounded
+  exact ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩
 
 theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ size, size < budget → ExpressionReflectsAt size model program context evidence source certificate faults entry)
@@ -355,98 +666,12 @@ theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope id
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  induction tree generalizing size mapping world actual actualContext before store ξ value finalStore with
-  | nil =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (show Evaluates actual store
-      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
-    exact ⟨_, .ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
-      .refl _, .refl _, .refl _ _, .refl _⟩
-  | single found generated =>
-    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry evaluated
-    cases represented with
-    | value payload =>
-      cases execution with
-      | value trace => exact ⟨_, .ok [_], after, finalMap, finalWorld,
-          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata⟩
-    | fault matched =>
-      cases execution with
-      | fault trace => exact ⟨_, .error _, after, finalMap, finalWorld,
-          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    change EvaluationSize size actual store ((LocalSequence.pair lowered.type
-      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
-      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
-    rw [pair_rename] at evaluated
-    have complete := evaluated
-    cases evaluated with
-    | caseLeft first _ =>
-      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-        maps, worlds, frame, metadata⟩ := meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry first
-      cases represented with
-      | fault matched =>
-        cases execution with
-        | fault trace =>
-          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.pair_left_failure lowered.type
-            (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound)
-          exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
-            finalHeaps, maps, worlds, frame, metadata⟩
-    | caseRight first continuation =>
-      obtain ⟨sourceSize, outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
-        meaning _ (by omega) generated found environments heaps locals layout actualTyped installedEntry first
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        rename_i middleStore coreValue
-        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
-            (coreValue :: actual) := agree_prefix layout coreValue
-        cases execution with
-        | value firstSource =>
-          cases continuation with
-          | caseLeft second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted (by omega)
-            cases result with
-            | fault matched =>
-              cases sourceTrace with
-              | fault tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
-                  (LocalSequence.pair_right_failure lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
-                exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
-                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata⟩
-          | caseRight second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata⟩ := ih (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted (by omega)
-            cases result with
-            | @values sources values restRep =>
-              cases sourceTrace with
-              | values tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
-                  (LocalSequence.pair_success lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
-                have nonempty : values ≠ [] := by
-                  intro absent
-                  have lengths := restRep.length.2
-                  simp [absent] at lengths
-                refine ⟨_, .ok (sourceValue :: sources), after, finalMap, finalWorld,
-                  .values (.cons firstSource tailSource), ?_, finalHeaps,
-                  firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata⟩
-                simpa [packValues, nonempty] using
-                  Result.values (codes := lowered :: nextCode :: codes)
-                    (.cons (model.extend payload maps worlds) restRep)
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata, _⟩ := Stateful.reflects_bounded (legacyProtocol entry) budget tree
+      (fun size bounded => lift_reflects_at transport (meaning size bounded))
+      environments heaps locals layout actualTyped (PLift.up installedEntry) evaluated bounded
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩
 
 theorem preserves_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ size, size < budget → ExpressionPreservesAt size model program context evidence source certificate faults entry)
@@ -467,17 +692,12 @@ theorem preserves_bounded (budget : Nat) (tree : Tree source certificate scope i
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  cases execution with
-  | values execution =>
-    obtain ⟨values, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩  := preserves_values_bounded transport budget tree meaning environments heaps locals layout actualTyped installedEntry execution bounded
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .values represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
-  | fault execution =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata⟩  := preserves_fault_bounded transport budget tree meaning environments heaps locals layout actualTyped installedEntry execution bounded
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault represented,
-      finalHeaps, maps, worlds, frame, metadata⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, _⟩ := Stateful.preserves_bounded (legacyProtocol entry) budget tree
+      (fun size bounded => lift_preserves_at transport (meaning size bounded))
+      environments heaps locals layout actualTyped (PLift.up installedEntry) execution bounded
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata⟩
 
 theorem preserves_values (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ProtectedExpressionMeaning.Preserves model program context evidence source certificate faults entry)

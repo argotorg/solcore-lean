@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionSourceBounds
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
 
 /-! Pointwise composition of the existing static heads. Structural children
 may use the same budget (group and singleton code are unchanged). Real call
@@ -11,26 +12,6 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload Compat
 open RecursiveNamedBoundedContracts RecursiveNamedCallBounds
 open CompatibleExpressionConditionals
 open CompatibleExpressionTypedCompositions (Head)
-private def ReflectsRawAt (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
-    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
-    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
-    (source : TypedSource) (certificate : GenericExpressionMeaning.Certificate) (faults : FunctionCalls.FaultRep) (entry : ProtectedExpressionMeaning.Entry) : Prop :=
-  ∀ {scope id lowered}, certificate scope id lowered →
-  ∀ {node}, source.lookupExpression? id = some node →
-  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ value finalStore},
-    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
-    GenericHeap.HeapRepresents model mapping world before store →
-    Dynamic.EnvironmentAgrees before context.locals environment →
-    EnvironmentsAgree ξ canonical actual →
-    RuntimeEnvironmentHasTypes world actual actualContext definitions →
-    entry scope mapping world before store canonical →
-    EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore →
-    ∃ outcome after finalMap finalWorld,
-      Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after ∧
-      FunctionCalls.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
-      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
-      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
 
 
 private def Two (scope : SourceCoreLocalCell.Scope) (left right : ExpressionId) (first second : SourceCoreBasic.LoweredExpr) :
@@ -73,15 +54,52 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource} 
   {registry : SourceCoreRawMetadata.Registry}
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   {certificate : GenericExpressionMeaning.Certificate} {faults : FunctionCalls.FaultRep}
-  {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
-include transport
+
+universe u v
+namespace Stateful
+open ProtectedStateTransition (Transition)
+variable {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+
+private def ReflectsRawAt {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records) (size : Nat) {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
+    {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
+    (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (source : TypedSource) (certificate : GenericExpressionMeaning.Certificate) (faults : FunctionCalls.FaultRep) : Prop :=
+  ∀ {scope id lowered}, certificate scope id lowered →
+  ∀ {node}, source.lookupExpression? id = some node →
+  ∀ {mapping world administrativeContext environment canonical actual actualContext before store ξ value finalStore},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment →
+    EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+  ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
+    EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore →
+    ∃ outcome after finalMap finalWorld,
+      Dynamic.ExpressionEvaluatesOutcome program context evidence source environment before id outcome after ∧
+      FunctionCalls.ResultRepresents model finalMap finalWorld node.type lowered.type faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩
+
+
+/-- The second child starts at the first child's concrete post-witness. -/
+private theorem continue_transition {Records : Type v}
+    (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    {initial middle reached : ProtectedStateTransition.Index}
+    {state : protocol.State initial} {middleState : protocol.State middle}
+    (first : protocol.Relates state middleState)
+    (second : Transition protocol middleState reached) :
+    Transition protocol state reached := by
+  obtain ⟨final, last⟩ := second
+  exact ⟨final, protocol.trans first last⟩
 
 theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     (unique : NodeOccurrencesUnique source)
-    (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.PreservesAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source certificate faults entry) :
-    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source (Head checked source certificate) faults entry := by
+    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults childSize) :
+    ProtectedStateTransition.PreservesAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults size := by
   intro scope id lowered tree
   cases tree with
   | @group node inner innerNode lowered metadata form innerFound sourceType child =>
@@ -91,9 +109,9 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
     obtain ⟨childSize, childTrace, childSmaller⟩ := RecursiveNamedExpressionSourceBounds.group_inv metadata form unique trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
       ih childSize (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) innerFound environments heaps locals agrees actualTyped installedEntry childTrace
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     simpa only [sourceType] using represented
   | @pair node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree =>
     have leftIH := fun n (bound : n ≤ budget) => @meaning n bound _ _ _ firstTree
@@ -103,22 +121,22 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
     -- The sequence uses a strict bound; its successor is exactly childSize ≤ budget.
-    have children : ∀ childSize, childSize < budget + 1 → ProtectedDataExpressionSequence.ExpressionPreservesAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
-        program context evidence source (Two scope left right first second) faults entry := by
+    have children : ∀ childSize, childSize < budget + 1 → ProtectedDataExpressionSequence.Stateful.ExpressionPreservesAt protocol childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
+        program context evidence source (Two scope left right first second) faults := by
       intro childSize bound
-      apply RecursiveNamedPlaceKeyContracts.preserves_at
+      apply ProtectedStateTransition.SequenceBridge.preserves_at protocol
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH childSize (by omega)
       · exact rightIH childSize (by omega)
     obtain ⟨sequenceSize, sequence, sourceTrace, packed, sequenceSmaller⟩ := RecursiveNamedExpressionSourceBounds.pair_inv metadata form unique trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      ProtectedDataExpressionSequence.preserves_bounded transport (budget + 1) (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped installedEntry sourceTrace (by omega)
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
+      ProtectedDataExpressionSequence.Stateful.preserves_bounded protocol (budget + 1) (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped installedEntry sourceTrace (by omega)
     obtain ⟨actualOutcome, actualPack, payload⟩ := pair_result represented
     have sameOutcome := actualPack.functional packed
     subst actualOutcome
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     simpa only [sourceType] using payload
 
   | @unary node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child =>
@@ -129,7 +147,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     have sourceStep := RecursiveNamedExpressionSourceBounds.unary_inv metadata form unique trace
     cases sourceStep with
     | value childTrace applied childSmaller =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         ih _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) childFound environments heaps locals agrees actualTyped installedEntry (.value childTrace)
       cases represented with
       | value payload =>
@@ -137,16 +155,16 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
         have same := actualApplied.functional applied
         subst sourceResult
-        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
         · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace childSmaller =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         ih _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) childFound environments heaps locals agrees actualTyped installedEntry (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | invalid childTrace failed childSmaller =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := ih _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) childFound environments heaps locals agrees actualTyped installedEntry (.value childTrace)
       cases represented with
@@ -163,12 +181,12 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     have sourceStep := RecursiveNamedExpressionSourceBounds.binary_inv metadata form unique trace
     cases sourceStep with
     | leftFault childTrace childSmaller =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         leftIH _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact mode.left_failure operator evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | leftInvalid childTrace invalid childSmaller =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := leftIH _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.value childTrace)
       cases represented with
@@ -176,40 +194,42 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         rw [leftType] at payload
         exact False.elim (profile.left_valid payload invalid)
     | short childTrace circuit childSmaller =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         leftIH _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.value childTrace)
       cases represented with
       | value payload =>
         rw [leftType] at payload
         obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit evaluated
         exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
-          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | rightFault firstTrace continues secondTrace firstSmaller secondSmaller =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         leftIH _ (Nat.le_trans (Nat.le_of_lt firstSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.value firstTrace)
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
           rightIH _ (Nat.le_trans (Nat.le_of_lt secondSmaller) bounded) rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
-            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) (.fault secondTrace)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState (.fault secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
         cases represented with
         | fault matched =>
           exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact profile.right_failure payload continues first second,
             .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
     | value firstTrace continues secondTrace applied firstSmaller secondSmaller =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         leftIH _ (Nat.le_trans (Nat.le_of_lt firstSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.value firstTrace)
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
           rightIH _ (Nat.le_trans (Nat.le_of_lt secondSmaller) bounded) rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
-            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) (.value secondTrace)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState (.value secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
         cases represented with
         | value rightPayload =>
@@ -220,17 +240,18 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
             .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
     | invalid firstTrace continues secondTrace failed firstSmaller secondSmaller =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         leftIH _ (Nat.le_trans (Nat.le_of_lt firstSmaller) bounded) leftFound environments heaps locals agrees actualTyped installedEntry (.value firstTrace)
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
         obtain ⟨_, _, _, _, second, represented, _, maps, worlds, _⟩ :=
           rightIH _ (Nat.le_trans (Nat.le_of_lt secondSmaller) bounded) rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
-            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) (.value secondTrace)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState (.value secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
         cases represented with
         | value rightPayload =>
@@ -249,15 +270,16 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
     have sourceStep := RecursiveNamedExpressionSourceBounds.conditional_inv metadata form unique trace
     cases sourceStep with
     | fault childTrace childSmaller =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         conditionIH _ (Nat.le_trans (Nat.le_of_lt childSmaller) bounded) conditionFound environments heaps locals agrees actualTyped installedEntry (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [choose_rename]; exact LocalControl.choose_failure type evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | @branch conditionSize branchSize flag middle outcome after conditionTrace branchTrace conditionSmaller branchSmaller =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         conditionIH _ (Nat.le_trans (Nat.le_of_lt conditionSmaller) bounded) conditionFound environments heaps locals agrees actualTyped installedEntry (.value conditionTrace)
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | value payload =>
         obtain ⟨actualFlag, sourceEq, coreEq⟩ := bool_fields payload
@@ -265,23 +287,23 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         subst coreEq
         cases flag with
         | false =>
-          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
             elseIH _ (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded) elseFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (GenericExpressionMeaning.agree_prefix agrees (.bool false))
-              (.cons .bool (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) branchTrace
+              (.cons .bool (actualTyped.weaken firstWorlds)) middleState branchTrace
           rw [GenericExpressionMeaning.rename_prefix] at branch
           refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
           · rw [choose_rename]; exact LocalControl.choose_false type first branch
           · simpa only [elseType] using represented
         | true =>
-          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
             thenIH _ (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded) thenFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (GenericExpressionMeaning.agree_prefix agrees (.bool true))
-              (.cons .bool (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) branchTrace
+              (.cons .bool (actualTyped.weaken firstWorlds)) middleState branchTrace
           rw [GenericExpressionMeaning.rename_prefix] at branch
           refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
           · rw [choose_rename]; exact LocalControl.choose_true type first branch
           · simpa only [thenType] using represented
     | invalid childTrace invalid runtimeType childSmaller =>
@@ -293,10 +315,10 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
 
 
 private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
-    (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.ReflectsAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source certificate faults entry) :
-    ReflectsRawAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source (Head checked source certificate) faults entry := by
+    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults childSize) :
+    ReflectsRawAt protocol size (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults := by
   intro scope id lowered tree
   cases tree with
   | @group node inner innerNode lowered metadata form innerFound sourceType child =>
@@ -305,9 +327,9 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
       environments heaps locals agrees actualTyped installedEntry evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+    obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
       ih size bounded innerFound environments heaps locals agrees actualTyped installedEntry evaluated
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace.sound, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace.sound, ?_, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     simpa only [sourceType] using represented
   | @pair node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree =>
     have leftIH := fun n (bound : n ≤ budget) => @meaning n bound _ _ _ firstTree
@@ -317,19 +339,19 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
     -- The sequence uses a strict bound; its successor is exactly childSize ≤ budget.
-    have children : ∀ childSize, childSize < budget + 1 → ProtectedDataExpressionSequence.ExpressionReflectsAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
-        program context evidence source (Two scope left right first second) faults entry := by
+    have children : ∀ childSize, childSize < budget + 1 → ProtectedDataExpressionSequence.Stateful.ExpressionReflectsAt protocol childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
+        program context evidence source (Two scope left right first second) faults := by
       intro childSize bound
-      apply RecursiveNamedPlaceKeyContracts.reflects_at
+      apply ProtectedStateTransition.SequenceBridge.reflects_at protocol
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH childSize (by omega)
       · exact rightIH childSize (by omega)
-    obtain ⟨sequenceSize, sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      ProtectedDataExpressionSequence.reflects_bounded transport (budget + 1) (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped installedEntry evaluated (by omega)
+    obtain ⟨sequenceSize, sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
+      ProtectedDataExpressionSequence.Stateful.reflects_bounded protocol (budget + 1) (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped installedEntry evaluated (by omega)
     obtain ⟨outcome, packed, payload⟩ := pair_result represented
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace.sound packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace.sound packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     simpa only [sourceType] using payload
 
   | @unary node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child =>
@@ -341,7 +363,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
     have complete := evaluated.sound
     cases evaluated with
     | caseLeft childEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         ih _ (by omega) childFound environments heaps locals agrees actualTyped installedEntry childEvaluation
       cases represented with
       | fault matched =>
@@ -349,9 +371,9 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation.sound) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed.sound), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | caseRight childEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         ih _ (by omega) childFound environments heaps locals agrees actualTyped installedEntry childEvaluation
       cases represented with
       | value payload =>
@@ -361,7 +383,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace.sound applied),
-            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
   | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := fun n (bound : n ≤ budget) => @meaning n bound _ _ _ leftTree
     have rightIH := fun n (bound : n ≤ budget) => @meaning n bound _ _ _ rightTree
@@ -373,7 +395,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
     rw [Mode.binary_eq] at evaluated
     cases evaluated with
     | caseLeft leftEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         leftIH _ (by omega) leftFound environments heaps locals agrees actualTyped installedEntry leftEvaluation
       cases represented with
       | fault matched =>
@@ -381,10 +403,11 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (mode.left_failure operator leftEvaluation.sound)
           exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.leftFault failed.sound), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | caseRight leftEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         leftIH _ (by omega) leftFound environments heaps locals agrees actualTyped installedEntry leftEvaluation
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | @value sourceValue coreValue payload =>
         rw [leftType] at payload
@@ -394,14 +417,14 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
           · obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit leftEvaluation.sound
             obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
             exact ⟨_, middle, middleMap, middleWorld, binary_intro metadata form (.short firstTrace.sound circuit),
-              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩
+              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, ⟨middleState, firstRelated⟩⟩
           · obtain ⟨rightSize, rightValue, rightStore, rightEvaluation, rightSmaller⟩ := RecursiveNamedExpressionSourceBounds.right_evaluated profile payload continues branch
             have shifted := rightEvaluation
             rw [← GenericExpressionMeaning.rename_prefix] at shifted
-            obtain ⟨rightSourceSize, rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨rightSourceSize, rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
               rightIH rightSize (by omega) rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees _)
-                (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) shifted
+                (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState shifted
             cases represented with
             | fault matched =>
               cases trace with
@@ -410,7 +433,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
                 obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.rightFault firstTrace.sound continues failed.sound),
                   .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
@@ -421,7 +444,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
               | value secondTrace =>
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace.sound continues secondTrace.sound applied),
                   .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
 
   | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
     have conditionIH := fun n (bound : n ≤ budget) => @meaning n bound _ _ _ conditionTree
@@ -434,7 +457,7 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
     have complete := evaluated.sound
     cases evaluated with
     | caseLeft childEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
         conditionIH _ (by omega) conditionFound environments heaps locals agrees actualTyped installedEntry childEvaluation
       cases represented with
       | fault matched =>
@@ -442,10 +465,11 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalControl.choose_failure type childEvaluation.sound)
           exact ⟨_, after, finalMap, finalWorld, conditional_intro metadata form (.fault failed.sound), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, transition⟩
     | caseRight childEvaluation branch =>
-      obtain ⟨childSourceSize, childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨childSourceSize, childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
         conditionIH _ (by omega) conditionFound environments heaps locals agrees actualTyped installedEntry childEvaluation
+      obtain ⟨middleState, firstRelated⟩ := firstTransition
       cases represented with
       | value payload =>
         obtain ⟨flag, sourceEq, coreEq⟩ := bool_fields payload
@@ -458,25 +482,90 @@ private theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ bud
           | false =>
             change EvaluationSize selectedSize _ _ ((elseCode.rename ξ).weakenAt 0) _ _ at selected
             rw [← GenericExpressionMeaning.rename_prefix] at selected
-            obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
               elseIH selectedSize (by omega) elseFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees (.bool false))
-              (.cons .bool (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) selected
+              (.cons .bool (actualTyped.weaken firstWorlds)) middleState selected
             refine ⟨outcome, after, finalMap, finalWorld, conditional_intro metadata form (.branch conditionTrace.sound branchTrace.sound),
-              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
             simpa only [elseType] using represented
           | true =>
             change EvaluationSize selectedSize _ _ ((thenCode.rename ξ).weakenAt 0) _ _ at selected
             rw [← GenericExpressionMeaning.rename_prefix] at selected
-            obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨childSourceSize, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, transition⟩ :=
               thenIH selectedSize (by omega) thenFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees (.bool true))
-              (.cons .bool (actualTyped.weaken firstWorlds)) (transport.extend installedEntry firstMaps firstWorlds firstFrame firstMetadata) selected
+              (.cons .bool (actualTyped.weaken firstWorlds)) middleState selected
             refine ⟨outcome, after, finalMap, finalWorld, conditional_intro metadata form (.branch conditionTrace.sound branchTrace.sound),
-              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata, continue_transition protocol firstRelated transition⟩
             simpa only [thenType] using represented
 
 
+
+/-- Finite native completion yields an independently sized source trace. -/
+theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
+    (meaning : ∀ childSize, childSize ≤ budget → ProtectedStateTransition.ReflectsAt protocol
+      (CompatibleAmbientHeap.payloadModel checked registry functions) program context evidence source certificate faults childSize) :
+    ProtectedStateTransition.ReflectsAt protocol (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults size := by
+  intro scope id lowered tree node found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
+    environments heaps locals agrees actualTyped installedEntry evaluated
+  obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩ :=
+    Head.reflects_raw_at functions program evidence protocol budget size bounded meaning tree found environments heaps locals agrees actualTyped installedEntry evaluated
+  obtain ⟨sourceSize, sized⟩ := ExpressionOutcome.has_size trace
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sized, represented, finalHeaps, maps, worlds, frame, metadata, transition⟩
+
+end Stateful
+
+/-- Legacy entries carry a proof witness and no runtime record data. -/
+private def legacyProtocol (entry : ProtectedExpressionMeaning.Entry) :
+    ProtectedStateTransition.Protocol Unit where
+  State index := PLift (entry index.scope index.mapping index.world index.heap index.store index.canonical)
+  records _ := ()
+  Relates _ _ := True
+  refl _ := True.intro
+  trans _ _ := True.intro
+
+variable {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
+include transport
+
+private theorem lift_preserves_at {size : Nat}
+    (meaning : RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults entry) :
+    ProtectedStateTransition.PreservesAt (legacyProtocol entry) (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults size := by
+  intro scope id lowered certified node found mapping world administrative environment canonical actual actualContext before store ξ outcome after
+    environments heaps locals agrees actualTyped initial trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+    meaning certified found environments heaps locals agrees actualTyped initial.down trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata,
+    ⟨PLift.up (transport.extend initial.down maps worlds frame metadata), True.intro⟩⟩
+
+private theorem lift_reflects_at {size : Nat}
+    (meaning : RecursiveNamedBoundedContracts.ReflectsAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults entry) :
+    ProtectedStateTransition.ReflectsAt (legacyProtocol entry) (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults size := by
+  intro scope id lowered certified node found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
+    environments heaps locals agrees actualTyped initial evaluated
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+    meaning certified found environments heaps locals agrees actualTyped initial.down evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata,
+    ⟨PLift.up (transport.extend initial.down maps worlds frame metadata), True.intro⟩⟩
+
+theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
+    (unique : NodeOccurrencesUnique source)
+    (meaning : ∀ childSize, childSize ≤ budget → RecursiveNamedBoundedContracts.PreservesAt childSize (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults entry) :
+    RecursiveNamedBoundedContracts.PreservesAt size (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults entry := by
+  intro scope id lowered tree node found mapping world administrative environment canonical actual actualContext before store ξ outcome after
+    environments heaps locals agrees actualTyped installedEntry trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.Head.preserves_at functions program evidence (legacyProtocol entry) budget size bounded unique
+      (fun childSize bound => lift_preserves_at functions program evidence transport (meaning childSize bound))
+      tree found environments heaps locals agrees actualTyped (PLift.up installedEntry) trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 /-- Finite native completion yields an independently sized source trace. -/
 theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
@@ -486,9 +575,11 @@ theorem Head.reflects_at (budget size : Nat) (bounded : size ≤ budget)
       program context evidence source (Head checked source certificate) faults entry := by
   intro scope id lowered tree node found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
     environments heaps locals agrees actualTyped installedEntry evaluated
-  obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-    Head.reflects_raw_at functions program evidence transport budget size bounded meaning tree found environments heaps locals agrees actualTyped installedEntry evaluated
-  obtain ⟨sourceSize, sized⟩ := ExpressionOutcome.has_size trace
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sized, represented, finalHeaps, maps, worlds, frame, metadata⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.Head.reflects_at functions program evidence (legacyProtocol entry) budget size bounded
+      (fun childSize bound => lift_reflects_at functions program evidence transport (meaning childSize bound))
+      tree found environments heaps locals agrees actualTyped (PLift.up installedEntry) evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩
+
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionCompositionsBounds
