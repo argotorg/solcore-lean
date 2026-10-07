@@ -782,6 +782,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipalR
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedFamilyClosure
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedClosedReadyNamedExpressionRuntimeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaFrames
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaReadyFamilyReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodReadyFamilyReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
