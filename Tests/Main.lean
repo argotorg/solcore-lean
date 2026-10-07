@@ -1836,6 +1836,7 @@ import Solcore.Test.SourceCoreClosedOwnedExpressionHead
 import Solcore.Test.SourceCoreClosedOwnedExpressionTree
 import Solcore.Test.SourceCoreClosedOwnedNamedFamily
 import Solcore.Test.SourceCoreClosedOwnedAnonymousInvocation
+import Solcore.Test.SourceCoreClosedOwnedIndirectExpression
 import Solcore.Test.SourceCoreClosedOwnedWhile
 import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
