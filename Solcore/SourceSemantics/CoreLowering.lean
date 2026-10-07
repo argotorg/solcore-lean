@@ -717,6 +717,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSelected
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
