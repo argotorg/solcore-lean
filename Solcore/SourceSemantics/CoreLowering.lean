@@ -751,6 +751,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMatchPrefixAdmis
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMatchReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMatchBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSnapshotAdmission
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderReady
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderSourceSites
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeaderReadiness
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeaderBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
