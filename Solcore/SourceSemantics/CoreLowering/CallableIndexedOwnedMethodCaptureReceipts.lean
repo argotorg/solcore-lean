@@ -104,6 +104,34 @@ private theorem installed_of_typed {world : StoreTyping}
 
 /-- Actual preparation and the whole Source method selector construct this
 capture packet without a body execution or arbitrary captured-slot premise. -/
+theorem of_selected_with_heap {registry : SourceCoreRawMetadata.Registry} {recipe : SourceCoreIndexedSession.Recipe}
+    (accepted : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    {context : SourceSemantics.Context} {caller : Dynamic.EvidenceEnvironment}
+    {traitName methodName : String} {requirements : List RequirementId}
+    (selected : Dynamic.OperatorMethodSelected (Program.ofChecked compiled.sourceProgram) context caller traitName methodName
+      requirements (sourceBody (compiled := compiled) (method := method)) dictionary)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
+    ∃ world,
+      RuntimeStoreHasTypes world (RecursiveNamedCatalogPreparedInitialization.store compiled) compiled.indexed.layouts.definitions ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions [] world ⟨[]⟩
+        (RecursiveNamedCatalogPreparedInitialization.store compiled) ∧
+      Nonempty (BootstrapCapture cached dictionary functions world) := by
+  obtain ⟨world, typed⟩ := RecursiveNamedCatalogPreparedInitialization.typed accepted
+  obtain ⟨_types, _context, _facts, certified, _valid⟩ := CallablePreparedMethodSelection.selected_typed selected wellFormed
+  obtain ⟨administrative, installed, canonical, captured, embedding, frame⟩ :=
+    installed_of_typed cached functions typed certified.locals_empty
+  have heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions [] world ⟨[]⟩
+      (RecursiveNamedCatalogPreparedInitialization.store compiled) := by
+    refine ⟨rfl, ?_, typed, ?_⟩
+    · intro left right target impossible; simp at impossible
+    · intro source target impossible; simp at impossible
+  refine ⟨world, typed, heaps, ⟨⟨administrative, installed, cached.frame selected, canonical, captured, embedding, frame, ?_⟩⟩⟩
+  intro header
+  rw [canonical]
+  exact CallableIndexedOwnedNamedHeaderReceipts.bootstrap_slot header
+
+/-- Compatibility forgets only the retained whole-store/heap typing receipts;
+the bootstrap capture is the same actual one produced above. -/
 theorem of_selected {recipe : SourceCoreIndexedSession.Recipe}
     (accepted : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     {context : SourceSemantics.Context} {caller : Dynamic.EvidenceEnvironment}
@@ -112,14 +140,9 @@ theorem of_selected {recipe : SourceCoreIndexedSession.Recipe}
       requirements (sourceBody (compiled := compiled) (method := method)) dictionary)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
     ∃ world, Nonempty (BootstrapCapture cached dictionary functions world) := by
-  obtain ⟨world, typed⟩ := RecursiveNamedCatalogPreparedInitialization.typed accepted
-  obtain ⟨_types, _context, _facts, certified, _valid⟩ := CallablePreparedMethodSelection.selected_typed selected wellFormed
-  obtain ⟨administrative, installed, canonical, captured, embedding, frame⟩ :=
-    installed_of_typed cached functions typed certified.locals_empty
-  refine ⟨world, ⟨⟨administrative, installed, cached.frame selected, canonical, captured, embedding, frame, ?_⟩⟩⟩
-  intro header
-  rw [canonical]
-  exact CallableIndexedOwnedNamedHeaderReceipts.bootstrap_slot header
+  obtain ⟨world, _typed, _heaps, capture⟩ := of_selected_with_heap (registry := (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry)
+    cached dictionary functions accepted selected wellFormed
+  exact ⟨world, capture⟩
 
 /-- An actual bootstrap owner's complete location association identifies the
 same canonical slots. Physical pool ownership alone cannot supply this map. -/
