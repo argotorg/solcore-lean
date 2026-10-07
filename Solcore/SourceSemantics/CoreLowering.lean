@@ -713,6 +713,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipalC
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipalBuiltinBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedIndirectSequence
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSelectedIndirectHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyEntries
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
