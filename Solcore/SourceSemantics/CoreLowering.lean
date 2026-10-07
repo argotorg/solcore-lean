@@ -773,6 +773,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedExpres
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedParameterReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaReadyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodReadyContinuations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedReadyFamilyReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedExpressionRuntimeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
