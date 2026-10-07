@@ -55,10 +55,87 @@ private theorem latest_of_heap {mapping : LocationMap} {world : StoreTyping} {af
 variable {administrativeContext actualContext : Core.Context} {environment : Dynamic.Environment}
   {id : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
 
+universe u v
+
+/-- Pack the actual RHS execution and reached state under the real saved slots. -/
+theorem rhs_of_expression {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, resolution.mapping, resolution.world, targetHeap, resolution.store, canonical⟩)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap} {value : Value}
+    {store : Store} {mapping : LocationMap} {world : StoreTyping}
+    (trace : Dynamic.ExpressionEvaluatesOutcome program context evidence source environment targetHeap id outcome after)
+    (evaluated : Evaluates
+      (snapshotEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+        (.inRight .unit resolution.snapshot) coreEnvironment)
+      resolution.store (shift 3 (lowered.expression.rename ξ)) value store)
+    (represented : ResultRepresents (payloadModel checked registry functions) mapping world node.type lowered.type faults outcome value)
+    (heaps : HeapRepresents checked registry functions mapping world after store)
+    (maps : LocationMap.Extends resolution.mapping mapping) (worlds : WorldExtends resolution.world world)
+    (frame : AdministrativePreserved resolution.mapping resolution.store mapping store)
+    (metadata : Dynamic.HeapMetadataExtend targetHeap after)
+    (post : ProtectedStateTransition.Transition protocol initial ⟨scope, mapping, world, after, store, canonical⟩) :
+    Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
+      resolution id node (renamed lowered ξ) environment outcome after value store mapping world ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, mapping, world, after, store, canonical⟩ :=
+  ⟨⟨trace, evaluated, represented, heaps, maps, worlds, frame, metadata,
+    latest_of_heap resolution heaps maps worlds metadata⟩, post⟩
+
+/-- Source RHS meaning at one actual getter state, with a strict child budget. -/
+def Preserves {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, resolution.mapping, resolution.world, targetHeap, resolution.store, canonical⟩)
+    (budget : Nat) : Prop :=
+  ∀ {size outcome after}, size < budget →
+    RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment targetHeap id outcome after →
+    ∃ value store mapping world,
+      Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
+        resolution id node (renamed lowered ξ) environment outcome after value store mapping world ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, mapping, world, after, store, canonical⟩
+
+/-- Native RHS meaning at the same getter state retains an independent Source grade. -/
+def Reflects {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, resolution.mapping, resolution.world, targetHeap, resolution.store, canonical⟩)
+    (budget : Nat) : Prop :=
+  ∀ {size value store}, size < budget →
+    CoreProof.EvaluationSize size
+      (snapshotEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+        (.inRight .unit resolution.snapshot) coreEnvironment)
+      resolution.store (shift 3 (lowered.expression.rename ξ)) value store →
+    ∃ sourceSize outcome after mapping world,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment targetHeap id outcome after ∧
+      Result (program := program) (context := context) (evidence := evidence) (source := source) (faults := faults)
+        resolution id node (renamed lowered ξ) environment outcome after value store mapping world ∧
+      ProtectedStateTransition.Transition protocol initial ⟨scope, mapping, world, after, store, canonical⟩
+
+/-- Choose Source RHS meaning only after the genuine resolution and its actual post. -/
+def PreservesAfter {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, initialMap, initialWorld, before, initialStore, canonical⟩)
+    (budget : Nat) : Prop :=
+  ∀ {sourceTarget targetHeap},
+    Dynamic.SourcePlaceResolves program context evidence source environment before place sourceTarget targetHeap →
+    ∀ (execution : CompatiblePlaceResolution.Execution checked registry functions prepared (renamedCodes codes ξ)
+      sourceTypes place leaf sourceTarget coreEnvironment initialStore initialMap initialWorld before targetHeap)
+      (reached : protocol.State ⟨scope, execution.mapping, execution.world, targetHeap, execution.store, canonical⟩),
+    protocol.Relates initial reached →
+    Preserves (program := program) (context := context) (evidence := evidence) (source := source)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) (environment := environment)
+      execution protocol reached budget
+
+/-- Choose native RHS meaning at that same genuine resolution and actual post. -/
+def ReflectsAfter {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (initial : protocol.State ⟨scope, initialMap, initialWorld, before, initialStore, canonical⟩)
+    (budget : Nat) : Prop :=
+  ∀ {sourceTarget targetHeap},
+    Dynamic.SourcePlaceResolves program context evidence source environment before place sourceTarget targetHeap →
+    ∀ (execution : CompatiblePlaceResolution.Execution checked registry functions prepared (renamedCodes codes ξ)
+      sourceTypes place leaf sourceTarget coreEnvironment initialStore initialMap initialWorld before targetHeap)
+      (reached : protocol.State ⟨scope, execution.mapping, execution.world, targetHeap, execution.store, canonical⟩),
+    protocol.Relates initial reached →
+    Reflects (program := program) (context := context) (evidence := evidence) (source := source)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) (environment := environment)
+      execution protocol reached budget
+
 /- Every source RHS outcome executes under the actual saved snapshot slots.
 The returned live-root receipt is derived from the IH's new heap. -/
 namespace Stateful
-universe u v
 
 theorem preserves_at (size : Nat)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -79,8 +156,8 @@ theorem preserves_at (size : Nat)
     meaning generated found (environments.extend resolution.maps resolution.worlds) resolution.heaps (locals.mono resolution.metadata)
       (DataPlaceChildExpressions.prefix_agrees agrees
         [.inRight .unit resolution.snapshot, packValues resolution.values, .cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target]) snapshotTyped initialState trace
-  refine ⟨value, store, mapping, world, ⟨trace.sound, ?_, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap resolution heaps maps worlds metadata⟩, post⟩
+  refine ⟨value, store, mapping, world,
+    rhs_of_expression resolution protocol initialState trace.sound ?_ represented heaps maps worlds frame metadata post⟩
   simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
     List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
     SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated
@@ -112,10 +189,53 @@ theorem reflects_at (size : Nat)
       (by simpa only [DataPlaceChildExpressions.rename_prefix, renamed, List.length_cons, List.length_nil,
         List.cons_append, List.nil_append, snapshotEnvironment, keysEnvironment, referenceEnvironment,
         SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)
-  exact ⟨sourceSize, outcome, after, mapping, world, trace, ⟨trace.sound, evaluated.sound, represented, heaps, maps, worlds, frame, metadata,
-    latest_of_heap resolution heaps maps worlds metadata⟩, post⟩
+  exact ⟨sourceSize, outcome, after, mapping, world, trace,
+    rhs_of_expression resolution protocol initialState trace.sound evaluated.sound represented heaps maps worlds frame metadata post⟩
 
 end Stateful
+
+/-- Compatibility supplies the old uniform child family only at the real getter post. -/
+theorem PreservesAfter.of_uniform (budget : Nat)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol
+      (payloadModel checked registry functions) program context evidence source certificate faults size))
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog)
+      initialMap initialWorld administrativeContext scope environment canonical)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes initialWorld coreEnvironment actualContext ambient.definitions)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (initial : protocol.State ⟨scope, initialMap, initialWorld, before, initialStore, canonical⟩) :
+    PreservesAfter (checked := checked) (registry := registry) (functions := functions)
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (prepared := prepared) (place := place) (codes := codes) (sourceTypes := sourceTypes) (leaf := leaf)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) (environment := environment)
+      (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initial budget := by
+  intro target targetHeap _ execution reached _ size outcome after bounded trace
+  exact Stateful.preserves_at execution size protocol (meaning size bounded) generated found
+    environments agrees actualTyped locals reached trace
+
+/-- Native compatibility keeps the original independently measured child grades. -/
+theorem ReflectsAfter.of_uniform (budget : Nat)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol
+      (payloadModel checked registry functions) program context evidence source certificate faults size))
+    (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog)
+      initialMap initialWorld administrativeContext scope environment canonical)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes initialWorld coreEnvironment actualContext ambient.definitions)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (initial : protocol.State ⟨scope, initialMap, initialWorld, before, initialStore, canonical⟩) :
+    ReflectsAfter (checked := checked) (registry := registry) (functions := functions)
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (prepared := prepared) (place := place) (codes := codes) (sourceTypes := sourceTypes) (leaf := leaf)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) (environment := environment)
+      (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initial budget := by
+  intro target targetHeap _ execution reached _ size value store bounded evaluated
+  exact Stateful.reflects_at execution size protocol (meaning size bounded) generated found
+    environments agrees actualTyped locals reached evaluated
+
 
 theorem preserves_at (size : Nat)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
