@@ -1828,6 +1828,7 @@ import Solcore.Test.SourceCoreCallableIndexedOwnedFunctions
 import Solcore.Test.SourceCoreCallableIndexedOwnedFunctionState
 import Solcore.Test.SourceCoreCallableIndexedOwnedOrdinaryAllocation
 import Solcore.Test.SourceCoreProtectedStateSequence
+import Solcore.Test.SourceCoreOwnedAllocationReadiness
 set_option autoImplicit false
 
 open Solcore
