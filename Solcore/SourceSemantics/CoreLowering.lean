@@ -732,6 +732,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBareAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPlaceAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedNamedExpressionHeads
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
