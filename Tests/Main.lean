@@ -1830,6 +1830,7 @@ import Solcore.Test.SourceCoreCallableIndexedOwnedOrdinaryAllocation
 import Solcore.Test.SourceCoreProtectedStateSequence
 import Solcore.Test.SourceCoreOwnedAllocationReadiness
 import Solcore.Test.SourceCoreClosedOwnedLexicalBody
+import Solcore.Test.SourceCoreClosedOwnedBodyKernel
 import Solcore.Test.SourceCoreClosedOwnedWhile
 import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
