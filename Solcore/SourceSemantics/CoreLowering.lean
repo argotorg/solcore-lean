@@ -703,6 +703,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaNestedEntr
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNestedLambdaBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodPrincipal
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOriginCanonicalState
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodNestedEntries
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
