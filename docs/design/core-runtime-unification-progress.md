@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `7faa4c7b`. Actual selected method hook history now reaches the exact Source/native parameter post and body continuation while every old API remains unchanged. `5d353ee3` adds genuine Source admission at actual expression inputs and successful posts; `c699334b` selects literal indirect callees from their authentic formation producer and supplies closed anonymous-body continuations. These units retain original Source provenance, captures, dictionaries, ordered records and independent grades. The complete shared mixed family remains unfinished.
+The latest implementation commit is `fece310c`. `b15447b9` connects real method hook history and ordered parameter posts to the authentic origin-packet body family, then closes builtin method invocation internally. A genuine typed bootstrap and Boolean argument consumer observe the same restored pool in `fece310c`. Earlier pointwise Source admission, actual selected literal calls and exact compatible method continuation factors remain registered. General mixed dispatch and the full compiler theorem remain unfinished.
 
-The latest normal build of the proof umbrella and `Tests.Main` passed **5114 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **2994 declarations** against the three permitted standard axioms. All **75** pre-existing method-invocation declarations retained byte-identical raw types and axiom logs after the actual-history continuation factor; the module now has 82 declarations. Earlier exact comparisons of 84 indirect-head, 51 Source-adapter, 10 expression-Tree, 17 named-head and 94 coercion-path declarations remain recorded below. The semantic kernel policy and whitespace checks passed.
+The latest normal build of the proof umbrella and `Tests.Main` passed **5117 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **3005 declarations** against the three permitted standard axioms. All **75** pre-existing method-invocation declarations retained byte-identical raw types and axiom logs after the actual-history continuation factor; the module now has 82 declarations. Earlier exact comparisons of 84 indirect-head, 51 Source-adapter, 10 expression-Tree, 17 named-head and 94 coercion-path declarations remain recorded below. The semantic kernel policy and whitespace checks passed.
 
-Records: `/private/tmp/solcore-owned-functions-resume-20261007/`, particularly `owned-selected-admitted-method-history-validation.json`. The preservation check found **5020 original files** outside explicit owned changes unchanged. Unrelated inference/parser work remains outside these commits.
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/`, particularly `owned-authentic-method-closed-validation.json`. The preservation check found **5020 original files** outside explicit owned changes unchanged. Unrelated inference/parser work remains outside these commits.
 
 ### Implementation in progress
 
@@ -1979,3 +1979,12 @@ Validation: proof umbrella plus Tests.Main 5110 jobs, all registered execution t
 | `7faa4c7b` | Moves the same method invocation proof cores behind actual-history continuation interfaces. Real hook selection, Carries, emitted code, ordered parameter spine, reached state and caller relation reach body providers before restoration. | A production authentic origin-packet provider and closed general method body grammar are next. Existing method-produced lambda support remains Header-indexed. |
 
 Validation: proof umbrella plus Tests.Main 5114 jobs, all registered execution tests, 2994 strict kernel declarations, exact raw types and axiom logs for all 75 old method-invocation declarations, semantic policy and whitespace checks, and 5020 protected original files unchanged. All frozen sources passed exact-hash independent review. No Core instruction or new execution induction was added.
+
+### 2026-10-08: closed authentic method principal bodies verified at `fece310c`
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `b15447b9` | Real hook selection and Carries authenticate the original method seed at the actual Source/native parameter post. Pointwise providers consume that same origin packet. The existing shared measured family closes builtin bodies and complete invocation with real marked allocation and caller restoration. | General method calls, live caller transport and method-produced lambda support remain. The complete trait selector and dictionary stay independent of ordinary Header authority. |
+| `fece310c` | A genuine preparation recipe and original method selector derive typed bootstrap; an actual Boolean argument passes through parameters, closed body and restoration. Both directions retain the same reached pool, ordered prefixes, snapshot Holds and old-record membership. | The consumer covers the existing builtin body fragment and empty initial Source heap. |
+
+Validation: proof umbrella plus Tests.Main 5117 jobs, all registered execution tests, 3005 strict kernel declarations, semantic policy and whitespace checks, and 5020 protected original files unchanged. All three frozen modules passed independent exact-hash reviews. No Core instruction or new execution induction was added.
