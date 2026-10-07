@@ -675,6 +675,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedFamilyClosure
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCaptureValidity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCaptureExecutionValidity
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaSourceAdmission
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
