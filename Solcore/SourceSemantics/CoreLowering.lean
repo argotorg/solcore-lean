@@ -661,6 +661,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryAllocati
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadiness
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateBareAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMarkedAllocation
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
