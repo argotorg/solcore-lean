@@ -251,13 +251,52 @@ def StepPreservesFor (row : α → Row)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (State finalMap finalWorld after finalStore)
 
-theorem preserves_for
-    (extendState : ∀ {mapping nextMap world nextWorld before after store finalStore},
-      State mapping world before store → LocationMap.Extends mapping nextMap → WorldExtends world nextWorld →
-      AdministrativePreserved mapping store nextMap finalStore → Dynamic.HeapMetadataExtend before after →
-      State nextMap nextWorld after finalStore)
+/-- Relate actual states at their original heap/store indices. -/
+def StateRelation (State : LocationMap → StoreTyping → Dynamic.Heap → Store → Type) :=
+  ∀ {mapping nextMap : LocationMap} {world nextWorld : StoreTyping}
+    {before after : Dynamic.Heap} {store finalStore : Store},
+    State mapping world before store → State nextMap nextWorld after finalStore → Prop
+
+variable (relation : StateRelation State)
+
+/-- The actual empty path retains exactly its input state. -/
+def StateReflexive : Prop :=
+  ∀ {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    (entry : State mapping world heap store), relation entry entry
+
+/-- Actual successive method states compose through their common reached state. -/
+def StateTransitive : Prop :=
+  ∀ {mapping middleMap finalMap : LocationMap} {world middleWorld finalWorld : StoreTyping}
+    {before middle after : Dynamic.Heap} {store middleStore finalStore : Store}
+    {entry : State mapping world before store} {reached : State middleMap middleWorld middle middleStore}
+    {returned : State finalMap finalWorld after finalStore},
+    relation entry reached → relation reached returned → relation entry returned
+
+def StepPreservesForWithState (row : α → Row)
+    (State : LocationMap → StoreTyping → Dynamic.Heap → Store → Type)
+    (relation : StateRelation State)
+    (functions : FunctionModel values.checked.catalog ambient)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (program : Program) (caller : Environment) (reason : Word) (methods : List α) : Prop :=
+  ∀ {method mapping world before after store input native outcome}, method ∈ methods →
+    ∀ entry : State mapping world before store,
+    CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store →
+    ValueRep values.checked registry functions mapping world (row method).step.source input native
+      (row method).call.signature.parameterType →
+    BodyOutcome program (row method).body (row method).dictionary before [input] outcome after →
+    ∃ result finalStore finalMap finalWorld,
+      CallableCoercionSpine.Invoke caller reason (row method).call store (.inRight .word native) result finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) finalMap finalWorld
+        (row method).step.target (row method).call.signature.resultType faults outcome result ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ returned : State finalMap finalWorld after finalStore, relation entry returned
+
+theorem preserves_for_with_state
+    (reflexive : StateReflexive (State := State) @relation) (transitive : StateTransitive (State := State) @relation)
     {source target : TypeSystem.Ty} {inputType outputType : Ty} {methods : List α}
-    (step : StepPreservesFor row State functions registry faults program caller reason methods)
+    (step : StepPreservesForWithState row State relation functions registry faults program caller reason methods)
     (chain : ChainFor row source inputType methods target outputType)
     {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
     {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome}
@@ -272,23 +311,23 @@ theorem preserves_for
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
-      Nonempty (State finalMap finalWorld after finalStore) := by
+      ∃ returned : State finalMap finalWorld after finalStore, relation entry returned := by
   induction chain generalizing mapping world before after store input native outcome with
   | nil source type =>
     cases trace
-    exact ⟨_, _, _, _, .nil, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _, ⟨entry⟩⟩
+    exact ⟨_, _, _, _, .nil, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _, ⟨entry, reflexive entry⟩⟩
   | @cons method rest target output chain ih =>
     cases trace with
     | @cons _ _ _ middle _ _ value _ body tail =>
-      obtain ⟨result, middleStore, middleMap, middleWorld, invoked, related, middleHeaps, maps, worlds, frame, metadata, ⟨nextEntry⟩⟩ :=
+      obtain ⟨result, middleStore, middleMap, middleWorld, invoked, related, middleHeaps, maps, worlds, frame, metadata, nextEntry, headRelated⟩ :=
         step (List.mem_cons_self) entry heaps represented (.value body)
       cases related with
       | value middleRepresented =>
-        obtain ⟨result, finalStore, finalMap, finalWorld, runs, related, finalHeaps, tailMaps, tailWorlds, tailFrame, tailMetadata, _⟩ :=
+        obtain ⟨result, finalStore, finalMap, finalWorld, runs, related, finalHeaps, tailMaps, tailWorlds, tailFrame, tailMetadata, finalEntry, tailRelated⟩ :=
           ih (fun member => step (List.mem_cons_of_mem _ member)) nextEntry middleHeaps middleRepresented tail
         exact ⟨_, _, _, _, .cons invoked runs, related, finalHeaps, maps.trans tailMaps, worlds.trans tailWorlds,
           frame.trans tailFrame, metadata.trans tailMetadata,
-          ⟨extendState entry (maps.trans tailMaps) (worlds.trans tailWorlds) (frame.trans tailFrame) (metadata.trans tailMetadata)⟩⟩
+          finalEntry, transitive headRelated tailRelated⟩
     | fault body =>
       obtain ⟨result, finalStore, finalMap, finalWorld, invoked, related, finalHeaps, maps, worlds, frame, metadata, finalEntry⟩ :=
         step (List.mem_cons_self) entry heaps represented (.fault body)
@@ -320,6 +359,109 @@ def StepReflectsFor (row : α → Row)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (State finalMap finalWorld after finalStore)
 
+def StepReflectsForWithState (row : α → Row)
+    (State : LocationMap → StoreTyping → Dynamic.Heap → Store → Type)
+    (relation : StateRelation State)
+    (functions : FunctionModel values.checked.catalog ambient)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (program : Program)
+    (invocation : CallableCoercionSpine.Call → Store → Value → Value → Store → Prop) (methods : List α) : Prop :=
+  ∀ {method mapping world before store finalStore input native value}, method ∈ methods →
+    ∀ entry : State mapping world before store,
+    CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store →
+    ValueRep values.checked registry functions mapping world (row method).step.source input native
+      (row method).call.signature.parameterType →
+    invocation (row method).call store (.inRight .word native) value finalStore →
+    ∃ outcome after finalMap finalWorld,
+      BodyOutcome program (row method).body (row method).dictionary before [input] outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) finalMap finalWorld
+        (row method).step.target (row method).call.signature.resultType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ returned : State finalMap finalWorld after finalStore, relation entry returned
+
+theorem reflects_for_with_state
+    {invocation : CallableCoercionSpine.Call → Store → Value → Value → Store → Prop}
+    (forget : ∀ {call before input result after}, invocation call before input result after →
+      CallableCoercionSpine.Invoke caller reason call before input result after)
+    (reflexive : StateReflexive (State := State) @relation) (transitive : StateTransitive (State := State) @relation)
+    {source target : TypeSystem.Ty} {inputType outputType : Ty} {methods : List α}
+    (step : StepReflectsForWithState row State relation functions registry faults program invocation methods)
+    (chain : ChainFor row source inputType methods target outputType)
+    {mapping : LocationMap} {world : StoreTyping}
+    {before : Dynamic.Heap} {store finalStore : Store} {input : Dynamic.Value} {native value : Value}
+    (entry : State mapping world before store)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (represented : ValueRep values.checked registry functions mapping world source input native inputType)
+    (runs : CallableCoercionSpine.RunsFor invocation store (.inRight .word native) (methods.map (fun method => (row method).call)) value finalStore) :
+    ∃ outcome after finalMap finalWorld,
+      SelectedTraceFor row program methods before input outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) finalMap finalWorld
+        target outputType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ returned : State finalMap finalWorld after finalStore, relation entry returned := by
+  induction chain generalizing mapping world before store input native value finalStore with
+  | nil source type =>
+    cases runs
+    exact ⟨_, _, _, _, .nil, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _, ⟨entry, reflexive entry⟩⟩
+  | @cons method rest target output chain ih =>
+    cases runs with
+    | cons invoked tail =>
+      obtain ⟨outcome, middle, middleMap, middleWorld, body, related, middleHeaps, maps, worlds, frame, metadata, nextEntry, headRelated⟩ :=
+        step (List.mem_cons_self) entry heaps represented invoked
+      cases related with
+      | value middleRepresented =>
+        obtain ⟨outcome, after, finalMap, finalWorld, traced, related, finalHeaps, tailMaps, tailWorlds, tailFrame, tailMetadata, finalEntry, tailRelated⟩ :=
+          ih (fun member => step (List.mem_cons_of_mem _ member)) nextEntry middleHeaps middleRepresented tail
+        have invoked := by cases body with | value body => exact body
+        exact ⟨_, _, _, _, .cons invoked traced, related, finalHeaps, maps.trans tailMaps, worlds.trans tailWorlds,
+          frame.trans tailFrame, metadata.trans tailMetadata,
+          finalEntry, transitive headRelated tailRelated⟩
+      | fault faultRep =>
+        obtain ⟨rfl, rfl⟩ := failed_runs (tail.map forget).toRuns
+        have failed := by cases body with | fault body => exact body
+        refine ⟨_, _, _, _, .fault failed, ?_, middleHeaps, maps, worlds, frame, metadata, nextEntry, headRelated⟩
+        rw [chain.final_type]
+        exact .fault faultRep
+
+theorem preserves_for
+    (extendState : ∀ {mapping nextMap world nextWorld before after store finalStore},
+      State mapping world before store → LocationMap.Extends mapping nextMap → WorldExtends world nextWorld →
+      AdministrativePreserved mapping store nextMap finalStore → Dynamic.HeapMetadataExtend before after →
+      State nextMap nextWorld after finalStore)
+    {source target : TypeSystem.Ty} {inputType outputType : Ty} {methods : List α}
+    (step : StepPreservesFor row State functions registry faults program caller reason methods)
+    (chain : ChainFor row source inputType methods target outputType)
+    {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
+    {input : Dynamic.Value} {native : Value} {outcome : Dynamic.ExpressionOutcome}
+    (entry : State mapping world before store)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (represented : ValueRep values.checked registry functions mapping world source input native inputType)
+    (trace : SelectedTraceFor row program methods before input outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      CallableCoercionSpine.Runs caller reason store (.inRight .word native) (methods.map (fun method => (row method).call)) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions) finalMap finalWorld
+        target outputType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Nonempty (State finalMap finalWorld after finalStore) := by
+  let _legacyTransport := @extendState
+  obtain ⟨value, finalStore, finalMap, finalWorld, runs, related, finalHeaps,
+    maps, worlds, frame, metadata, returned, _⟩ :=
+    preserves_for_with_state (functions := functions) (State := State) (relation := fun _ _ => True) (fun _ => True.intro) (fun _ _ => True.intro)
+      (by
+        intro method mapping world before after store input native outcome member initial heaps represented trace
+        obtain ⟨value, finalStore, finalMap, finalWorld, invoked, related, finalHeaps,
+          maps, worlds, frame, metadata, ⟨returned⟩⟩ := step member initial heaps represented trace
+        exact ⟨value, finalStore, finalMap, finalWorld, invoked, related, finalHeaps,
+          maps, worlds, frame, metadata, returned, True.intro⟩)
+      chain entry heaps represented trace
+  exact ⟨value, finalStore, finalMap, finalWorld, runs, related, finalHeaps, maps, worlds, frame, metadata, ⟨returned⟩⟩
+
 theorem reflects_for
     {invocation : CallableCoercionSpine.Call → Store → Value → Value → Store → Prop}
     (forget : ∀ {call before input result after}, invocation call before input result after →
@@ -345,29 +487,18 @@ theorem reflects_for
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Nonempty (State finalMap finalWorld after finalStore) := by
-  induction chain generalizing mapping world before store input native value finalStore with
-  | nil source type =>
-    cases runs
-    exact ⟨_, _, _, _, .nil, .value represented, heaps, .refl _, .refl _, .refl _ _, .refl _, ⟨entry⟩⟩
-  | @cons method rest target output chain ih =>
-    cases runs with
-    | cons invoked tail =>
-      obtain ⟨outcome, middle, middleMap, middleWorld, body, related, middleHeaps, maps, worlds, frame, metadata, ⟨nextEntry⟩⟩ :=
-        step (List.mem_cons_self) entry heaps represented invoked
-      cases related with
-      | value middleRepresented =>
-        obtain ⟨outcome, after, finalMap, finalWorld, traced, related, finalHeaps, tailMaps, tailWorlds, tailFrame, tailMetadata, _⟩ :=
-          ih (fun member => step (List.mem_cons_of_mem _ member)) nextEntry middleHeaps middleRepresented tail
-        have invoked := by cases body with | value body => exact body
-        exact ⟨_, _, _, _, .cons invoked traced, related, finalHeaps, maps.trans tailMaps, worlds.trans tailWorlds,
-          frame.trans tailFrame, metadata.trans tailMetadata,
-          ⟨extendState entry (maps.trans tailMaps) (worlds.trans tailWorlds) (frame.trans tailFrame) (metadata.trans tailMetadata)⟩⟩
-      | fault faultRep =>
-        obtain ⟨rfl, rfl⟩ := failed_runs (tail.map forget).toRuns
-        have failed := by cases body with | fault body => exact body
-        refine ⟨_, _, _, _, .fault failed, ?_, middleHeaps, maps, worlds, frame, metadata, ⟨nextEntry⟩⟩
-        rw [chain.final_type]
-        exact .fault faultRep
+  let _legacyTransport := @extendState
+  obtain ⟨outcome, after, finalMap, finalWorld, traced, related, finalHeaps,
+    maps, worlds, frame, metadata, returned, _⟩ :=
+    reflects_for_with_state (functions := functions) (State := State) (relation := fun _ _ => True) forget (fun _ => True.intro) (fun _ _ => True.intro)
+      (by
+        intro method mapping world before store finalStore input native value member initial heaps represented invoked
+        obtain ⟨outcome, after, finalMap, finalWorld, body, related, finalHeaps,
+          maps, worlds, frame, metadata, ⟨returned⟩⟩ := step member initial heaps represented invoked
+        exact ⟨outcome, after, finalMap, finalWorld, body, related, finalHeaps,
+          maps, worlds, frame, metadata, returned, True.intro⟩)
+      chain entry heaps represented runs
+  exact ⟨outcome, after, finalMap, finalWorld, traced, related, finalHeaps, maps, worlds, frame, metadata, ⟨returned⟩⟩
 
 
 end Common
