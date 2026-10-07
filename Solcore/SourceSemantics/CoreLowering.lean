@@ -669,6 +669,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableRuntimeNamedBodyFamily
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedHeaderReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCanonicalState
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExpressionTreeBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedBodyBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaInvocationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedFamilyClosure
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
