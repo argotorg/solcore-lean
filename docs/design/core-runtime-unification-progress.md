@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `0d4fc1ba`. The same match preservation and reflection cores retain actual scrutinee, selection, body and restored states. Source hidden and pattern allocations establish deep heap typing at the single combined selection post, with no intermediate protocol state. Genuine selected-body typing remains separate from the compiler certificate. Restoration retains the exact returned pool; faults retain stable row histories.
+The latest implementation commit is `1224dc4e`. Genuine parent Source typing constructs the high match endpoints, including raw scrutinee, cases and default typing. The existing match cores retain actual selected/body/restored states; strict selected-body callbacks remain internal composition interfaces for CatalogSites. Actual bit-not snapshot/write traces supply reached Source heap typing and extension through already proved Source preservation. Their generic expression preservation premise is derived internally at the authentic runtime context.
 
-The latest normal build of the proof umbrella and `Tests.Main` passed **5158 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **3862 declarations** against the three permitted standard axioms. All **56** original match declarations retain identical raw types and axiom sets. The same three finite match cores are reused. Every final source passed independent exact-hash reviews. Earlier API and original-expression comparisons remain recorded below. The semantic kernel policy and whitespace checks passed; **5019 protected original files** remain unchanged.
+The latest normal build of the proof umbrella and `Tests.Main` passed **5160 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **3866 declarations** against the three permitted standard axioms. All **four** declarations in the two added modules have fresh strict inventories and exact-hash reviews. Earlier API and original-expression comparisons remain recorded below. The semantic kernel policy and whitespace checks passed; **5019 protected original files** remain unchanged.
 
-Records: `/private/tmp/solcore-owned-functions-resume-20261007/match-ready-six-validation.json` and its build, test, kernel and API logs. High match endpoints, for initializer/post headers and actual Source facts are being connected to the original CatalogSites fold. General body closure, selected indirect/method closure, staging/pass composition and the public compiler theorem remain incomplete.
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/high-match-snapshot-two-validation.json` and its logs. For initializer/post headers and actual Source facts are being connected to the original CatalogSites fold and general body kernel. General mixed-family closure, staging/pass composition and the public compiler theorem remain incomplete.
 
 ### Implementation in progress
 
@@ -2129,3 +2129,12 @@ Next: finish actual for header/post and match selected-body readiness; thread th
 Validation: proof umbrella plus Tests.Main 5158 jobs, all registered execution tests, 3862 strict kernel declarations, all 56 original raw types and axiom sets exact, semantic policy and whitespace checks, and 5019 protected original files unchanged. All six final sources passed independent exact-hash reviews. The same three finite match cores are reused; no Core instruction or execution induction was added.
 
 Next: complete high match and for header/post providers from genuine Source typing at actual states; compose them inside the original CatalogSites and general body kernel. Internal shared-family closure and final compiler/public-entry integration remain necessary.
+
+### 2026-10-08: high match endpoints and snapshot admission verified at `1224dc4e`
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `3cdf35fd` | Genuine parent match typing supplies original control, scrutinee/cases/default judgments. Source occurrence uniqueness aligns only the stored raw type. Admitted children and authentic selected-body typing feed the same neutral actual-state preservation/reflection cores. | CatalogSites and the general body family must internally discharge strict body callbacks. |
+| `1224dc4e` | Actual bit-not resolution/snapshot/write traces supply final deep Source heap typing and extension. Existing whole-language Source preservation closes the expression premise internally. Actual administrative effects supply reached row history only. | High header and general imperative providers consume this receipt next. |
+
+Validation: proof umbrella plus Tests.Main 5160 jobs, all registered execution tests, 3866 strict kernel declarations, all four new declarations inventoried, semantic policy and whitespace checks, and 5019 protected original files unchanged. Both final sources passed independent exact-hash reviews. No Core instruction or execution induction was added.
