@@ -722,9 +722,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedSequenceHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionReady
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedCompositionsBounds
-/-! Proofs connecting executable Core lowering to the independent source
-semantics. This boundary is separate from the specification's umbrella so that
-the specification does not depend on executable frontend passes. -/
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedDataHeadBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalSourceSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalTreeBounds
+/-! Proofs connecting executable Core lowering to the independent source
+semantics. This boundary is separate from the specification's umbrella so that
+the specification does not depend on executable frontend passes. -/
