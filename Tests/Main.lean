@@ -1839,6 +1839,7 @@ import Solcore.Test.SourceCoreClosedOwnedAnonymousInvocation
 import Solcore.Test.SourceCoreClosedOwnedIndirectExpression
 import Solcore.Test.SourceCoreClosedOwnedMethodBootstrap
 import Solcore.Test.SourceCoreClosedOwnedCoercionStep
+import Solcore.Test.SourceCoreClosedOwnedCoercionPath
 import Solcore.Test.SourceCoreClosedOwnedWhile
 import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
