@@ -739,6 +739,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedProjecte
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedWhileReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedWhileBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedClosedNamedBodies
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionTreeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
