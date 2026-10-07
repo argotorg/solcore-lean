@@ -1831,6 +1831,7 @@ import Solcore.Test.SourceCoreProtectedStateSequence
 import Solcore.Test.SourceCoreOwnedAllocationReadiness
 import Solcore.Test.SourceCoreClosedOwnedLexicalBody
 import Solcore.Test.SourceCoreClosedOwnedWhile
+import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
 set_option autoImplicit false
 
