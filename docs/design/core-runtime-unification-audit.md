@@ -456,6 +456,12 @@ Finished mixed body closure requires the authentic canonical or nested protocol 
 
 The public session keeps valid inert prefixes separately from its empty active Source bootstrap heap. Existing heap migration proves reconstruction and prefix preservation, without a whole execution correspondence. A theorem executing Source over a nonempty initial prefix therefore needs an authentic complete heap relation or a proved prefix execution relation. The existing fresh public root entry is constructible for the empty active Source heap.
 
+Actual named parameter receipts now choose the complete static family index internally from their original profile, member, Source runtime validity and independent Syntax. The actual canonical entry supplies global slots; the original admitted expression Tree consumes strict family children for arbitrary authentic ordinary/direct named callee profiles. Runtime literal meanings come from the real requirement ledger. Actual lambda/method wrappers retain genuine captured or principal packets beside the same Source receipt and all-row history, then forward the same returned pool. These adapters reuse the existing folds and do not establish joint mixed dispatch.
+
+Method lambda sites now retain original Source provenance, graph uniqueness, genuine carried history and emitted descriptor from the actual selected method principal. The owned lambda StaticSupport remains Header-based; a method-only principal requires an explicit support alternative before the current value model can represent it. No ordinary Header or FunctionInstantiates is inferred from synthetic compiler code.
+
+Verification at `ed314136` passed the 5190-job normal build, all registered tests, strict kernel audit of 4375 declarations, fresh inventories of 71 declarations in six new modules, 37 signature probes and the kernel policy. No original proof module changed in this unit, and the 5019 protected original files are unchanged. General named closure, joint origin factories, mixed dispatch and the compiler/public theorem remain unfinished.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
