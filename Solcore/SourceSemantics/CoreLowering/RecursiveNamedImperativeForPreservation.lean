@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeControlBounds
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchRuntimeHead
@@ -66,67 +67,6 @@ variable {administrative : Core.Context} {frameLayout : SourceCoreCallableIndexe
   (program : Program) (evidence : Dynamic.EvidenceEnvironment) (unique : NodeOccurrencesUnique source)
   {faults : FunctionCalls.FaultRep} {entry : ProtectedExpressionMeaning.Entry}
   (transport : ProtectedExpressionMeaning.Transport entry)
-def HeadPreservesAtWith (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
-    : Prop :=
-  ∀ (_valid : validity context)
-    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
-    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
-    {store : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {outcome : Dynamic.ControlOutcome} {finalContext : SourceSemantics.Context}
-    (_environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
-      mapping world administrative scope environment canonical ambient.definitions)
-    (_heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
-    (_locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    (_agrees : EnvironmentsAgree ξ canonical actual)
-    (_actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
-    (_reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
-    (_read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
-    (_unmapped : contextLocation ∉ mapping)
-    (_installed : entry scope mapping world before store canonical)
-    (_trace : RecursiveNamedLoopContracts.StatementOutcome program size context evidence source environment before id finalContext outcome after),
-    finalContext = context ∧ Restored environment outcome ∧ ∃ value finalStore finalMap finalWorld,
-      Evaluates actual store (code.rename ξ) value finalStore ∧
-      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
-      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
-      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
-
-def HeadPreservesAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
-  HeadPreservesAtWith (entry := entry) functions program evidence
-    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
-    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
-    (frameLayout := frameLayout) (globals := globals) (faults := faults)
-
-def HeadReflectsAtWith (validity : SourceSemantics.Context → Prop) (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr)
-    : Prop :=
-  ∀ (_valid : validity context)
-    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
-    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
-    {store finalStore : Store} {ξ : Renaming} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
-    (_environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
-      mapping world administrative scope environment canonical ambient.definitions)
-    (_heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
-    (_locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    (_agrees : EnvironmentsAgree ξ canonical actual)
-    (_actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
-    (_reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
-    (_read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
-    (_unmapped : contextLocation ∉ mapping)
-    (_installed : entry scope mapping world before store canonical)
-    (_evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore),
-    ∃ sourceSize outcome after finalMap finalWorld,
-      RecursiveNamedLoopContracts.StatementOutcome program sourceSize context evidence source environment before id context outcome after ∧
-      Restored environment outcome ∧
-      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
-      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
-      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after
-
-def HeadReflectsAt (size : Nat) {scope : Scope} (id : StatementId) (expected : TypeSystem.Ty) (type : Ty) (code : Expr) : Prop :=
-  HeadReflectsAtWith (entry := entry) functions program evidence
-    (fun context => CompatibleExpressionLiterals.ContextValid solved context evidence) size (scope := scope) id expected type code
-    (values := values) (source := source) (context := context) (registry := registry) (administrative := administrative)
-    (frameLayout := frameLayout) (globals := globals) (faults := faults)
-
 include unique in
 theorem block_preserves_at_with (validity : SourceSemantics.Context → Prop) (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
@@ -140,23 +80,15 @@ theorem block_preserves_at_with (validity : SourceSemantics.Context → Prop) (b
       size (scope := scope) id expected type code := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  cases trace with
-  | control trace =>
-    obtain ⟨rfl, child, innerContext, innerOutcome, rfl, executed, smaller⟩ :=
-      RecursiveNamedStatementSourceBounds.block_value unique (lookupStatement?_sound found) form trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
-      inner child (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed
-        (.control executed)
-    exact ⟨rfl, restored environment innerOutcome, value, finalStore, finalMap, finalWorld,
-      evaluated, restore_rep represented environment, finalHeaps, maps, worlds, frame, metadata⟩
-  | fault failed =>
-    obtain ⟨child, innerContext, failed, smaller⟩ :=
-      RecursiveNamedStatementSourceBounds.block_fault unique (lookupStatement?_sound found) form failed
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
-      inner child (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed
-        (.fault failed)
-    exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld,
-      evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
+  obtain ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.block_preserves_at_with_state (canonical := canonical) (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol (fun _ _ _ _ _ _ => True)) validity budget size bounded found form ⟨trivial⟩
+      (fun child childBound {_ _} innerTrace => by
+        obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
+          inner child childBound valid environments heaps locals agrees actualTyped reference read unmapped installed innerTrace
+        exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical,
+          ⟨⟨trivial⟩, trivial⟩⟩) trace
+  exact ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 include unique in
 theorem block_preserves_at (budget size : Nat) (bounded : size ≤ budget)
@@ -183,69 +115,14 @@ theorem sequence_preserves_at_with (validity : SourceSemantics.Context → Prop)
     PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  have go {headSize tailSize : Nat} {middleContext : SourceSemantics.Context} {next : Dynamic.Environment} {middle : Dynamic.Heap}
-      (headTrace : SourceExecutionSize.StatementExecutes program headSize context evidence source environment before id middleContext (.fallthrough next) middle)
-      (tailTrace : ExecutesAt tailSize mode program middleContext evidence source next middle rest finalContext outcome after) (headSmaller : headSize < size) (tailSmaller : tailSize < size) :
-      ∃ value finalStore finalMap finalWorld,
-        Evaluates actual store ((LocalLoop.sequence type head body).rename ξ) value finalStore ∧
-        FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
-        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
-        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
-        LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
-          context scope environment finalContext after := by
-    obtain ⟨rfl, restores, value, middleStore, middleMap, middleWorld, headEval, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
-      first headSize (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed (.control headTrace)
-    have same := restores next rfl
-    subst next
-    cases represented with
-    | fallthrough _ =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, tailEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
-        remaining tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-          (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix
-            (GenericExpressionMeaning.agree_prefix agrees (.inLeft LocalLoop.transferType (.inLeft type .unit))) (.inLeft type .unit)) .unit)
-          (.cons .unit (.cons (.inLeft .unit) (.cons (.inLeft (.inLeft .unit)) (actualTyped.weaken worlds)))) reference
-          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-          (transport.extend installed maps worlds frame metadata) tailTrace
-      refine ⟨value, finalStore, finalMap, finalWorld, ?_, represented, finalHeaps,
-        maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
-      rw [LoopRenaming.sequence]
-      simp only [GenericExpressionMeaning.rename_prefix] at tailEval
-      exact LocalLoop.sequence_fallthrough _ headEval tailEval
-  have view := RecursiveNamedStatementSourceBounds.cons_inv unique (lookupStatement?_sound found)
-    (fun _ _ => notTail) trace
-  cases view with
-  | next headTrace tailTrace headSmaller tailSmaller => exact go headTrace tailTrace headSmaller tailSmaller
-  | terminal headTrace terminal headSmaller =>
-    obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      first _ (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed (.control headTrace)
-    cases represented with
-    | fallthrough _ => cases terminal
-    | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
-        .returned payload, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | breaking next => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
-        .breaking next, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | continuing next => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
-        .continuing next, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
-        .fault matched, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | fault headTrace headSmaller =>
-    obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      first _ (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed (.fault headTrace)
-    cases represented with
-    | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
-        .fault matched, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, lexical, _⟩ :=
+    Stateful.sequence_preserves_at_with (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (staticCondition := fun _ _ => True)
+      validity budget size bounded found notTail
+      (fun child childBound => Compatibility.legacy_head_preserves functions program evidence transport (first child childBound))
+      (fun child childBound => Compatibility.legacy_preserves functions program evidence transport (remaining child childBound))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩
 
 variable {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
@@ -271,39 +148,15 @@ private theorem sequence_stopped_preserves_at_with (validity : SourceSemantics.C
     PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals) size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  have view := RecursiveNamedStatementSourceBounds.cons_inv unique (lookupStatement?_sound found)
-    (fun _ _ => notTail) trace
-  cases view with
-  | next headTrace tailTrace headSmaller tailSmaller => cases stops headTrace.sound
-  | terminal headTrace terminal headSmaller =>
-    obtain ⟨rfl, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      first _ (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed (.control headTrace)
-    cases represented with
-    | fallthrough _ => cases terminal
-    | returned payload => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_returned _ headEval,
-        .returned payload, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | breaking next => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
-        .breaking next, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | continuing next => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_transfer _ headEval,
-        .continuing next, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-    | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
-        .fault matched, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | fault headTrace headSmaller =>
-    obtain ⟨_, _, value, finalStore, finalMap, finalWorld, headEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      first _ (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid environments heaps locals agrees actualTyped reference read unmapped installed (.fault headTrace)
-    cases represented with
-    | fault matched => exact ⟨_, finalStore, finalMap, finalWorld,
-        by rw [LoopRenaming.sequence]; exact LocalLoop.sequence_failure _ headEval,
-        .fault matched, finalHeaps, maps, worlds, frame, metadata,
-        _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, lexical, _⟩ :=
+    Stateful.sequence_stopped_preserves_at_with_state (canonical := canonical) (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol (fun _ _ _ _ _ _ => True)) validity budget size bounded found notTail environments locals ⟨trivial⟩
+      (fun child childBound {_ _ _} headTrace => by
+        obtain ⟨same, restores, headValue, middleStore, middleMap, middleWorld, headEval, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+          first child childBound valid environments heaps locals agrees actualTyped reference read unmapped installed headTrace
+        exact ⟨same, restores, headValue, middleStore, middleMap, middleWorld, headEval, represented, middleHeaps, maps, worlds, frame, metadata, ⟨⟨trivial⟩, trivial⟩⟩)
+      stops trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩
 
 include unique in
 private theorem sequence_stopped_preserves_at (budget size : Nat) (bounded : size ≤ budget) {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
@@ -335,64 +188,15 @@ theorem conditional_preserves_at_with (validity : SourceSemantics.Context → Pr
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  have selected {conditionSize bodySize : Nat} {boolean : Bool} {middle : Dynamic.Heap} {innerContext : SourceSemantics.Context} {innerOutcome : Dynamic.ControlOutcome}
-      (conditionTrace : SourceExecutionSize.ExpressionEvaluates program conditionSize context evidence source environment before condition (.bool boolean) middle)
-      (branchTrace : ExecutesAt bodySize false program context evidence source environment middle
-        (if boolean then thenBody else elseBody.getD []) innerContext innerOutcome after) (conditionSmaller : conditionSize < size) (bodySmaller : bodySize < size) :
-      ∃ value finalStore finalMap finalWorld,
-        Evaluates actual store ((LocalLoop.conditional type conditionCode thenCode elseCode).rename ξ) value finalStore ∧
-        FlowRep (registry := registry) functions finalMap finalWorld faults expected type
-          (Dynamic.restoreControl environment innerOutcome) value ∧
-        CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
-        LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-        AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-    obtain ⟨_, middleStore, middleMap, middleWorld, conditionEval, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
-      expressionPreserves conditionSize (Nat.le_of_lt (Nat.lt_of_lt_of_le conditionSmaller bounded)) context valid conditionTree conditionFound
-        environments heaps locals agrees actualTyped installed (.value conditionTrace)
-    cases represented with
-    | value payload =>
-      obtain ⟨actualBoolean, sourceEq, coreEq⟩ := bool_fields payload
-      cases sourceEq
-      subst coreEq
-      have branchCorrect : PreservesAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context) (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
-          bodySize (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
-        cases boolean <;> first | exact thenCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded)) | exact elseCorrect bodySize (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller bounded))
-      obtain ⟨value, finalStore, finalMap, finalWorld, branchEval, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
-        branchCorrect valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-          (GenericExpressionMeaning.agree_prefix agrees (.bool boolean)) (.cons .bool (actualTyped.weaken worlds)) reference
-          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-          (transport.extend installed maps worlds frame metadata) branchTrace
-      refine ⟨value, finalStore, finalMap, finalWorld, ?_, restore_rep represented environment, finalHeaps,
-        maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata⟩
-      rw [LoopRenaming.conditional]
-      rw [GenericExpressionMeaning.rename_prefix] at branchEval
-      cases boolean with
-      | false => exact LocalControl.choose_false _ conditionEval branchEval
-      | true => exact LocalControl.choose_true _ conditionEval branchEval
-  obtain ⟨same, view⟩ := RecursiveNamedStatementSourceBounds.if_inv unique (lookupStatement?_sound found) form trace
-  subst finalContext
-  cases view with
-  | conditionFault failed smaller =>
-    obtain ⟨_, finalStore, finalMap, finalWorld, conditionEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-      expressionPreserves _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) context valid conditionTree conditionFound
-        environments heaps locals agrees actualTyped installed (.fault failed)
-    cases represented with
-    | fault matched =>
-      refine ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld, ?_,
-        .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
-      rw [LoopRenaming.conditional]
-      exact LocalControl.choose_failure _ conditionEval
-  | conditionType conditionTrace notBoolean runtimeType smaller =>
-    obtain ⟨_, _, _, _, _, represented, _⟩ :=
-      expressionPreserves _ (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller bounded)) context valid conditionTree conditionFound
-        environments heaps locals agrees actualTyped installed (.value conditionTrace)
-    cases represented with
-    | value payload =>
-      obtain ⟨_, rfl, _⟩ := bool_fields payload
-      exact False.elim (notBoolean trivial)
-  | branch conditionTrace branchTrace conditionSmaller bodySmaller =>
-    exact ⟨rfl, restored environment _, selected conditionTrace branchTrace conditionSmaller bodySmaller⟩
+  obtain ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.conditional_preserves_at_with (functions := functions) (program := program) (evidence := evidence)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (staticCondition := fun _ _ => True)
+      validity budget size bounded unique (fun child childBound context valid => Compatibility.legacy_expression_preserves functions program evidence transport (expressionPreserves child childBound context valid))
+      found form conditionFound _conditionType conditionTree
+      (fun child childBound => Compatibility.legacy_preserves functions program evidence transport (thenCorrect child childBound))
+      (fun child childBound => Compatibility.legacy_preserves functions program evidence transport (elseCorrect child childBound))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial trace
+  exact ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluation, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 include transport in
 theorem conditional_preserves_at (budget size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)

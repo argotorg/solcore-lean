@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeControlBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
 
 /-! Original native children select the bounded reflected head and tail.
@@ -33,13 +34,14 @@ theorem block_reflects_at_with (validity : SourceSemantics.Context → Prop) (bu
       size (scope := scope) id expected type code := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  obtain ⟨sourceSize, innerContext, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+  obtain ⟨sourceSize, innerContext, outcome, after, finalMap, finalWorld, innerTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩ :=
     inner size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  refine ⟨SourceExecutionSize.stepSize [sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
-    ?_, restored environment outcome, restore_rep represented environment, finalHeaps, maps, worlds, frame, metadata⟩
-  cases trace with
-  | control trace => exact .control (.block (lookupStatement?_sound found) form trace)
-  | fault failed => exact .fault (.block (lookupStatement?_sound found) form failed)
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, restores, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.block_reflects_at_with_state (canonical := canonical) (functions := functions) (program := program) (evidence := evidence)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol (fun _ _ _ _ _ _ => True)) budget size found form ⟨trivial⟩
+      ⟨sourceSize, innerContext, outcome, after, finalMap, finalWorld, innerTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical,
+        ⟨⟨trivial⟩, trivial⟩⟩
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, restores, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 theorem block_reflects_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {id : StatementId} {node : StatementNode} {statements : List StatementId}
@@ -72,59 +74,14 @@ theorem sequence_reflects_at_with (validity : SourceSemantics.Context → Prop) 
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  rw [LoopRenaming.sequence] at evaluated
-  obtain ⟨headSize, middleStore, headValue, headSmaller, headEval⟩ := evaluated.bind_computation
-  obtain ⟨sourceHeadSize, outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
-    first headSize (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid
-      environments heaps locals agrees actualTyped reference read unmapped installed headEval
-  cases represented with
-  | fallthrough next =>
-    have same := restores next rfl
-    subst next
-    cases headTrace with | control headTrace =>
-      obtain ⟨tailSize, tailSmaller, tailEval⟩ := evaluated.sequence_fallthrough headEval.sound
-      obtain ⟨sourceTailSize, finalContext, outcome, after, finalMap, finalWorld, tailTrace, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
-        remaining tailSize (Nat.le_of_lt (Nat.lt_of_lt_of_le tailSmaller bounded)) valid
-          (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-          (GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix
-            (GenericExpressionMeaning.agree_prefix agrees (.inLeft LocalLoop.transferType (.inLeft type .unit))) (.inLeft type .unit)) .unit)
-          (.cons .unit (.cons (.inLeft .unit) (.cons (.inLeft (.inLeft .unit)) (actualTyped.weaken worlds)))) reference
-          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-          (transport.extend installed maps worlds frame metadata)
-          (by simpa only [GenericExpressionMeaning.rename_prefix] using tailEval)
-      obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-        (prepend (lookupStatement?_sound found) (fun _ _ => notTail) headTrace.sound tailTrace.sound)
-      exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace,
-        represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
-  | returned payload =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_returned _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.returned _))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .returned payload, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | breaking next =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_transfer _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.breaking next))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .breaking next, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | continuing next =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_transfer _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.continuing next))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .continuing next, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | fault matched =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_failure _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.fault _))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .fault matched, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical, _⟩ :=
+    Stateful.sequence_reflects_at_with (functions := functions) (program := program) (evidence := evidence)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (staticCondition := fun _ _ => True)
+      validity budget size bounded found notTail
+      (fun child childBound => Compatibility.legacy_head_reflects functions program evidence transport (first child childBound))
+      (fun child childBound => Compatibility.legacy_reflects functions program evidence transport (remaining child childBound))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial evaluated
+  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩
 
 variable {expressions : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
 
@@ -161,42 +118,15 @@ private theorem sequence_stopped_reflects_at_with (validity : SourceSemantics.Co
       size (scope := scope) mode (id :: rest) expected type (LocalLoop.sequence type head body) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  rw [LoopRenaming.sequence] at evaluated
-  obtain ⟨headSize, middleStore, headValue, headSmaller, headEval⟩ := evaluated.bind_computation
-  obtain ⟨sourceHeadSize, outcome, middle, middleMap, middleWorld, headTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
-    first headSize (Nat.le_of_lt (Nat.lt_of_lt_of_le headSmaller bounded)) valid
-      environments heaps locals agrees actualTyped reference read unmapped installed headEval
-  cases represented with
-  | fallthrough next =>
-    cases headTrace with | control headTrace => cases stops headTrace.sound
-  | returned payload =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_returned _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.returned _))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .returned payload, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | breaking next =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_transfer _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.breaking next))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .breaking next, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | continuing next =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_transfer _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.continuing next))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .continuing next, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
-  | fault matched =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalLoop.sequence_failure _ headEval.sound)
-    obtain ⟨sourceSize, trace⟩ := ExecutesAt.has_size
-      (TypedLexicalWhile.terminal_outcome program evidence found notTail headTrace.sound (.fault _))
-    exact ⟨sourceSize, context, _, middle, middleMap, middleWorld, trace,
-      .fault matched, middleHeaps, maps, worlds, frame, metadata,
-      _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
+  obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical, _⟩ :=
+    Stateful.sequence_stopped_reflects_at_with_state (canonical := canonical) (functions := functions) (program := program) (evidence := evidence)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol (fun _ _ _ _ _ _ => True)) validity budget size bounded found notTail environments locals ⟨trivial⟩
+      (fun child childBound {_ _} headTrace => by
+        obtain ⟨sourceSize, outcome, after, middleMap, middleWorld, sourceTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
+          first child childBound valid environments heaps locals agrees actualTyped reference read unmapped installed headTrace
+        exact ⟨sourceSize, outcome, after, middleMap, middleWorld, sourceTrace, restores, represented, middleHeaps, maps, worlds, frame, metadata, ⟨⟨trivial⟩, trivial⟩⟩)
+      stops evaluated
+  exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, lexical⟩
 
 private theorem sequence_stopped_reflects_at (budget size : Nat) (bounded : size ≤ budget)
     {scope : Scope} {mode : Bool} {id : StatementId} {node : StatementNode}
@@ -232,52 +162,15 @@ theorem conditional_reflects_at_with (validity : SourceSemantics.Context → Pro
       size (scope := scope) id expected type (LocalLoop.conditional type conditionCode thenCode elseCode) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  rw [LoopRenaming.conditional] at evaluated
-  obtain ⟨conditionSize, middleStore, conditionValue, conditionSmaller, conditionEval⟩ := evaluated.bind_computation
-  obtain ⟨sourceConditionSize, conditionOutcome, middle, middleMap, middleWorld, conditionTrace, represented, middleHeaps, maps, worlds, frame, metadata⟩ :=
-    expressionReflects conditionSize (Nat.le_of_lt (Nat.lt_of_lt_of_le conditionSmaller bounded)) context valid conditionTree conditionFound
-      environments heaps locals agrees actualTyped installed conditionEval
-  cases represented with
-  | fault matched =>
-    cases conditionTrace with
-    | fault failed =>
-      obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (LocalControl.choose_failure _ conditionEval.sound)
-      obtain ⟨sourceSize, trace⟩ := StatementOutcome.has_size
-        (Dynamic.StatementExecutesOutcome.fault (Dynamic.StatementFaults.ifCondition (lookupStatement?_sound found) form failed.sound))
-      exact ⟨sourceSize, _, middle, middleMap, middleWorld, trace,
-        (by intro next impossible; cases impossible), .fault matched, middleHeaps, maps, worlds, frame, metadata⟩
-  | value payload =>
-    cases conditionTrace with
-    | value conditionTrace =>
-      obtain ⟨boolean, sourceEq, coreEq⟩ := bool_fields payload
-      subst sourceEq
-      subst coreEq
-
-      obtain ⟨branchSize, branchSmaller, branchEval⟩ :
-          ∃ branchSize, branchSize < size ∧ EvaluationSize branchSize (.bool boolean :: actual) middleStore
-            ((if boolean then thenCode else elseCode).rename ξ |>.weakenAt 0) value finalStore := by
-        cases boolean with
-        | false => exact evaluated.choose_false conditionEval.sound
-        | true => exact evaluated.choose_true conditionEval.sound
-      have branchCorrect : ReflectsAtWith (validity := validity) (administrative := administrative) (entry := entry) functions program evidence (source := source) (context := context)
-          (registry := registry) (faults := faults)  (frameLayout := frameLayout) (globals := globals)
-          branchSize (scope := scope) false (if boolean then thenBody else elseBody.getD []) expected type (if boolean then thenCode else elseCode) := by
-        cases boolean <;> first
-          | exact thenCorrect branchSize (Nat.le_of_lt (Nat.lt_of_lt_of_le branchSmaller bounded))
-          | exact elseCorrect branchSize (Nat.le_of_lt (Nat.lt_of_lt_of_le branchSmaller bounded))
-      obtain ⟨sourceBranchSize, innerContext, outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, _⟩ :=
-        branchCorrect valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-          (GenericExpressionMeaning.agree_prefix agrees (.bool boolean)) (.cons .bool (actualTyped.weaken worlds)) reference
-          ((frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-          (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-          (transport.extend installed maps worlds frame metadata)
-          (by simpa only [GenericExpressionMeaning.rename_prefix] using branchEval)
-      obtain ⟨sourceSize, trace⟩ := StatementOutcome.has_size
-        (selected_intro program evidence found form conditionTrace.sound branchTrace.sound)
-      exact ⟨sourceSize, Dynamic.restoreControl environment outcome, after, finalMap, finalWorld,
-        trace, restored environment outcome,
-        restore_rep represented environment, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds,
-        frame.trans lastFrame, metadata.trans lastMetadata⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, restores, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ :=
+    Stateful.conditional_reflects_at_with (functions := functions) (program := program) (evidence := evidence)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (staticCondition := fun _ _ => True)
+      validity budget size bounded (fun child childBound context valid => Compatibility.legacy_expression_reflects functions program evidence transport (expressionReflects child childBound context valid))
+      found form conditionFound _conditionType conditionTree
+      (fun child childBound => Compatibility.legacy_reflects functions program evidence transport (thenCorrect child childBound))
+      (fun child childBound => Compatibility.legacy_reflects functions program evidence transport (elseCorrect child childBound))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, restores, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 include transport in
 theorem conditional_reflects_at (budget size : Nat) (bounded : size ≤ budget)
