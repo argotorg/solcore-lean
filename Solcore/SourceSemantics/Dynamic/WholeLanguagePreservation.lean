@@ -3479,3 +3479,32 @@ theorem _root_.Solcore.SourceSemantics.ProgramWellFormed.wholeLanguagePreservati
 }
 
 end Solcore.SourceSemantics.Dynamic
+
+namespace Solcore.SourceSemantics.Dynamic
+open Frontend SourceInference TypeSystem
+
+namespace FunctionStatementsExecute
+
+/-- The original function-statement preservation core applies to this exact
+Source execution, including its implicit final expression. -/
+theorem preserved
+    {program : Program} (wellFormed : ProgramWellFormed program)
+    {context staticFinalContext runtimeFinalContext : Context}
+    {evidence : EvidenceEnvironment} {source : TypedSource}
+    {environment : Environment} {before after : Heap}
+    {statements : List StatementId} {outcome : ControlOutcome}
+    {control : ControlContext} {facts : BodyFacts}
+    (runtime : SourceRuntimeValid program context source)
+    (covers : evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment)
+    (heap : HeapWellTyped context before)
+    (typing : StatementsHaveType source control context statements staticFinalContext facts)
+    (completes : BodyCompletes control.returnType facts)
+    (execution : FunctionStatementsExecute program context evidence source environment
+      before statements runtimeFinalContext outcome after) :
+    StatementEvaluationPreserved context staticFinalContext control.returnType before after outcome :=
+  preserveFunctionStatementsRec wellFormed runtime covers locals heap typing completes execution
+
+end FunctionStatementsExecute
+
+end Solcore.SourceSemantics.Dynamic
