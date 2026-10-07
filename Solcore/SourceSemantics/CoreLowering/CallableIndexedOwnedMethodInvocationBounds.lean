@@ -558,12 +558,81 @@ def NativeContinuation (budget : Nat) : Prop :=
       (conditionGate := CallableIndexedOwnedAllocationProducer.StableOwner keys)
       functions program (prefix_entry_origin generation profile functions escaped extend runtimeOf entry reached gate))
 
+/-- Actual hook ownership and the original named ghost accompany the complete
+Source parameter post. The original caller relation and every prefix field are
+available before selecting that actual body's continuation. -/
+def SourceContinuationWithHistory (budget : Nat) : Prop :=
+  ∀ (originId : Word) (index : Int) (metadata : MetadataState)
+    (_selected : compiled.indexed.ancestry.graph.inputs.callable.table.idAt?
+      (.named named.signature.key) = some originId)
+    (history : Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
+      (.state index) (.named originId) (some metadata))
+    (_emitted : generation.output = withFrame (.var (compiled.indexed.base.globals.length + 1))
+      (SourceCoreCallableIndexedDispatch.literal compiled.indexed.ancestry.layout.frame (.state index)) generation.parameterCode)
+    (entry : ParameterEntry compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
+      owner.key.frameLocation (.state index) (.initial compiled.compatible.checked) functions registry
+      (methodFunction generation sourceBody dictionary) profile.context named.inputs arguments before
+      (store.set owner.key.frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index))) mapping world
+      administrative (.unit :: compiled.indexed.ancestry.layout.frame.type :: named.signature.parameterType :: installed.capturedContext)
+      (.unit :: encode compiled.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current ::
+        DataPatternValues.packValues payloads :: installed.captured)
+      (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) installed.embedding.lift))
+      generation.parameterCode generation.body)
+    (added : Environment), added.length = named.inputs.length →
+    entry.canonical = added ++ DataPatternValues.packValues payloads :: installed.canonical →
+  ∀ (reached : State headers keys ⟨named.inputs.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩),
+    Relates caller reached →
+    Below budget (CallableRuntimeBodyEntryContracts.PreservesAt
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (protocol := protocol headers keys)
+      (conditionGate := CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      functions program (parameter_entry_origin generation profile functions escaped extend runtimeOf entry reached
+        (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)))
+
+/-- Native inversion supplies the same actual hook history, measured prefix,
+body completion and saved-frame write. The independent Source body contract is
+selected at that exact reached parameter pool. -/
+def NativeContinuationWithHistory (budget : Nat) : Prop :=
+  ∀ (originId : Word) (index : Int) (metadata : MetadataState) (prefixSize : Nat) (bodyStore : Store)
+    (_selected : compiled.indexed.ancestry.graph.inputs.callable.table.idAt?
+      (.named named.signature.key) = some originId)
+    (history : Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
+      (.state index) (.named originId) (some metadata))
+    (_prefixWithin : prefixSize < budget)
+    {value : Value} {finalStore : Store}
+    (_restored : finalStore = bodyStore.set owner.key.frameLocation
+      (encode compiled.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current))
+    (entry : Prefix compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length
+      owner.key.frameLocation (.state index) (.initial compiled.compatible.checked) functions registry
+      (methodFunction generation sourceBody dictionary) profile.context named.inputs arguments before
+      (store.set owner.key.frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index))) mapping world
+      administrative (.unit :: compiled.indexed.ancestry.layout.frame.type :: named.signature.parameterType :: installed.capturedContext)
+      (.unit :: encode compiled.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current ::
+        DataPatternValues.packValues payloads :: installed.captured)
+      (Renaming.comp (Renaming.insertion 0) (Renaming.comp (Renaming.insertion 0) installed.embedding.lift))
+      generation.parameterCode generation.body prefixSize value bodyStore)
+    (added : Environment), added.length = named.inputs.length →
+    entry.canonical = added ++ DataPatternValues.packValues payloads :: installed.canonical →
+  ∀ (reached : State headers keys ⟨named.inputs.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩),
+    Relates caller reached →
+    Below budget (CallableRuntimeBodyEntryContracts.ReflectsAt
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (protocol := protocol headers keys)
+      (conditionGate := CallableIndexedOwnedAllocationProducer.StableOwner keys)
+      functions program (prefix_entry_origin generation profile functions escaped extend runtimeOf entry reached
+        (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)))
+
 include profile installed represented sameFrame heaps in
 /-- Independent source method invocation selects its genuine strict body
 child. Actual parameters enter the origin-neutral body family, and restoration
 uses that body's reached pool, retaining every complete ordered row list. -/
-theorem invocation_preserves_bounded_at (budget : Nat)
-    (bodyMeaning : SourceContinuation (program := program) (headers := headers) (keys := keys)
+theorem invocation_preserves_bounded_at_with_history (budget : Nat)
+    (bodyMeaning : SourceContinuationWithHistory (program := program) (headers := headers) (keys := keys)
+      (owner := owner) (caller := caller)
       (arguments := arguments) (payloads := payloads) generation profile functions escaped extend runtimeOf installed budget)
     {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size sourceBody dictionary before arguments outcome after)
@@ -585,7 +654,7 @@ theorem invocation_preserves_bounded_at (budget : Nat)
   obtain ⟨child, environment, bound, allocated, bodyTrace, smaller⟩ :=
     RecursiveNamedCallBounds.body_trace_of_fields profile.sourceFrame.source profile.sourceFrame.context
       profile.sourceFrame.parameters profile.sourceFrame.result profile.sourceFrame.roots profile.extended arity trace
-  obtain ⟨originId, index, metadata, _owned, history, emitted, entry, added, length, spine, parameterState, parameterRelated⟩ :=
+  obtain ⟨originId, index, metadata, owned, history, emitted, entry, added, length, spine, parameterState, parameterRelated⟩ :=
     parameters_with_state generation profile functions installed represented owner caller sameFrame heaps
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
@@ -593,8 +662,7 @@ theorem invocation_preserves_bounded_at (budget : Nat)
     (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)
   obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
     bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
-    bodyMeaning entry added length spine parameterState
-      (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)
+    bodyMeaning originId index metadata owned history emitted entry added length spine parameterState parameterRelated
       child (Nat.lt_of_lt_of_le smaller within) bodyTrace
   have prefixEvaluation := entry.agreement.wrap bodyEvaluation
   rw [rename_prefix] at prefixEvaluation
@@ -625,6 +693,33 @@ theorem invocation_preserves_bounded_at (budget : Nat)
   refine ⟨value, _, finalMap, finalWorld, ?_, result, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
   exact renamed.symm ▸ evaluated
 
+include profile installed represented sameFrame heaps in
+/-- Independent source method invocation selects its genuine strict body
+child. Actual parameters enter the origin-neutral body family, and restoration
+uses that body's reached pool, retaining every complete ordered row list. -/
+theorem invocation_preserves_bounded_at (budget : Nat)
+    (bodyMeaning : SourceContinuation (program := program) (headers := headers) (keys := keys)
+      (arguments := arguments) (payloads := payloads) generation profile functions escaped extend runtimeOf installed budget)
+    {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.BodyOutcome program size sourceBody dictionary before arguments outcome after)
+    (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (DataPatternValues.packValues payloads :: installed.captured) store
+        (generation.output.rename installed.embedding.lift) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld sourceBody.resultType named.signature.resultType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
+  exact invocation_preserves_bounded_at_with_history generation profile functions escaped extend runtimeOf installed represented
+    owner caller sameFrame heaps budget
+    (fun _originId _index _metadata _selected history _emitted entry added length spine reached _related =>
+      bodyMeaning entry added length spine reached
+        (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history))
+    trace within
+
 include profile in
 private theorem body_of_trace_sized {size : Nat} {environment : Dynamic.Environment} {bound after : Dynamic.Heap}
     {outcome : Dynamic.ExpressionOutcome}
@@ -637,6 +732,49 @@ private theorem body_of_trace_sized {size : Nat} {environment : Dynamic.Environm
   | unit same executed => exact .value (.unit profile.sourceFrame.covers same profile.sourceFrame.roots profile.extended allocated executed ⟨_, rfl⟩)
   | fault failed => exact .fault (.statements profile.sourceFrame.roots profile.extended allocated failed)
   | escaped executed escape => exact .fault (.controlEscape profile.sourceFrame.roots profile.extended allocated executed escape)
+
+include profile installed represented sameFrame heaps in
+/-- Native hook reflection consumes its actual parameter and body witnesses.
+The independent source method grade and full dictionary are reconstructed;
+the completed body pool supplies every record retained by caller restoration. -/
+theorem invocation_reflects_bounded_at_with_history (budget : Nat)
+    (bodyMeaning : NativeContinuationWithHistory (program := program) (headers := headers) (keys := keys)
+      (owner := owner) (caller := caller)
+      (arguments := arguments) (payloads := payloads) generation profile functions escaped extend runtimeOf installed budget)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size (DataPatternValues.packValues payloads :: installed.captured) store
+      (generation.output.rename installed.embedding.lift) value finalStore) (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyOutcome program sourceSize sourceBody dictionary before arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld sourceBody.resultType named.signature.resultType faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
+  obtain ⟨originId, index, metadata, prefixSize, bodyStore, owned, history, strict, restored,
+    entry, added, length, spine, parameterState, parameterRelated⟩ :=
+    body_prefix_with_state generation profile functions installed represented owner caller sameFrame heaps completed
+  let actualEntry := prefix_entry_origin generation profile functions escaped extend runtimeOf entry parameterState
+    (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps,
+    bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
+    bodyMeaning originId index metadata prefixSize bodyStore owned history
+      (Nat.lt_of_lt_of_le strict within) restored entry added length spine parameterState parameterRelated
+      entry.childSize (Nat.lt_of_le_of_lt entry.bounded (Nat.lt_of_lt_of_le strict within)) entry.completed
+  have maps := entry.maps.trans bodyMaps
+  have worlds := entry.worlds.trans bodyWorlds
+  have frame := entry.frame.trans bodyFrame
+  have sourceMetadata := entry.metadata.trans bodyMetadata
+  have related : Relates caller bodyState := parameterRelated.trans bodyRelated
+  obtain ⟨restoredHeaps, restoredFrame, _cell, _bodyRelated, _callerRelated, _records, returned⟩ :=
+    CallableIndexedOwnedBodyRestoration.restore_return caller bodyState owner.position profile.registered
+      finalHeaps worlds frame related
+  subst finalStore
+  exact ⟨_, outcome, after, finalMap, finalWorld,
+    body_of_trace_sized generation profile entry.allocation bodyTrace,
+    result, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
 
 include profile installed represented sameFrame heaps in
 /-- Native hook reflection consumes its actual parameter and body witnesses.
@@ -657,28 +795,13 @@ theorem invocation_reflects_bounded_at (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition (protocol headers keys) caller
         ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
-  obtain ⟨originId, index, metadata, prefixSize, bodyStore, _owned, history, strict, restored,
-    entry, added, length, spine, parameterState, parameterRelated⟩ :=
-    body_prefix_with_state generation profile functions installed represented owner caller sameFrame heaps completed
-  let actualEntry := prefix_entry_origin generation profile functions escaped extend runtimeOf entry parameterState
-    (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps,
-    bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
-    bodyMeaning entry added length spine parameterState
-      (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history)
-      entry.childSize (Nat.lt_of_le_of_lt entry.bounded (Nat.lt_of_lt_of_le strict within)) entry.completed
-  have maps := entry.maps.trans bodyMaps
-  have worlds := entry.worlds.trans bodyWorlds
-  have frame := entry.frame.trans bodyFrame
-  have sourceMetadata := entry.metadata.trans bodyMetadata
-  have related : Relates caller bodyState := parameterRelated.trans bodyRelated
-  obtain ⟨restoredHeaps, restoredFrame, _cell, _bodyRelated, _callerRelated, _records, returned⟩ :=
-    CallableIndexedOwnedBodyRestoration.restore_return caller bodyState owner.position profile.registered
-      finalHeaps worlds frame related
-  subst finalStore
-  exact ⟨_, outcome, after, finalMap, finalWorld,
-    body_of_trace_sized generation profile entry.allocation bodyTrace,
-    result, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
+  exact invocation_reflects_bounded_at_with_history generation profile functions escaped extend runtimeOf installed represented
+    owner caller sameFrame heaps budget
+    (fun _originId _index _metadata _prefixSize _bodyStore _selected history _prefixWithin {_value} {_finalStore}
+      _restored entry added length spine reached _related =>
+      bodyMeaning entry added length spine reached
+        (CallableIndexedOwnedAllocationProducer.stableOwner_selected owner.position history))
+    completed within
 
 include profile installed represented sameFrame heaps in
 /-- Independent source method invocation selects its genuine strict body
