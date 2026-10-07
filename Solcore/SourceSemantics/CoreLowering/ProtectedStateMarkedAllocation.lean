@@ -61,6 +61,31 @@ structure Producer (protocol : Protocol.{u, v} Records)
             SourceCoreHeapMarkers.markerValue allocation.entry.layout captured, optionalValue request.payloadType payload],
           .cellRef (OptionalCell.cellType request.payloadType) (store.length + 2) :: canonical⟩
 
+/-- The compatibility producer observes the actual proved administrative effects.
+It preserves the complete input record observation and adds no snapshot record. -/
+def of_administrative (protocol : Protocol.{u, v} Records)
+    (transport : AdministrativeTransport protocol) (bindings : Bindings protocol)
+    (layouts : SourceCoreAllocationLayouts.Prepared) (layout : SourceCoreCallableIndexedFrames.Layout)
+    (model : GenericHeap.PayloadModel catalog projects nativeDefinitions) : Producer protocol layouts layout model where
+  Ready _ _ _ := True
+  complete := by
+    intro owner active request globals allocate allocation annotation same definitions registered
+      mapping world administrative environment canonical actual before after store contextLocation native sourceType payload sourceValue sourceLocation
+      environments agrees heaps reference read payloadAt cell allocated initial _ready
+    obtain ⟨captured, captures, capturedTyped, evaluated, finalHeaps, finalReference, frame⟩ :=
+      CallableIndexedOrdinaryAllocation.preserves_with_captures_for_type allocation annotation same definitions registered
+        environments agrees heaps reference read payloadAt cell allocated
+    let extended := transport.extend initial
+      (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩)
+      (show WorldExtends world (world ++ [layout.type, allocation.entry.layout.type, OptionalCell.cellType request.payloadType]) from ⟨_, rfl⟩)
+      frame (Dynamic.HeapMetadataExtend.of_allocation allocated)
+    refine ⟨captured, captures, capturedTyped, evaluated, finalHeaps, finalReference, frame,
+      bindings.prepend extended request.binder.id request.payloadType
+        (.cellRef (OptionalCell.cellType request.payloadType) (store.length + 2)), ?_⟩
+    exact protocol.trans
+      (transport.related initial _ _ frame (Dynamic.HeapMetadataExtend.of_allocation allocated))
+      (bindings.prepend_related extended _ _ _)
+
 /-- A source binder is the declaration-type instance of the same producer. -/
 def Producer.toOrdinary {protocol : Protocol.{u, v} Records}
     {layouts : SourceCoreAllocationLayouts.Prepared} {layout : SourceCoreCallableIndexedFrames.Layout}
