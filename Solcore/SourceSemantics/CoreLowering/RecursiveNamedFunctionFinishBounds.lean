@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLoopContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexical
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateLexicalGate
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateFunctionFinishReady
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchFallthrough
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
@@ -70,6 +71,58 @@ private theorem emitted : code = CompatibleStatements.finish type flow fellThrou
   exact Except.ok.inj accepted.symm
 
 include tree projection unique escapedFault in
+theorem WithReady.preserves_at_emitted_with_state_when {Records : Type v}
+    (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (readiness : RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness protocol)
+    (condition : Location → CallableIndexedHistory.NativeFrame → Prop)
+    (facts : SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop) (emitted : code = CompatibleStatements.finish type flow fellThrough escaped) (validity : SourceSemantics.Context → Prop) (size : Nat)
+    (meaning : RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith protocol readiness condition facts functions program function.evidence validity
+      (source := function.source) (context := context) (registry := registry) (faults := faults)
+      (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+      size (scope := scope) true function.body function.resultType type flow)
+    (valid : validity context) (bodyFacts : facts context true function.body function.resultType)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {outcome : Dynamic.ExpressionOutcome}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (gate : condition contextLocation native) (ready : readiness.Ready context initial)
+    (trace : BodyTrace program size function context environment before outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧
+      ProtectedStateTransition.FunctionFinish.Reached readiness context outcome initial
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  obtain ⟨finalContext, control, trace, exit⟩ := trace_flow trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical, reached, retained, post⟩ :=
+    meaning valid bodyFacts environments heaps locals agrees typed reference read unmapped initial gate ready trace
+  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
+    cases same
+    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
+    projection fellThrough escaped escapedFault represented evaluated
+  have evaluated : Evaluates actual store (code.rename ξ) result finalStore := by
+    rw [emitted, ImperativeFunctionFinish.rename]
+    exact completed
+  exact ⟨result, finalStore, finalMap, finalWorld, evaluated, ImperativeFunctionFinish.result related exit,
+    finalHeaps, maps, worlds, frame, metadata, ⟨finalContext, control, trace.sound, exit, lexical⟩,
+    ⟨reached, retained, ProtectedStateTransition.FunctionFinish.post_of_exit exit post⟩⟩
+
+
+include tree projection unique escapedFault in
 theorem preserves_at_emitted_with_state_when {Records : Type v}
     (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (condition : Location → CallableIndexedHistory.NativeFrame → Prop) (emitted : code = CompatibleStatements.finish type flow fellThrough escaped) (validity : SourceSemantics.Context → Prop) (size : Nat)
@@ -104,20 +157,16 @@ theorem preserves_at_emitted_with_state_when {Records : Type v}
         context scope environment before after outcome ∧
       ProtectedStateTransition.Transition protocol initial
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  obtain ⟨finalContext, control, trace, exit⟩ := trace_flow trace
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical, transition⟩ :=
-    meaning valid environments heaps locals agrees typed reference read unmapped initial gate trace
-  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
-    cases same
-    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
-    projection fellThrough escaped escapedFault represented evaluated
-  have evaluated : Evaluates actual store (code.rename ξ) result finalStore := by
-    rw [emitted, ImperativeFunctionFinish.rename]
-    exact completed
-  exact ⟨result, finalStore, finalMap, finalWorld, evaluated, ImperativeFunctionFinish.result related exit,
-    finalHeaps, maps, worlds, frame, metadata, ⟨finalContext, control, trace.sound, exit, lexical⟩,
-    transition⟩
-
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical, reached⟩ :=
+    WithReady.preserves_at_emitted_with_state_when (functions := functions) (program := program)
+      (tree := tree) (projection := projection) (unique := unique) (escapedFault := escapedFault)
+      protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) condition
+      (fun _ _ _ _ => True) emitted validity size
+      (RecursiveNamedImperativeFor.Control.Stateful.WithReady.PreservesAtWith.of_true
+        protocol condition functions program function.evidence meaning) valid True.intro
+      environments heaps locals agrees typed reference read unmapped initial gate True.intro trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, lexical,
+    ProtectedStateTransition.FunctionFinish.Reached.forget reached⟩
 
 include tree projection unique escapedFault in
 theorem preserves_at_emitted_with_state {Records : Type v}
@@ -237,6 +286,82 @@ theorem preserves_at_with (validity : SourceSemantics.Context → Prop) (size : 
   all_goals assumption
 
 include tree projection unique escapedFault in
+theorem WithReady.reflects_at_emitted_with_state_when {Records : Type v}
+    (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (readiness : RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness protocol)
+    (condition : Location → CallableIndexedHistory.NativeFrame → Prop)
+    (facts : SourceSemantics.Context → Bool → List StatementId → TypeSystem.Ty → Prop) (emitted : code = CompatibleStatements.finish type flow fellThrough escaped) (validity : SourceSemantics.Context → Prop) (budget size : Nat) (within : size ≤ budget)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun child =>
+      RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith protocol readiness condition facts functions program function.evidence validity
+        (source := function.source) (context := context) (registry := registry) (faults := faults)
+        (frameLayout := frameLayout) (globals := globals) (administrative := administrative)
+        child (scope := scope) true function.body function.resultType type flow))
+    (valid : validity context) (bodyFacts : facts context true function.body function.resultType)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frameLayout.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frameLayout native))
+    (unmapped : contextLocation ∉ mapping) (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (gate : condition contextLocation native) (ready : readiness.Ready context initial)
+    (evaluated : EvaluationSize size actual store (code.rename ξ) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      BodyTrace program sourceSize function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      TypedMixedNamedBody.ReachedExit values.checked ambient.definitions finalMap finalWorld administrative program function
+        context scope environment before after outcome ∧
+      ProtectedStateTransition.FunctionFinish.Reached readiness context outcome initial
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  rw [emitted, ImperativeFunctionFinish.rename] at evaluated
+  obtain ⟨flowSize, flowValue, middleStore, smaller, flowEval⟩ := RecursiveNamedCallBounds.finish_flow evaluated
+  obtain ⟨sourceSize, finalContext, control, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical, reached, retained, post⟩ :=
+    meaning flowSize (Nat.lt_of_lt_of_le smaller within) valid bodyFacts
+      environments heaps locals agrees typed reference read unmapped initial gate ready flowEval
+  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
+    cases same
+    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
+    projection fellThrough escaped escapedFault represented flowEval.sound
+  obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound completed
+  have sourceResult : ∃ outcome, BodyTrace program sourceSize function context environment before outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        finalMap finalWorld function.resultType type faults outcome value ∧
+      CompatibleNamedBody.Exit function.resultType control outcome := by
+    generalize raw : function.resultType = expected at related
+    cases related with
+    | fallthrough finalEnvironment =>
+      cases trace with
+      | control executed => exact ⟨_, .unit raw executed, .value .unit, .unit _ rfl⟩
+    | returned payload =>
+      cases trace with
+      | control executed => exact ⟨_, .returned executed, .value payload, .returned _⟩
+    | fault matched =>
+      cases trace with
+      | control executed => exact False.elim (tree.control_not_fault unique executed.sound)
+      | fault failed => exact ⟨_, .fault failed, .fault matched, .fault _⟩
+    | breaking finalEnvironment matched =>
+      cases trace with
+      | control executed => exact ⟨_, .escaped executed (.inl ⟨_, rfl⟩), .fault matched, .breaking _⟩
+    | continuing finalEnvironment matched =>
+      cases trace with
+      | control executed => exact ⟨_, .escaped executed (.inr ⟨_, rfl⟩), .fault matched, .continuing _⟩
+  obtain ⟨outcome, bodyTrace, represented, exit⟩ := sourceResult
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, represented, finalHeaps, maps, worlds, frame, metadata,
+    ⟨finalContext, control, trace.sound, exit, lexical⟩,
+    ⟨reached, retained, ProtectedStateTransition.FunctionFinish.post_of_exit exit post⟩⟩
+
+
+include tree projection unique escapedFault in
 theorem reflects_at_emitted_with_state_when {Records : Type v}
     (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (condition : Location → CallableIndexedHistory.NativeFrame → Prop) (emitted : code = CompatibleStatements.finish type flow fellThrough escaped) (validity : SourceSemantics.Context → Prop) (budget size : Nat) (within : size ≤ budget)
@@ -272,42 +397,16 @@ theorem reflects_at_emitted_with_state_when {Records : Type v}
         context scope environment before after outcome ∧
       ProtectedStateTransition.Transition protocol initial
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  rw [emitted, ImperativeFunctionFinish.rename] at evaluated
-  obtain ⟨flowSize, flowValue, middleStore, smaller, flowEval⟩ := RecursiveNamedCallBounds.finish_flow evaluated
-  obtain ⟨sourceSize, finalContext, control, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical, transition⟩ :=
-    meaning flowSize (Nat.lt_of_lt_of_le smaller within) valid
-      environments heaps locals agrees typed reference read unmapped initial gate flowEval
-  obtain ⟨result, completed, related⟩ := ImperativeFunctionFinish.from_flow functions (fun next same => by
-    cases same
-    exact GenericImperativeMatch.Tree.true_fallthrough_unit tree unique trace.sound)
-    projection fellThrough escaped escapedFault represented flowEval.sound
-  obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound completed
-  have sourceResult : ∃ outcome, BodyTrace program sourceSize function context environment before outcome after ∧
-      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-        finalMap finalWorld function.resultType type faults outcome value ∧
-      CompatibleNamedBody.Exit function.resultType control outcome := by
-    generalize raw : function.resultType = expected at related
-    cases related with
-    | fallthrough finalEnvironment =>
-      cases trace with
-      | control executed => exact ⟨_, .unit raw executed, .value .unit, .unit _ rfl⟩
-    | returned payload =>
-      cases trace with
-      | control executed => exact ⟨_, .returned executed, .value payload, .returned _⟩
-    | fault matched =>
-      cases trace with
-      | control executed => exact False.elim (tree.control_not_fault unique executed.sound)
-      | fault failed => exact ⟨_, .fault failed, .fault matched, .fault _⟩
-    | breaking finalEnvironment matched =>
-      cases trace with
-      | control executed => exact ⟨_, .escaped executed (.inl ⟨_, rfl⟩), .fault matched, .breaking _⟩
-    | continuing finalEnvironment matched =>
-      cases trace with
-      | control executed => exact ⟨_, .escaped executed (.inr ⟨_, rfl⟩), .fault matched, .continuing _⟩
-  obtain ⟨outcome, bodyTrace, represented, exit⟩ := sourceResult
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, represented, finalHeaps, maps, worlds, frame, metadata,
-    ⟨finalContext, control, trace.sound, exit, lexical⟩, transition⟩
-
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical, reached⟩ :=
+    WithReady.reflects_at_emitted_with_state_when (functions := functions) (program := program)
+      (tree := tree) (projection := projection) (unique := unique) (escapedFault := escapedFault)
+      protocol (RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol) condition
+      (fun _ _ _ _ => True) emitted validity budget size within
+      (fun child smaller => RecursiveNamedImperativeFor.Control.Stateful.WithReady.ReflectsAtWith.of_true
+        protocol condition functions program function.evidence (meaning child smaller)) valid True.intro
+      environments heaps locals agrees typed reference read unmapped initial gate True.intro evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, lexical,
+    ProtectedStateTransition.FunctionFinish.Reached.forget reached⟩
 
 include tree projection unique escapedFault in
 theorem reflects_at_emitted_with_state {Records : Type v}
