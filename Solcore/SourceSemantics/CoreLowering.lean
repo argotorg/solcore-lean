@@ -679,6 +679,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaSourceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodBuiltinBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceAdmission
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
