@@ -768,6 +768,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceOrigin
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyReadyCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyReadyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceBodyReadyBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedReadyContinuations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyNamedExpressionHeads
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
