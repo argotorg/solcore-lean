@@ -198,6 +198,143 @@ open GenericImperativeFor (Tree Position)
 open RecursiveNamedBoundedContracts (Below)
 open RecursiveNamedHeaderContracts (AtMost)
 open TypedLexicalControl (allocate_absent allocate_initialized sequence_rename valid_extend)
+namespace Stateful
+open ProtectedStateTransition
+universe u v
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  (conditionGate : Location → CallableIndexedHistory.NativeFrame → Prop)
+  {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+  {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+  {values : ValuesContext} {source : TypedSource} {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
+  {registry : SourceCoreRawMetadata.Registry} (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep} {identities : Dynamic.Value → Word → Prop}
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  (producer : OrdinaryAllocation.Producer protocol layouts frame (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+  (acquire : ∀ location native, conditionGate location native → OrdinaryAllocation.ReadyAt producer location native)
+  (stateTransport : AdministrativeTransport protocol) (stateBindings : Bindings protocol)
+  (validity : SourceSemantics.Context → Prop)
+  (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+    validity context → BinderExtends source.owner context binder next → validity next)
+  (budget : Nat)
+  {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+  {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
+  {expected : TypeSystem.Ty} {type : Ty} {code conditionCode postCode : Expr} {selfReason : Word}
+  (assignments : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentReflectsAt protocol functions (registry := registry)
+    program evidence source (certificates context) context administrative faults budget)
+  (reflection : ∀ context, validity context → Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol
+    (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults size))
+/-- Interpret one actual Header result and restore its selected final loop
+witness through the original binder receipt. Empty headers keep the inclusive
+native continuation grade. -/
+theorem header_reflects_at_with_result (size : Nat) (bounded : size ≤ budget)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    {continuation : SourceSemantics.Context → Scope → Expr → Prop}
+    (loopCorrect : ∀ {nextContext nextScope nextCode}, continuation nextContext nextScope nextCode →
+      AtMost budget (fun child => ProtectedFor.Body.Stateful.LoopReflectsAtFor protocol conditionGate functions program evidence
+        validity child (source := source) (context := nextContext) (registry := registry) (faults := faults)
+        (frameLayout := frame) (globals := globals) (administrative := administrative)
+        (scope := nextScope) condition post statements expected type nextCode))
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical : Environment}
+    {before : Dynamic.Heap} {store finalStore : Store} {contextLocation : Location} {native : CallableIndexedHistory.NativeFrame} {value : Value}
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (result : ProtectedForHeader.Stateful.ResultAtFor protocol conditionGate validity size registry functions program source solved evidence
+      administrative frame globals contextLocation native type faults continuation context environment
+      ⟨scope, mapping, world, before, store, canonical⟩ initial items value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedLoopContracts.StatementOutcome program sourceSize context evidence source environment before id context outcome after ∧
+      TypedLexicalWhile.Restored environment outcome ∧
+      FlowRep (registry := registry) functions finalMap finalWorld faults expected type outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  cases result with
+  | @continues initialSize remainingSize initialContext initialEnvironment initialized tail trace maps worlds frame metadata headerRelated returnReceipt remaining smaller =>
+    obtain ⟨returnTo⟩ := returnReceipt
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, loop, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+      (loopCorrect tail.certificate) _ (Nat.le_trans smaller bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate remaining
+    obtain ⟨loopState, loopRelated⟩ := loopTransition
+    refine ⟨SourceExecutionSize.stepSize [initialSize, sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld, ?_, restored environment outcome,
+      restore_rep represented environment, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
+      frame.trans loopFrame, metadata.trans loopMetadata,
+      ⟨returnTo.restore loopState, protocol.trans headerRelated (protocol.trans loopRelated (returnTo.related loopState))⟩⟩
+    cases loop with
+    | control loop => exact .control (.forLoop (lookupStatement?_sound found) form trace loop)
+    | fault loop => exact .fault (.forIteration (lookupStatement?_sound found) form trace loop)
+  | fault trace same matched heaps maps worlds frame metadata transition =>
+    subst value
+    exact ⟨_, _, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
+      (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
+
+include definitions registered observations producer acquire stateTransport stateBindings assignments reflection extend solved in
+theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    {continuation : SourceSemantics.Context → Scope → Expr → Prop}
+    (header : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type continuation context scope items code)
+    (errors : GenericForHeader.Tree.ReachableErrors registry faults header)
+    (loopCorrect : ∀ {nextContext nextScope nextCode}, continuation nextContext nextScope nextCode →
+      AtMost budget (fun child => ProtectedFor.Body.Stateful.LoopReflectsAtFor protocol conditionGate functions program evidence
+        validity child (source := source) (context := nextContext) (registry := registry) (faults := faults)
+        (frameLayout := frame) (globals := globals) (administrative := administrative)
+        (scope := nextScope) condition post statements expected type nextCode)) :
+    Control.Stateful.HeadReflectsAtWith protocol conditionGate (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      size (scope := scope) id expected type code := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped initial guarded evaluated
+  have result := ProtectedForHeader.Stateful.Tree.reflects_reachable_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments reflection header errors
+    valid environments heaps locals agrees actualTyped reference read unmapped initial guarded evaluated bounded
+  exact header_reflects_at_with_result (functions := functions) (program := program) (evidence := evidence)
+    (protocol := protocol) (conditionGate := conditionGate) (validity := validity) (budget := budget)
+    size bounded found form loopCorrect initial result
+
+include definitions registered observations producer acquire stateTransport stateBindings assignments reflection extend solved in
+theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget)
+    {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
+    (correct : Below budget (fun child => ProtectedStateTransition.Lexical.Gated.ReflectsAtFor protocol conditionGate (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) child false statements expected type code))
+    (bodyCannotFault : ∀ {program context evidence environment before after finalContext reason},
+      Dynamic.StatementsExecute program context evidence source environment before statements finalContext (.fault reason) after → False) :
+    ProtectedFor.Body.Stateful.LoopReflectsAtFor protocol conditionGate (validity := validity) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped initial gate evaluated
+  have result := ProtectedFor.Body.Stateful.loop_reflects_bounded_for (protocol := protocol) (guard := conditionGate) (validity := validity) functions program evidence stateTransport budget (reflection _ valid)
+    conditionFound conditionTree typed correct bodyCannotFault
+    (by
+      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+        child small mapping world before store finalStore value state native realRead guarded continued execution
+      exact ProtectedForHeader.Stateful.post_reflects_reachable_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (guard := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments reflection postTree postErrors
+        actualValid actualAgrees actualReference state realRead guarded continued execution (Nat.le_of_lt small))
+  exact result size bounded valid environments heaps locals agrees actualTyped reference read unmapped initial gate evaluated
+
+
+
+end Stateful
+
 section WithValidity
 variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -247,6 +384,7 @@ private theorem measure_result {program : Program} {context : SourceSemantics.Co
   exact ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, rest⟩
 
 include definitions registered extension transport bindings reflection faithful observations extend solved in
+set_option linter.unusedSectionVars false in
 theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : ReflectingHeaderWith (validity := validity) (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
@@ -259,24 +397,27 @@ theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functi
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
   obtain ⟨header, errors⟩ := headers
-  have result := ProtectedForHeader.Tree.reflects_reachable_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget reflection functionTypes header errors
-    valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated bounded
-  cases result with
-  | @continues initialSize remainingSize initialContext initialEnvironment initialized tail trace maps worlds frame metadata remaining smaller =>
-    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, loop, represented, progress⟩ :=
-      tail.certificate _ (Nat.le_trans smaller bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.installed remaining
-    refine ⟨SourceExecutionSize.stepSize [initialSize, sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld, ?_, restored environment outcome,
-      restore_rep represented environment, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
-      frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2.1⟩
-    cases loop with
-    | control loop => exact .control (.forLoop (lookupStatement?_sound found) form trace loop)
-    | fault loop => exact .fault (.forIteration (lookupStatement?_sound found) form trace loop)
-  | fault trace same matched heaps maps worlds frame metadata =>
-    subst value
-    exact ⟨_, _, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
-      (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, restores, represented, finalHeaps, maps, worlds, preservation, metadata, _transition⟩ :=
+    Stateful.header_reflects_at_with
+      (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      (program := program) (evidence := evidence) (observations := observations)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
+      (producer := ForCompatibility.legacyProducer functions transport bindings)
+      (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)
+      (stateTransport := ProtectedStateTransition.Lexical.legacyTransport transport)
+      (stateBindings := ForCompatibility.legacyBindings bindings)
+      (validity := validity) (extend := extend) (budget := budget)
+      (assignments := fun context valid => ForCompatibility.legacyAssignmentReflection functions extension program evidence transport faithful observations context budget
+        (reflection context valid) functionTypes)
+      (reflection := fun context valid child smaller => RecursiveNamedLexicalContracts.Stateful.legacy_expression_reflects
+        functions program evidence transport (reflection context valid child smaller))
+      size bounded found form header errors
+      (fun old child within => ForCompatibility.legacyLoopReflects functions program evidence validity (old child within))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, restores, represented, finalHeaps, maps, worlds, preservation, metadata⟩
 
 include extension reflection transport bindings definitions registered faithful observations extend solved in
+set_option linter.unusedSectionVars false in
 theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functionTypes : FunctionRuntimeViews functions)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -297,16 +438,27 @@ theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget) (function
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  have result := ProtectedFor.Body.loop_reflects_bounded_for (validity := validity) functions program evidence transport budget (reflection _ valid)
-    conditionFound conditionTree typed correct bodyCannotFault
-    (by
-      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
-        child small mapping world before store finalStore value guarded continued execution
-      exact ProtectedForHeader.post_reflects_reachable_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget reflection functionTypes postTree postErrors
-        actualValid actualAgrees actualReference guarded continued execution (Nat.le_of_lt small))
-  exact result size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-
-
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, transition⟩ :=
+    Stateful.loop_reflects_at_with
+      (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      (program := program) (evidence := evidence) (observations := observations)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
+      (producer := ForCompatibility.legacyProducer functions transport bindings)
+      (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)
+      (stateTransport := ProtectedStateTransition.Lexical.legacyTransport transport)
+      (stateBindings := ForCompatibility.legacyBindings bindings)
+      (validity := validity) (extend := extend) (budget := budget)
+      (assignments := fun context valid => ForCompatibility.legacyAssignmentReflection functions extension program evidence transport faithful observations context budget
+        (reflection context valid) functionTypes)
+      (reflection := fun context valid child smaller => RecursiveNamedLexicalContracts.Stateful.legacy_expression_reflects
+        functions program evidence transport (reflection context valid child smaller))
+      size bounded conditionFound conditionTree typed postTree postErrors
+      (fun child smaller => ProtectedStateTransition.Lexical.Gated.reflects_of_unguarded
+        (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True) functions program evidence
+        (ProtectedStateTransition.Lexical.legacy_reflects functions program evidence transport (correct child smaller))) bodyCannotFault
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial evaluated
+  obtain ⟨reached, _related⟩ := transition
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, reached.down⟩
 
 include definitions registered extension transport bindings reflection faithful observations extend runtimeOf in
 theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (functionTypes : FunctionRuntimeViews functions) (unique : NodeOccurrencesUnique source)

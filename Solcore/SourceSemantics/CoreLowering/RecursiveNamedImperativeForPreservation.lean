@@ -6,6 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeLexicalBound
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLexicalTreeBounds
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeForPreservation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedBitNotStatementContracts
+import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderPost
 
 /-! The existing Match Tree closes lexical, assignment, loop and match children
 at one fixed budget. The original For entry is a static inclusion wrapper. The reached header retains an inclusive loop continuation;
@@ -382,6 +383,144 @@ private theorem continuing_view {program : Program} {context finalContext : Sour
 open GenericImperativeFor (Tree Position)
 open RecursiveNamedBoundedContracts (Below)
 open RecursiveNamedHeaderContracts (AtMost)
+namespace Stateful
+open ProtectedStateTransition
+universe u v
+variable {Records : Type v} (protocol : Protocol.{u, v} Records)
+  (conditionGate : Location → CallableIndexedHistory.NativeFrame → Prop)
+  {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+  {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+  {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
+  {values : ValuesContext} {source : TypedSource} {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+  {solved : List SolvedRequirement} {ambient : AmbientDefinitions values.checked.catalog.definitions}
+  (functions : FunctionModel values.checked.catalog ambient)
+  (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
+  {registry : SourceCoreRawMetadata.Registry} (program : Program) (evidence : Dynamic.EvidenceEnvironment)
+  {faults : FunctionCalls.FaultRep} {identities : Dynamic.Value → Word → Prop}
+  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  (producer : OrdinaryAllocation.Producer protocol layouts frame (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+  (acquire : ∀ location native, conditionGate location native → OrdinaryAllocation.ReadyAt producer location native)
+  (stateTransport : AdministrativeTransport protocol) (stateBindings : Bindings protocol)
+  (validity : SourceSemantics.Context → Prop)
+  (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+    validity context → BinderExtends source.owner context binder next → validity next)
+  (budget : Nat)
+  {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+  {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
+  {expected : TypeSystem.Ty} {type : Ty} {code conditionCode postCode : Expr} {selfReason : Word}
+  (assignments : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentPrefixPreservesAt protocol functions (registry := registry)
+    program evidence source (certificates context) context administrative budget)
+  (assignmentFaults : ∀ context, validity context → ProtectedForHeader.Stateful.AssignmentFaultPreservesAt protocol functions (registry := registry)
+    program evidence source (certificates context) context administrative faults budget)
+  (meaning : ∀ context, validity context → Below budget (fun size => ProtectedStateTransition.PreservesAt protocol
+    (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults size))
+include definitions registered observations producer acquire stateTransport stateBindings assignments assignmentFaults meaning extend solved in
+theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    {continuation : SourceSemantics.Context → Scope → Expr → Prop}
+    (header : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type continuation context scope items code)
+    (errors : GenericForHeader.Tree.ReachableErrors registry faults header)
+    (loopCorrect : ∀ {nextContext nextScope nextCode}, continuation nextContext nextScope nextCode →
+      AtMost budget (fun child => ProtectedFor.Body.Stateful.LoopPreservesAtFor protocol conditionGate functions program evidence
+        validity child (source := source) (context := nextContext) (registry := registry) (faults := faults)
+        (frameLayout := frame) (globals := globals) (administrative := administrative)
+        (scope := nextScope) condition post statements expected type nextCode)) :
+    Control.Stateful.HeadPreservesAtWith protocol conditionGate (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      size (scope := scope) id expected type code := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped initial guarded trace
+  cases trace with
+  | control executed =>
+    obtain ⟨rfl, initialSize, loopSize, loopContext, loopFinalContext, loopEnvironment, initialized, loopOutcome, rfl, initialization, loop, initialSmall, loopSmall⟩ :=
+      ForSourceAt.success_at unique (lookupStatement?_sound found) form executed
+    have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
+    subst loopFinalContext
+    obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, agreement⟩ :=
+      ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments meaning header
+        valid environments heaps locals agrees actualTyped reference read unmapped initial guarded initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+      (loopCorrect tail.certificate) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate (.control loop)
+    obtain ⟨loopState, loopRelated⟩ := loopTransition
+    exact ⟨rfl, restored environment loopOutcome, value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
+      restore_rep represented environment, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
+      frame.trans loopFrame, metadata.trans loopMetadata,
+      ⟨returnTo.restore loopState, protocol.trans headerRelated (protocol.trans loopRelated (returnTo.related loopState))⟩⟩
+  | fault failed =>
+    rcases ForSourceAt.fault_at unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
+    · obtain ⟨_, _, fault, smaller⟩ := initialFailure
+      obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata, transition⟩ :=
+        ProtectedForHeader.Stateful.Tree.preserves_fault_reachable_bounded_for (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments assignmentFaults meaning header errors
+          valid environments heaps locals agrees actualTyped reference read unmapped initial guarded fault (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+      exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
+        evaluated, .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
+    · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
+      obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, agreement⟩ :=
+        ProtectedForHeader.Stateful.Tree.preserves_prefix_bounded_for_with_return (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments meaning header
+          valid environments heaps locals agrees actualTyped reference read unmapped initial guarded initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+        (loopCorrect tail.certificate) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate (.fault loop)
+      obtain ⟨loopState, loopRelated⟩ := loopTransition
+      exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
+        represented, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
+        frame.trans loopFrame, metadata.trans loopMetadata,
+      ⟨returnTo.restore loopState, protocol.trans headerRelated (protocol.trans loopRelated (returnTo.related loopState))⟩⟩
+
+include definitions registered observations producer acquire stateTransport stateBindings assignments assignmentFaults meaning extend solved in
+theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
+    {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
+    (conditionFound : source.lookupExpression? condition = some conditionNode)
+    (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+      (LocalLoop.iterate type conditionCode code postCode selfReason) (LocalLoop.resultType type) ambient.definitions)
+    (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates ambient.definitions administrative
+      type (TypedForHeader.Fallthrough type) context scope post postCode)
+    (postErrors : GenericForHeader.Tree.ReachableErrors registry faults postTree)
+    (correct : Below budget (fun child => ProtectedStateTransition.Lexical.Gated.PreservesAtFor protocol conditionGate (validity := validity) functions program evidence (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) child false statements expected type code)) :
+    ProtectedFor.Body.Stateful.LoopPreservesAtFor protocol conditionGate (validity := validity) functions program evidence size (source := source) (context := context) (registry := registry)
+      (faults := faults)  (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
+    environments heaps locals agrees actualTyped reference read unmapped initial gate trace
+  have result := ProtectedFor.Body.Stateful.loop_preserves_bounded_for (protocol := protocol) (guard := conditionGate) (validity := validity) functions program evidence stateTransport budget (meaning _ valid)
+    conditionFound conditionTree typed unique correct
+    (by
+      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+        child small mapping world before after store finalContext finalEnvironment state native realRead guarded continued execution
+      exact ProtectedForHeader.Stateful.post_preserves_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (guard := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments meaning postTree
+        actualValid actualAgrees actualReference state realRead guarded continued execution (Nat.le_of_lt small))
+    (by
+      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
+        child small mapping world before after store finalContext reason state native realRead guarded continued execution
+      exact ProtectedForHeader.Stateful.post_fault_reachable_bounded_for (functions := functions) (definitions := definitions) (registered := registered)
+        (program := program) (evidence := evidence) (observations := observations)
+        (protocol := protocol) (guard := conditionGate) (producer := producer) (acquire := acquire)
+        (stateTransport := stateTransport) (stateBindings := stateBindings)
+        validity extend budget assignments assignmentFaults meaning postTree postErrors
+        actualValid actualAgrees actualReference state realRead guarded continued execution (Nat.le_of_lt small))
+  exact result size bounded valid environments heaps locals agrees actualTyped reference read unmapped initial gate trace
+
+end Stateful
+
 section WithValidity
 variable {administrative : Core.Context} {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
@@ -421,6 +560,104 @@ variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} 
   (faithful : DataEquality.IdentityFaithful identities)
   (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
 
+
+namespace ForCompatibility
+def legacyBindings (bindings : ProtectedExpressionMeaning.Binds entry) :
+    ProtectedStateTransition.Bindings (ProtectedStateTransition.Lexical.legacyProtocol entry) where
+  prepend state _id _type _value := ⟨bindings.prepend state.down⟩
+  prepend_related _state _id _type _value := trivial
+  prepend_records _state _id _type _value := rfl
+  restore state := ⟨bindings.restore state.down⟩
+  restore_related _state := trivial
+  restore_records _state := rfl
+
+def legacyProducer (functions : FunctionModel values.checked.catalog ambient)
+    (transport : ProtectedExpressionMeaning.Transport entry) (bindings : ProtectedExpressionMeaning.Binds entry) :
+    ProtectedStateTransition.OrdinaryAllocation.Producer (ProtectedStateTransition.Lexical.legacyProtocol entry) layouts frame
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) :=
+  ProtectedStateTransition.OrdinaryAllocation.of_administrative _
+    (ProtectedStateTransition.Lexical.legacyTransport transport) (legacyBindings bindings)
+    layouts frame (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+
+include extension faithful observations transport in
+theorem legacyAssignmentPrefix (context : SourceSemantics.Context) (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) :
+    ProtectedForHeader.Stateful.AssignmentPrefixPreservesAt (ProtectedStateTransition.Lexical.legacyProtocol entry) functions (registry := registry)
+      program evidence source (certificates context) context administrative budget := by
+  intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
+    environments heaps locals agrees typed state updated after size assigned within
+  obtain ⟨written, nextMap, nextWorld, slots, nextHeaps, maps, worlds, preservation, metadata, count, typed, installed, agreement⟩ :=
+    ProtectedAssignmentHeads.Head.preserves_prefix_bounded functions extension program evidence transport faithful observations head
+      environments heaps locals agrees typed state.down budget boundedMeaning assigned within
+  exact ⟨written, nextMap, nextWorld, slots, nextHeaps, maps, worlds, preservation, metadata, count, typed,
+    ⟨⟨installed⟩, trivial⟩, agreement⟩
+
+include extension faithful observations transport in
+theorem legacyAssignmentFault (context : SourceSemantics.Context) (budget : Nat)
+    (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry)) :
+    ProtectedForHeader.Stateful.AssignmentFaultPreservesAt (ProtectedStateTransition.Lexical.legacyProtocol entry) functions (registry := registry)
+      program evidence source (certificates context) context administrative faults budget := by
+  intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
+    environments heaps locals agrees typed state errors reason after size failed within next output
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, installed⟩ :=
+    ProtectedAssignmentHeads.Head.preserves_fault_reachable_bounded functions extension program evidence transport faithful observations head
+      environments heaps locals agrees typed state.down budget boundedMeaning errors failed within next output
+  exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
+    ⟨⟨installed⟩, trivial⟩⟩
+
+include extension faithful observations transport in
+theorem legacyAssignmentReflection (context : SourceSemantics.Context) (budget : Nat)
+    (boundedReflection : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions) program context evidence source (certificates context) faults entry))
+    (functionTypes : FunctionRuntimeViews functions) :
+    ProtectedForHeader.Stateful.AssignmentReflectsAt (ProtectedStateTransition.Lexical.legacyProtocol entry) functions (registry := registry)
+      program evidence source (certificates context) context administrative faults budget := by
+  intro scope assignment operator rhs head mapping world environment canonical actual before store actualContext ξ
+    environments heaps locals agrees typed state errors next output value finalStore size evaluated within
+  have result := ProtectedAssignmentHeads.Head.reflects_reachable_bounded functions extension program evidence transport faithful observations head
+    environments heaps locals agrees typed state.down budget boundedReflection functionTypes errors evaluated within
+  cases result with
+  | fault trace same matched finalHeaps maps worlds preservation metadata installed =>
+    exact .fault trace same matched finalHeaps maps worlds preservation metadata ⟨⟨installed⟩, trivial⟩
+  | success trace finalHeaps maps worlds preservation metadata count typed installed smaller remaining =>
+    exact .success trace finalHeaps maps worlds preservation metadata count typed ⟨⟨installed⟩, trivial⟩ smaller remaining
+
+
+variable {loopContext : SourceSemantics.Context} {loopScope : Scope} {loopCode : Expr} {child : Nat}
+
+theorem legacyLoopPreserves
+    (old : RecursiveNamedForContracts.LoopPreservesAtFor (validity := validity) (entry := entry) functions program evidence child
+      (source := source) (context := loopContext) (registry := registry) (faults := faults)
+      (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := loopScope) condition post statements expected type loopCode) :
+    ProtectedFor.Body.Stateful.LoopPreservesAtFor (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True)
+      functions program evidence validity child (source := source) (context := loopContext) (registry := registry) (faults := faults)
+      (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := loopScope) condition post statements expected type loopCode := by
+  intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
+    environments heaps locals agrees actualTyped reference read unmapped initial _gate trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, installed⟩ :=
+    old valid environments heaps locals agrees actualTyped reference read unmapped initial.down trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, ⟨⟨installed⟩, trivial⟩⟩
+
+theorem legacyLoopReflects
+    (old : RecursiveNamedForContracts.LoopReflectsAtFor (validity := validity) (entry := entry) functions program evidence child
+      (source := source) (context := loopContext) (registry := registry) (faults := faults)
+      (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := loopScope) condition post statements expected type loopCode) :
+    ProtectedFor.Body.Stateful.LoopReflectsAtFor (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True)
+      functions program evidence validity child (source := source) (context := loopContext) (registry := registry) (faults := faults)
+      (frameLayout := frame) (globals := globals) (administrative := administrative)
+      (scope := loopScope) condition post statements expected type loopCode := by
+  intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped initial _gate evaluated
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, installed⟩ :=
+    old valid environments heaps locals agrees actualTyped reference read unmapped initial.down evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, ⟨⟨installed⟩, trivial⟩⟩
+
+end ForCompatibility
 
 abbrev PreservingHeaderWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context : SourceSemantics.Context) (scope : Scope) (items : List ForItemForm)
     (condition : ExpressionId) (post : List ForItemForm) (statements : List StatementId)
@@ -465,6 +702,7 @@ abbrev ReflectsAtWith (diagnosticPolicy : AssignmentDiagnosticPolicy) (context :
       context scope items condition post statements expected type code
 
 include definitions registered extension transport bindings meaning faithful observations extend solved in
+set_option linter.unusedSectionVars false in
 theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     (headers : PreservingHeaderWith (validity := validity) (diagnosticPolicy := .reachable) (certificates := certificates) (entry := entry) functions program evidence budget (layouts := layouts) (owner := owner) (active := active)
@@ -477,39 +715,28 @@ theorem header_preserves_at_with (size : Nat) (bounded : size ≤ budget) (uniqu
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
     environments heaps locals agrees actualTyped reference read unmapped installed trace
   obtain ⟨header, errors⟩ := headers
-  cases trace with
-  | control executed =>
-    obtain ⟨rfl, initialSize, loopSize, loopContext, loopFinalContext, loopEnvironment, initialized, loopOutcome, rfl, initialization, loop, initialSmall, loopSmall⟩ :=
-      ForSourceAt.success_at unique (lookupStatement?_sound found) form executed
-    have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
-    subst loopFinalContext
-    obtain ⟨tail, maps, worlds, frame, metadata, agreement⟩ :=
-      ProtectedForHeader.Tree.preserves_prefix_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
-        valid environments heaps locals agrees actualTyped reference read unmapped installed initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress⟩ :=
-      tail.certificate _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.installed (.control loop)
-    exact ⟨rfl, restored environment loopOutcome, value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
-      restore_rep represented environment, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
-      frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2.1⟩
-  | fault failed =>
-    rcases ForSourceAt.fault_at unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
-    · obtain ⟨_, _, fault, smaller⟩ := initialFailure
-      obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata⟩ :=
-        ProtectedForHeader.Tree.preserves_fault_reachable_bounded_for (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header errors
-          valid environments heaps locals agrees actualTyped reference read unmapped installed fault (Nat.le_trans (Nat.le_of_lt smaller) bounded)
-      exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
-        evaluated, .fault matched, heaps, maps, worlds, frame, metadata⟩
-    · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
-      obtain ⟨tail, maps, worlds, frame, metadata, agreement⟩ :=
-        ProtectedForHeader.Tree.preserves_prefix_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning header
-          valid environments heaps locals agrees actualTyped reference read unmapped installed initialization (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, progress⟩ :=
-        tail.certificate _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.installed (.fault loop)
-      exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
-        represented, progress.1, maps.trans progress.2.1, worlds.trans progress.2.2.1,
-        frame.trans progress.2.2.2.1, metadata.trans progress.2.2.2.2.1⟩
+  obtain ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, _transition⟩ :=
+    Stateful.header_preserves_at_with
+      (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      (program := program) (evidence := evidence) (observations := observations)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
+      (producer := ForCompatibility.legacyProducer functions transport bindings)
+      (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)
+      (stateTransport := ProtectedStateTransition.Lexical.legacyTransport transport)
+      (stateBindings := ForCompatibility.legacyBindings bindings)
+      (validity := validity) (extend := extend) (budget := budget)
+      (assignments := fun context valid => ForCompatibility.legacyAssignmentPrefix functions extension program evidence transport faithful observations context budget
+        (meaning context valid))
+      (assignmentFaults := fun context valid => ForCompatibility.legacyAssignmentFault functions extension program evidence transport faithful observations context budget (meaning context valid))
+      (meaning := fun context valid child smaller => RecursiveNamedLexicalContracts.Stateful.legacy_expression_preserves
+        functions program evidence transport (meaning context valid child smaller))
+      size bounded unique found form header errors
+      (fun old child within => ForCompatibility.legacyLoopPreserves functions program evidence validity (old child within))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial trace
+  exact ⟨same, restores, value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata⟩
 
 include extension meaning transport bindings definitions registered faithful observations extend solved in
+set_option linter.unusedSectionVars false in
 theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique : NodeOccurrencesUnique source) {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
     (conditionFound : source.lookupExpression? condition = some conditionNode)
@@ -527,19 +754,28 @@ theorem loop_preserves_at_with (size : Nat) (bounded : size ≤ budget) (unique 
       (scope := scope) condition post statements expected type (LocalLoop.iterate type conditionCode code postCode selfReason) := by
   intro valid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome
     environments heaps locals agrees actualTyped reference read unmapped installed trace
-  have result := ProtectedFor.Body.loop_preserves_bounded_for (validity := validity) functions program evidence transport budget (meaning _ valid)
-    conditionFound conditionTree typed unique correct
-    (by
-      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
-        child small mapping world before after store finalContext finalEnvironment guarded continued execution
-      exact ProtectedForHeader.post_preserves_bounded_for (solved := solved) (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree
-        actualValid actualAgrees actualReference guarded continued execution (Nat.le_of_lt small))
-    (by
-      intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
-        child small mapping world before after store finalContext reason guarded continued execution
-      exact ProtectedForHeader.post_fault_reachable_bounded_for (validity := validity) (extend := extend) functions definitions registered extension program evidence transport bindings faithful observations budget meaning postTree postErrors
-        actualValid actualAgrees actualReference guarded continued execution (Nat.le_of_lt small))
-  exact result size bounded valid environments heaps locals agrees actualTyped reference read unmapped installed trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, transition⟩ :=
+    Stateful.loop_preserves_at_with
+      (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
+      (program := program) (evidence := evidence) (observations := observations)
+      (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
+      (producer := ForCompatibility.legacyProducer functions transport bindings)
+      (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)
+      (stateTransport := ProtectedStateTransition.Lexical.legacyTransport transport)
+      (stateBindings := ForCompatibility.legacyBindings bindings)
+      (validity := validity) (extend := extend) (budget := budget)
+      (assignments := fun context valid => ForCompatibility.legacyAssignmentPrefix functions extension program evidence transport faithful observations context budget
+        (meaning context valid))
+      (assignmentFaults := fun context valid => ForCompatibility.legacyAssignmentFault functions extension program evidence transport faithful observations context budget (meaning context valid))
+      (meaning := fun context valid child smaller => RecursiveNamedLexicalContracts.Stateful.legacy_expression_preserves
+        functions program evidence transport (meaning context valid child smaller))
+      size bounded unique conditionFound conditionTree typed postTree postErrors
+      (fun child smaller => ProtectedStateTransition.Lexical.Gated.preserves_of_unguarded
+        (ProtectedStateTransition.Lexical.legacyProtocol entry) (fun _ _ => True) functions program evidence
+        (ProtectedStateTransition.Lexical.legacy_preserves functions program evidence transport (correct child smaller)))
+      valid environments heaps locals agrees actualTyped reference read unmapped ⟨installed⟩ trivial trace
+  obtain ⟨reached, _related⟩ := transition
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, reached.down⟩
 
 variable (meaningMost : ∀ context, validity context →
   AtMost budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size
