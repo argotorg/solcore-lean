@@ -764,6 +764,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedCatalogP
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyReadyOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyReadyEntries
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyReadyInputs
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodySourceOrigin
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyReadyCatalog
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBodyReadyBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceBodyReadyBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
