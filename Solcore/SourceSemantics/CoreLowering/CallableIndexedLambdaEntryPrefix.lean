@@ -155,6 +155,8 @@ def Entry.toFor {values : SourceCoreCompatibleValues.Context} {prepared : Prepar
     entry.entry, entry.wrap, entry.unwrap, entry.unmapped, entry.referenceTyped,
     entry.currentHistory, entry.currentRead⟩
 
+namespace Stateful
+
 /-- Every native prefix step is derived from its actual compiler receipt.
 The caller token and lexical token have independent carried histories. -/
 theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
@@ -163,7 +165,10 @@ theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context
     (captured : Captures prepared mapping world scope function.captured capturedActual)
     (code : Code prepared function scope captured.administrative) (history : History code)
     (inputs : Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
-    {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    {registry : SourceCoreRawMetadata.Registry}
+    {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
+    (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol prepared.layouts prepared.ancestry.layout.frame
+      (CompatibleAmbientHeap.payloadModel values.checked registry functions)) {arguments : List Dynamic.Value} {nativeArguments : List Value}
     (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       mapping world code.receipt.loweredParameters arguments nativeArguments)
     {before : Dynamic.Heap} {store : Store} {location : Location}
@@ -174,10 +179,19 @@ theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context
     (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
     (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
     (unmapped : location ∉ mapping)
-    (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
+    (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
+    (initial : protocol.State ⟨scope, mapping, world, before,
+      store.set location (encode prepared.ancestry.layout.frame
+        (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current)),
+      captured.canonical⟩)
+    (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary location
+      (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current)) :
     ∃ entry : EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost,
       ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
-        entry.entry.canonical = added ++ captured.canonical := by
+        entry.entry.canonical = added ++ captured.canonical ∧
+        ProtectedStateTransition.Transition protocol initial
+          ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+            entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := by
   let layout := prepared.ancestry.layout.frame
   let argument := DataPatternValues.packValues nativeArguments
   let saved := encode layout current
@@ -203,10 +217,10 @@ theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context
         (.cons (encode_runtime_typed world registered history.native) captured.typed)))
   obtain ⟨manifest, manifestTyped, manifestAgreement⟩ := CallableIndexedLambdaManifest.agreement
     captured.represented actualLayout descriptor fields code.receipt.allocatedBody (store.set location (encode layout next))
-  obtain ⟨entry, added, prefixLength, canonicalEq⟩ := CallableIndexedLambdaViewPrefix.entry_of_accepted_with_spine functions code.allocationError
+  obtain ⟨entry, added, prefixLength, canonicalEq, transition⟩ := CallableIndexedLambdaViewPrefix.Stateful.entry_of_accepted_with_spine functions code.allocationError protocol producer
     code.viewOfSource (prefix_accepted code) (parameters code) inputs.kinds inputs.extended rfl registered represented
     captured.represented installedHeaps locals (GenericExpressionMeaning.agree_prefix actualLayout manifest)
-    (.cons manifestTyped actualTyped) (inputs.referenceIndex ▸ reference) installedCurrent.read unmapped
+    (.cons manifestTyped actualTyped) (inputs.referenceIndex ▸ reference) installedCurrent.read unmapped initial readyAt
   have selectedReference : (argument :: lexical :: capturedActual)[captured.embedding code.referenceIndex + 2]? =
       some (.cellRef layout.type location) := by simpa using captured.agrees reference
   have selected : DataEquality.Selects (argument :: lexical :: capturedActual)
@@ -238,7 +252,7 @@ theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context
     rw [emitted]
     exact manifestAgreement.trans entry.agreement
   refine ⟨⟨next, nextHistory, _, _, _, entry, ?_, ?_, unmapped, refTyped, .stable currentCarried, read⟩,
-    added, prefixLength, canonicalEq⟩
+    added, prefixLength, canonicalEq, transition⟩
   · intro result bodyStore evaluated
     rw [wrapper]
     apply CallableContextFrames.withFrame_evaluates selected read nextEvaluation
@@ -251,6 +265,37 @@ theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context
     obtain ⟨rfl, rfl⟩ := evaluation_deterministic nextEval nextEvaluation
     rw [body_rename] at bodyEval
     exact ⟨bodyStore, agreement.unwrap bodyEval, finalEq⟩
+
+end Stateful
+
+theorem entry_exists_for_with_spine {values : SourceCoreCompatibleValues.Context} {prepared : Prepared values.checked}
+    {function : Dynamic.Closure} {scope : Scope} {mapping : LocationMap} {world : StoreTyping}
+    {capturedActual : Environment}
+    (captured : Captures prepared mapping world scope function.captured capturedActual)
+    (code : Code prepared function scope captured.administrative) (history : History code)
+    (inputs : Context code) (functions : FunctionModel values.checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared))
+    {registry : SourceCoreRawMetadata.Registry} {arguments : List Dynamic.Value} {nativeArguments : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      mapping world code.receipt.loweredParameters arguments nativeArguments)
+    {before : Dynamic.Heap} {store : Store} {location : Location}
+    {current : NativeFrame} {currentGhost : GhostFrame} {currentMetadata : Option MetadataState}
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before function.context.locals function.captured)
+    (reference : captured.canonical[code.referenceIndex]? = some (.cellRef prepared.ancestry.layout.frame.type location))
+    (read : store.read? location = some (encode prepared.ancestry.layout.frame current))
+    (currentCarried : Carries prepared.ancestry.graph.inputs prepared.ancestry.graph.table current currentGhost currentMetadata)
+    (unmapped : location ∉ mapping)
+    (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true) :
+    ∃ entry : EntryFor captured code history inputs functions registry arguments nativeArguments before store location current currentGhost,
+      ∃ added : Environment, added.length = code.receipt.loweredParameters.length ∧
+        entry.entry.canonical = added ++ captured.canonical := by
+  obtain ⟨entry, added, length, spine, _transition⟩ :=
+    Stateful.entry_exists_for_with_spine captured code history inputs functions
+      ProtectedStateTransition.OrdinaryAllocation.unitProtocol
+      (ProtectedStateTransition.MarkedAllocation.unitProducer prepared.layouts prepared.ancestry.layout.frame
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+      represented heaps locals reference read currentCarried unmapped allowed () (by intro index state read; trivial)
+  exact ⟨entry, added, length, spine⟩
 
 /-- The original generic entry keeps the same model and forgets only the
 canonical allocation prefix witness. -/

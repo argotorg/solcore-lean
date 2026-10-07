@@ -250,7 +250,18 @@ variable {values : SourceCoreCompatibleValues.Context} {prepared : Prepared valu
   (unmapped : location ∉ mapping)
   (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed prepared.ancestry.graph.inputs history.metadata code.descriptor.id = true)
 
-include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
+namespace Stateful
+variable {Records : Type} (protocol : ProtectedStateTransition.Protocol Records)
+  (producer : ProtectedStateTransition.MarkedAllocation.Producer protocol prepared.layouts prepared.ancestry.layout.frame
+    (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+  (initial : protocol.State ⟨scope, mapping, world, before,
+    store.set location (encode prepared.ancestry.layout.frame
+      (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current)),
+    captured.canonical⟩)
+  (readyAt : ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary location
+    (SourceCoreCallableIndexedDispatch.selectedFrame prepared.ancestry.graph.table code.descriptor.id history.native current))
+
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer initial readyAt in
 /-- Frame and manifest steps are strict even for an empty parameter prefix.
 The final body witness comes only from the supplied original completion. -/
 theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
@@ -261,7 +272,10 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
       ∃ child bodyStore,
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
-        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) ∧
+        ProtectedStateTransition.Transition protocol initial
+          ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+            reached.mapping, reached.world, reached.heap, reached.store, reached.canonical⟩ := by
   let layout := prepared.ancestry.layout.frame
   let argument := DataPatternValues.packValues nativeArguments
   let saved := encode layout current
@@ -325,13 +339,13 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
     simpa using represented.length.2
   obtain ⟨environment, heap, canonical, logical, bodyActual, prefixStore, finalMap, finalWorld, embedding, child,
       allocated, environments, finalHeaps, maps, worlds, frame, sourceLayout, lookups, spine, finalTyped,
-      bodyEval, childBound, _⟩ :=
-    RecursiveNamedCallBounds.parameter_prefix tree rfl registered represented captured.represented installedHeaps
+      bodyEval, childBound, _, transition⟩ :=
+    RecursiveNamedCallBounds.Stateful.parameter_prefix tree protocol producer rfl registered represented captured.represented installedHeaps
       sourceLayout (GenericExpressionMeaning.agree_prefix actualLayout manifest) (.cons manifestTyped actualTyped)
       (allTypes := code.receipt.loweredParameters.map Prod.snd) (named := false) rfl (by simp) length
       (fun {_ _} found => by simpa using found)
       (by simpa only [← code.viewOfSource.inputs] using inputs.kinds)
-      (by simpa [inputs.referenceIndex] using reference) installedCurrent.read unmapped parameterEval
+      (by simpa [inputs.referenceIndex] using reference) installedCurrent.read unmapped initial readyAt parameterEval
   obtain ⟨added, prefixLength, canonicalEq, logicalEq⟩ := spine
   have finalReference : canonical[(code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + 1 + prepared.base.globals.length]? =
       some (.cellRef layout.type location) := by
@@ -362,9 +376,10 @@ theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
     maps, worlds, frame, GenericLexicalContext.binders_metadata allocated,
     ⟨added, prefixLength, canonicalEq⟩, finalLookups, finalTyped,
     finalReference, unchanged.trans installedCurrent.read, finalUnmapped⟩,
-    child, bodyStore, Nat.lt_trans (Nat.lt_of_le_of_lt childBound parameterLess) rawLess, bodyEval, restored⟩
+    child, bodyStore, Nat.lt_trans (Nat.lt_of_le_of_lt childBound parameterLess) rawLess, bodyEval, restored, ?_⟩
+  simpa only [CallableIndexedParameters.scope_eq] using transition
 
-include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed protocol producer initial readyAt in
 /-- The authenticated payload application adds its original strict body edge.
 The argument and complete captured environment are exactly the stored values;
 stage guards and the enclosing expression head are separate boundaries. -/
@@ -377,12 +392,55 @@ theorem application_prefix_for {size : Nat} {result : Value} {finalStore : Store
       ∃ child bodyStore,
         child < size ∧ EvaluationSize child reached.actual reached.store
           (code.receipt.body.rename reached.embedding) result bodyStore ∧
-        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) ∧
+        ProtectedStateTransition.Transition protocol initial
+          ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+            reached.mapping, reached.world, reached.heap, reached.store, reached.canonical⟩ := by
   obtain ⟨bodySize, smaller, applied⟩ := completed.apply_body
     (.second (.first (.var rfl))) (.var rfl)
-  obtain ⟨reached, child, bodyStore, childLess, evaluated, restored⟩ :=
-    body_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed applied
-  exact ⟨reached, child, bodyStore, Nat.lt_trans childLess smaller, evaluated, restored⟩
+  obtain ⟨reached, child, bodyStore, childLess, evaluated, restored, transition⟩ :=
+    body_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed
+      protocol producer initial readyAt applied
+  exact ⟨reached, child, bodyStore, Nat.lt_trans childLess smaller, evaluated, restored, transition⟩
+
+end Stateful
+
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
+theorem body_prefix_for {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      (DataPatternValues.packValues nativeArguments :: encode prepared.ancestry.layout.frame history.native :: capturedActual)
+      store (code.body.rename captured.embedding.lift.lift) result finalStore) :
+    ∃ reached : PrefixFor captured code history inputs functions registry arguments before store location current,
+      ∃ child bodyStore,
+        child < size ∧ EvaluationSize child reached.actual reached.store
+          (code.receipt.body.rename reached.embedding) result bodyStore ∧
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+  obtain ⟨reached, child, bodyStore, smaller, evaluated, restored, _transition⟩ :=
+    Stateful.body_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed
+      ProtectedStateTransition.OrdinaryAllocation.unitProtocol
+      (ProtectedStateTransition.MarkedAllocation.unitProducer prepared.layouts prepared.ancestry.layout.frame
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+      () (by intro index state read; trivial) completed
+  exact ⟨reached, child, bodyStore, smaller, evaluated, restored⟩
+
+include captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed in
+theorem application_prefix_for {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      [CallableIndexedLambdaValues.value code captured.embedding history.native capturedActual,
+        DataPatternValues.packValues nativeArguments]
+      store CallableIndexedLambdaCalls.applyPayload result finalStore) :
+    ∃ reached : PrefixFor captured code history inputs functions registry arguments before store location current,
+      ∃ child bodyStore,
+        child < size ∧ EvaluationSize child reached.actual reached.store
+          (code.receipt.body.rename reached.embedding) result bodyStore ∧
+        finalStore = bodyStore.set location (encode prepared.ancestry.layout.frame current) := by
+  obtain ⟨reached, child, bodyStore, smaller, evaluated, restored, _transition⟩ :=
+    Stateful.application_prefix_for captured code history inputs functions represented heaps locals reference read currentCarried unmapped allowed
+      ProtectedStateTransition.OrdinaryAllocation.unitProtocol
+      (ProtectedStateTransition.MarkedAllocation.unitProducer prepared.layouts prepared.ancestry.layout.frame
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions))
+      () (by intro index state read; trivial) completed
+  exact ⟨reached, child, bodyStore, smaller, evaluated, restored⟩
 
 end GenericEntry
 
