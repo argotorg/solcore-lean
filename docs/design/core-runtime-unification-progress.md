@@ -32,24 +32,25 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The shared staged-function, authority-pool, template-permission and additional-child registrations are committed in `f0d6b5c2`. The owned function relation and live call-entry/restoration adapters are committed in `6afb5d58`. The dependent protected-state protocol, ordered record-prefix relation, actual snapshot/restore transitions and shared expression Tree fold are committed in `375cdd53`. Function finish forwards the actual flow state in `c4d02229`; ordered expressions and primitive/control heads do so in `28c302a8`. Actual ordinary allocation and binder removal retain registered snapshots in `b5ba23a4`.
+The latest implementation commit is `6840f01c`. The allocation readiness and lexical body units are committed in `3f524792` and `84a8863d`; while edges and the shared finite folds in `5a15ff5b` and `ac01b3b1`; bare assignment in `8dbef2f0`; for header completion/faults in `6462af2a`; and five-way imperative control in `ad0f8673`. Closed lexical and while consumers derive their child meaning from static receipts and the actual owned allocator.
 
-The latest normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5022 jobs**, and `lake test` passed all registered executions. A strict `--trust=0` audit checked all **410 declarations** in the expression, allocation, finish and formal-consumer modules against the three permitted standard axioms. The preceding state/Tree unit passed a 5016-job integrated build, all registered executions and a 144-declaration audit. The preceding owned-value/call-entry unit passed a 5012-job integrated build, all registered executions, and a strict audit of 247 declarations. The retained public parameter and Tree theorem types are unchanged; generated helpers moved or disappeared when their shared proofs were factored.
+The normal integrated build of `Solcore.SourceSemantics.CoreLowering` and `Tests.Main` passed **5039 jobs**, and `lake test` passed all registered executions. The latest strict `--trust=0` audit checked **344 declarations** in the assignment, header, while, control, and closed while modules against the three permitted standard axioms. All 11 original header APIs and 65 retained declarations from the imperative For modules have byte-identical raw types and axiom lists; relocated generated proof helpers are excluded from that retained API count. Earlier units separately audited 145 allocation/readiness declarations, 158 lexical/finish declarations, and 220 assignment/header/while declarations. The semantic kernel policy and whitespace checks passed.
 
 Records: `/private/tmp/solcore-owned-functions-resume-20261007/`. Unrelated inference/parser work remains outside these commits.
 
 ### Implementation in progress
 
-The next unit connects the actual allocation producer to the existing lexical Tree and imperative CatalogSites proofs. Block, sequence and conditional producers must forward the reached witness. A static physical-owner/stable-frame receipt supplies allocation readiness at each reached state through the actual retained frame read; it contains no body execution law.
+The reached state now passes through the existing lexical Tree, actual allocation, lexical restoration, shared finite while proofs, bare assignment, for header folds, and block/sequence/conditional producers. A static physical-owner/stable-frame receipt supplies allocation readiness from each actual retained frame read; it asserts no body execution law. Source and Core grades remain independent, including an empty for header whose remaining native grade equals its inclusive budget.
 
-These changes do not yet close the general body or full compiler theorem. Existing imperative producers still need to return actual reached state through lexical lets, assignments, loops, matches and five-way control flow before the body kernel can consume it.
+For activation and loop edges are being connected to the actual initialized header tail. A structural restoration receipt must remove the header's introduced binders from the eventual body/post state, preserving records added after initialization. Projected assignment must pass the actual state from index evaluation through the getter, RHS, latest-root reread, writeback, and each failure path. These connections are still in progress.
 
 ### Next implementation units and remaining obligations
 
-1. Thread initializer post-state into the actual allocation producer, feed its registered post-state into the lexical tail, and remove binders from the tail's reached witness. Reuse the existing lexical Tree and CatalogSites proofs.
-2. Connect callee, ordered arguments, general bodies and return to the same mutual induction. On return, install the saved caller frame into the reached pool, retaining every ordered record list created during the body.
-3. Connect nested lambda, indirect calls, method/coercion and local instantiation to the same value/heap relations. Retain actual Source receipts, complete captures, dictionaries and type-substitution rows.
-4. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
+1. Complete actual-state for activation, condition/body/post edges and finite folds, including restoration after later body/post effects. Complete projected assignment success, fault and original native completion reflection.
+2. Thread scrutinee, hidden-cell allocation, selected-arm binder allocation and restoration through match. Connect these producers to the existing imperative CatalogSites folds and body kernel.
+3. Connect callee, ordered arguments, general bodies and return to the same mutual induction. On return, install the saved caller frame into the reached pool, retaining every ordered record list created during the body.
+4. Connect nested lambda, indirect calls, method/coercion and local instantiation to the same value/heap relations. Retain actual Source receipts, complete captures, dictionaries and type-substitution rows.
+5. Compose the actual specialization, evidence and staging passes. Close preservation of normal results, language failures and all state, together with reflection of finite completion, from independent Source before pre-evaluation to the public Core path. Leave no unproved body/pass laws in the final theorem.
 
 ## History by commit
 
@@ -1807,3 +1808,21 @@ Restoration uses `reached.install selected savedRow.frame.history`. Every reache
 The original temporary Values and Entry fragments have been replaced by the committed modules above. They are historical scratch work, not the current restart point. The current sources are `CallableIndexedOwnedFunctionValues`, `CallableIndexedOwnedFunctionEntries`, `CallableIndexedOwnedFunctionState`, `ProtectedState` and `ProtectedStateTransition`.
 
 Ordered expression, allocation and function-finish proofs now retain concrete post-witnesses. Formal consumers verify actual state changes and snapshot retention. Administrative transport preserves the input's records and cannot substitute for dynamic registration. The next lexical/imperative integration and the final general-body/compiler theorems remain unfinished.
+
+
+## 2026-10-07: actual lexical, assignment, loop and control states
+
+| Commit | Completed scope | Remaining boundary |
+| --- | --- | --- |
+| `3f524792` | Supplies lexical allocation from an actual selected authority row and stable frame read. Preserves captures and uses the real snapshot-producing allocator. | General body producers must return and consume its state. |
+| `84a8863d` | Factors the existing lexical control and Tree proofs to carry actual states through allocation, children and binder restoration; gated five-way adapters and finish retain that state. Registers closed lexical preservation/reflection consumers. | Loops, projected places, selected match and the general body fold remain. |
+| `5a15ff5b` | Installs the actual while self closure and retains each condition/body child's reached state through the measured edges. | The shared finite while folds were connected in `ac01b3b1`. |
+| `8dbef2f0` | Passes actual RHS state into bare assignment writes; RHS and operand faults return the reached state. Keeps the seven original native slots and strict continuation bound. | Projected places require the same flow through indices, getter and writeback. |
+| `ac01b3b1` | Reuses the three existing finite while folds and endpoints. Condition, body and recursive loop steps carry the actual child state and compose its relation. | General body callbacks remain internal induction interfaces. |
+| `6462af2a` | Reuses the same for header success, fault and native reflection folds. A live tail keeps its actual scope and state; faults restore binders from the reached witness. | Body/post effects need a structural restoration receipt for the eventual reached tail state. |
+| `ad0f8673` | Factors block, sequence, conditional and terminal control producers for five-way outcomes. Tail and selected branch receive the actual first-child state. | The outer imperative CatalogSites fold still needs these producers. |
+| `6840f01c` | Derives Boolean condition and closed lexical body callbacks from actual static receipts. Verifies owned while preservation/reflection and constructs a real false-loop completion that retains every row's exact records. | This consumer covers Boolean literals and closed lexical bodies; it is not the whole body/compiler theorem. |
+
+The latest combined verification passed 5039 normal build jobs, all registered executions, and a strict 344-declaration kernel audit. Existing header and imperative For APIs retain their raw types and axiom lists. These proof changes add no Core instruction or runtime recursion. The same original finite folds perform the work.
+
+Administrative transport preserves its input record lists exactly. A generic transition proves ordered prefix retention but does not alone prove membership of a fresh allocation snapshot. Exact append claims use the concrete allocator's selected-row receipt for that same execution. Whole-body semantic preservation and completion reflection remain incomplete.

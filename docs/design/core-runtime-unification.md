@@ -10,9 +10,9 @@ Created: 2026-09-30. Updated: 2026-10-07.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest implementation commit | `b5ba23a4`. Includes owned values/call entries, ordered expression state, actual snapshot-producing ordinary allocation, binder restoration and function finish. |
-| Latest verification of all registered modules | Verified on 2026-10-07 at `b5ba23a4`: normal umbrella and test-entry build (5022 jobs), all registered `lake test` executions, strict audit of 410 declarations and the semantic kernel policy. |
-| Working implementation | Lexical Tree and imperative producers are being connected to actual allocation and reached-state contracts. General bodies and the full compiler theorem remain incomplete. |
+| Latest implementation commit | `6840f01c`. Actual reached-state proofs now cover ordinary lexical allocation, five-way control, bare assignment, finite while, and for header completion/faults. Closed lexical and while consumers are registered. |
+| Latest verification of all registered modules | Verified on 2026-10-07 at `6840f01c`: normal umbrella and test-entry build (5039 jobs), all registered `lake test` executions, a strict audit of 344 declarations in the assignment/header/while/control group, exact retained API comparisons, and the semantic kernel policy. Earlier units have separate kernel audits. |
+| Working implementation | Carry actual states through projected assignment and the for condition/body/post/recursive edges, then connect selected match prefixes and the imperative CatalogSites fold. General bodies, mutual calls, and the full compiler theorem remain incomplete. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Anyone resuming implementation should first read the current status and the handoff at the end of the [implementation record](core-runtime-unification-progress.md). Public API users should consult the [API migration record](core-runtime-unification-api.md); see the [T0 audit](core-runtime-unification-audit.md) for the initial compatibility and semantics investigation.
