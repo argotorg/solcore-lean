@@ -318,4 +318,21 @@ theorem named_prefix {layouts : SourceCoreAllocationLayouts.Prepared}
     frame, finalActualLayout, finalTyped, agreement⟩
 
 
+/-- Public packaging receipt for the original ordered canonical insertion. -/
+theorem insert_at_suffix_receipt (added tail : Environment) (value : Value) :
+    Environment.insertAt (added ++ tail) added.length value = added ++ value :: tail :=
+  insert_at_suffix added tail value
+
+/-- The original lexical representation inserts one typed administrative slot
+at its scope boundary. This wrapper retains the unchanged existing proof. -/
+theorem insert_administrative_receipt {catalog : SourceCoreDataCatalog.Catalog} {nativeDefinitions : DataEnvironment}
+    {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
+    {scope : Scope} {environment : Dynamic.Environment} {canonical : Environment}
+    (related : DataHeap.EnvRepresents catalog mapping world administrative scope environment canonical nativeDefinitions)
+    {value : Value} {type : Ty} (typed : RuntimeValueHasType world value type nativeDefinitions) :
+    DataHeap.EnvRepresents catalog mapping world (type :: administrative) scope environment
+      (Environment.insertAt canonical scope.length value) nativeDefinitions :=
+  insert_administrative related typed
+
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedParameterTyped
