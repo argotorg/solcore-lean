@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreClosedAdmittedWhile
+import Solcore.Test.SourceCoreClosedAdmittedFor
 import Solcore.Test.SourceCoreClosedAdmittedNamedReceipt
 import Solcore.Test.SourceCoreOwnedSelectedLiteralCall
 import Solcore.Test.SourceCoreClosedOwnedMethodPrincipalBuiltin
