@@ -913,6 +913,7 @@ import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupling
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupledExtraction
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupling
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupledExtraction
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectNativePrefix
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
