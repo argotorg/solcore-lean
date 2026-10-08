@@ -108,10 +108,17 @@ variable
     (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
   (inclusion : (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile).Includes functions)
 
-include packet prefixContext observed inclusion prepared in
-/-- The original actual formation supplies the closure. Only its function
-representation is transferred forward to the caller's model. -/
-theorem formation
+include packet profile observed in
+/-- Actual formation supplies independent native typing to the static constructor
+for this same known closure and history. The heap model stays arbitrary. -/
+theorem formation_with_member
+    (member : RuntimeValueHasType world
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+      compiled.indexed.layouts.definitions →
+      functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore))
     (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
     (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
     (coercions : code.sourceNode.coercions = []) :
@@ -139,13 +146,31 @@ theorem formation
     captured code history (Program.ofChecked compiled.sourceProgram) heap ordinary coercions stored reference read
   have nativeTyped := (CallableIndexedLambdaValues.model compiled.indexed profile).runtime_hasType
     (registry := registry) represented
-  have rich : CallableIndexedOwnedPreparedOrdinaryLambdaValues.Represents headers keys registry faults
-      mapping world (FunctionValues.sourceType function) (.closure function)
-      (value code captured.embedding history.native actual)
-      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) :=
-    .prepared_ordinary owner captured code history support (source_origin captured code support owner initial packet)
-      prefixContext observed (reference_index captured code support) nativeTyped prepared
-  exact ⟨sourceTrace, native, inclusion rich, fun _ _ completed => Core.evaluation_deterministic completed native⟩
+  exact ⟨sourceTrace, native, member nativeTyped,
+    fun _ _ completed => Core.evaluation_deterministic completed native⟩
+
+include packet prefixContext observed inclusion prepared in
+/-- The original actual formation supplies the closure. Only its function
+representation is transferred forward to the caller's model. -/
+theorem formation
+    (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions)
+    (ordinary : Dynamic.OrdinaryRequirementLayout code.sourceNode.requirements code.sourceNode.coercions [])
+    (coercions : code.sourceNode.coercions = []) :
+    Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) function.context function.evidence
+      function.source function.captured heap code.id (.closure function) heap ∧
+    Evaluates actual store (code.lowered.expression.rename captured.embedding)
+      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store ∧
+    functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) ∧
+    (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
+      result = .inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual) ∧
+      finalStore = store) := by
+  exact formation_with_member captured code support owner initial packet profile observed functions
+    (fun nativeTyped => inclusion
+      (.prepared_ordinary owner captured code (history_at captured code support owner initial packet) support
+        (source_origin captured code support owner initial packet) prefixContext observed
+        (reference_index captured code support) nativeTyped prepared)) stored ordinary coercions
 
 /-- The output retains all ordinary leaf effects and the exact packet state. -/
 def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap) (result : Value) (finalStore : Store) : Prop :=
@@ -177,10 +202,44 @@ variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgr
   (admitted : Admission (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
     function.context ⟨initial, packet⟩)
 
-include prefixContext observed inclusion prepared sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
-/-- Original Source value and fault inversion select the authentic lambda
-leaf. Its proved formation supplies the actual native and admitted post. -/
-theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+
+include sourceType heaps admitted wellFormed runtime covers locals typed in
+private theorem result_of_formation
+    (sourceTrace : Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
+      function.context function.evidence function.source function.captured heap code.id (.closure function) heap)
+    (native : Evaluates actual store (code.lowered.expression.rename captured.embedding)
+      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store)
+    (represented : functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)) :
+    ResultAt (registry := registry) (faults := faults) captured code support owner initial packet functions
+      (.value (.closure function)) heap
+      (.inRight .word (value code captured.embedding (history_at captured code support owner initial packet).native actual)) store := by
+  have valueRep : ValueRep compiled.compatible.checked registry functions mapping world
+      code.sourceNode.type (.closure function)
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual) code.lowered.type := by
+    rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
+    exact .function represented
+  have post := after_expression
+    (bridge := CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
+    (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
+    ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
+    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
+  exact ⟨native, .value valueRep, heaps, .refl _, .refl _, .refl _ _, .refl _,
+    ⟨initial, packet⟩, Relates.refl initial, post⟩
+
+include profile observed sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
+/-- The actual Source leaf constructs one formation and retains the same reached
+packet under its local static membership constructor. -/
+theorem preserves_at_with_member
+    (member : RuntimeValueHasType world
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+      compiled.indexed.layouts.definitions →
+      functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore))
+    {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) size
       function.context function.evidence function.source function.captured heap code.id outcome after) :
     ∃ result finalStore, ResultAt (registry := registry) (faults := faults) captured code support owner initial packet functions outcome after result finalStore := by
@@ -190,24 +249,54 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
       (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
       (program := Program.ofChecked compiled.sourceProgram) code support.unique coercions evaluated
     obtain ⟨sourceTrace, native, represented, _determined⟩ :=
-      formation captured code support prepared owner initial packet profile prefixContext observed functions inclusion heaps.runtime_hasTypes ordinary coercions
-    have valueRep : ValueRep compiled.compatible.checked registry
-        functions mapping world
-        code.sourceNode.type (.closure function)
-        (value code captured.embedding (history_at captured code support owner initial packet).native actual) code.lowered.type := by
-      rw [sourceType, CallableIndexedOwnedAdmittedMethodLambdaFormation.native_type captured code]
-      exact .function represented
-    have post := after_expression
-      (bridge := CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
-      (context := function.context) (program := Program.ofChecked compiled.sourceProgram)
-      ⟨initial, packet⟩ ⟨initial, packet⟩ admitted wellFormed runtime covers locals typed
-      (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace) (AdministrativePreserved.refl mapping store)
-    exact ⟨_, store, native, .value valueRep, heaps, .refl _, .refl _, .refl _ _, .refl _,
-      ⟨initial, packet⟩, Relates.refl initial, post⟩
+      formation_with_member captured code support owner initial packet profile observed functions member heaps.runtime_hasTypes ordinary coercions
+    exact ⟨_, store, result_of_formation captured code support owner initial packet functions
+      wellFormed runtime covers locals typed sourceType heaps admitted sourceTrace native represented⟩
   | fault failed =>
     exact False.elim (RecursiveNamedLambdaFormationHeads.excludes_fault_of_code
       (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
       (program := Program.ofChecked compiled.sourceProgram) code support.unique coercions failed)
+
+include prefixContext observed inclusion prepared sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
+/-- Original Source value and fault inversion select the authentic lambda
+leaf. Its proved formation supplies the actual native and admitted post. -/
+theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) size
+      function.context function.evidence function.source function.captured heap code.id outcome after) :
+    ∃ result finalStore, ResultAt (registry := registry) (faults := faults) captured code support owner initial packet functions outcome after result finalStore := by
+  exact preserves_at_with_member captured code support owner initial packet profile observed functions
+    wellFormed runtime covers locals typed sourceType ordinary coercions heaps admitted
+    (fun nativeTyped => inclusion
+      (.prepared_ordinary owner captured code (history_at captured code support owner initial packet) support
+        (source_origin captured code support owner initial packet) prefixContext observed
+        (reference_index captured code support) nativeTyped prepared)) trace
+
+include profile observed sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
+/-- Reflection uses one authentic formation, its deterministic native completion
+and independently sized Source trace, under the same local member constructor. -/
+theorem reflects_at_with_member
+    (member : RuntimeValueHasType world
+      (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+      (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+      compiled.indexed.layouts.definitions →
+      functions.Represents registry mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding (history_at captured code support owner initial packet).native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore))
+    {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual store (code.lowered.expression.rename captured.embedding) result finalStore) :
+    ∃ sourceSize outcome after,
+      RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+        function.context function.evidence function.source function.captured heap code.id outcome after ∧
+      ResultAt (registry := registry) (faults := faults) captured code support owner initial packet functions outcome after result finalStore := by
+  obtain ⟨sourceTrace, native, represented, determined⟩ :=
+    formation_with_member captured code support owner initial packet profile observed functions member
+      heaps.runtime_hasTypes ordinary coercions
+  obtain ⟨rfl, rfl⟩ := determined result finalStore completed.sound
+  obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
+    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
+  exact ⟨sourceSize, _, heap, sized,
+    result_of_formation captured code support owner initial packet functions
+      wellFormed runtime covers locals typed sourceType heaps admitted sourceTrace native represented⟩
 
 include prefixContext observed inclusion prepared sourceType ordinary coercions heaps admitted wellFormed runtime covers locals typed in
 /-- The original native completion is deterministic against authentic
@@ -218,14 +307,11 @@ theorem reflects_at {size : Nat} {result : Value} {finalStore : Store}
       RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         function.context function.evidence function.source function.captured heap code.id outcome after ∧
       ResultAt (registry := registry) (faults := faults) captured code support owner initial packet functions outcome after result finalStore := by
-  obtain ⟨sourceTrace, _native, _represented, determined⟩ :=
-    formation captured code support prepared owner initial packet profile prefixContext observed functions inclusion heaps.runtime_hasTypes ordinary coercions
-  obtain ⟨rfl, rfl⟩ := determined result finalStore completed.sound
-  obtain ⟨sourceSize, sized⟩ := RecursiveNamedCallBounds.ExpressionOutcome.has_size
-    (Dynamic.ExpressionEvaluatesOutcome.value sourceTrace)
-  obtain ⟨nativeResult, reachedStore, resultAt⟩ := preserves_at captured code support prepared owner initial packet profile prefixContext observed functions inclusion
-    wellFormed runtime covers locals typed sourceType ordinary coercions heaps admitted sized
-  obtain ⟨rfl, rfl⟩ := determined nativeResult reachedStore resultAt.1
-  exact ⟨sourceSize, _, heap, sized, resultAt⟩
+  exact reflects_at_with_member captured code support owner initial packet profile observed functions
+    wellFormed runtime covers locals typed sourceType ordinary coercions heaps admitted
+    (fun nativeTyped => inclusion
+      (.prepared_ordinary owner captured code (history_at captured code support owner initial packet) support
+        (source_origin captured code support owner initial packet) prefixContext observed
+        (reference_index captured code support) nativeTyped prepared)) completed
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaFormation
