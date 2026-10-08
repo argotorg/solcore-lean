@@ -543,6 +543,12 @@ At `a1bb3536`, the public Header supplies actual per-context assignment provider
 
 A legacy Tree or diagnostic predicate does not yield PreparedAt. Catalog integration must retain actual initializer code, loop post-header receipts and genuine match catalog/context fields. The current coupled match receipt omits its full solved-row identity; emitted code cannot recover unused rows. Unary token interpretation, interpretation of reached table entries as semantic faults, later phases, nonempty coercions and recursive staged semantics remain separate obligations. Public Source admission and all-pass compiler closure remain incomplete.
 
+At `31bf3d35`, genuine public Source program facts derive catalog well-formedness, and strict child induction composes the stored-call parent prefixes at one real callee post. That checkpoint passed 5334 jobs, 7532 strict declarations, 12 fresh declarations and six signatures. The accepted body continuation still needs the callee-to-argument effects retained from the same ordered argument traversal.
+
+At `5faa387e`, the proof umbrella and `Tests.Main` build passed **5338 jobs**. Strict verification checked **7702 declarations**, with **326 fresh module-attributed declarations** across seven new or modified modules and **55 signatures**. All 156 original declarations retain their types and axiom arrays: 154 have exact same-name raw types, and two generated matchers pass independently regenerated literal Lean-expression checks against saved original normal objects. Every final source and all three modified original-module diffs passed parent and two independent reviews. Policy, whitespace, final source hashes and **5009 protected original-file checks** pass.
+
+The Catalog common cores preserve actual initializer code and continuation and exact loop post-header receipts. The compiler extraction carries genuine Source signatures and full solved-row ledger identity through binder and selected-child contexts. Prepared endpoints consume that same static receipt internally; a bare coupled receipt still needs an explicit match-field supplier. Prepared Head/loop providers, precise diagnostics, strict general body closure and all-pass/public-entry composition remain separate obligations. No runtime code or tests changed; actual executions remain those at `3ff3daf4`.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
