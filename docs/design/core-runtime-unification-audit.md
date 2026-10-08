@@ -510,6 +510,12 @@ At `69e3f120`, actual Source call prefixes retain independent callee/argument ty
 
 At `eb7851c3`, genuine equal arity and independent Source/native bundle equalities derive the original binder argument representation. The indirect parent and payload application suffixes preserve the exact native grade, body, captures, argument and stores through finite inversion. Verification passed 5280 normal jobs, 6345 strict declarations, 21 fresh declarations and 11 signatures. All source reviews, policy, whitespace and 5013 other protected-file checks pass. Actual compiler pack provenance, whole-parent composition and coherent public diagnostic lookup remain incomplete; row membership and packed type equality do not replace those obligations.
 
+At `f3a8bc11`, actual native binder packs, accepted stored-call invocation and terminal provider provenance passed 5283 normal jobs, 6409 strict declarations, 64 fresh declarations and 31 signatures. All 16 original prepared-path raw types and axiom arrays match independently saved original normal objects exactly.
+
+At `8d187247`, strict callee bounds construct the actual reached state and retain complete selection; callee faults close the original parent at that same state. Actual contextual lambda generation retains the genuine binder policy and Source monomorphic projections. Original diagnostic preparation supplies all range, fixed and escaped exclusion conditions for coherent raw-error lookup at a genuine MissingSite member. Verification passed 5287 normal jobs, 6628 strict declarations, 223 fresh module-attributed declarations and 17 signatures. All 59 original lambda-generation types and axioms remain exact. Three exact source/diff reviews, kernel policy, whitespace and 5011 other protected-file checks passed. Runtime and registered tests remain unchanged since their actual native and interpreted executions at `3ff3daf4`.
+
+Terminal-to-inventory membership and catalog Source type closure remain separate static obligations. Header occurrence graph closure does not establish type closure. Successful stored-call composition currently requires genuine strong ordinary/principal provenance, same-Code body syntax, actual guard acceptance and independent raw Source bundle/count facts. It does not cover every legacy, rejected or coerced call.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
