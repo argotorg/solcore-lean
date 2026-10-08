@@ -96,11 +96,80 @@ def ClosureResolution (budget : Nat) (value : Value) (finalStore : Store) : Prop
       CallableIndexedOwnedStoredIndirectApplicationPrefix.PassedAt (actual := actual)
         compiler prepared dispatch budget value finalStore))))
 
+
+/-- Each alternative retains its genuine outcome at the actual reached post.
+Accepted arguments retain the entire original receipt, actual intermediate
+effects and fourth-bind grade. -/
+def ClosureResolutionWithEffects (budget : Nat) (value : Value) (finalStore : Store) : Prop :=
+  (∃ reason, value = .inLeft compiler.resultType (.word (dispatch.reason reason)) ∧
+    CallableIndexedOwnedStoredIndirectStageBoundary.ResultAt
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (calleeNode := calleeNode) (mapping := calleeMap) (world := calleeWorld)
+      (calleeHeap := calleeHeap) (store := calleeStore)
+      (environment := environment) (actual := actual) (ξ := ξ) (calleeSize := calleeSize)
+      bridge profile compiler prepared initial dispatch reason (dispatch.reason reason) finalStore) ∨
+  (Staging.CallBoundary.GuardAccepts (CallableLedger.frame sidecar) prepared.site.call ids (.closure function) ∧
+    (CallableIndexedOwnedStoredIndirectArgumentPrefix.FaultPrefix
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge profile compiler initial budget value finalStore ∨
+    (CallableIndexedOwnedStoredIndirectArgumentPrefix.SuccessPrefix
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge profile compiler prepared initial budget value finalStore ∧
+      CallableIndexedOwnedStoredIndirectSuccessStep.SuccessStep
+        (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+        (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+        (calleeMap := calleeMap) (calleeWorld := calleeWorld)
+        bridge profile compiler prepared initial budget value finalStore ∧
+      (CallableIndexedOwnedStoredIndirectApplicationPrefix.RejectedAt
+        (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (sidecar := sidecar) bridge profile compiler prepared initial dispatch value finalStore ∨
+      CallableIndexedOwnedStoredIndirectApplicationPrefix.PassedAt (actual := actual)
+        compiler prepared dispatch budget value finalStore))))
+
 variable (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
     context evidence source environment before callee (.closure function) calleeHeap)
   (post : CallableIndexedOwnedStoredIndirectCalleePost.ValuePost (registry := registry) (faults := faults)
     (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
     bridge profile compiler initial (.closure function) calleeHeap calleeNative calleeStore calleeMap calleeWorld)
+
+include caller sidecarSource parentTyped wellFormed runtime covers environments locals agrees typed admitted
+  calleeTrace post tree unique parent selected in
+/-- Consume static dispatch receipts only at the one actual closure post.
+The existing prefix proofs handle both guards and the ordered children. -/
+theorem resolve_closure_with_effects (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
+      bridge model context evidence source certificate faults size)
+    {value : Value} {finalStore : Store}
+    (receipt : CallableIndexedOwnedStoredIndirectNativePrefix.GatePrefix budget prepared.site
+      native.diagnostics.unknown compiler.resultType
+      ((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ) actual calleeStore calleeNative value finalStore) :
+    ClosureResolutionWithEffects (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (calleeNode := calleeNode) (environment := environment) (actual := actual) (ξ := ξ)
+      (calleeMap := calleeMap) (calleeWorld := calleeWorld) (calleeHeap := calleeHeap)
+      (calleeStore := calleeStore) (calleeSize := calleeSize) (sourceTypes := sourceTypes)
+      bridge profile compiler prepared initial dispatch budget value finalStore := by
+  rcases CallableIndexedOwnedStoredIndirectNativePrefix.resolve_at_post bridge profile compiler prepared initial
+      caller sidecarSource calleeTrace post dispatch receipt with rejected | ⟨accepted, suffixSize, suffix, smaller⟩
+  · exact Or.inl rejected
+  · right
+    refine ⟨accepted, ?_⟩
+    obtain ⟨_caller, _source, arguments⟩ :=
+      CallableIndexedOwnedStoredIndirectArgumentPrefix.reflects_suffix_with_effects bridge profile compiler prepared parentTyped
+        wellFormed runtime covers environments locals agrees typed initial admitted caller sidecarSource calleeTrace post
+        accepted tree unique budget children suffix smaller
+    rcases arguments with failed | succeeded
+    · exact Or.inl failed
+    · right
+      obtain ⟨sameSuccess, verdict⟩ := CallableIndexedOwnedStoredIndirectApplicationPrefix.resolve_success
+        bridge profile compiler prepared parentTyped wellFormed runtime covers locals initial admitted
+        calleeTrace post accepted unique parent dispatch selected budget succeeded.1
+      exact ⟨sameSuccess, succeeded.2, verdict⟩
+
 
 include caller sidecarSource parentTyped wellFormed runtime covers environments locals agrees typed admitted
   calleeTrace post tree unique parent selected in
@@ -118,21 +187,13 @@ theorem resolve_closure (budget : Nat)
       (calleeMap := calleeMap) (calleeWorld := calleeWorld) (calleeHeap := calleeHeap)
       (calleeStore := calleeStore) (calleeSize := calleeSize) (sourceTypes := sourceTypes)
       bridge profile compiler prepared initial dispatch budget value finalStore := by
-  rcases CallableIndexedOwnedStoredIndirectNativePrefix.resolve_at_post bridge profile compiler prepared initial
-      caller sidecarSource calleeTrace post dispatch receipt with rejected | ⟨accepted, suffixSize, suffix, smaller⟩
+  have resolution := resolve_closure_with_effects bridge profile compiler prepared parentTyped wellFormed runtime
+    covers environments locals agrees typed initial admitted caller sidecarSource tree unique parent
+    dispatch selected calleeTrace post budget children receipt
+  rcases resolution with rejected | ⟨accepted, arguments⟩
   · exact Or.inl rejected
-  · right
-    refine ⟨accepted, ?_⟩
-    obtain ⟨_caller, _source, arguments⟩ :=
-      CallableIndexedOwnedStoredIndirectArgumentPrefix.reflects_suffix bridge profile compiler prepared parentTyped
-        wellFormed runtime covers environments locals agrees typed initial admitted caller sidecarSource calleeTrace post
-        accepted tree unique budget children suffix smaller
-    rcases arguments with failed | succeeded
-    · exact Or.inl failed
-    · right
-      exact CallableIndexedOwnedStoredIndirectApplicationPrefix.resolve_success bridge profile compiler prepared parentTyped
-        wellFormed runtime covers locals initial admitted calleeTrace post accepted unique parent
-        dispatch selected budget succeeded
+  · refine Or.inr ⟨accepted, ?_⟩
+    exact arguments.elim Or.inl (fun succeeded => Or.inr ⟨succeeded.1, succeeded.2.2⟩)
 
 /-- A produced value preserves one concrete callee post and a resolver whose
 closure and attached-row inputs are indexed by precisely that same witness.
@@ -159,6 +220,71 @@ def ValuePrefix (budget : Nat) (value : Value) (finalStore : Store) : Prop :=
           (calleeStore := calleeStore) (calleeSize := sourceSize) (sourceTypes := sourceTypes)
           bridge profile compiler prepared initial dispatch budget value finalStore
 
+
+/-- A produced value preserves one concrete callee post and a resolver whose
+closure and attached-row inputs are indexed by precisely that same witness.
+The successful resolver retains its true intermediate argument effects.
+Existence of those static inputs remains a separate provenance obligation. -/
+def ValuePrefixWithEffects (budget : Nat) (value : Value) (finalStore : Store) : Prop :=
+  ∃ nativeSize sourceSize sourceValue after carrier calleeStore finalMap finalWorld,
+    EvaluationSize nativeSize actual store (compiler.calleeCode.expression.rename ξ)
+      (.inRight .word carrier) calleeStore ∧ nativeSize < budget ∧
+    SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) sourceSize
+      context evidence source environment before callee sourceValue after ∧
+    CallableIndexedOwnedStoredIndirectCalleePost.ValuePost (registry := registry) (faults := faults)
+      (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
+      bridge profile compiler initial sourceValue after carrier calleeStore finalMap finalWorld ∧
+    CallableIndexedOwnedStoredIndirectNativePrefix.GatePrefix budget prepared.site native.diagnostics.unknown compiler.resultType
+      ((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ) actual calleeStore carrier value finalStore ∧
+    ∀ (function : Dynamic.Closure), sourceValue = .closure function →
+      ∀ (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids
+          (.closure function) carrier)
+        (_selected : CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata
+          compiler.original dispatch.row),
+        ClosureResolutionWithEffects (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+          (calleeNode := calleeNode) (environment := environment) (actual := actual) (ξ := ξ)
+          (calleeMap := finalMap) (calleeWorld := finalWorld) (calleeHeap := after)
+          (calleeStore := calleeStore) (calleeSize := sourceSize) (sourceTypes := sourceTypes)
+          bridge profile compiler prepared initial dispatch budget value finalStore
+
+include prepared certified found sourceTyped parentTyped wellFormed runtime covers
+  environments heaps locals agrees typed admitted caller sidecarSource tree unique parent in
+/-- Reflect the whole native parent through its actual strict children. Callee
+faults are closed internally; one successful post carries the finite resolver
+for genuine closure/dispatch receipts, with no successful child premise. -/
+theorem reflects_parent_with_effects (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
+      bridge model context evidence source certificate faults size)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
+    (within : size ≤ budget) :
+    SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar ∧
+    sidecar.source = source ∧
+    (CallableIndexedOwnedStoredIndirectNativePrefix.FaultPrefix
+        (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar)
+        bridge profile compiler initial budget value finalStore ∨
+      ValuePrefixWithEffects (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (calleeNode := calleeNode)
+        (sourceTypes := sourceTypes) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) := by
+  obtain ⟨sameCaller, sameSource, producedPrefix⟩ :=
+    CallableIndexedOwnedStoredIndirectNativePrefix.reflects_prefix bridge profile compiler prepared certified found
+      sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed initial admitted
+      caller sidecarSource budget children completed within
+  refine ⟨sameCaller, sameSource, ?_⟩
+  rcases producedPrefix with failed | succeeded
+  · exact Or.inl failed
+  · right
+    obtain ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
+      child, childStrict, trace, post, gate⟩ := succeeded
+    refine ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
+      child, childStrict, trace, post, gate, ?_⟩
+    intro function sameClosure dispatch selected
+    cases sameClosure
+    exact resolve_closure_with_effects bridge profile compiler prepared parentTyped wellFormed runtime covers environments locals
+      agrees typed initial admitted caller sidecarSource tree unique parent dispatch selected trace post budget children gate
+
+
 include prepared certified found sourceTyped parentTyped wellFormed runtime covers
   environments heaps locals agrees typed admitted caller sidecarSource tree unique parent in
 /-- Reflect the whole native parent through its actual strict children. Callee
@@ -179,21 +305,22 @@ theorem reflects_parent (budget : Nat)
       ValuePrefix (registry := registry) (faults := faults) (context := context) (evidence := evidence)
         (environment := environment) (actual := actual) (ξ := ξ) (calleeNode := calleeNode)
         (sourceTypes := sourceTypes) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) := by
-  obtain ⟨sameCaller, sameSource, producedPrefix⟩ :=
-    CallableIndexedOwnedStoredIndirectNativePrefix.reflects_prefix bridge profile compiler prepared certified found
-      sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed initial admitted
-      caller sidecarSource budget children completed within
+  obtain ⟨sameCaller, sameSource, producedPrefix⟩ := reflects_parent_with_effects bridge profile compiler prepared
+    certified found sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed
+    initial admitted caller sidecarSource tree unique parent budget children completed within
   refine ⟨sameCaller, sameSource, ?_⟩
   rcases producedPrefix with failed | succeeded
   · exact Or.inl failed
   · right
     obtain ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
-      child, childStrict, trace, post, gate⟩ := succeeded
+      child, childStrict, trace, post, gate, resolver⟩ := succeeded
     refine ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
       child, childStrict, trace, post, gate, ?_⟩
     intro function sameClosure dispatch selected
-    cases sameClosure
-    exact resolve_closure bridge profile compiler prepared parentTyped wellFormed runtime covers environments locals
-      agrees typed initial admitted caller sidecarSource tree unique parent dispatch selected trace post budget children gate
+    have resolution := resolver function sameClosure dispatch selected
+    rcases resolution with rejected | ⟨accepted, arguments⟩
+    · exact Or.inl rejected
+    · refine Or.inr ⟨accepted, ?_⟩
+      exact arguments.elim Or.inl (fun succeeded => Or.inr ⟨succeeded.1, succeeded.2.2⟩)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectParentPrefix
