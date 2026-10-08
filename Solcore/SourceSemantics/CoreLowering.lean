@@ -997,6 +997,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualMissingDi
 import Solcore.SourceSemantics.CoreLowering.BuiltinFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinExpressionFaultPaths
 import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinFragmentOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.ReachedIndexMissingDiagnosticObservations
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
