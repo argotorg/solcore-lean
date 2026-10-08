@@ -860,6 +860,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedObservedGeneralC
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureInvocation
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStoredClosureInvocation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureAssociation
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
