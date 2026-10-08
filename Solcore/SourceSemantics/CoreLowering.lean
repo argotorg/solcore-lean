@@ -918,6 +918,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPointwis
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderStructuralElimination
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderCoupledReadyBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedAssignmentReadiness
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
