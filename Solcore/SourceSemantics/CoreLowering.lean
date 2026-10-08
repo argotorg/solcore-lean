@@ -1010,6 +1010,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCompiler
 import Solcore.SourceSemantics.CoreLowering.ProtectedReadyExpressionFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequenceFaultBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStoredIndirectPreservation
+import Solcore.SourceSemantics.CoreLowering.NamedArgumentFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.ReachedNamedArgumentFaultPaths
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedNamedArgumentFaultBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
