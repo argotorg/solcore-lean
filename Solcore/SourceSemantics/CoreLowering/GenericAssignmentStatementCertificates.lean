@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatementHead
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceLayoutCertificates
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentPreparedOrigins
 
 /-! Assignment certificates follow the successful production place callback
 and flow branch. Independent source typing and native site typing remain
@@ -102,7 +103,7 @@ private theorem keys_of_generated {checked : Checked} {source : TypedSource} {si
   rw [PreparedPath.key_ids path] at tree
   exact ⟨types, tree, receipts.2⟩
 
-theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
+theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSource}
     {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
     {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
     {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
@@ -123,13 +124,15 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
       output next reasonAt invalidProjection invalidOperand missing = .ok code)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
-      code = head.emit next output ∧ head.invalid = invalidOperand := by
+      code = head.emit next output ∧ head.invalid = invalidOperand ∧
+        head.PreparedAt site fuel invalidProjection missing := by
   classical
   by_cases bare : assignment.target.projections = []
-  · apply Head.of_lower_bare_with_token bare unique writable rightTyped profile ?_ accepted
-    intro lowered generated
-    obtain ⟨node, found, tree, _⟩ := extract rhs lowered (by simp) generated
-    exact ⟨node, found, tree⟩
+  · obtain ⟨head, emitted, token⟩ := Head.of_lower_bare_with_token bare unique writable rightTyped profile
+      (fun lowered generated => by
+        obtain ⟨node, found, tree, _⟩ := extract rhs lowered (by simp) generated
+        exact ⟨node, found, tree⟩) accepted
+    exact ⟨head, emitted, token, .bare bare⟩
   · cases generated_of_lower accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
@@ -166,11 +169,42 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
         have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl⟩
-        rcases profile with equal | word | integer
-        · exact .inl equal
-        · exact .inr (.inl (leafView.trans word))
-        · exact .inr (.inr (leafView.trans integer))
+          found, certified, by simpa only [rawType] using leafView, rhsType, ?_⟩, by simp [Head.emit, routeEq], rfl, ?_⟩
+        · rcases profile with equal | word | integer
+          · exact .inl equal
+          · exact .inr (.inl (leafView.trans word))
+          · exact .inr (.inr (leafView.trans integer))
+        · exact .projected route layout ordinary rfl described preparedBy
+
+/-- Compatibility projection retains the original selected head and token. -/
+theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
+    {context : SourceSemantics.Context} {certificate : GenericExpressionMeaning.Certificate} {reasonAt : ExpressionId → Word}
+    {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution} {operator : Solcore.Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {expression : ExpressionLowerer} {fuel : Nat} {site : SourceCoreElaboration.ErrorSite}
+    {next code : Expr} {output result : Ty} {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word}
+    (unique : NodeOccurrencesUnique source) (signatures : context.signatures = values.checked.signatures)
+    (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
+      SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+    (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
+      expression fuel source scope id reasonAt = .ok lowered → ∃ node,
+      source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
+      HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression (LanguageResult.resultType lowered.type) definitions)
+    (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
+      output next reasonAt invalidProjection invalidOperand missing = .ok code)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
+    ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
+      code = head.emit next output ∧ head.invalid = invalidOperand := by
+  obtain ⟨head, emitted, token, _preparedAt⟩ := Head.of_lower_with_prepared unique signatures sourceTyped writable
+    rightTyped profile extract accepted typed
+  exact ⟨head, emitted, token⟩
+
+/-- The original static key matcher retains its exact public type. -/
+abbrev Head.of_lower_with_token.match_1_1 := @Head.of_lower_with_prepared.match_1_1
 
 /-- Compatibility projection of the actual compiler receipt. -/
 theorem Head.of_lower {values : ValuesContext} {source : TypedSource}

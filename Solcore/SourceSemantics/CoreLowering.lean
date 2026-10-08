@@ -894,6 +894,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceMissingTerminalReceipt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureArityBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureArityDiagnostics
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentPreparedOrigins
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
