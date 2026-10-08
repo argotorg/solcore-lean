@@ -557,6 +557,12 @@ Accepted stored-call adapters retain the real callee-to-argument effects from on
 
 Prepared Head/loop production, public flow/finish family closure, precise diagnostics, nonempty coercion and stage routes, Source admission and all-pass compiler closure remain incomplete. Runtime code and tests are unchanged; actual native and interpreted executions remain those at `3ff3daf4`.
 
+At `0a3ab594`, the proof umbrella and `Tests.Main` build passed **5349 jobs**. Strict verification checked **7843 declarations**, with **148 fresh module-attributed declarations** across ten new or modified modules and **55 signatures**. All 72 original declarations retain exact same-name raw types and axiom arrays against independently saved normal objects. Every final source or complete original-module diff passed parent and two independent reviews. Policy, whitespace, final source hashes and **5009 protected original-file checks** pass. This checkpoint changes proofs; the most recent actual native and interpreted executions remain those at `3ff3daf4`.
+
+Prepared initializer/Head/loop providers now construct genuine reached header results and exact post receipts internally. Their legacy wrappers and the three post restorations share the existing finite proof bodies. Public Source-site inputs and successful Source heap typing retain the actual original body receipt. Whole stored-call reflection retains ordered argument effects and the actual callee post through accepted ordinary/principal body invocation; its provenance callback does not establish a complete classifier. All 72 original declarations have exact raw types and axiom arrays.
+
+Next: connect the actual public flow through the existing function finish and named callbacks carrying genuine parameter receipts into the same measured family. Prove that typed Source bodies cannot let break or continue escape the function, and retain actual lambda formation provenance through stored values. Precise reached diagnostic interpretation, complete callee classification, general rejection/coercion and stage coverage, public Source admission, all-pass composition and the final compiler theorem remain unfinished. Semantic child callbacks must come from strict mutual induction.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
