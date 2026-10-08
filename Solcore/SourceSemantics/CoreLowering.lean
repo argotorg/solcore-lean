@@ -926,6 +926,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureC
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectParentPrefix
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchStructuralElimination
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeCatalogPayloadContracts
+import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
