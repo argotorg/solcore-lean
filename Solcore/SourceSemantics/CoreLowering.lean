@@ -939,6 +939,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPostReceiptOpera
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedSourceSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectParentApplication
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedParameterReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedExpressionRuntimeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
