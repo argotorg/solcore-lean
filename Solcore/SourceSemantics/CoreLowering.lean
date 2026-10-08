@@ -985,6 +985,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.ReachedRecursiveFragmentOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMissingSourceReceipts
+import Solcore.SourceSemantics.CoreLowering.CompatibleContextualDiagnosticMissingOrigins
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
