@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPostReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedWhileBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedMatchBounds
@@ -92,6 +93,65 @@ abbrev ReflectingGoal := RecursiveNamedImperativeFor.Stateful.WithReady.Reflects
   (frame := frame) (globals := globals) (onError := onError) (source := source)
   (administrative := administrative) (registry := registry) (faults := faults)
 
+open ProtectedStateImperativeCatalogPayload (HeaderReceiptFamily)
+
+abbrev PreservingGoalWithReceipt (R : HeaderReceiptFamily) := ProtectedStateImperativeCatalogPayload.PreservesAtWithReceipt
+  callerProtocol (readiness bridge) guard
+  (ProtectedStateImperativeTypedSourceSites.Facts source expressionSyntax)
+  (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+  (ProtectedStateImperativeInitializerSourceSites.Facts source expressionSyntax)
+  (validity := validity)
+  functions program evidence budget R
+  (frame := frame) (globals := globals) (source := source)
+  (administrative := administrative) (registry := registry) (faults := faults)
+
+abbrev ReflectingGoalWithReceipt (R : HeaderReceiptFamily) := ProtectedStateImperativeCatalogPayload.ReflectsAtWithReceipt
+  callerProtocol (readiness bridge) guard
+  (ProtectedStateImperativeTypedSourceSites.Facts source expressionSyntax)
+  (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+  (ProtectedStateImperativeInitializerSourceSites.Facts source expressionSyntax)
+  (validity := validity)
+  functions program evidence budget R
+  (frame := frame) (globals := globals) (source := source)
+  (administrative := administrative) (registry := registry) (faults := faults)
+
+include stateTransport unique in
+theorem preserving_loops_with_receipts
+    (R : HeaderReceiptFamily)
+    (HP : GenericImperativeMatch.Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative))
+    (postSuccess : CallableIndexedOwnedPostReceiptOperations.PrefixAt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (certificates := certificates) (administrative := administrative) (registry := registry) bridge functions evidence guard validity budget HP)
+    (postFault : CallableIndexedOwnedPostReceiptOperations.FaultAt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget HP)
+    (meaning : ∀ context, validity context → Below budget (fun size =>
+      CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        context evidence source (certificates context) faults size)) :
+    ProtectedStateImperativeCatalogPayload.PreservingLoopsWithPayload callerProtocol (readiness bridge) guard
+      (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+      functions program evidence validity budget
+      (PreservingGoalWithReceipt bridge functions evidence guard validity budget R (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax) (administrative := administrative) (registry := registry) (faults := faults))
+      HP (administrative := administrative) (layouts := layouts) (owner := owner)
+      (active := active) (frame := frame) (globals := globals) (onError := onError)
+      (values := values) (source := source) (expressionSyntax := expressionSyntax)
+      (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
+  intro context scope condition post statements expected type code recipe loopFacts
+  cases recipe with
+  | mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child =>
+    obtain ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩ := loopFacts
+    have packet : CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax context condition post statements expected :=
+      ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩
+    intro size bounded valid
+    refine (CallableIndexedOwnedAdmittedForBounds.loop_preserves_bounded_for bridge guard functions evidence stateTransport validity budget
+      (meaning context valid) packet conditionFound conditionTree typed unique
+      (fun size smaller => child size (Nat.le_of_lt smaller)) ?_ ?_) size bounded valid
+    · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid size smaller
+      intro mapping world before after store finalContext finalEnvironment state native read guarded ready continued trace
+      exact postSuccess postTree postErrors valid postTyped agrees reference
+        state read guarded ready continued trace (Nat.le_of_lt smaller)
+    · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid size smaller
+      intro mapping world before after store finalContext reason state native read guarded ready continued trace
+      exact postFault postTree postErrors
+        valid postTyped agrees reference state read guarded ready continued trace (Nat.le_of_lt smaller)
+
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
 theorem preserving_loops
     (meaning : ∀ context, validity context → Below budget (fun size =>
@@ -109,25 +169,49 @@ theorem preserving_loops
   intro context scope condition post statements expected type code recipe loopFacts
   cases recipe with
   | mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child =>
+    exact preserving_loops_with_receipts (stateTransport := stateTransport) (unique := unique) bridge functions evidence guard validity budget
+      (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults) (fun tree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree)
+      (CallableIndexedOwnedPostReceiptOperations.prefixat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative)
+        bridge functions evidence guard validity budget (fun tree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree) (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+        (fun tree errors => ⟨tree, errors⟩)
+        (CallableIndexedOwnedHeaderReceiptOperations.legacy_PrefixAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning))
+      (CallableIndexedOwnedPostReceiptOperations.faultat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative) (faults := faults)
+        bridge functions evidence guard validity budget (fun tree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree) (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+        (fun tree errors => ⟨tree, errors⟩)
+        (CallableIndexedOwnedHeaderReceiptOperations.legacy_FaultAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning))
+      meaning
+      (.mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child) loopFacts
+
+include stateTransport unique in
+theorem reflecting_loops_with_receipts
+    (R : HeaderReceiptFamily)
+    (HP : GenericImperativeMatch.Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative))
+    (postReflection : CallableIndexedOwnedPostReceiptOperations.ReflectsAt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget HP)
+    (reflection : ∀ context, validity context → Below budget (fun size =>
+      CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        context evidence source (certificates context) faults size)) :
+    ProtectedStateImperativeCatalogPayload.ReflectingLoopsWithPayload callerProtocol (readiness bridge) guard
+      (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+      functions program evidence validity budget
+      (ReflectingGoalWithReceipt bridge functions evidence guard validity budget R (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax) (administrative := administrative) (registry := registry) (faults := faults))
+      HP (administrative := administrative) (layouts := layouts) (owner := owner)
+      (active := active) (frame := frame) (globals := globals) (onError := onError)
+      (values := values) (source := source) (expressionSyntax := expressionSyntax)
+      (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
+  intro context scope condition post statements expected type code recipe loopFacts
+  cases recipe with
+  | mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child =>
     obtain ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩ := loopFacts
     have packet : CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax context condition post statements expected :=
       ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩
     intro size bounded valid
-    refine (CallableIndexedOwnedAdmittedForBounds.loop_preserves_bounded_for bridge guard functions evidence stateTransport validity budget
-      (meaning context valid) packet conditionFound conditionTree typed unique
-      (fun size smaller => child size (Nat.le_of_lt smaller)) ?_ ?_) size bounded valid
+    refine (CallableIndexedOwnedAdmittedForBounds.loop_reflects_bounded_from_tree_for bridge guard functions evidence stateTransport validity budget
+      (reflection context valid) packet conditionFound conditionTree typed unique child ?_ bodyTree) size bounded valid
     · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid size smaller
-      intro mapping world before after store finalContext finalEnvironment state native read guarded ready continued trace
-      exact CallableIndexedOwnedAdmittedForHeaderBounds.post_preserves_bounded_for
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget meaning postTree valid postTyped agrees reference
-        state read guarded ready continued trace (Nat.le_of_lt smaller)
-    · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid size smaller
-      intro mapping world before after store finalContext reason state native read guarded ready continued trace
-      exact CallableIndexedOwnedAdmittedForHeaderBounds.post_fault_reachable_bounded_for
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget meaning postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors)
-        valid postTyped agrees reference state read guarded ready continued trace (Nat.le_of_lt smaller)
+      intro mapping world before store finalStore value state native read guarded ready continued evaluated
+      exact postReflection postTree postErrors
+        valid postTyped agrees reference state read guarded ready continued evaluated (Nat.le_of_lt smaller)
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
 theorem reflecting_loops (functionTypes : FunctionRuntimeViews functions)
@@ -146,21 +230,20 @@ theorem reflecting_loops (functionTypes : FunctionRuntimeViews functions)
   intro context scope condition post statements expected type code recipe loopFacts
   cases recipe with
   | mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child =>
-    obtain ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩ := loopFacts
-    have packet : CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax context condition post statements expected :=
-      ⟨control, bodyFinal, bodyFacts, postFinal, conditionTyped, bodySyntax, bodyTyped, postTyped, postSyntax⟩
-    intro size bounded valid
-    refine (CallableIndexedOwnedAdmittedForBounds.loop_reflects_bounded_from_tree_for bridge guard functions evidence stateTransport validity budget
-      (reflection context valid) packet conditionFound conditionTree typed unique child ?_ bodyTree) size bounded valid
-    · intro actualContext environment canonical actual ξ contextLocation location agrees reference valid size smaller
-      intro mapping world before store finalStore value state native read guarded ready continued evaluated
-      exact CallableIndexedOwnedAdmittedForHeaderBounds.post_reflects_reachable_bounded_for
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget functionTypes reflection postTree (GenericForHeader.Tree.ErrorsFor.reachable postErrors)
-        valid postTyped agrees reference state read guarded ready continued evaluated (Nat.le_of_lt smaller)
+    exact reflecting_loops_with_receipts (stateTransport := stateTransport) (unique := unique) bridge functions evidence guard validity budget
+      (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults) (fun tree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree)
+      (CallableIndexedOwnedPostReceiptOperations.reflectsat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative) (faults := faults)
+        bridge functions evidence guard validity budget (fun tree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults tree) (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+        (fun tree errors => ⟨tree, errors⟩)
+        (CallableIndexedOwnedHeaderReceiptOperations.legacy_ReflectsAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy functionTypes reflection))
+      reflection
+      (.mk conditionFound conditionType conditionTree bodyTree postTree postErrors typed child) loopFacts
 
-include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend runtimeOf in
-theorem preserving_heads
+include definitions registered extension producer acquire stateTransport stateBindings unique extend runtimeOf in
+theorem preserving_heads_with_receipts
+    (R : HeaderReceiptFamily)
+    (headerPrefix : CallableIndexedOwnedHeaderReceiptOperations.PrefixAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) bridge functions evidence guard validity budget R)
+    (headerFault : CallableIndexedOwnedHeaderReceiptOperations.FaultAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget R)
     (meaning : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -168,7 +251,7 @@ theorem preserving_heads
     PreservingHeads callerProtocol (readiness bridge) guard
       (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
       functions program evidence validity budget
-      (PreservingGoal bridge functions evidence guard validity budget diagnosticPolicy (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults))
+      (PreservingGoalWithReceipt bridge functions evidence guard validity budget R (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax) (administrative := administrative) (registry := registry) (faults := faults))
       (administrative := administrative) (layouts := layouts) (owner := owner)
       (active := active) (frame := frame) (globals := globals) (onError := onError)
       (values := values) (source := source) (expressionSyntax := expressionSyntax)
@@ -181,9 +264,8 @@ theorem preserving_heads
       (meaning context valid) found form conditionFound conditionTree typed unique
       (fun childSize less => child childSize (Nat.le_of_lt less))) size bounded valid
   | forLoop found form child =>
-    exact CallableIndexedOwnedAdmittedForHeadBounds.header_preserves
-      bridge functions definitions registered extension evidence faithful observations guard producer acquire stateTransport stateBindings unique wellFormed
-      validity runtime covers extend budget diagnosticPolicy meaning found form child
+    exact CallableIndexedOwnedAdmittedForHeadBounds.header_preserves_with_receipt
+      (unique := unique) bridge functions evidence guard validity budget R headerPrefix headerFault found form child
   | @matchWith node resolution scrutineeNode _expected _type _code selfReason originalControl caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children catalog patternContext child =>
     rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
     dsimp only at sameValues
@@ -233,7 +315,29 @@ theorem preserving_heads
           ⟨match_child_syntax parentFacts found form scrutineeFound selectedContext, ⟨control, staticFinal, facts, bodyTyped⟩⟩ environments heaps locals agrees typed reference read unmapped state gated ready trace
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend runtimeOf in
-theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
+theorem preserving_heads
+    (meaning : ∀ context, validity context → Below budget (fun size =>
+      CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        context evidence source (certificates context) faults size)) :
+    PreservingHeads callerProtocol (readiness bridge) guard
+      (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
+      functions program evidence validity budget
+      (PreservingGoal bridge functions evidence guard validity budget diagnosticPolicy (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults))
+      (administrative := administrative) (layouts := layouts) (owner := owner)
+      (active := active) (frame := frame) (globals := globals) (onError := onError)
+      (values := values) (source := source) (expressionSyntax := expressionSyntax)
+      (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
+  exact preserving_heads_with_receipts bridge functions definitions registered extension evidence guard producer acquire stateTransport stateBindings unique validity extend budget runtimeOf
+    (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_PrefixAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_FaultAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning)
+    meaning
+
+include definitions registered extension producer acquire stateTransport stateBindings unique extend runtimeOf in
+theorem reflecting_heads_with_receipts
+    (R : HeaderReceiptFamily)
+    (headerReflection : CallableIndexedOwnedHeaderReceiptOperations.ReflectsAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget R)
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
         (CompatibleAmbientHeap.payloadModel values.checked registry functions)
@@ -241,7 +345,7 @@ theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
     ReflectingHeads callerProtocol (readiness bridge) guard
       (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
       functions program evidence validity budget
-      (ReflectingGoal bridge functions evidence guard validity budget diagnosticPolicy (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults))
+      (ReflectingGoalWithReceipt bridge functions evidence guard validity budget R (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax) (administrative := administrative) (registry := registry) (faults := faults))
       (administrative := administrative) (layouts := layouts) (owner := owner)
       (active := active) (frame := frame) (globals := globals) (onError := onError)
       (values := values) (source := source) (expressionSyntax := expressionSyntax)
@@ -254,9 +358,8 @@ theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
       (reflection context valid) found form conditionFound conditionTree typed unique
       (fun childSize less => child childSize less) bodyTree) size (Nat.le_of_lt bounded) valid
   | forLoop found form child =>
-    exact CallableIndexedOwnedAdmittedForHeadBounds.header_reflects
-      bridge functions definitions registered extension evidence faithful observations guard producer acquire stateTransport stateBindings unique wellFormed
-      validity runtime covers extend budget diagnosticPolicy functionTypes reflection found form child
+    exact CallableIndexedOwnedAdmittedForHeadBounds.header_reflects_with_receipt
+      (unique := unique) bridge functions evidence guard validity budget R headerReflection found form child
   | @matchWith node resolution scrutineeNode _expected _type _code selfReason originalControl caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children catalog patternContext child =>
     rcases compilation with ⟨compiledValues, requirements, cells, nativeDefs⟩
     dsimp only at sameValues
@@ -304,5 +407,24 @@ theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
           .default selected.defaultBody_eq scopeIds
         exact child ⟨_, statements, body⟩ certified context selectedContext childSize less valid
           ⟨match_child_syntax parentFacts found form scrutineeFound selectedContext, ⟨control, staticFinal, facts, bodyTyped⟩⟩ environments heaps locals agrees typed reference read unmapped state gated ready trace
+
+include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend runtimeOf in
+theorem reflecting_heads (functionTypes : FunctionRuntimeViews functions)
+    (reflection : ∀ context, validity context → Below budget (fun size =>
+      CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        context evidence source (certificates context) faults size)) :
+    ReflectingHeads callerProtocol (readiness bridge) guard
+      (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
+      functions program evidence validity budget
+      (ReflectingGoal bridge functions evidence guard validity budget diagnosticPolicy (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (source := source) (expressionSyntax := expressionSyntax) (certificates := certificates) (administrative := administrative) (registry := registry) (faults := faults))
+      (administrative := administrative) (layouts := layouts) (owner := owner)
+      (active := active) (frame := frame) (globals := globals) (onError := onError)
+      (values := values) (source := source) (expressionSyntax := expressionSyntax)
+      (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
+  exact reflecting_heads_with_receipts bridge functions definitions registered extension evidence guard producer acquire stateTransport stateBindings unique validity extend budget runtimeOf
+    (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_ReflectsAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy functionTypes reflection)
+    reflection
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedCatalogProducers

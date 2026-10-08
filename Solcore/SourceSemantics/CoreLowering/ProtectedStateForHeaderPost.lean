@@ -46,6 +46,40 @@ variable (readiness : Readiness protocol)
   (sites : StaticSites facts itemFacts exprFacts assignmentFacts snapshotFacts program evidence source)
   (transfers : AllocationTransfers protocol readiness stateBindings source)
 
+theorem post_preserves_bounded_for_with_header_result
+    (validity : SourceSemantics.Context → Prop)
+    {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment} {native : CallableIndexedHistory.NativeFrame}
+    (state : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode body (postCode.rename ξ) selfReason mapping world before store)
+    (continued : Bool)
+    (headerResult : ∃ tail : TailFor protocol guard validity registry functions source solved evidence administrative frameLayout globals
+        contextLocation native (TypedForHeader.Fallthrough type) finalContext finalEnvironment after,
+      LocationMap.Extends mapping tail.mapping ∧ WorldExtends world tail.world ∧
+      AdministrativePreserved mapping store tail.mapping tail.store ∧ Dynamic.HeapMetadataExtend before after ∧
+      protocol.Relates state.retained tail.state ∧
+      Nonempty (ReadyReturn protocol readiness context scope canonical finalContext tail.scope tail.canonical) ∧
+      readiness.Ready finalContext tail.state ∧
+      ContinuationAgreement (postValues type location continued ++ actual) store (postCode.rename ((fun index => index + 6) ∘ ξ))
+        tail.actual tail.store (tail.code.rename tail.embedding)) :
+    ∃ finalStore finalMap finalWorld,
+      Evaluates (postValues type location continued ++ actual) store (ForLoop.postCode (postCode.rename ξ))
+        (LocalLoop.fallthroughValue type) finalStore ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ readiness.Ready context reached.retained := by
+  obtain ⟨tail, maps, worlds, preservation, metadata, related, ⟨returnTo⟩, tailReady, agreement⟩ := headerResult
+  have progress : Progress values registry functions before after mapping tail.mapping world tail.world store tail.store :=
+    ⟨tail.heaps, maps, worlds, preservation, metadata⟩
+  let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode body (postCode.rename ξ) selfReason tail.mapping tail.world after tail.store :=
+    ⟨state.live.progress progress, returnTo.restore tail.state⟩
+  have retained : protocol.Relates state.retained reached.retained := protocol.trans related (returnTo.related tail.state)
+  have reachedReady : readiness.Ready context reached.retained := returnTo.restore_ready tail.state tailReady
+  exact ⟨tail.store, tail.mapping, tail.world,
+    by simpa only [post_rename] using agreement.wrap tail.toTailFor.fallthrough_evaluates,
+    progress, reached, retained, reachedReady⟩
+
 include definitions registered observations producer acquire stateTransport stateBindings sites transfers solved in
 theorem post_preserves_bounded_for
     (validity : SourceSemantics.Context → Prop)
@@ -90,16 +124,38 @@ theorem post_preserves_bounded_for
       validity extend budget assignments boundedMeaning tree valid itemsFacts
       state.live.environments state.live.heaps state.live.locals (postValues_agree agrees type location continued)
       postTyped reference read state.live.contextUnmapped state.retained guarded ready trace bounded
-  have progress : Progress values registry functions before after mapping tail.mapping world tail.world store tail.store :=
-    ⟨tail.heaps, maps, worlds, preservation, metadata⟩
+  exact post_preserves_bounded_for_with_header_result protocol guard functions evidence readiness validity state continued
+    ⟨tail, maps, worlds, preservation, metadata, related, ⟨returnTo⟩, tailReady, agreement⟩
+
+theorem post_fault_reachable_bounded_for_with_header_result
+    {reason : Dynamic.SemanticFault}
+    (state : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode body (postCode.rename ξ) selfReason mapping world before store)
+    (continued : Bool)
+    (headerResult : ∃ token finalStore finalMap finalWorld,
+      Evaluates (postValues type location continued ++ actual) store (postCode.rename ((fun index => index + 6) ∘ ξ))
+        (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧ faults reason token ∧
+      CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      FaultTransition readiness state.retained ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates (postValues type location continued ++ actual) store (ForLoop.postCode (postCode.rename ξ))
+        (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧ faults reason token ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ readiness.FaultReady reached.retained := by
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, preservation, metadata, transition⟩ := headerResult
+  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
+    ⟨heaps, maps, worlds, preservation, metadata⟩
+  obtain ⟨finalState, retained, faultReady⟩ := transition
   let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
-      contextLocation location type conditionCode body (postCode.rename ξ) selfReason tail.mapping tail.world after tail.store :=
-    ⟨state.live.progress progress, returnTo.restore tail.state⟩
-  have retained : protocol.Relates state.retained reached.retained := protocol.trans related (returnTo.related tail.state)
-  have reachedReady : readiness.Ready context reached.retained := returnTo.restore_ready tail.state tailReady
-  exact ⟨tail.store, tail.mapping, tail.world,
-    by simpa only [post_rename] using agreement.wrap tail.toTailFor.fallthrough_evaluates,
-    progress, reached, retained, reachedReady⟩
+      contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore :=
+    ⟨state.live.progress progress, finalState⟩
+  exact ⟨token, finalStore, finalMap, finalWorld,
+    by simpa only [post_rename] using evaluated,
+    matched, progress, reached, retained, faultReady⟩
 
 include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
 theorem post_fault_reachable_bounded_for
@@ -148,15 +204,54 @@ theorem post_fault_reachable_bounded_for
       validity extend budget assignments assignmentFaults boundedMeaning tree errors valid itemsFacts
       state.live.environments state.live.heaps state.live.locals (postValues_agree agrees type location continued)
       postTyped reference read state.live.contextUnmapped state.retained guarded ready trace bounded
-  have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-    ⟨heaps, maps, worlds, preservation, metadata⟩
-  obtain ⟨finalState, retained, faultReady⟩ := transition
-  let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
-      contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore :=
-    ⟨state.live.progress progress, finalState⟩
-  exact ⟨token, finalStore, finalMap, finalWorld,
-    by simpa only [post_rename] using evaluated,
-    matched, progress, reached, retained, faultReady⟩
+  exact post_fault_reachable_bounded_for_with_header_result protocol functions readiness state continued
+    ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, preservation, metadata, transition⟩
+
+theorem post_reflects_reachable_bounded_for_with_header_result
+    (validity : SourceSemantics.Context → Prop)
+    {items : List ForItemForm} {value : Value} {finalStore : Store} {native : CallableIndexedHistory.NativeFrame} {size : Nat}
+    (state : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+      contextLocation location type conditionCode body (postCode.rename ξ) selfReason mapping world before store)
+    (headerResult : ResultAtFor protocol readiness guard validity size registry functions program source solved evidence administrative
+      frameLayout globals contextLocation native type faults (TypedForHeader.Fallthrough type) context environment
+      ⟨scope, mapping, world, before, store, canonical⟩ state.retained items value finalStore) :
+    (∃ sourceSize finalContext finalEnvironment after finalMap finalWorld,
+      SourceExecutionSize.ForItemsExecute program sourceSize context evidence source environment before items finalContext finalEnvironment after ∧
+      value = LocalLoop.fallthroughValue type ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ readiness.Ready context reached.retained) ∨
+    (∃ sourceSize finalContext reason token after finalMap finalWorld,
+      SourceExecutionSize.ForItemsFault program sourceSize context evidence source environment before items finalContext reason after ∧
+      value = .inLeft (LocalLoop.controlType type) (.word token) ∧ faults reason token ∧
+      Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
+      ∃ reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore,
+        protocol.Relates state.retained reached.retained ∧ readiness.FaultReady reached.retained) := by
+  cases headerResult with
+  | @continues sourceSize remainingSize finalContext finalEnvironment after tail trace maps worlds preservation metadata related returnReceipt tailReady remaining _ =>
+    obtain ⟨returnTo⟩ := returnReceipt
+    obtain ⟨same, storeEq⟩ := tail.toTailFor.fallthrough_reflects remaining.sound
+    subst finalStore
+    have progress : Progress values registry functions before after mapping tail.mapping world tail.world store tail.store :=
+      ⟨tail.heaps, maps, worlds, preservation, metadata⟩
+    let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason tail.mapping tail.world after tail.store :=
+      ⟨state.live.progress progress, returnTo.restore tail.state⟩
+    have retained : protocol.Relates state.retained reached.retained := protocol.trans related (returnTo.related tail.state)
+    have reachedReady : readiness.Ready context reached.retained := returnTo.restore_ready tail.state tailReady
+    exact .inl ⟨sourceSize, finalContext, finalEnvironment, after, tail.mapping, tail.world, trace, same,
+      progress, reached, retained, reachedReady⟩
+  | @fault sourceSize finalContext reason token after finalMap finalWorld trace same matched heaps maps worlds preservation metadata transition =>
+    have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
+      ⟨heaps, maps, worlds, preservation, metadata⟩
+    obtain ⟨finalState, retained, faultReady⟩ := transition
+    let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
+        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore :=
+      ⟨state.live.progress progress, finalState⟩
+    exact .inr ⟨sourceSize, finalContext, reason, token, after, finalMap, finalWorld, trace, same, matched,
+      progress, reached, retained, faultReady⟩
 
 include definitions registered observations producer acquire stateTransport stateBindings sites transfers solved in
 theorem post_reflects_reachable_bounded_for
@@ -211,29 +306,8 @@ theorem post_reflects_reachable_bounded_for
       state.live.environments state.live.heaps state.live.locals (postValues_agree agrees type location continued)
       postTyped reference read state.live.contextUnmapped state.retained guarded ready
       (by simpa only [post_rename] using evaluated) bounded
-  cases result with
-  | @continues sourceSize remainingSize finalContext finalEnvironment after tail trace maps worlds preservation metadata related returnReceipt tailReady remaining _ =>
-    obtain ⟨returnTo⟩ := returnReceipt
-    obtain ⟨same, storeEq⟩ := tail.toTailFor.fallthrough_reflects remaining.sound
-    subst finalStore
-    have progress : Progress values registry functions before after mapping tail.mapping world tail.world store tail.store :=
-      ⟨tail.heaps, maps, worlds, preservation, metadata⟩
-    let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
-        contextLocation location type conditionCode body (postCode.rename ξ) selfReason tail.mapping tail.world after tail.store :=
-      ⟨state.live.progress progress, returnTo.restore tail.state⟩
-    have retained : protocol.Relates state.retained reached.retained := protocol.trans related (returnTo.related tail.state)
-    have reachedReady : readiness.Ready context reached.retained := returnTo.restore_ready tail.state tailReady
-    exact .inl ⟨sourceSize, finalContext, finalEnvironment, after, tail.mapping, tail.world, trace, same,
-      progress, reached, retained, reachedReady⟩
-  | @fault sourceSize finalContext reason token after finalMap finalWorld trace same matched heaps maps worlds preservation metadata transition =>
-    have progress : Progress values registry functions before after mapping finalMap world finalWorld store finalStore :=
-      ⟨heaps, maps, worlds, preservation, metadata⟩
-    obtain ⟨finalState, retained, faultReady⟩ := transition
-    let reached : ProtectedStateTransition.For.State protocol values registry functions context scope administrative actualContext frameLayout environment canonical actual
-        contextLocation location type conditionCode body (postCode.rename ξ) selfReason finalMap finalWorld after finalStore :=
-      ⟨state.live.progress progress, finalState⟩
-    exact .inr ⟨sourceSize, finalContext, reason, token, after, finalMap, finalWorld, trace, same, matched,
-      progress, reached, retained, faultReady⟩
+  exact post_reflects_reachable_bounded_for_with_header_result protocol guard functions program evidence readiness validity state result
+
 
 end WithReady
 

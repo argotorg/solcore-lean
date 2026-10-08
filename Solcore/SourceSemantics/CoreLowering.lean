@@ -934,6 +934,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectAc
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicCatalogPreparedReceipts
 import Solcore.SourceSemantics.CoreLowering.GenericForHeaderStructuralTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedForHeaderBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedHeaderReceiptOperations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPostReceiptOperations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogProducers
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

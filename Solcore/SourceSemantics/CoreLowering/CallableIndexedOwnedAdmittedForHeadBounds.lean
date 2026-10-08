@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedHeaderReceiptOperations
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeInitializerSourceSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeaderBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedImperativeForPreservation
@@ -81,6 +82,92 @@ theorem restore_post {context finalContext : SourceSemantics.Context}
   | fallthrough | returned | breaking | continuing => exact returnTo.restore_ready reached post
   | fault => exact (readiness bridge).fault_after reached (returnTo.restore reached) post (.refl _ _)
 
+open ProtectedStateImperativeCatalogPayload (HeaderReceiptFamily)
+
+abbrev PreservingGoalWithReceipt (R : HeaderReceiptFamily) := ProtectedStateImperativeCatalogPayload.PreservesAtWithReceipt
+  callerProtocol (readiness bridge) guard
+  (ProtectedStateImperativeTypedSourceSites.Facts source expressionSyntax)
+  (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+  (ProtectedStateImperativeInitializerSourceSites.Facts source expressionSyntax)
+  (validity := validity)
+  functions program evidence budget R
+  (frame := frame) (globals := globals) (source := source)
+  (administrative := administrative) (registry := registry) (faults := faults)
+
+abbrev ReflectingGoalWithReceipt (R : HeaderReceiptFamily) := ProtectedStateImperativeCatalogPayload.ReflectsAtWithReceipt
+  callerProtocol (readiness bridge) guard
+  (ProtectedStateImperativeTypedSourceSites.Facts source expressionSyntax)
+  (CallableIndexedOwnedAdmittedForBounds.LoopFacts source expressionSyntax)
+  (ProtectedStateImperativeInitializerSourceSites.Facts source expressionSyntax)
+  (validity := validity)
+  functions program evidence budget R
+  (frame := frame) (globals := globals) (source := source)
+  (administrative := administrative) (registry := registry) (faults := faults)
+
+include unique in
+theorem header_preserves_with_receipt
+    (R : HeaderReceiptFamily)
+    (prefixAt : CallableIndexedOwnedHeaderReceiptOperations.PrefixAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) bridge functions evidence guard validity budget R)
+    (faultsAt : CallableIndexedOwnedHeaderReceiptOperations.FaultAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget R)
+    {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+    {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (child : PreservingGoalWithReceipt bridge functions evidence guard validity budget R
+      (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope (.initializers items condition post statements) expected type code) :
+    AtMost budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.HeadPreservesAtWith
+      callerProtocol (readiness bridge) guard
+      (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
+      functions program evidence validity size (context := context) (scope := scope)
+      (source := source) (registry := registry) (faults := faults) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) id expected type code) := by
+  intro size bounded valid parentFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
+    environments heaps locals agrees actualTyped reference read unmapped initial guarded ready trace
+  have static := ProtectedStateImperativeInitializerSourceSites.for_parent unique parentFacts found form
+  have header := child static
+  obtain ⟨control, staticFinal, _bodyFinal, _bodyFacts, _postFinal, _syntaxTree,
+    itemsTyped, _conditionTyped, _bodyTyped, _postTyped⟩ := static
+  cases trace with
+  | control executed =>
+    obtain ⟨rfl, initialSize, loopSize, loopContext, loopFinalContext, loopEnvironment, initialized, loopOutcome, rfl, initialization, loop, initialSmall, loopSmall⟩ :=
+      ForSourceAt.success_at unique (lookupStatement?_sound found) form executed
+    have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
+    subst loopFinalContext
+    obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, tailReady, agreement, _same, _originalAdmission, _finalAdmission, _typedExtension, _finalLocals⟩ :=
+      prefixAt header valid itemsTyped
+        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready initialization
+        (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+      (tail.certificate.2) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady (.control loop)
+    obtain ⟨loopState, loopRelated, loopReady⟩ := loopTransition
+    exact ⟨rfl, restored environment loopOutcome, value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
+      restore_rep represented environment, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
+      frame.trans loopFrame, metadata.trans loopMetadata,
+      ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
+  | fault failed =>
+    rcases ForSourceAt.fault_at unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
+    · obtain ⟨_, _, fault, smaller⟩ := initialFailure
+      obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata, transition⟩ :=
+        faultsAt header valid itemsTyped
+        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready fault
+        (Nat.le_trans (Nat.le_of_lt smaller) bounded)
+      exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
+        evaluated, .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
+    · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
+      obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, tailReady, agreement, _same, _originalAdmission, _finalAdmission, _typedExtension, _finalLocals⟩ :=
+        prefixAt header valid itemsTyped
+        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready initialization
+        (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+        (tail.certificate.2) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady (.fault loop)
+      obtain ⟨loopState, loopRelated, loopReady⟩ := loopTransition
+      exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
+        represented, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
+        frame.trans loopFrame, metadata.trans loopMetadata,
+      ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
+
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
 theorem header_preserves
     (meaning : ∀ context, validity context → Below budget (fun size =>
@@ -102,56 +189,55 @@ theorem header_preserves
       functions program evidence validity size (context := context) (scope := scope)
       (source := source) (registry := registry) (faults := faults) (frameLayout := frame)
       (globals := globals) (administrative := administrative) id expected type code) := by
-  intro size bounded valid parentFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome finalContext
-    environments heaps locals agrees actualTyped reference read unmapped initial guarded ready trace
+  exact header_preserves_with_receipt (unique := unique) bridge functions evidence guard validity budget
+    (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_PrefixAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_FaultAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy meaning)
+    found form child
+
+include unique in
+theorem header_reflects_with_receipt
+    (R : HeaderReceiptFamily)
+    (reflected : CallableIndexedOwnedHeaderReceiptOperations.ReflectsAt (source := source) (frame := frame) (globals := globals) (administrative := administrative) (registry := registry) (faults := faults) bridge functions evidence guard validity budget R)
+    {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
+    {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
+    {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
+    (child : ReflectingGoalWithReceipt bridge functions evidence guard validity budget R
+      (frame := frame) (globals := globals) (source := source) (expressionSyntax := expressionSyntax)
+      (administrative := administrative) (registry := registry) (faults := faults)
+      context scope (.initializers items condition post statements) expected type code) :
+    Below budget (fun size => RecursiveNamedImperativeFor.Control.Stateful.WithReady.HeadReflectsAtWith
+      callerProtocol (readiness bridge) guard
+      (ProtectedStateImperativeTypedSourceSites.HeadFacts source expressionSyntax)
+      functions program evidence validity size (context := context) (scope := scope)
+      (source := source) (registry := registry) (faults := faults) (frameLayout := frame)
+      (globals := globals) (administrative := administrative) id expected type code) := by
+  intro size bounded valid parentFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
+    environments heaps locals agrees actualTyped reference read unmapped initial guarded ready evaluated
   have static := ProtectedStateImperativeInitializerSourceSites.for_parent unique parentFacts found form
-  obtain ⟨header, errors⟩ := child static
+  have header := child static
   obtain ⟨control, staticFinal, _bodyFinal, _bodyFacts, _postFinal, _syntaxTree,
     itemsTyped, _conditionTyped, _bodyTyped, _postTyped⟩ := static
-  cases trace with
-  | control executed =>
-    obtain ⟨rfl, initialSize, loopSize, loopContext, loopFinalContext, loopEnvironment, initialized, loopOutcome, rfl, initialization, loop, initialSmall, loopSmall⟩ :=
-      ForSourceAt.success_at unique (lookupStatement?_sound found) form executed
-    have sameContext : loopFinalContext = loopContext := ContextTransport.loop_context loop
-    subst loopFinalContext
-    obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, tailReady, agreement, _same, _originalAdmission, _finalAdmission, _typedExtension, _finalLocals⟩ :=
-      CallableIndexedOwnedAdmittedForHeaderBounds.preserves_prefix_bounded_for (solved := [])
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget meaning header valid itemsTyped
-        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready initialization
-        (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
-      (tail.certificate.2) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady (.control loop)
+  have result := reflected header
+    valid itemsTyped environments heaps locals agrees actualTyped reference read unmapped initial guarded ready evaluated (Nat.le_of_lt bounded)
+  cases result with
+  | @continues initialSize remainingSize initialContext initialEnvironment initialized tail trace maps worlds frame metadata headerRelated returnReceipt tailReady remaining smaller =>
+    obtain ⟨returnTo⟩ := returnReceipt
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, loop, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
+      (tail.certificate.2) _ (Nat.le_trans smaller (Nat.le_of_lt bounded)) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady remaining
     obtain ⟨loopState, loopRelated, loopReady⟩ := loopTransition
-    exact ⟨rfl, restored environment loopOutcome, value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
+    refine ⟨SourceExecutionSize.stepSize [initialSize, sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld, ?_, restored environment outcome,
       restore_rep represented environment, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
       frame.trans loopFrame, metadata.trans loopMetadata,
       ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
-  | fault failed =>
-    rcases ForSourceAt.fault_at unique (lookupStatement?_sound found) form failed with initialFailure | loopFailure
-    · obtain ⟨_, _, fault, smaller⟩ := initialFailure
-      obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, frame, metadata, transition⟩ :=
-        CallableIndexedOwnedAdmittedForHeaderBounds.preserves_fault_reachable_bounded_for
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget meaning header (GenericForHeader.Tree.ErrorsFor.reachable errors) valid itemsTyped
-        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready fault
-        (Nat.le_trans (Nat.le_of_lt smaller) bounded)
-      exact ⟨rfl, (by intro next impossible; cases impossible), _, finalStore, finalMap, finalWorld,
-        evaluated, .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
-    · obtain ⟨initialSize, loopSize, loopContext, loopEnvironment, initialized, initialization, loop, initialSmall, loopSmall⟩ := loopFailure
-      obtain ⟨tail, maps, worlds, frame, metadata, headerRelated, ⟨returnTo⟩, tailReady, agreement, _same, _originalAdmission, _finalAdmission, _typedExtension, _finalLocals⟩ :=
-        CallableIndexedOwnedAdmittedForHeaderBounds.preserves_prefix_bounded_for (solved := [])
-        bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-        validity runtime covers extend budget meaning header valid itemsTyped
-        environments heaps locals agrees actualTyped reference read unmapped initial guarded ready initialization
-        (Nat.le_trans (Nat.le_of_lt initialSmall) bounded)
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
-        (tail.certificate.2) _ (Nat.le_trans (Nat.le_of_lt loopSmall) bounded) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady (.fault loop)
-      obtain ⟨loopState, loopRelated, loopReady⟩ := loopTransition
-      exact ⟨rfl, (by intro next impossible; cases impossible), value, finalStore, finalMap, finalWorld, agreement.wrap evaluated,
-        represented, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
-        frame.trans loopFrame, metadata.trans loopMetadata,
-      ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
+    cases loop with
+    | control loop => exact .control (.forLoop (lookupStatement?_sound found) form trace loop)
+    | fault loop => exact .fault (.forIteration (lookupStatement?_sound found) form trace loop)
+  | fault trace same matched heaps maps worlds frame metadata transition =>
+    subst value
+    exact ⟨_, _, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
+      (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
 
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend in
@@ -175,32 +261,9 @@ theorem header_reflects (functionTypes : FunctionRuntimeViews functions)
       functions program evidence validity size (context := context) (scope := scope)
       (source := source) (registry := registry) (faults := faults) (frameLayout := frame)
       (globals := globals) (administrative := administrative) id expected type code) := by
-  intro size bounded valid parentFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
-    environments heaps locals agrees actualTyped reference read unmapped initial guarded ready evaluated
-  have static := ProtectedStateImperativeInitializerSourceSites.for_parent unique parentFacts found form
-  obtain ⟨header, errors⟩ := child static
-  obtain ⟨control, staticFinal, _bodyFinal, _bodyFacts, _postFinal, _syntaxTree,
-    itemsTyped, _conditionTyped, _bodyTyped, _postTyped⟩ := static
-  have result := CallableIndexedOwnedAdmittedForHeaderBounds.reflects_reachable_bounded_for (solved := [])
-    bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed
-    validity runtime covers extend budget functionTypes reflection header (GenericForHeader.Tree.ErrorsFor.reachable errors)
-    valid itemsTyped environments heaps locals agrees actualTyped reference read unmapped initial guarded ready evaluated (Nat.le_of_lt bounded)
-  cases result with
-  | @continues initialSize remainingSize initialContext initialEnvironment initialized tail trace maps worlds frame metadata headerRelated returnReceipt tailReady remaining smaller =>
-    obtain ⟨returnTo⟩ := returnReceipt
-    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, loop, represented, loopHeaps, loopMaps, loopWorlds, loopFrame, loopMetadata, loopTransition⟩ :=
-      (tail.certificate.2) _ (Nat.le_trans smaller (Nat.le_of_lt bounded)) tail.valid tail.environments tail.heaps tail.locals tail.agrees tail.actualTyped tail.reference tail.read tail.unmapped tail.state tail.gate tailReady remaining
-    obtain ⟨loopState, loopRelated, loopReady⟩ := loopTransition
-    refine ⟨SourceExecutionSize.stepSize [initialSize, sourceSize], Dynamic.restoreControl environment outcome, after, finalMap, finalWorld, ?_, restored environment outcome,
-      restore_rep represented environment, loopHeaps, maps.trans loopMaps, worlds.trans loopWorlds,
-      frame.trans loopFrame, metadata.trans loopMetadata,
-      ⟨returnTo.restore loopState, callerProtocol.trans headerRelated (callerProtocol.trans loopRelated (returnTo.related loopState)), restore_post bridge returnTo environment loopState loopReady⟩⟩
-    cases loop with
-    | control loop => exact .control (.forLoop (lookupStatement?_sound found) form trace loop)
-    | fault loop => exact .fault (.forIteration (lookupStatement?_sound found) form trace loop)
-  | fault trace same matched heaps maps worlds frame metadata transition =>
-    subst value
-    exact ⟨_, _, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
-      (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
+  exact header_reflects_with_receipt (unique := unique) bridge functions evidence guard validity budget
+    (ProtectedStateImperativeCatalogPayload.LegacyHeaderReceipt (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative) diagnosticPolicy registry faults)
+    (CallableIndexedOwnedHeaderReceiptOperations.legacy_ReflectsAt bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget diagnosticPolicy functionTypes reflection)
+    found form child
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedForHeadBounds
