@@ -15,8 +15,8 @@ open CallableIndexedOwnedOrdinaryLambdaSupport (Support SourceOrigin)
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
 
-/-- The method relation stays complete; the new ordinary constructor keeps
-its actual same-Code body, Source seed and genuine captured Header prefix. -/
+/-- Prior method values remain intact. Principal closures retain their
+actual leading bundle, and ordinary closures retain the genuine Header prefix. -/
 inductive Represents (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
     (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
     (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -24,6 +24,21 @@ inductive Represents (headers : List (Header compiled (Program.ofChecked compile
   | prior {sourceType source native type}
       (related : CallableIndexedOwnedMethodLambdaValues.Represents headers keys registry faults mapping world sourceType source native type) :
       Represents headers keys registry faults mapping world sourceType source native type
+  | principal_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
+      (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
+      (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+      (body : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults)
+      (origin : CallableIndexedOwnedMethodLambdaSupport.SourceOrigin body history)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (leading : captured.administrative[0]? = some body.principal.named.signature.parameterType)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions) :
+      Represents headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
   | ordinary_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
       (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
       (code : Code compiled.indexed function scope captured.administrative) (history : History code)
@@ -47,6 +62,8 @@ theorem Represents.forget {keys : List (Key compiled (Program.ofChecked compiled
     CallableIndexedLambdaValues.Represents compiled.indexed mapping world sourceType source native type := by
   cases related with
   | prior original => exact original.forget
+  | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
+    exact .lambda captured code history typed
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
     exact .lambda captured code history typed
 
@@ -67,6 +84,8 @@ def model (headers : List (Header compiled (Program.ofChecked compiled.sourcePro
     cases related with
     | prior original => exact .prior ((CallableIndexedOwnedMethodLambdaValues.model headers keys bodyRegistry faults profile).extend
         original registries maps worlds)
+    | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
+      exact .principal_lambda owner (captured.extend maps worlds) code history body origin globals leading referenceIndex (typed.weaken worlds)
     | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
       exact .ordinary_lambda owner (captured.extend maps worlds) code history body origin prefixContext globals referenceIndex (typed.weaken worlds)
 
@@ -108,6 +127,13 @@ theorem Represents.map_keys {keys futureKeys : List (Key compiled (Program.ofChe
     Represents headers futureKeys registry faults mapping world sourceType source native type := by
   cases related with
   | prior original => exact .prior (original.map_keys embedding)
+  | @principal_lambda function scope actual owner captured code history body origin globals leading referenceIndex typed =>
+    have actualGlobals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers (embedding.map owner).key.locations 1 scope captured.canonical (embedding.map owner).key.frameLocation := by
+      rw [embedding.same owner]
+      exact globals
+    exact .principal_lambda (embedding.map owner) captured code history body origin actualGlobals leading referenceIndex typed
   | @ordinary_lambda function scope actual owner captured code history body origin prefixContext globals referenceIndex typed =>
     have actualGlobals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
         (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
@@ -147,6 +173,8 @@ theorem Represents.closure_cases {keys : List (Key compiled (Program.ofChecked c
           (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions := by
   cases related with
   | prior original => exact Or.inl original
+  | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
+    exact Or.inl (.method_lambda owner captured code history body origin globals referenceIndex typed)
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
     exact Or.inr ⟨owner, _, _, captured, code, history, body, origin, prefixContext, globals, referenceIndex, rfl, rfl, rfl, typed⟩
 
