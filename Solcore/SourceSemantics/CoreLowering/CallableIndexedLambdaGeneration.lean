@@ -36,6 +36,64 @@ private theorem evidence_lambda (program : CheckedProgram) (projector : SourceCo
 /-- Successful execution of the actual ordinary callback yields its lambda
 branch receipt and all production hook profiles. No lambda-body execution is
 an input. Excluding the generalized-initializer override is a static condition. -/
+theorem contextual_certificate_with_binder {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)
+    {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+    (compiled : Compilation prepared named diagnostics namedCode)
+    (record : SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key = .ok named.specialized)
+    {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
+    {node : ExpressionNode} {parameters : List TypedBinder} {result : TypeSystem.Ty} {body : List StatementId}
+    {reported : Ty} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (found : view.lookupExpression? id = some node) (form : node.form = .lambda parameters result body)
+    (owner : id.occurrence.owner = view.owner)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (ordinary : prepared.base.locals.bindings.find? (fun binding =>
+      decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none)
+    (read : SourceCoreCompatibleDataExpressions.readExpression checked view id = .ok (node, reported))
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression prepared.base.sourceProgram
+      ((representation prepared).atContext named.signature.key []) prepared.base.sourceProgram.signatures
+      prepared.base.locals compiled.parents compiled.own.assignments diagnostics (context prepared named)
+      prepared.base.callableContext none none (fuel + 1) view scope id reasonAt = .ok lowered) :
+    ∃ (policy : SourceCoreFunctions.Policy) (lowerBody : SourceCoreFunctions.BodyLowerer),
+      SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1) (context prepared named)
+        view scope id reasonAt = .ok lowered ∧
+      Nonempty (CallableIndexedLambdaCertificates.Certificate policy lowerBody fuel (context prepared named)
+        view scope id node parameters result body reported reasonAt lowered) ∧
+      policy.sourceCells = some (allocator prepared named) ∧
+      policy.rawLambdaBody = SourceCoreLambdaTemplates.hook prepared.ancestry.templates named.signature.key [] ∧
+      policy.rawLambdaExpression = SourceCoreCallableIndexedAncestry.expressionHook prepared.ancestry named.signature.key [] ∧
+      policy.callables = SourceCoreGeneralFunctions.callablePolicy (some prepared.ancestry.graph.inputs.callable) [] ∧
+      policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked ∧
+      policy.lowerBinder = SourceCoreGeneralFunctions.contextualBinder
+        ((representation prepared).atContext named.signature.key []) prepared.base.locals named.signature.key [] := by
+  rw [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at accepted
+  dsimp only at accepted
+  change (SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key |>.mapError SourceCoreBasic.Error.callPreparation) >>= _ = .ok lowered at accepted
+  rw [record] at accepted
+  simp only [Except.mapError, bind, Except.bind] at accepted
+  refine ⟨_, _, accepted, ?_, rfl, rfl, rfl, ?_, rfl, rfl⟩
+  · apply CallableIndexedLambdaCertificates.of_accepted (owner := owner) (found := found) (form := form) (accepted := accepted)
+    · change (do
+        let actualSource ← SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
+          prepared.base.locals named.signature.key none view id
+        _) = .ok none
+      have unchanged : SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
+          prepared.base.locals named.signature.key none view id = .ok view := by
+        simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
+      rw [unchanged]
+      simp only [bind, Except.bind, pure, Except.pure, found]
+      rw [ordinary]
+      simp only [Option.filter_none]
+      rw [evidence_lambda _ _ _ _ _ _ _ _ _ found form requirements coercions]
+      simp [form]
+    · change (do
+        let actualSource ← SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
+          prepared.base.locals named.signature.key none view id
+        SourceCoreCompatibleDataExpressions.readExpression checked actualSource id) = .ok (node, reported)
+      simpa [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure] using read
+  · change SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext [] = _
+    rw [prepared.ancestry.graph.inputs.callableSelected]
+
+/-- The original interface forgets only the actual binder policy receipt. -/
 theorem contextual_certificate {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compiled : Compilation prepared named diagnostics namedCode)
@@ -63,33 +121,9 @@ theorem contextual_certificate {checked : SourceCoreCompatibleCatalog.Checked} (
       policy.rawLambdaExpression = SourceCoreCallableIndexedAncestry.expressionHook prepared.ancestry named.signature.key [] ∧
       policy.callables = SourceCoreGeneralFunctions.callablePolicy (some prepared.ancestry.graph.inputs.callable) [] ∧
       policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked := by
-  rw [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at accepted
-  dsimp only at accepted
-  change (SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key |>.mapError SourceCoreBasic.Error.callPreparation) >>= _ = .ok lowered at accepted
-  rw [record] at accepted
-  simp only [Except.mapError, bind, Except.bind] at accepted
-  refine ⟨_, _, accepted, ?_, rfl, rfl, rfl, ?_, rfl⟩
-  · apply CallableIndexedLambdaCertificates.of_accepted (owner := owner) (found := found) (form := form) (accepted := accepted)
-    · change (do
-        let actualSource ← SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
-          prepared.base.locals named.signature.key none view id
-        _) = .ok none
-      have unchanged : SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
-          prepared.base.locals named.signature.key none view id = .ok view := by
-        simp [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure]
-      rw [unchanged]
-      simp only [bind, Except.bind, pure, Except.pure, found]
-      rw [ordinary]
-      simp only [Option.filter_none]
-      rw [evidence_lambda _ _ _ _ _ _ _ _ _ found form requirements coercions]
-      simp [form]
-    · change (do
-        let actualSource ← SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram prepared.base.plan
-          prepared.base.locals named.signature.key none view id
-        SourceCoreCompatibleDataExpressions.readExpression checked actualSource id) = .ok (node, reported)
-      simpa [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure] using read
-  · change SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext [] = _
-    rw [prepared.ancestry.graph.inputs.callableSelected]
+  obtain ⟨policy, lowerBody, generated, receipt, allocation, manifest, expression, callables, projector, _binder⟩ :=
+    contextual_certificate_with_binder prepared compiled record found form owner requirements coercions ordinary read accepted
+  exact ⟨policy, lowerBody, generated, receipt, allocation, manifest, expression, callables, projector⟩
 
 /-- A static ordinary generation site keeps the actual callback receipt. Its
 owner and native parent are established by that callback, rather than supplied
@@ -119,7 +153,7 @@ private theorem descriptor_exists (table : SourceCoreStageCodebook.Table)
 /-- Build every static code field from the actual named callback's accepted
 ordinary lambda branch. Canonical metadata and native checking remain explicit,
 but no generation-history alignment is assumed. -/
-theorem of_contextual {checked : SourceCoreCompatibleCatalog.Checked}
+theorem of_contextual_with_binder {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : CallableIndexedNamedGeneration.Prepared checked)
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compiled : Compilation prepared named diagnostics namedCode)
@@ -146,9 +180,11 @@ theorem of_contextual {checked : SourceCoreCompatibleCatalog.Checked}
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
       (LanguageResult.resultType lowered.type) prepared.layouts.definitions) :
     ∃ site : Site prepared named parameters result body sourceContext evidence captured scope administrative,
-      site.code.id = id ∧ site.code.lowered = lowered := by
-  obtain ⟨policy, lowerBody, accepted, ⟨receipt⟩, allocationProfile, manifest, expressionProfile, callables, projector⟩ :=
-    contextual_certificate prepared compiled record found (form.trans sourceForm) owner requirements coercions ordinary read accepted
+      site.code.id = id ∧ site.code.lowered = lowered ∧
+        site.code.policy.lowerBinder = SourceCoreGeneralFunctions.contextualBinder
+          ((representation prepared).atContext named.signature.key []) prepared.base.locals named.signature.key [] := by
+  obtain ⟨policy, lowerBody, accepted, ⟨receipt⟩, allocationProfile, manifest, expressionProfile, callables, projector, binderPolicy⟩ :=
+    contextual_certificate_with_binder prepared compiled record found (form.trans sourceForm) owner requirements coercions ordinary read accepted
   have parameterProjected := receipt.parameterProjected
   have resultProjected := receipt.resultProjected
   rw [projector] at parameterProjected resultProjected
@@ -182,7 +218,41 @@ theorem of_contextual {checked : SourceCoreCompatibleCatalog.Checked}
     id, sourceNode, sourceFound, sourceForm, node, found, form, reported, reasonAt, lowered, receipt, accepted,
     allocationError := fun error => .sourceAllocation (reprStr error), allocationProfile, manifest, expressionProfile,
     callables, descriptor, projection, typed }
-  exact ⟨⟨code, rfl, rfl⟩, rfl, rfl⟩
+  exact ⟨⟨code, rfl, rfl⟩, rfl, rfl, binderPolicy⟩
+
+/-- The original site factory preserves its complete Code and output fields. -/
+theorem of_contextual {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : CallableIndexedNamedGeneration.Prepared checked)
+    {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+    (compiled : Compilation prepared named diagnostics namedCode)
+    (record : SourceCompilationPlan.exactSpecialization prepared.base.plan named.signature.key = .ok named.specialized)
+    {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
+    {result : TypeSystem.Ty} {body : List StatementId} {reported : Ty}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (sourceContext : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment) (captured : Dynamic.Environment)
+    (profile : checked.catalog.callableContracts = true)
+    (viewOfSource : LambdaMetadataViews.MetadataView (source named) view)
+    (sourceFound : (source named).lookupExpression? id = some sourceNode)
+    (sourceForm : sourceNode.form = .lambda parameters result body)
+    (found : view.lookupExpression? id = some node) (form : node.form = sourceNode.form)
+    (owner : id.occurrence.owner = view.owner)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (ordinary : prepared.base.locals.bindings.find? (fun binding =>
+      decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none)
+    (read : SourceCoreCompatibleDataExpressions.readExpression checked view id = .ok (node, reported))
+    (accepted : SourceCoreGeneralFunctions.lowerContextualExpression prepared.base.sourceProgram
+      ((representation prepared).atContext named.signature.key []) prepared.base.sourceProgram.signatures
+      prepared.base.locals compiled.parents compiled.own.assignments diagnostics (context prepared named)
+      prepared.base.callableContext none none (fuel + 1) view scope id reasonAt = .ok lowered)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+      (LanguageResult.resultType lowered.type) prepared.layouts.definitions) :
+    ∃ site : Site prepared named parameters result body sourceContext evidence captured scope administrative,
+      site.code.id = id ∧ site.code.lowered = lowered := by
+  obtain ⟨site, siteId, siteLowered, _binder⟩ := of_contextual_with_binder prepared compiled record
+    sourceContext evidence captured profile viewOfSource sourceFound sourceForm found form owner requirements coercions
+    ordinary read accepted typed
+  exact ⟨site, siteId, siteLowered⟩
 
 variable {checked : SourceCoreCompatibleCatalog.Checked}
   {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : Named}

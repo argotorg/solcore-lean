@@ -873,6 +873,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredApplicatio
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredNativePackReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCallBounds
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathMissingProvider
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaBinderProjections
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
