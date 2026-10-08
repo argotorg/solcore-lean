@@ -1989,3 +1989,89 @@ theorem Checkpoint.RootStart.data_inputs {artifact : Artifact} {session : Sessio
   exact ⟨root, encoded.native, selected, related, projected, initial⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- The actual retained metadata registry, expressed only as a proposition. -/
+def Session.RegistryAt {artifact : Artifact} (session : Session artifact)
+    (registry : SourceCoreRawMetadata.Registry) : Prop :=
+  session.values.registry = registry
+
+/-- The diagnostic table selected by the genuine ordinary root lookup and
+rebuilt at this session's retained values. This receipt does not expose a
+request or add an operational accessor. -/
+def Session.DiagnosticTableAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (table : SourceCoreFaultSites.Table) : Prop :=
+  ∃ root : Root artifact.recipe.compiled,
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    diagnosticTable artifact root.request session.values session.owner = .ok table
+
+/-- An actual successful public lookup retains the very table that decoded
+its reason. The original two binds are inverted without running them again. -/
+theorem Session.diagnostic_table_receipt {artifact : Artifact} (session : Session artifact)
+    {key : Key} {reason : Core.Word} {diagnostic : SourceCoreFaultSites.Diagnostic}
+    (accepted : session.diagnostic key reason = .ok (some diagnostic)) :
+    ∃ table, session.DiagnosticTableAt key table ∧ table.diagnostic? reason = some diagnostic := by
+  unfold Session.diagnostic at accepted
+  cases found : artifact.recipe.roots.find? (fun root => decide (root.key = key)) with
+  | none => simp [found, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at accepted
+  | some root =>
+    simp only [found, pure, Except.pure, bind, Except.bind] at accepted
+    obtain ⟨table, made, accepted⟩ := root_factory_bind_ok accepted
+    simp only [Except.ok.injEq] at accepted
+    exact ⟨table, ⟨root, found, made⟩, accepted⟩
+
+/-- The retained table comes from the original registry rebuild, or its real
+root fallback, followed by exactly the original filtered callable append.
+Handle and pending-checkpoint requests are separate interfaces. -/
+theorem Session.DiagnosticTableAt.rebuild {artifact : Artifact} {session : Session artifact}
+    {key : Key} {table : SourceCoreFaultSites.Table}
+    (receipt : session.DiagnosticTableAt key table) :
+    ∃ registry, session.RegistryAt registry ∧
+      ∃ (extension : SourceCoreRawMetadata.Extends artifact.recipe.compiled.compatible.checked.staticRegistry registry)
+        (root : Root artifact.recipe.compiled) (base : SourceCoreFaultSites.Table),
+        artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+        root.key = key ∧
+        (match artifact.program.base.diagnostics with
+          | some diagnostics => diagnostics.tableForRegistry registry extension = .ok base
+          | none => base = {
+              owner := key.declaration
+              resultType := root.result
+              reads := []
+              escapedReason := Core.Word.zero }) ∧
+        table = (match artifact.program.base.callableDiagnostics with
+          | none => base
+          | some diagnostics => { base with additional := base.additional ++
+              diagnostics.rootTable.additional.filter (fun item => diagnostics.unknown.val ≤ item.1.val) }) := by
+  obtain ⟨root, found, accepted⟩ := receipt
+  have sameKey : root.key = key := by simpa using List.find?_some found
+  let extension : SourceCoreRawMetadata.Extends artifact.recipe.compiled.compatible.checked.staticRegistry session.values.registry := by
+    simpa only [session.owner] using session.values.extension
+  refine ⟨session.values.registry, rfl, extension, root, ?_⟩
+  unfold diagnosticTable at accepted
+  dsimp only at accepted
+  cases present : artifact.program.base.diagnostics with
+  | some diagnostics =>
+    simp only [present] at accepted
+    obtain ⟨base, made, accepted⟩ := root_factory_bind_ok accepted
+    refine ⟨base, found, sameKey, ?_, ?_⟩
+    · change diagnostics.tableForRegistry session.values.registry extension = .ok base
+      cases rebuilt : diagnostics.tableForRegistry session.values.registry extension with
+      | error error => simp [rebuilt, Except.mapError] at made
+      | ok actual =>
+        have same : actual = base := by
+          simpa only [rebuilt, Except.mapError, Except.ok.injEq] using made
+        exact congrArg Except.ok same
+    · exact (Except.ok.inj accepted).symm
+  | none =>
+    simp only [present, Root.request, pure, Except.pure, bind, Except.bind] at accepted
+    cases accepted
+    refine ⟨_, found, sameKey, ?_, rfl⟩
+    change ({
+      owner := root.key.declaration
+      resultType := root.result
+      reads := []
+      escapedReason := Core.Word.zero } : SourceCoreFaultSites.Table) = _
+    rw [sameKey]
+
+end Solcore.Frontend.SourceCoreIndexedSession
