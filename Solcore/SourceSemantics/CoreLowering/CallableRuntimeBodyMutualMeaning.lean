@@ -14,6 +14,14 @@ private theorem close_sized {ι : Type} (family : ι → Nat → Prop)
       ∀ i, family i size) (size : Nat) : ∀ i, family i size := by
   induction size using Nat.strongRecOn with
   | ind size ih => exact step size (fun callee smaller strict => ih smaller strict callee)
+
+/-- Reuse the existing measured closer for a family with its own static receipts.
+Each step receives only strictly smaller callee obligations. -/
+theorem close_family {ι : Type} (family : ι → Nat → Prop)
+    (step : ∀ size, (∀ callee, RecursiveNamedBoundedContracts.Below size (family callee)) →
+      ∀ i, family i size) (size : Nat) : ∀ i, family i size :=
+  close_sized family step size
+
 variable {values : SourceCoreCompatibleValues.Context}
   {ambient : AmbientDefinitions values.checked.catalog.definitions}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
