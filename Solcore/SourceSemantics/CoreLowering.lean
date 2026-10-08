@@ -1045,6 +1045,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinarySe
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedConditionalBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedConditionalNamedBodyFaultBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaValues
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryLambdaFormation
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
