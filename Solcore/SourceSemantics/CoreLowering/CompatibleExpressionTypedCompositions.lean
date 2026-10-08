@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.TypedDataExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.ExpressionFailurePostContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalExecution
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalTree
 
@@ -100,19 +101,46 @@ private theorem pair_result {checked : SourceCoreCompatibleCatalog.Checked} {reg
   | fault matched => exact ⟨_, .fault _, .fault matched⟩
 
 
+private theorem pair_post {expressionPost : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {id : ExpressionId} {ids : List ExpressionId} {type : Core.Ty}
+    {sequence : DataExpressionSequence.Outcome} {outcome : Dynamic.ExpressionOutcome}
+    {value : Value} {mapping : LocationMap} {world : StoreTyping} {store : Store}
+    (joins : ExpressionFailurePostContracts.CompositionJoins expressionPost listPost program context evidence source)
+    (link : ExpressionFailurePostContracts.ExpressionsLink source id ids)
+    (trace : DataExpressionSequence.Trace program context evidence source environment before ids sequence after)
+    (packed : CompatibleExpressionProducts.PacksOutcome sequence outcome)
+    (retained : ExpressionFailurePostContracts.ListOutcomePost listPost program context evidence source
+      environment before ids type sequence after value mapping world store) :
+    ExpressionFailurePostContracts.OutcomePost expressionPost program context evidence source environment
+      before id type outcome after value mapping world store := by
+  cases packed with
+  | values _ => trivial
+  | fault _ =>
+    cases trace with
+    | fault failed =>
+      obtain ⟨token, same, retained⟩ := retained
+      exact ⟨token, same, joins.expressions link failed retained⟩
+
+
 variable {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource} {context : SourceSemantics.Context}
   {ambient : AmbientDefinitions checked.catalog.definitions}
   (functions : FunctionModel checked.catalog ambient)
   {registry : SourceCoreRawMetadata.Registry}
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   {certificate : GenericExpressionMeaning.Certificate} {faults : FunctionCalls.FaultRep}
+  {expressionPost : ExpressionFailurePostContracts.ExpressionFaultPost} {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
 
-theorem Head.preserves
+theorem Head.preserves_with_post
     (unique : NodeOccurrencesUnique source)
-    (meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source certificate faults) :
-    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
-      program context evidence source (Head checked source certificate) faults := by
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins expressionPost listPost program context evidence source)
+    (joins : ExpressionFailurePostContracts.CompositionJoins expressionPost listPost program context evidence source)
+    (meaning : ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults expressionPost) :
+    ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults expressionPost := by
   intro scope id lowered tree
   cases tree with
   | @group node inner innerNode lowered metadata form innerFound sourceType child =>
@@ -121,9 +149,13 @@ theorem Head.preserves
       environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      ih innerFound environments heaps locals agrees actualTyped (CompatibleExpressionProducts.group_inv metadata form unique trace)
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
+    have childTrace := CompatibleExpressionProducts.group_inv metadata form unique trace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      ih innerFound environments heaps locals agrees actualTyped childTrace
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.group contains form layout) childTrace retained⟩
     simpa only [sourceType] using represented
   | @pair node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree =>
     have leftIH := @meaning _ _ _ firstTree
@@ -132,20 +164,23 @@ theorem Head.preserves
       environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    have children : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
+    have children : ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel checked registry functions)
+        program context evidence source (Two scope left right first second) faults expressionPost := by
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH
       · exact rightIH
     obtain ⟨sequence, sourceTrace, packed⟩ := CompatibleExpressionProducts.pair_inv metadata form unique trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      TypedDataExpressionSequence.preserves (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped sourceTrace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      TypedDataExpressionSequence.preserves_with_post (two_tree (first := first) (second := second) leftFound rightFound) sequenceJoins children environments heaps locals agrees actualTyped sourceTrace
     obtain ⟨actualOutcome, actualPack, payload⟩ := pair_result represented
     have sameOutcome := actualPack.functional packed
     subst actualOutcome
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata, pair_post joins (.tuple contains form layout) sourceTrace packed retained⟩
     simpa only [sourceType] using payload
 
   | @unary node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child =>
@@ -153,10 +188,13 @@ theorem Head.preserves
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     have sourceStep := unary_inv metadata form unique trace
     cases sourceStep with
     | value childTrace applied =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees actualTyped (.value childTrace)
       cases represented with
       | value payload =>
@@ -164,16 +202,16 @@ theorem Head.preserves
         obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
         have same := actualApplied.functional applied
         subst sourceResult
-        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
         · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees actualTyped (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.unary contains form layout) childTrace (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | invalid childTrace failed =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := ih childFound environments heaps locals agrees actualTyped (.value childTrace)
       cases represented with
@@ -187,15 +225,18 @@ theorem Head.preserves
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     have sourceStep := binary_inv metadata form unique trace
     cases sourceStep with
     | leftFault childTrace =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact mode.left_failure operator evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.binaryLeft contains form layout) childTrace (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | leftInvalid childTrace invalid =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := leftIH leftFound environments heaps locals agrees actualTyped (.value childTrace)
       cases represented with
@@ -203,21 +244,21 @@ theorem Head.preserves
         rw [leftType] at payload
         exact False.elim (profile.left_valid payload invalid)
     | short childTrace circuit =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped (.value childTrace)
       cases represented with
       | value payload =>
         rw [leftType] at payload
         obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit evaluated
         exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
-          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
     | rightFault firstTrace continues secondTrace =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
             (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (.fault secondTrace)
@@ -226,14 +267,14 @@ theorem Head.preserves
         | fault matched =>
           exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact profile.right_failure payload continues first second,
             .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨_, rfl, joins.expression (.binaryRight contains form layout firstTrace continues) secondTrace (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | value firstTrace continues secondTrace applied =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue)
             (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) (.value secondTrace)
@@ -247,9 +288,9 @@ theorem Head.preserves
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
             .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
     | invalid firstTrace continues secondTrace failed =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata, _firstPost⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
@@ -273,17 +314,20 @@ theorem Head.preserves
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     have sourceStep := conditional_inv metadata form unique trace
     cases sourceStep with
     | fault childTrace =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         conditionIH conditionFound environments heaps locals agrees actualTyped (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [choose_rename]; exact LocalControl.choose_failure type evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.conditionalCondition contains form layout) childTrace (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | @branch flag middle outcome after conditionTrace branchTrace =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         conditionIH conditionFound environments heaps locals agrees actualTyped (.value conditionTrace)
       cases represented with
       | value payload =>
@@ -292,23 +336,23 @@ theorem Head.preserves
         subst coreEq
         cases flag with
         | false =>
-          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
             elseIH elseFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (GenericExpressionMeaning.agree_prefix agrees (.bool false))
               (.cons .bool (actualTyped.weaken firstWorlds)) branchTrace
           rw [GenericExpressionMeaning.rename_prefix] at branch
           refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.conditionalFalse contains form layout conditionTrace) branchTrace retained⟩
           · rw [choose_rename]; exact LocalControl.choose_false type first branch
           · simpa only [elseType] using represented
         | true =>
-          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+          obtain ⟨value, finalStore, finalMap, finalWorld, branch, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
             thenIH thenFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (GenericExpressionMeaning.agree_prefix agrees (.bool true))
               (.cons .bool (actualTyped.weaken firstWorlds)) branchTrace
           rw [GenericExpressionMeaning.rename_prefix] at branch
           refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.conditionalTrue contains form layout conditionTrace) branchTrace retained⟩
           · rw [choose_rename]; exact LocalControl.choose_true type first branch
           · simpa only [thenType] using represented
     | invalid childTrace invalid runtimeType =>
@@ -319,11 +363,24 @@ theorem Head.preserves
         exact False.elim (invalid trivial)
 
 
-theorem Head.reflects
-    (meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+theorem Head.preserves
+    (unique : NodeOccurrencesUnique source)
+    (meaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source certificate faults) :
-    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel checked registry functions)
       program context evidence source (Head checked source certificate) faults := by
+  exact ExpressionFailurePostContracts.TypedPreserves.forget (Head.preserves_with_post functions program evidence unique
+    (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+    (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+    (ExpressionFailurePostContracts.TypedPreserves.of_trivial meaning))
+
+theorem Head.reflects_with_post
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins expressionPost listPost program context evidence source)
+    (joins : ExpressionFailurePostContracts.CompositionJoins expressionPost listPost program context evidence source)
+    (meaning : ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults expressionPost) :
+    ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults expressionPost := by
   intro scope id lowered tree
   cases tree with
   | @group node inner innerNode lowered metadata form innerFound sourceType child =>
@@ -332,9 +389,12 @@ theorem Head.reflects
       environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
+    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
       ih innerFound environments heaps locals agrees actualTyped evaluated
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.group contains form layout) trace retained⟩
     simpa only [sourceType] using represented
   | @pair node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree =>
     have leftIH := @meaning _ _ _ firstTree
@@ -343,17 +403,20 @@ theorem Head.reflects
       environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    have children : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
+    have children : ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+        program context evidence source (Two scope left right first second) faults expressionPost := by
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH
       · exact rightIH
-    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      TypedDataExpressionSequence.reflects (two_tree (first := first) (second := second) leftFound rightFound) children environments heaps locals agrees actualTyped evaluated
+    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      TypedDataExpressionSequence.reflects_with_post (two_tree (first := first) (second := second) leftFound rightFound) sequenceJoins children environments heaps locals agrees actualTyped evaluated
     obtain ⟨outcome, packed, payload⟩ := pair_result represented
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata, pair_post joins (.tuple contains form layout) sourceTrace packed retained⟩
     simpa only [sourceType] using payload
 
   | @unary node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child =>
@@ -361,11 +424,14 @@ theorem Head.reflects
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     rw [unary_rename] at evaluated
     have complete := evaluated
     cases evaluated with
     | caseLeft childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees actualTyped childEvaluation
       cases represented with
       | fault matched =>
@@ -373,9 +439,9 @@ theorem Head.reflects
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.unary contains form layout) failed (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | caseRight childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees actualTyped childEvaluation
       cases represented with
       | value payload =>
@@ -385,19 +451,22 @@ theorem Head.reflects
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
-            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
   | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
     have rightIH := @meaning _ _ _ rightTree
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     rw [Mode.binary_rename] at evaluated
     have complete := evaluated
     rw [Mode.binary_eq] at evaluated
     cases evaluated with
     | caseLeft leftEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped leftEvaluation
       cases represented with
       | fault matched =>
@@ -405,9 +474,9 @@ theorem Head.reflects
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (mode.left_failure operator leftEvaluation)
           exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.leftFault failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.binaryLeft contains form layout) failed (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | caseRight leftEvaluation branch =>
-      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         leftIH leftFound environments heaps locals agrees actualTyped leftEvaluation
       cases represented with
       | @value sourceValue coreValue payload =>
@@ -418,11 +487,11 @@ theorem Head.reflects
           · obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit leftEvaluation
             obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
             exact ⟨_, middle, middleMap, middleWorld, binary_intro metadata form (.short firstTrace circuit),
-              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩
+              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, trivial⟩
           · obtain ⟨rightValue, rightStore, rightEvaluation⟩ := profile.right_evaluated payload continues branch
             have shifted := rightEvaluation
             rw [← GenericExpressionMeaning.rename_prefix] at shifted
-            obtain ⟨rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
               rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees _)
                 (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) shifted
@@ -434,7 +503,7 @@ theorem Head.reflects
                 obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.rightFault firstTrace continues failed),
                   .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨_, rfl, joins.expression (.binaryRight contains form layout firstTrace continues) failed (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
@@ -445,7 +514,7 @@ theorem Head.reflects
               | value secondTrace =>
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
                   .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
 
   | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
     have conditionIH := @meaning _ _ _ conditionTree
@@ -454,11 +523,14 @@ theorem Head.reflects
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
+    have contains := lookupExpression?_sound metadata.found
+    have layout : Dynamic.OrdinaryRequirementLayout node.requirements node.coercions [] := by
+      rw [metadata.requirements, metadata.coercions]; rfl
     rw [choose_rename] at evaluated
     have complete := evaluated
     cases evaluated with
     | caseLeft childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         conditionIH conditionFound environments heaps locals agrees actualTyped childEvaluation
       cases represented with
       | fault matched =>
@@ -466,9 +538,9 @@ theorem Head.reflects
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (LocalControl.choose_failure type childEvaluation)
           exact ⟨_, after, finalMap, finalWorld, conditional_intro metadata form (.fault failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, ⟨_, rfl, joins.expression (.conditionalCondition contains form layout) failed (ExpressionFailurePostContracts.OutcomePost.fault retained)⟩⟩
     | caseRight childEvaluation branch =>
-      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         conditionIH conditionFound environments heaps locals agrees actualTyped childEvaluation
       cases represented with
       | value payload =>
@@ -482,23 +554,33 @@ theorem Head.reflects
           | false =>
             change Evaluates _ _ ((elseCode.rename ξ).weakenAt 0) _ _ at selected
             rw [← GenericExpressionMeaning.rename_prefix] at selected
-            obtain ⟨outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
               elseIH elseFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees (.bool false))
               (.cons .bool (actualTyped.weaken firstWorlds)) selected
             refine ⟨outcome, after, finalMap, finalWorld, conditional_intro metadata form (.branch conditionTrace branchTrace),
-              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.conditionalFalse contains form layout conditionTrace) branchTrace retained⟩
             simpa only [elseType] using represented
           | true =>
             change Evaluates _ _ ((thenCode.rename ξ).weakenAt 0) _ _ at selected
             rw [← GenericExpressionMeaning.rename_prefix] at selected
-            obtain ⟨outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨outcome, after, finalMap, finalWorld, branchTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
               thenIH thenFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees (.bool true))
               (.cons .bool (actualTyped.weaken firstWorlds)) selected
             refine ⟨outcome, after, finalMap, finalWorld, conditional_intro metadata form (.branch conditionTrace branchTrace),
-              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+              ?_, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata, ExpressionFailurePostContracts.OutcomePost.expression joins (.conditionalTrue contains form layout conditionTrace) branchTrace retained⟩
             simpa only [thenType] using represented
+theorem Head.reflects
+    (meaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source certificate faults) :
+    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel checked registry functions)
+      program context evidence source (Head checked source certificate) faults := by
+  exact ExpressionFailurePostContracts.TypedReflects.forget (Head.reflects_with_post functions program evidence
+    (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+    (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+    (ExpressionFailurePostContracts.TypedReflects.of_trivial meaning))
+
 
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTypedCompositions
