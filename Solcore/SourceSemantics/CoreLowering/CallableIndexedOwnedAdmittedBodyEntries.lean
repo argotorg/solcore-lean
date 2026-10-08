@@ -87,6 +87,33 @@ theorem of_lambda {program : Program} {function : Dynamic.Closure} {compiled : S
       frame beforeTyped argumentsTyped
   exact ⟨runtime, covers, heapTyped, locals, finalContext, facts, typing, completes⟩
 
+/-- The actual Source body trace supplies successful value and heap typing.
+The proof depends only on the original parameter receipt and program typing. -/
+theorem after_body_values {program : Program} {function : Dynamic.Closure}
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap}
+    (receipt : SourceReceipt program function context environment before)
+    (wellFormed : ProgramWellFormed program) {size : Nat} {outcome : Dynamic.ExpressionOutcome}
+    (trace : RecursiveNamedCallBounds.BodyTrace program size function context environment before outcome after) :
+    ∀ value, outcome = .value value →
+      Dynamic.ValueHasType context after value function.resultType ∧ Dynamic.HeapWellTyped context after := by
+  intro value same
+  obtain ⟨finalContext, facts, typing, completes⟩ := receipt.bodyTyped
+  cases trace with
+  | returned executed =>
+    cases same
+    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed receipt.runtime receipt.covers
+      receipt.locals receipt.heapTyped typing completes executed.sound
+    cases preserved.outcome_typed with
+    | returned typed => exact ⟨typed, preserved.heap_typed⟩
+  | unit unitType executed =>
+    cases same
+    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed receipt.runtime receipt.covers
+      receipt.locals receipt.heapTyped typing completes executed.sound
+    exact ⟨unitType.symm ▸ Dynamic.ValueHasType.unit, preserved.heap_typed⟩
+  | fault _ => cases same
+  | escaped _ _ => cases same
+
 end SourceReceipt
 
 section ActualEntries
@@ -168,22 +195,7 @@ theorem after_body (wellFormed : ProgramWellFormed program)
     (frame : AdministrativePreserved entry.original.mapping entry.original.store mapping store) :
     PostAdmission bridge origin.context origin.function.resultType outcome reached := by
   refine ⟨StableRows.after_administrative (bridge.pool entry.original.initial) (bridge.pool reached) entry.rows frame, ?_⟩
-  intro value same
-  obtain ⟨finalContext, facts, typing, completes⟩ := entry.source.bodyTyped
-  cases trace with
-  | returned executed =>
-    cases same
-    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed entry.source.runtime entry.source.covers
-      entry.source.locals entry.source.heapTyped typing completes executed.sound
-    cases preserved.outcome_typed with
-    | returned typed => exact ⟨typed, preserved.heap_typed⟩
-  | unit unitType executed =>
-    cases same
-    have preserved := Dynamic.FunctionStatementsExecute.preserved wellFormed entry.source.runtime entry.source.covers
-      entry.source.locals entry.source.heapTyped typing completes executed.sound
-    exact ⟨unitType.symm ▸ Dynamic.ValueHasType.unit, preserved.heap_typed⟩
-  | fault _ => cases same
-  | escaped _ _ => cases same
+  exact entry.source.after_body_values wellFormed trace
 
 
 /-- This pointwise body contract requires genuine Source admission at its actual
