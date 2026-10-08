@@ -849,6 +849,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryL
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryLambdaExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryLambdaExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrincipalLambdaExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralMethodMixedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralMethodMixedExpressionRuntimeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
