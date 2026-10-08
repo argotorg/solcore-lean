@@ -1006,6 +1006,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBuiltinF
 import Solcore.SourceSemantics.CoreLowering.ReachedReadFaultDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSourceFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIndirectCompilerPolicyInputs
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
