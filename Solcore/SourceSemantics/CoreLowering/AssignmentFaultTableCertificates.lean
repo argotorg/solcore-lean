@@ -306,4 +306,62 @@ theorem prepare_operand {source : TypedSource} {first : Nat} {table : Table}
   exact ⟨site, found, matched.1, matched.2.1, matched.2.2,
     Table.reasonAt_found found, (prepare_numbered accepted).diagnostic (List.mem_of_find?_eq_some found)⟩
 
+
+/-- A unary assignment retains its genuine statement or owning header site. -/
+inductive UnaryAt (node : StatementNode) (assignment : AssignmentResolution) : Prop where
+  | statement : node.form = .assignBitNot assignment → UnaryAt node assignment
+  | header {initializer condition post body} : node.form = .forLoop initializer condition post body →
+      .assignBitNot assignment ∈ initializer ++ post → UnaryAt node assignment
+
+private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first : Nat} {sites next : List Site}
+    {node : StatementNode} {assignment : AssignmentResolution}
+    (occurs : UnaryAt node assignment)
+    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer)
+    (accepted : addStatement owner first sites node = .ok next) :
+    ∃ site, next.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site := by
+  by_cases owned : node.id.occurrence.owner = owner
+  · simp only [addStatement, owned, ne_eq, not_true_eq_false, ↓reduceIte, pure, Except.pure] at accepted
+    cases occurs with
+    | statement form =>
+      simp only [form] at accepted
+      exact add_lookup rawScalar accepted
+    | header form member =>
+      simp only [form] at accepted
+      apply fold_contains (selected := ForItemForm.assignBitNot assignment)
+        (property := fun sites => ∃ site, sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site) ?_ ?_ member accepted
+      · intro sites item next ⟨site, found⟩ step
+        exact ⟨site, item_preserves step found⟩
+      · intro sites next step
+        exact add_lookup rawScalar step
+  · simp [addStatement, owned, throw, bind, Except.bind] at accepted
+
+/-- The saved original table fold also authenticates actual unary occurrences.
+Repeated header requests retain their original first table entry. -/
+theorem prepare_unary {source : TypedSource} {first : Nat} {table : Table}
+    {node : StatementNode} {assignment : AssignmentResolution}
+    (accepted : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
+    (occurs : UnaryAt node assignment)
+    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer) :
+    ∃ site, table.sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site ∧
+      site.site = .occurrence node.id.occurrence ∧ site.binder = assignment.target.root ∧ site.kind = .bitNot ∧
+      table.reasonAt (.occurrence node.id.occurrence) assignment.target.root .bitNot = site.reason ∧
+      table.diagnostic? site.reason = some site.diagnostic := by
+  have lookup : ∃ site, table.sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site := by
+    unfold prepare at accepted
+    obtain ⟨sites, folded, returned⟩ := bind_ok accepted
+    cases returned
+    apply fold_contains (selected := node)
+      (property := fun sites => ∃ site, sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site) ?_ ?_ ?_ folded
+    · intro sites item next ⟨site, found⟩ step
+      exact ⟨site, statement_preserves step found⟩
+    · intro sites next step
+      exact statement_unary_lookup occurs rawScalar step
+    · apply List.mem_mergeSort.mpr
+      exact List.mem_filterMap.mpr ⟨.statement node, member, rfl⟩
+  obtain ⟨site, found⟩ := lookup
+  have matched : site.site = .occurrence node.id.occurrence ∧ site.binder = assignment.target.root ∧ site.kind = .bitNot :=
+    by simpa [Matches] using List.find?_some found
+  exact ⟨site, found, matched.1, matched.2.1, matched.2.2,
+    Table.reasonAt_found found, (prepare_numbered accepted).diagnostic (List.mem_of_find?_eq_some found)⟩
+
 end Solcore.Frontend.SourceCoreAssignmentFaultSites.Certificates
