@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectSuccessStep
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectNativePrefix
 
 /-! Finite argument-prefix reflection after the actual first guard passed.
@@ -135,7 +136,7 @@ include caller sidecarSource parentTyped wellFormed runtime covers environments 
 /-- Use the existing ordered sequence proof at the same admitted callee post.
 Two further original bind projections retain actual argument failure or the
 complete beforeApplication gate and application trace, with no body IH. -/
-theorem reflects_suffix (budget : Nat)
+theorem reflects_suffix_with_effects (budget : Nat)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
       bridge model context evidence source certificate faults size)
     {size : Nat} {value : Value} {finalStore : Store}
@@ -149,10 +150,15 @@ theorem reflects_suffix (budget : Nat)
         (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar)
         (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
         bridge profile compiler initial budget value finalStore ∨
-      SuccessPrefix (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (SuccessPrefix (registry := registry) (faults := faults) (context := context) (evidence := evidence)
         (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
         (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
-        bridge profile compiler prepared initial budget value finalStore) := by
+        bridge profile compiler prepared initial budget value finalStore ∧
+      CallableIndexedOwnedStoredIndirectSuccessStep.SuccessStep (registry := registry) (faults := faults)
+        (context := context) (evidence := evidence) (environment := environment) (actual := actual) (ξ := ξ)
+        (sourceTypes := sourceTypes) (calleeHeap := calleeHeap) (calleeNative := calleeNative)
+        (calleeStore := calleeStore) (calleeMap := calleeMap) (calleeWorld := calleeWorld)
+        bridge profile compiler prepared initial budget value finalStore)) := by
   obtain ⟨_parameter, _sourceResult, rawTypes, _calleeTyped, argumentsTyped, _application⟩ :=
     CallableIndexedOwnedStoredClosureArgumentReceipts.original_facts unique compiler.found compiler.originalForm parentTyped
   obtain ⟨calleeEvaluation, calleeRepresentation, calleeHeaps, calleeMaps, calleeWorlds, calleeFrame,
@@ -211,13 +217,49 @@ theorem reflects_suffix (budget : Nat)
       cases trace with
       | values evaluated =>
         right
-        refine ⟨_, sourceSize, _, _, after, _, finalMap, finalWorld, originalArguments, argumentStrict,
-          evaluated, represented, finalHeaps, calleeMaps.trans maps, calleeWorlds.trans worlds,
-          calleeFrame.trans frame, calleeMetadata.trans heapMetadata,
-          ⟨reached, callerProtocol.trans calleeRelated related, argumentPost.at_values⟩, ?_⟩
-        refine ⟨_, remaining, remainingStrict, ?_⟩
-        cases CallableIndirectCallBounds.bind_completed remaining (Nat.le_of_lt remainingStrict) with
-        | failed gate gateStrict => exact .failed gate gateStrict
-        | continued gate application gateStrict applicationStrict => exact .passed gate application gateStrict applicationStrict
+        constructor
+        · refine ⟨_, sourceSize, _, _, after, _, finalMap, finalWorld, originalArguments, argumentStrict,
+            evaluated, represented, finalHeaps, calleeMaps.trans maps, calleeWorlds.trans worlds,
+            calleeFrame.trans frame, calleeMetadata.trans heapMetadata,
+            ⟨reached, callerProtocol.trans calleeRelated related, argumentPost.at_values⟩, ?_⟩
+          refine ⟨_, remaining, remainingStrict, ?_⟩
+          cases CallableIndirectCallBounds.bind_completed remaining (Nat.le_of_lt remainingStrict) with
+          | failed gate gateStrict => exact .failed gate gateStrict
+          | continued gate application gateStrict applicationStrict => exact .passed gate application gateStrict applicationStrict
+        · exact ⟨_, sourceSize, _, _, after, _, finalMap, finalWorld, originalArguments, argumentStrict,
+            evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata,
+            calleeMaps.trans maps, calleeWorlds.trans worlds, calleeFrame.trans frame,
+            calleeMetadata.trans heapMetadata,
+            ⟨reached, callerProtocol.trans calleeRelated related, argumentPost.at_values⟩,
+            ⟨_, remaining, remainingStrict⟩⟩
+
+
+include caller sidecarSource parentTyped wellFormed runtime covers environments locals agrees typed admitted
+  calleeTrace post accepted tree unique in
+/-- Use the existing ordered sequence proof at the same admitted callee post.
+Two further original bind projections retain actual argument failure or the
+complete beforeApplication gate and application trace, with no body IH. -/
+theorem reflects_suffix (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
+      bridge model context evidence source certificate faults size)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size (.unit :: calleeNative :: actual) calleeStore
+      (CallableIndexedOwnedStoredIndirectNativePrefix.suffix prepared.site native.diagnostics.unknown compiler.resultType
+        ((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ)) value finalStore)
+    (smaller : size < budget) :
+    SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar ∧
+    sidecar.source = source ∧
+    (FaultPrefix (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar)
+        (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+        bridge profile compiler initial budget value finalStore ∨
+      SuccessPrefix (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+        (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+        bridge profile compiler prepared initial budget value finalStore) := by
+  obtain ⟨sameCaller, sameSource, result⟩ := reflects_suffix_with_effects bridge profile compiler prepared
+    parentTyped wellFormed runtime covers environments locals agrees typed initial admitted caller sidecarSource
+    calleeTrace post accepted tree unique budget children completed smaller
+  exact ⟨sameCaller, sameSource, result.elim Or.inl (fun success => Or.inr success.1)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectArgumentPrefix
