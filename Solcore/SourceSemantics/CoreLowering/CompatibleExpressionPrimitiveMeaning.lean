@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScalarExpressionFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveTree
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionPrimitiveExecution
 
@@ -121,45 +122,55 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
-include extension unique uninitialized in
-theorem preserves_with_literals
-    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source literals faults) :
-    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include unique in
+theorem preserves_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
-        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
   intro scope id lowered ⟨tree, sites⟩
   induction sites with
   | product child childSites =>
-    exact CompatibleExpressionProducts.preserves_with_literals functions extension program evidence unique uninitialized literalMeaning ⟨child, childSites⟩
+    exact CompatibleExpressionProducts.preserves_with_literals_and_post (fuel := fuel) (reasonAt := reasonAt) functions program evidence unique sequenceJoins ordinaryJoins literalMeaning readMeaning ⟨child, childSites⟩
   | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after
       environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
       ih innerFound environments heaps locals agrees (CompatibleExpressionProducts.group_inv metadata form unique trace)
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ExpressionFailurePostContracts.OutcomePost.expression ordinaryJoins
+        (.group (lookupExpression?_sound metadata.found) form
+          (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) (CompatibleExpressionProducts.group_inv metadata form unique trace) retained⟩
     simpa only [sourceType] using represented
   | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after
       environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    have children : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
+    have children : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (Two scope left right first second) faults post := by
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH
       · exact rightIH
     obtain ⟨sequence, sourceTrace, packed⟩ := CompatibleExpressionProducts.pair_inv metadata form unique trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      (two_tree (first := first) (second := second) leftFound rightFound).preserves children environments heaps locals agrees sourceTrace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      (two_tree (first := first) (second := second) leftFound rightFound).preserves_with_post sequenceJoins children environments heaps locals agrees sourceTrace
     obtain ⟨actualOutcome, actualPack, payload⟩ := pair_result represented
     have sameOutcome := actualPack.functional packed
     subst actualOutcome
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ScalarExpressionFaultPostContracts.tuple_outcome ordinaryJoins metadata form sourceTrace packed retained⟩
     simpa only [sourceType] using payload
 
   | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child childSites ih =>
@@ -169,7 +180,7 @@ theorem preserves_with_literals
     have sourceStep := unary_inv metadata form unique trace
     cases sourceStep with
     | value childTrace applied =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees (.value childTrace)
       cases represented with
       | value payload =>
@@ -177,16 +188,18 @@ theorem preserves_with_literals
         obtain ⟨sourceResult, result, actualApplied, coreApplied, resultRep⟩ := profile.preserves payload
         have same := actualApplied.functional applied
         subst sourceResult
-        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+        refine ⟨.inRight .word result, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
         · rw [unary_rename]; exact LocalPrimitiveResults.unary_success evaluated coreApplied
         · exact .value (outputType ▸ resultRep)
     | fault childTrace =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [unary_rename]; exact LocalPrimitiveResults.unary_failure evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
+          ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+            (.unary (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) childTrace retained⟩
     | invalid childTrace failed =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := ih childFound environments heaps locals agrees (.value childTrace)
       cases represented with
@@ -201,12 +214,14 @@ theorem preserves_with_literals
     have sourceStep := binary_inv metadata form unique trace
     cases sourceStep with
     | leftFault childTrace =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact mode.left_failure operator evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
+          ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+            (.binaryLeft (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) childTrace retained⟩
     | leftInvalid childTrace invalid =>
       obtain ⟨_, _, _, _, _, represented, _⟩ := leftIH leftFound environments heaps locals agrees (.value childTrace)
       cases represented with
@@ -214,21 +229,21 @@ theorem preserves_with_literals
         rw [leftType] at payload
         exact False.elim (profile.left_valid payload invalid)
     | short childTrace circuit =>
-      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees (.value childTrace)
       cases represented with
       | value payload =>
         rw [leftType] at payload
         obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit evaluated
         exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
-          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
     | rightFault firstTrace continues secondTrace =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstRetained⟩ :=
         leftIH leftFound environments heaps locals agrees (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue) (.fault secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
@@ -236,14 +251,16 @@ theorem preserves_with_literals
         | fault matched =>
           exact ⟨_, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact profile.right_failure payload continues first second,
             .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata,
+            ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+              (.binaryRight (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata) firstTrace continues) secondTrace retained⟩
     | value firstTrace continues secondTrace applied =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstRetained⟩ :=
         leftIH leftFound environments heaps locals agrees (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
         rw [leftType] at payload
-        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+        obtain ⟨_, finalStore, finalMap, finalWorld, second, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
           rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
             (GenericExpressionMeaning.agree_prefix agrees coreValue) (.value secondTrace)
         rw [GenericExpressionMeaning.rename_prefix] at second
@@ -256,9 +273,9 @@ theorem preserves_with_literals
           subst sourceResult
           exact ⟨.inRight .word result, finalStore, finalMap, finalWorld, by rw [Mode.binary_rename]; exact combined,
             .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-            firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+            firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
     | invalid firstTrace continues secondTrace failed =>
-      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata⟩ :=
+      obtain ⟨_, middleStore, middleMap, middleWorld, first, represented, middleHeaps, firstMaps, firstWorlds, _, firstMetadata, _⟩ :=
         leftIH leftFound environments heaps locals agrees (.value firstTrace)
       cases represented with
       | @value _ coreValue payload =>
@@ -275,50 +292,51 @@ theorem preserves_with_literals
           exact False.elim (binary_fault_excluded applied failed)
 
 
-include extension valid unique uninitialized in
-theorem preserves :
-    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
-  intro scope id lowered tree
-  exact preserves_with_literals functions extension program evidence unique uninitialized
-    (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) ⟨tree, tree.literalSites⟩
-
-include extension uninitialized in
-theorem reflects_with_literals
-    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source literals faults) :
-    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+theorem reflects_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
-        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
   intro scope id lowered ⟨tree, sites⟩
   induction sites with
   | product child childSites =>
-    exact CompatibleExpressionProducts.reflects_with_literals functions extension program evidence uninitialized literalMeaning ⟨child, childSites⟩
+    exact CompatibleExpressionProducts.reflects_with_literals_and_post (fuel := fuel) (reasonAt := reasonAt) functions program evidence sequenceJoins ordinaryJoins literalMeaning readMeaning ⟨child, childSites⟩
   | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore
       environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
       ih innerFound environments heaps locals agrees evaluated
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ExpressionFailurePostContracts.OutcomePost.expression ordinaryJoins
+        (.group (lookupExpression?_sound metadata.found) form
+          (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) trace retained⟩
     simpa only [sourceType] using represented
   | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore
       environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
-    have children : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
+    have children : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (Two scope left right first second) faults post := by
       intro childScope childId childCode entry
       obtain ⟨rfl, alternatives⟩ := entry
       rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
       · exact leftIH
       · exact rightIH
-    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      (two_tree (first := first) (second := second) leftFound rightFound).reflects children environments heaps locals agrees evaluated
+    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      (two_tree (first := first) (second := second) leftFound rightFound).reflects_with_post sequenceJoins children environments heaps locals agrees evaluated
     obtain ⟨outcome, packed, payload⟩ := pair_result represented
-    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
+    refine ⟨outcome, after, finalMap, finalWorld, CompatibleExpressionProducts.pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ScalarExpressionFaultPostContracts.tuple_outcome ordinaryJoins metadata form sourceTrace packed retained⟩
     simpa only [sourceType] using payload
 
   | @unary id node operand childNode operator operandType resultType core childCode metadata form childFound inputType outputType profile child childSites ih =>
@@ -329,7 +347,7 @@ theorem reflects_with_literals
     have complete := evaluated
     cases evaluated with
     | caseLeft childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees childEvaluation
       cases represented with
       | fault matched =>
@@ -337,9 +355,11 @@ theorem reflects_with_literals
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := Core.evaluation_deterministic (LocalPrimitiveResults.unary_failure (operator := core) childEvaluation) complete
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.fault failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata,
+            ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+              (.unary (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) failed retained⟩
     | caseRight childEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih childFound environments heaps locals agrees childEvaluation
       cases represented with
       | value payload =>
@@ -349,7 +369,7 @@ theorem reflects_with_literals
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
-            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
+            .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
   | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
@@ -359,7 +379,7 @@ theorem reflects_with_literals
     rw [Mode.binary_eq] at evaluated
     cases evaluated with
     | caseLeft leftEvaluation branch =>
-      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨childOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         leftIH leftFound environments heaps locals agrees leftEvaluation
       cases represented with
       | fault matched =>
@@ -367,9 +387,11 @@ theorem reflects_with_literals
         | fault failed =>
           obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete (mode.left_failure operator leftEvaluation)
           exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.leftFault failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata,
+            ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+              (.binaryLeft (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) failed retained⟩
     | caseRight leftEvaluation branch =>
-      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨childOutcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, firstRetained⟩ :=
         leftIH leftFound environments heaps locals agrees leftEvaluation
       cases represented with
       | @value sourceValue coreValue payload =>
@@ -380,11 +402,11 @@ theorem reflects_with_literals
           · obtain ⟨result, resultRep, combined⟩ := profile.short (right := rightCode.rename ξ) payload circuit leftEvaluation
             obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
             exact ⟨_, middle, middleMap, middleWorld, binary_intro metadata form (.short firstTrace circuit),
-              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩
+              .value (outputType ▸ resultRep), middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, trivial⟩
           · obtain ⟨rightValue, rightStore, rightEvaluation⟩ := profile.right_evaluated payload continues branch
             have shifted := rightEvaluation
             rw [← GenericExpressionMeaning.rename_prefix] at shifted
-            obtain ⟨rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+            obtain ⟨rightOutcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
               rightIH rightFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (GenericExpressionMeaning.agree_prefix agrees _) shifted
             cases represented with
@@ -395,7 +417,9 @@ theorem reflects_with_literals
                 obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete combined
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.rightFault firstTrace continues failed),
                   .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata,
+                  ScalarExpressionFaultPostContracts.expression_fault_outcome ordinaryJoins
+                    (.binaryRight (lookupExpression?_sound metadata.found) form (ScalarExpressionFaultPostContracts.ordinary_layout metadata) firstTrace continues) failed retained⟩
             | value rightPayload =>
               rw [rightType] at rightPayload
               have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
@@ -406,8 +430,55 @@ theorem reflects_with_literals
               | value secondTrace =>
                 exact ⟨_, after, finalMap, finalWorld, binary_intro metadata form (.value firstTrace continues secondTrace applied),
                   .value (outputType ▸ resultRep), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans heapMetadata⟩
+                  firstFrame.trans frame, firstMetadata.trans heapMetadata, trivial⟩
 
+
+include extension unique uninitialized in
+theorem preserves_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  exact ExpressionFailurePostContracts.Preserves.forget
+    (preserves_with_literals_and_post (functions := functions) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence) (unique := unique)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ExpressionFailurePostContracts.Preserves.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Preserves.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
+
+include extension valid unique uninitialized in
+theorem preserves :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  intro scope id lowered tree
+  exact preserves_with_literals functions extension program evidence unique uninitialized
+    (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) ⟨tree, tree.literalSites⟩
+
+
+include extension uninitialized in
+theorem reflects_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  exact ExpressionFailurePostContracts.Reflects.forget
+    (reflects_with_literals_and_post (functions := functions) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ExpressionFailurePostContracts.Reflects.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Reflects.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension valid uninitialized in
 theorem reflects :

@@ -972,6 +972,12 @@ import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPreparedStaticTran
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaJointStaticReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatibleContextualDiagnosticIndexOrigins
+import Solcore.SourceSemantics.CoreLowering.ScalarExpressionFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.ScalarConstructorFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.ReachedLiteralOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.ReachedScalarExpressionFaultPaths
+import Solcore.SourceSemantics.CoreLowering.ReachedScalarFragmentOutcomePorts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

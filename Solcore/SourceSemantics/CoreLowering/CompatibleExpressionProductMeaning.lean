@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScalarExpressionFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionProductSource
 
 /-! Whole finite product trees discharge the universal child interfaces.
@@ -100,6 +101,108 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
+include unique in
+theorem preserves_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | literal receipt leaf =>
+    exact literalMeaning leaf
+  | read receipt =>
+    exact readMeaning receipt
+  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
+    intro root found mapping world administrative environment canonical actual before store ξ outcome after
+      environments heaps locals agrees trace
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      ih innerFound environments heaps locals agrees (group_inv metadata form unique trace)
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ExpressionFailurePostContracts.OutcomePost.expression ordinaryJoins
+        (.group (lookupExpression?_sound metadata.found) form
+          (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) (group_inv metadata form unique trace) retained⟩
+    simpa only [sourceType] using represented
+  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
+    intro root found mapping world administrative environment canonical actual before store ξ outcome after
+      environments heaps locals agrees trace
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    have children : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (Two scope left right first second) faults post := by
+      intro childScope childId childCode entry
+      obtain ⟨rfl, alternatives⟩ := entry
+      rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact leftIH
+      · exact rightIH
+    obtain ⟨sequence, sourceTrace, packed⟩ := pair_inv metadata form unique trace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      (two_tree (first := first) (second := second) leftFound rightFound).preserves_with_post sequenceJoins children environments heaps locals agrees sourceTrace
+    obtain ⟨actualOutcome, actualPack, payload⟩ := pair_result represented
+    have sameOutcome := actualPack.functional packed
+    subst actualOutcome
+    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ScalarExpressionFaultPostContracts.tuple_outcome ordinaryJoins metadata form sourceTrace packed retained⟩
+    simpa only [sourceType] using payload
+
+theorem reflects_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
+  intro scope id lowered ⟨tree, sites⟩
+  induction sites with
+  | literal receipt leaf =>
+    exact literalMeaning leaf
+  | read receipt =>
+    exact readMeaning receipt
+  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
+    intro root found mapping world administrative environment canonical actual before store ξ value finalStore
+      environments heaps locals agrees evaluated
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      ih innerFound environments heaps locals agrees evaluated
+    refine ⟨outcome, after, finalMap, finalWorld, group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ExpressionFailurePostContracts.OutcomePost.expression ordinaryJoins
+        (.group (lookupExpression?_sound metadata.found) form
+          (ScalarExpressionFaultPostContracts.ordinary_layout metadata)) trace retained⟩
+    simpa only [sourceType] using represented
+  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
+    intro root found mapping world administrative environment canonical actual before store ξ value finalStore
+      environments heaps locals agrees evaluated
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    have children : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+        program context evidence source (Two scope left right first second) faults post := by
+      intro childScope childId childCode entry
+      obtain ⟨rfl, alternatives⟩ := entry
+      rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact leftIH
+      · exact rightIH
+    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+      (two_tree (first := first) (second := second) leftFound rightFound).reflects_with_post sequenceJoins children environments heaps locals agrees evaluated
+    obtain ⟨outcome, packed, payload⟩ := pair_result represented
+    refine ⟨outcome, after, finalMap, finalWorld, pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata,
+      ScalarExpressionFaultPostContracts.tuple_outcome ordinaryJoins metadata form sourceTrace packed retained⟩
+    simpa only [sourceType] using payload
+
 include extension unique uninitialized in
 /-- Every independent completed source execution is preserved for the entire
 certified tree. There is no external child semantic hypothesis. -/
@@ -109,41 +212,17 @@ theorem preserves_with_literals
     GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
         (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites with
-  | literal receipt leaf =>
-    exact literalMeaning leaf
-  | read receipt =>
-    exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt
-  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
-    intro root found mapping world administrative environment canonical actual before store ξ outcome after
-      environments heaps locals agrees trace
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      ih innerFound environments heaps locals agrees (group_inv metadata form unique trace)
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
-    simpa only [sourceType] using represented
-  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
-    intro root found mapping world administrative environment canonical actual before store ξ outcome after
-      environments heaps locals agrees trace
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    have children : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
-      intro childScope childId childCode entry
-      obtain ⟨rfl, alternatives⟩ := entry
-      rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-      · exact leftIH
-      · exact rightIH
-    obtain ⟨sequence, sourceTrace, packed⟩ := pair_inv metadata form unique trace
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      (two_tree (first := first) (second := second) leftFound rightFound).preserves children environments heaps locals agrees sourceTrace
-    obtain ⟨actualOutcome, actualPack, payload⟩ := pair_result represented
-    have sameOutcome := actualPack.functional packed
-    subst actualOutcome
-    refine ⟨value, finalStore, finalMap, finalWorld, evaluated, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
-    simpa only [sourceType] using payload
+  exact ExpressionFailurePostContracts.Preserves.forget
+    (preserves_with_literals_and_post (functions := functions) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence) (unique := unique)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ExpressionFailurePostContracts.Preserves.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Preserves.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
 
 include extension valid unique uninitialized in
 theorem preserves :
@@ -152,6 +231,7 @@ theorem preserves :
   intro scope id lowered tree
   exact preserves_with_literals functions extension program evidence unique uninitialized
     (CompatibleExpressionLiterals.preserves functions program context evidence valid unique faults) ⟨tree, tree.literalSites⟩
+
 
 include extension uninitialized in
 /-- Every native completion reconstructs the independent source execution of
@@ -162,38 +242,17 @@ theorem reflects_with_literals
     GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
         (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
-  intro scope id lowered ⟨tree, sites⟩
-  induction sites with
-  | literal receipt leaf =>
-    exact literalMeaning leaf
-  | read receipt =>
-    exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt
-  | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
-    intro root found mapping world administrative environment canonical actual before store ξ value finalStore
-      environments heaps locals agrees evaluated
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      ih innerFound environments heaps locals agrees evaluated
-    refine ⟨outcome, after, finalMap, finalWorld, group_intro metadata form trace, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
-    simpa only [sourceType] using represented
-  | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType firstTree secondTree firstTreeSites secondTreeSites leftIH rightIH =>
-    intro root found mapping world administrative environment canonical actual before store ξ value finalStore
-      environments heaps locals agrees evaluated
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    have children : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-        program context evidence source (Two scope left right first second) faults := by
-      intro childScope childId childCode entry
-      obtain ⟨rfl, alternatives⟩ := entry
-      rcases alternatives with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-      · exact leftIH
-      · exact rightIH
-    obtain ⟨sequence, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-      (two_tree (first := first) (second := second) leftFound rightFound).reflects children environments heaps locals agrees evaluated
-    obtain ⟨outcome, packed, payload⟩ := pair_result represented
-    refine ⟨outcome, after, finalMap, finalWorld, pair_intro metadata form sourceTrace packed, ?_, finalHeaps, maps, worlds, frame, heapMetadata⟩
-    simpa only [sourceType] using payload
+  exact ExpressionFailurePostContracts.Reflects.forget
+    (reflects_with_literals_and_post (functions := functions) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ExpressionFailurePostContracts.Reflects.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Reflects.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension valid uninitialized in
 theorem reflects :

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionMemberTree
 
 /-! Exact member selection after the real child evaluation, with arbitrary
@@ -117,16 +118,24 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (unique : NodeOccurrencesUnique source) {faults : FunctionCalls.FaultRep}
   (uninitialized : ∀ id location, faults (.uninitializedLocation location) (reasonAt id))
 
-include extension unique uninitialized in
-theorem preserves_with_literals
-    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source literals faults) :
-    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include extension unique in
+theorem preserves_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (constructorJoins : ScalarConstructorFaultPostContracts.Joins post listPost values program context evidence source)
+    (memberJoins : ScalarMemberFaultPostContracts.Joins post values program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
-        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
   intro scope id lowered ⟨tree, sites⟩
   induction sites with
-  | fragment child treeSites => exact CompatibleExpressionConstructors.preserves_with_literals functions extension program evidence unique uninitialized literalMeaning ⟨child, treeSites⟩
+  | fragment child treeSites => exact CompatibleExpressionConstructors.preserves_with_literals_and_post (fuel := fuel) (reasonAt := reasonAt) functions extension program evidence unique sequenceJoins ordinaryJoins constructorJoins literalMeaning readMeaning ⟨child, treeSites⟩
   | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
@@ -134,7 +143,7 @@ theorem preserves_with_literals
     have raw := member_inv metadata form unique trace
     cases raw with
     | value childTrace selected =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih baseMetadata.found environments heaps locals agrees (.value childTrace)
       cases represented with
       | value payload =>
@@ -143,14 +152,16 @@ theorem preserves_with_literals
         have same := at_functional sourceAt selected
         subst sourceChild
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [member_rename layout]; exact completed,
-          .value related, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .value related, finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
     | failure childTrace =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih baseMetadata.found environments heaps locals agrees (.fault childTrace)
       cases represented with
       | fault matched =>
         exact ⟨_, finalStore, finalMap, finalWorld, by rw [member_rename layout]; exact LanguageResult.bind_failure _ evaluated,
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
+          ScalarMemberFaultPostContracts.base_fault_outcome memberJoins
+            metadata baseMetadata form layout childTrace retained⟩
     | shape childTrace invalid =>
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, _⟩ :=
         ih baseMetadata.found environments heaps locals agrees (.value childTrace)
@@ -168,24 +179,24 @@ theorem preserves_with_literals
         cases shape
         exact False.elim (missing_excludes missing selected)
 
-include extension contextValid unique uninitialized in
-theorem preserves :
-    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
-  intro scope id lowered tree
-  exact preserves_with_literals functions extension program evidence unique uninitialized
-    (CompatibleExpressionLiterals.preserves functions program context evidence contextValid unique faults) ⟨tree, tree.literalSites⟩
-
-include extension uninitialized in
-theorem reflects_with_literals
-    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source literals faults) :
-    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include extension in
+theorem reflects_with_literals_and_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (ordinaryJoins : ExpressionFailurePostContracts.CompositionJoins post listPost program context evidence source)
+    (constructorJoins : ScalarConstructorFaultPostContracts.Joins post listPost values program context evidence source)
+    (memberJoins : ScalarMemberFaultPostContracts.Joins post values program context evidence source)
+    (literalMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults post)
+    (readMeaning : ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionReads.LoweredRead fuel values source context reasonAt) faults post) :
+    ExpressionFailurePostContracts.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
-        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults post := by
   intro scope id lowered ⟨tree, sites⟩
   induction sites with
-  | fragment child treeSites => exact CompatibleExpressionConstructors.reflects_with_literals functions extension program evidence uninitialized literalMeaning ⟨child, treeSites⟩
+  | fragment child treeSites => exact CompatibleExpressionConstructors.reflects_with_literals_and_post (fuel := fuel) (reasonAt := reasonAt) functions extension program evidence sequenceJoins ordinaryJoins constructorJoins literalMeaning readMeaning ⟨child, treeSites⟩
   | @member id node base baseNode name index identity branches result child metadata baseMetadata form layout childTree childTreeSites ih =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
@@ -194,7 +205,7 @@ theorem reflects_with_literals
     have complete := evaluated
     cases evaluated with
     | caseLeft baseEvaluation branch =>
-      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih baseMetadata.found environments heaps locals agrees baseEvaluation
       cases represented with
       | fault matched =>
@@ -203,9 +214,11 @@ theorem reflects_with_literals
         cases trace with
         | fault failed =>
           exact ⟨_, after, finalMap, finalWorld, member_intro metadata form (.failure failed), .fault matched,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata,
+            ScalarMemberFaultPostContracts.base_fault_outcome memberJoins
+              metadata baseMetadata form layout failed retained⟩
     | caseRight baseEvaluation branch =>
-      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
+      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
         ih baseMetadata.found environments heaps locals agrees baseEvaluation
       cases represented with
       | value payload =>
@@ -215,7 +228,58 @@ theorem reflects_with_literals
         cases trace with
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, member_intro metadata form (.value childTrace sourceAt), .value related,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
+
+include extension unique uninitialized in
+theorem preserves_with_literals
+    (literalMeaning : GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  exact ExpressionFailurePostContracts.Preserves.forget
+    (preserves_with_literals_and_post (functions := functions) (extension := extension) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence) (unique := unique)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ScalarConstructorFaultPostContracts.trivial_joins values program context evidence source)
+      (ScalarMemberFaultPostContracts.trivial_joins values program context evidence source)
+      (ExpressionFailurePostContracts.Preserves.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Preserves.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_preserves functions extension program context evidence reasonAt uninitialized unique receipt)))
+
+include extension contextValid unique uninitialized in
+theorem preserves :
+    GenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  intro scope id lowered tree
+  exact preserves_with_literals functions extension program evidence unique uninitialized
+    (CompatibleExpressionLiterals.preserves functions program context evidence contextValid unique faults) ⟨tree, tree.literalSites⟩
+
+
+include extension uninitialized in
+theorem reflects_with_literals
+    (literalMeaning : GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source literals faults) :
+    GenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree.WithLiterals (fuel := fuel) (values := values) (source := source)
+        (context := context) (solved := solved) (reasonAt := reasonAt) literals) faults := by
+  exact ExpressionFailurePostContracts.Reflects.forget
+    (reflects_with_literals_and_post (functions := functions) (extension := extension) (fuel := fuel) (reasonAt := reasonAt)
+      (program := program) (evidence := evidence)
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (ExpressionFailurePostContracts.trivial_composition_joins program context evidence source)
+      (ScalarConstructorFaultPostContracts.trivial_joins values program context evidence source)
+      (ScalarMemberFaultPostContracts.trivial_joins values program context evidence source)
+      (ExpressionFailurePostContracts.Reflects.of_trivial literalMeaning)
+      (ExpressionFailurePostContracts.Reflects.of_trivial
+        (certificate := CompatibleExpressionReads.LoweredRead fuel values source context reasonAt)
+        (by
+          intro scope id lowered receipt
+          exact CompatibleExpressionReads.loweredRead_reflects functions extension program context evidence reasonAt uninitialized receipt)))
 
 include extension contextValid uninitialized in
 theorem reflects :
