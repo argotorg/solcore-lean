@@ -2075,3 +2075,84 @@ theorem Session.DiagnosticTableAt.rebuild {artifact : Artifact} {session : Sessi
     rw [sameKey]
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- An actual failed native completion retains its precise value and store,
+unchanged metadata values, and the original world weakening of callable slots.
+This proof receipt makes no Source-fault or public IO-event attribution. -/
+def Checkpoint.FailedResultAt {artifact : Artifact}
+    (checkpoint : Checkpoint artifact) (fuel : Nat)
+    (native : Core.Value) (store : Core.Store) (reason : Core.Word)
+    (returned : Session artifact) : Prop :=
+  checkpoint.NativeDone fuel native store ∧
+  Core.LanguageResult.decode? native = some (.failed reason) ∧
+  returned.store = store ∧
+  returned.world = store.map Core.Value.type ∧
+  returned.values = checkpoint.values ∧
+  HEq returned.owner checkpoint.owner ∧
+  returned.authority = checkpoint.origin.authority ∧
+  returned.sourcePrefix = checkpoint.origin.sourcePrefix ∧
+  ∃ extension : Core.WorldExtends checkpoint.world returned.world,
+    HEq returned.registry (checkpoint.registry.weaken extension)
+
+/-- Finite inversion of the same pure completion producer. The returned
+session is the one actually constructed from the given done trace. -/
+theorem Checkpoint.complete_failed_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {reason : Core.Word} {returned : Session artifact}
+    (completed : checkpoint.NativeDone fuel native store)
+    (failed : complete checkpoint generation fuel boundaryFuel native store completed =
+      .failed reason returned) :
+    checkpoint.FailedResultAt fuel native store reason returned := by
+  unfold complete at failed
+  dsimp only at failed
+  split at failed
+  next decoded =>
+    obtain ⟨_world, _stored, typed⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed completed
+    obtain ⟨_outcome, found, _typed⟩ := Core.LanguageResult.decode?_runtime_typed typed
+    rw [decoded] at found
+    cases found
+  next outcome decoded =>
+    cases outcome with
+    | failed actualReason =>
+      dsimp only at failed
+      cases failed
+      refine ⟨completed, decoded, rfl, rfl, rfl, HEq.rfl, rfl, rfl, ?_⟩
+      have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+        obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+        obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+        simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+      exact ⟨extension, HEq.rfl⟩
+    | succeeded payload =>
+      dsimp only at failed
+      split at failed <;> cases failed
+
+/-- Genuine done and decode receipts construct the actual failed session
+through the original producer; native execution is not repeated. -/
+theorem Checkpoint.native_failed_result_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {reason : Core.Word}
+    (completed : checkpoint.NativeDone fuel native store)
+    (decoded : Core.LanguageResult.decode? native = some (.failed reason)) :
+    ∃ returned : Session artifact,
+      complete checkpoint generation fuel boundaryFuel native store completed =
+        .failed reason returned ∧
+      checkpoint.FailedResultAt fuel native store reason returned := by
+  have actual : ∃ returned : Session artifact,
+      complete checkpoint generation fuel boundaryFuel native store completed =
+        .failed reason returned := by
+    unfold complete
+    dsimp only
+    split
+    next found => simp [decoded] at found
+    next outcome found =>
+      have same : outcome = .failed reason := by simpa [decoded] using found.symm
+      cases same
+      exact ⟨_, rfl⟩
+  obtain ⟨returned, failed⟩ := actual
+  exact ⟨returned, failed, complete_failed_receipt completed failed⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
