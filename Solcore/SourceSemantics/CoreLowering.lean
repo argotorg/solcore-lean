@@ -890,6 +890,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredSourceBund
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectSiteSuccess
 import Solcore.SourceSemantics.CoreLowering.CallableFaultDiagnosticPreparation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicCallableDiagnostics
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceMissingTerminalReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceReachedDiagnostics
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
