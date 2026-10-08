@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCallerProtocol
 import Solcore.SourceSemantics.CoreLowering.NamedCallBodyFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.NamedExpressionBodyFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
@@ -877,6 +878,125 @@ variable {compilation : SourceCoreFunctions.Context}
 /-- Original ordinary/direct call metadata selects the actual header and keeps
 all caller/callee evidence and synthetic validation order in the source trace.
 Only genuinely smaller argument and body callbacks are consumed. -/
+theorem preserves_at_with_sequence_with_body_post
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts)
+    (conditions : ∀ header, BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → CallableIndexedOwnedInvocationBounds.BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation (conditions header))
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
+      (fun index => Globals (headers := headers) owner compilation.administrativePrefix index.scope index.canonical) callerProtocol)
+    (budget size : Nat) (within : size ≤ budget)
+    (idsUnique : RequirementIdsUnique context) (unique : NodeOccurrencesUnique source)
+    (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : RecursiveNamedCallEvidenceHeads.Head (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers compilation source context evidence certificate scope id lowered)
+    {root : ExpressionNode} (found : source.lookupExpression? id = some root)
+    {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) mapping world
+      administrative scope environment canonical (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (argumentMeaning : ∀ (header : CallableIndexedOwnedFunctionValues.Header compiled program), header ∈ headers →
+      ∀ {callee ids codes}, root.form = .call callee ids (.declaration header.instantiation) →
+      DataExpressionSequence.Tree source certificate scope ids (header.bindings.map (fun binding => binding.1.scheme.body)) codes →
+      codes.map (·.type) = header.bindings.map Prod.snd →
+      header.named.signature.parameterType = (SourceCoreCalls.packArguments codes).type →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (environment := environment) (actual := actual) (ξ := ξ) (ids := ids)
+        (sourceTypes := header.bindings.map (fun binding => binding.1.scheme.body)) (codes := codes) (faults := faults)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) initial budget)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : ∀ (header : CallableIndexedOwnedFunctionValues.Header compiled program), header ∈ headers →
+      ∀ {callee ids}, root.form = .call callee ids (.declaration header.instantiation) →
+      SourceInvocationsForWithPost (post := post) (source := source) (context := context) (evidence := evidence) (faults := faults)
+        functions owner (conditions header) callerBridge initial (environment := environment) (ids := ids) budget)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.ExpressionOutcome program size context evidence source environment before id outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (lowered.expression.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld root.type lowered.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition callerProtocol initial
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedExpressionBodyFaultPostContracts.OuterCallRouteAt
+        (functions := functions) (registry := registry) (source := source) (context := context)
+        (evidence := evidence) (environment := environment) (actual := actual) (ξ := ξ)
+        post owner callerBridge initial compilation.administrativePrefix compilation.internalReason size none
+        id root lowered outcome after value finalMap finalWorld finalStore := by
+  cases head with
+  | ordinary ordinary =>
+    cases ordinary with
+    | @named callee arguments header node calleeNode name codes expression member metadata sourceType form calleeFound calleeForm
+        calleeRequirements calleeCoercions valid predicates evidenceEmpty arity emission selectedSlot sequence nativeTypes =>
+      have same := Option.some.inj (metadata.found.symm.trans found)
+      subst root
+      have independent := RecursiveNamedArgumentTraceBounds.source_inv metadata form calleeFound predicates evidenceEmpty unique trace
+      obtain ⟨emitted, packed, target, selected⟩ := emission.equation
+      change expression = _ at emitted
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, preserved, heapMetadata, transition, route⟩ :=
+        call_preserves_bounded_with_sequence_with_body_post functions nativeTypes packed owner (sameLayouts header member)
+          (conditions header) (authorized header member) budget callerBridge owners member
+          initial environments heaps locals agrees typed
+          (argumentMeaning header member form sequence nativeTypes packed) post (bodyMeaning header member form) independent within
+      refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps,
+        maps, worlds, preserved, heapMetadata, transition, ?_⟩
+      · change Evaluates actual store (expression.rename ξ) value finalStore
+        rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot]
+        exact evaluated
+      · simpa only [sourceType] using represented
+      · refine ⟨header, callee, arguments, codes, size, member, form, sourceType, rfl, ?_, trace, independent, route⟩
+        change expression.rename ξ = _
+        rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot]
+  | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    have instantiationEq := certified.selected.metadata receipt
+    have form : node.form = .call callee arguments (.declaration header.instantiation) := by
+      simpa only [instantiationEq] using receipt.form
+    have dictionary : Dynamic.DirectCallProducesEvidence context evidence node.requirements []
+        header.instantiation.predicates header.function.evidence := by
+      simpa only [metadata.coercions, instantiationEq] using certified.dictionary
+    have independent := RecursiveNamedArgumentTraceBounds.source_inv_with_evidence metadata.found metadata.coercions
+      form certified.calleeFound dictionary idsUnique unique trace
+    have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
+      simpa only [certified.selected.signature] using receipt.native.inputType
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, preserved, heapMetadata, transition, route⟩ :=
+      call_preserves_bounded_with_sequence_with_body_post functions certified.nativeTypes packed owner
+        (sameLayouts header certified.selected.member) (conditions header) (authorized header certified.selected.member) budget callerBridge
+        owners certified.selected.member initial environments heaps locals agrees typed
+        (argumentMeaning header certified.selected.member form certified.sequence certified.nativeTypes packed)
+        post (bodyMeaning header certified.selected.member form) independent within
+    refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps,
+      maps, worlds, preserved, heapMetadata, transition, ?_⟩
+    · change Evaluates actual store (lowered.expression.rename ξ) value finalStore
+      rw [certified.emitted receipt metadata.coercions]
+      simpa only [NamedCalls.Arguments.call_rename] using evaluated
+    · simpa only [certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type)
+        (certified.emitted receipt metadata.coercions)] using represented
+    · refine ⟨header, callee, arguments, receipt.loweredArguments, size, certified.selected.member,
+        form, certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type)
+          (certified.emitted receipt metadata.coercions), ?_, trace, independent, route⟩
+      simpa only [NamedCalls.Arguments.call_rename] using
+        congrArg (fun code : SourceCoreBasic.LoweredExpr => code.expression.rename ξ)
+          (certified.emitted receipt metadata.coercions)
+
 theorem preserves_at_with_sequence
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
     (sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts)
@@ -931,55 +1051,17 @@ theorem preserves_at_with_sequence
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition callerProtocol initial
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  cases head with
-  | ordinary ordinary =>
-    cases ordinary with
-    | @named callee arguments header node calleeNode name codes expression member metadata sourceType form calleeFound calleeForm
-        calleeRequirements calleeCoercions valid predicates evidenceEmpty arity emission selectedSlot sequence nativeTypes =>
-      have same := Option.some.inj (metadata.found.symm.trans found)
-      subst root
-      have independent := RecursiveNamedArgumentTraceBounds.source_inv metadata form calleeFound predicates evidenceEmpty unique trace
-      obtain ⟨emitted, packed, target, selected⟩ := emission.equation
-      change expression = _ at emitted
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, preserved, heapMetadata, transition⟩ :=
-        call_preserves_bounded_with_sequence functions nativeTypes packed owner (sameLayouts header member)
-          (conditions header) (authorized header member) budget callerBridge owners member
-          initial environments heaps locals agrees typed
-          (argumentMeaning header member form sequence nativeTypes packed) (bodyMeaning header member form) independent within
-      refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps,
-        maps, worlds, preserved, heapMetadata, transition⟩
-      · change Evaluates actual store (expression.rename ξ) value finalStore
-        rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot]
-        exact evaluated
-      · simpa only [sourceType] using represented
-  | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    have instantiationEq := certified.selected.metadata receipt
-    have form : node.form = .call callee arguments (.declaration header.instantiation) := by
-      simpa only [instantiationEq] using receipt.form
-    have dictionary : Dynamic.DirectCallProducesEvidence context evidence node.requirements []
-        header.instantiation.predicates header.function.evidence := by
-      simpa only [metadata.coercions, instantiationEq] using certified.dictionary
-    have independent := RecursiveNamedArgumentTraceBounds.source_inv_with_evidence metadata.found metadata.coercions
-      form certified.calleeFound dictionary idsUnique unique trace
-    have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
-      simpa only [certified.selected.signature] using receipt.native.inputType
-    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, preserved, heapMetadata, transition⟩ :=
-      call_preserves_bounded_with_sequence functions certified.nativeTypes packed owner
-        (sameLayouts header certified.selected.member) (conditions header) (authorized header certified.selected.member) budget callerBridge
-        owners certified.selected.member initial environments heaps locals agrees typed
-        (argumentMeaning header certified.selected.member form certified.sequence certified.nativeTypes packed)
-        (bodyMeaning header certified.selected.member form) independent within
-    refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps,
-      maps, worlds, preserved, heapMetadata, transition⟩
-    · change Evaluates actual store (lowered.expression.rename ξ) value finalStore
-      rw [certified.emitted receipt metadata.coercions]
-      simpa only [NamedCalls.Arguments.call_rename] using evaluated
-    · simpa only [certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type)
-        (certified.emitted receipt metadata.coercions)] using represented
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, preserved, heapMetadata, transition, _route⟩ :=
+    preserves_at_with_sequence_with_body_post functions owner sameLayouts conditions authorized callerBridge
+      budget size within idsUnique unique owners head found initial environments heaps locals agrees typed
+      argumentMeaning NamedInvocationFaultPostContracts.Trivial
+      (fun header member callee ids form sourceSize arguments middle middleMap middleWorld middleStore payloads
+        argumentsEvaluated argumentState argumentRelated maps worlds frame metadata capture related heaps =>
+        NamedCallBodyFaultPostContracts.source_trivial
+          (bodyMeaning header member form argumentsEvaluated argumentState argumentRelated maps worlds frame metadata capture related heaps)) trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, preserved, heapMetadata, transition⟩
 
 theorem preserves_at_with_caller
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
@@ -1060,6 +1142,121 @@ theorem preserves_at_with
 /-- Reflection uses the original full native call completion. Reconstructed
 source metadata and dictionaries stay those of the selected ordinary/direct
 receipt, while the final pool is the actual invocation's reached pool. -/
+theorem reflects_at_with_sequence_with_body_post
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts)
+    (conditions : ∀ header, BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : ∀ header, header ∈ headers → CallableIndexedOwnedInvocationBounds.BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation (conditions header))
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
+      (fun index => Globals (headers := headers) owner compilation.administrativePrefix index.scope index.canonical) callerProtocol)
+    (budget size : Nat) (within : size ≤ budget)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (head : RecursiveNamedCallEvidenceHeads.Head (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers compilation source context evidence certificate scope id lowered)
+    {root : ExpressionNode} (found : source.lookupExpression? id = some root)
+    {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) mapping world
+      administrative scope environment canonical (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (typed : RuntimeEnvironmentHasTypes world actual actualContext (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (argumentMeaning : ∀ (header : CallableIndexedOwnedFunctionValues.Header compiled program), header ∈ headers →
+      ∀ {callee ids codes}, root.form = .call callee ids (.declaration header.instantiation) →
+      DataExpressionSequence.Tree source certificate scope ids (header.bindings.map (fun binding => binding.1.scheme.body)) codes →
+      codes.map (·.type) = header.bindings.map Prod.snd →
+      header.named.signature.parameterType = (SourceCoreCalls.packArguments codes).type →
+      ProtectedStateExpressionSequenceProducer.Reflects
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (environment := environment) (actual := actual) (ξ := ξ) (ids := ids)
+        (sourceTypes := header.bindings.map (fun binding => binding.1.scheme.body)) (codes := codes) (faults := faults)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) initial budget)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : ∀ (header : CallableIndexedOwnedFunctionValues.Header compiled program), header ∈ headers →
+      ∀ {callee ids}, root.form = .call callee ids (.declaration header.instantiation) →
+      NativeInvocationsForWithPost (post := post) (source := source) (context := context) (evidence := evidence) (faults := faults)
+        functions owner (conditions header) callerBridge initial (environment := environment) (ids := ids) budget)
+    {value : Value} {finalStore : Store} (evaluated : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome program sourceSize context evidence source environment before id outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld root.type lowered.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition callerProtocol initial
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedExpressionBodyFaultPostContracts.OuterCallRouteAt
+        (functions := functions) (registry := registry) (source := source) (context := context)
+        (evidence := evidence) (environment := environment) (actual := actual) (ξ := ξ)
+        post owner callerBridge initial compilation.administrativePrefix compilation.internalReason sourceSize (some size)
+        id root lowered outcome after value finalMap finalWorld finalStore := by
+  cases head with
+  | ordinary ordinary =>
+    cases ordinary with
+    | @named callee arguments header node calleeNode name codes expression member metadata sourceType form calleeFound calleeForm
+        calleeRequirements calleeCoercions valid predicates evidenceEmpty arity emission selectedSlot sequence nativeTypes =>
+      have same := Option.some.inj (metadata.found.symm.trans found)
+      subst root
+      obtain ⟨emitted, packed, target, selected⟩ := emission.equation
+      change expression = _ at emitted
+      change EvaluationSize size actual store (expression.rename ξ) value finalStore at evaluated
+      rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot] at evaluated
+      obtain ⟨traceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+        maps, worlds, preserved, heapMetadata, transition, route⟩ :=
+        call_reflects_bounded_with_sequence_with_body_post functions nativeTypes packed owner (sameLayouts header member)
+          (conditions header) (authorized header member) budget callerBridge member
+          initial environments heaps locals agrees typed
+          (argumentMeaning header member form sequence nativeTypes packed) post (bodyMeaning header member form) evaluated within
+      obtain ⟨sourceSize, independent⟩ := RecursiveNamedArgumentTraceBounds.source_intro metadata form calleeFound calleeForm
+        calleeRequirements calleeCoercions valid predicates evidenceEmpty trace
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent, by simpa only [sourceType] using represented,
+        finalHeaps, maps, worlds, preserved, heapMetadata, transition,
+        ⟨header, callee, arguments, codes, traceSize, member, form, sourceType, rfl,
+          by change expression.rename ξ = _; rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot],
+          independent, trace, route⟩⟩
+  | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
+    have same := Option.some.inj (metadata.found.symm.trans found)
+    subst root
+    have emitted := certified.emitted receipt metadata.coercions
+    change EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore at evaluated
+    rw [emitted] at evaluated
+    simp only [NamedCalls.Arguments.call_rename] at evaluated
+    have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
+      simpa only [certified.selected.signature] using receipt.native.inputType
+    have instantiationEq := certified.selected.metadata receipt
+    have form : node.form = .call callee arguments (.declaration header.instantiation) := by
+      simpa only [instantiationEq] using receipt.form
+    obtain ⟨traceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+      maps, worlds, preserved, heapMetadata, transition, route⟩ :=
+      call_reflects_bounded_with_sequence_with_body_post functions certified.nativeTypes packed owner
+        (sameLayouts header certified.selected.member) (conditions header) (authorized header certified.selected.member) budget callerBridge
+        certified.selected.member initial environments heaps locals agrees typed
+        (argumentMeaning header certified.selected.member form certified.sequence certified.nativeTypes packed)
+        post (bodyMeaning header certified.selected.member form) evaluated within
+    have dictionary : Dynamic.DirectCallProducesEvidence context evidence node.requirements []
+        header.instantiation.predicates header.function.evidence := by
+      simpa only [metadata.coercions, instantiationEq] using certified.dictionary
+    obtain ⟨sourceSize, independent⟩ := RecursiveNamedArgumentTraceBounds.source_intro_with_evidence metadata.found
+      metadata.coercions form certified.calleeFound certified.calleeForm certified.calleeRequirements certified.calleeCoercions
+      certified.valid dictionary trace
+    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent,
+      by simpa only [certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type) emitted] using represented,
+      finalHeaps, maps, worlds, preserved, heapMetadata, transition,
+      ⟨header, callee, arguments, receipt.loweredArguments, traceSize, certified.selected.member,
+        form, certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type) emitted,
+        by simpa only [NamedCalls.Arguments.call_rename] using
+          congrArg (fun code : SourceCoreBasic.LoweredExpr => code.expression.rename ξ) emitted,
+        independent, trace, route⟩⟩
+
 theorem reflects_at_with_sequence
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
     (sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts)
@@ -1111,55 +1308,17 @@ theorem reflects_at_with_sequence
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition callerProtocol initial
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  cases head with
-  | ordinary ordinary =>
-    cases ordinary with
-    | @named callee arguments header node calleeNode name codes expression member metadata sourceType form calleeFound calleeForm
-        calleeRequirements calleeCoercions valid predicates evidenceEmpty arity emission selectedSlot sequence nativeTypes =>
-      have same := Option.some.inj (metadata.found.symm.trans found)
-      subst root
-      obtain ⟨emitted, packed, target, selected⟩ := emission.equation
-      change expression = _ at emitted
-      change EvaluationSize size actual store (expression.rename ξ) value finalStore at evaluated
-      rw [emitted, NamedCalls.Arguments.call_rename, selectedSlot] at evaluated
-      obtain ⟨traceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
-        maps, worlds, preserved, heapMetadata, transition⟩ :=
-        call_reflects_bounded_with_sequence functions nativeTypes packed owner (sameLayouts header member)
-          (conditions header) (authorized header member) budget callerBridge member
-          initial environments heaps locals agrees typed
-          (argumentMeaning header member form sequence nativeTypes packed) (bodyMeaning header member form) evaluated within
-      obtain ⟨sourceSize, independent⟩ := RecursiveNamedArgumentTraceBounds.source_intro metadata form calleeFound calleeForm
-        calleeRequirements calleeCoercions valid predicates evidenceEmpty trace
-      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent, by simpa only [sourceType] using represented,
-        finalHeaps, maps, worlds, preserved, heapMetadata, transition⟩
-  | @direct compilerProgram project caller child fuel id callee arguments instantiation reasonAt policy node output header receipt certified metadata =>
-    have same := Option.some.inj (metadata.found.symm.trans found)
-    subst root
-    have emitted := certified.emitted receipt metadata.coercions
-    change EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore at evaluated
-    rw [emitted] at evaluated
-    simp only [NamedCalls.Arguments.call_rename] at evaluated
-    have packed : header.named.signature.parameterType = (SourceCoreCalls.packArguments receipt.loweredArguments).type := by
-      simpa only [certified.selected.signature] using receipt.native.inputType
-    have instantiationEq := certified.selected.metadata receipt
-    have form : node.form = .call callee arguments (.declaration header.instantiation) := by
-      simpa only [instantiationEq] using receipt.form
-    obtain ⟨traceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
-      maps, worlds, preserved, heapMetadata, transition⟩ :=
-      call_reflects_bounded_with_sequence functions certified.nativeTypes packed owner
-        (sameLayouts header certified.selected.member) (conditions header) (authorized header certified.selected.member) budget callerBridge
-        certified.selected.member initial environments heaps locals agrees typed
-        (argumentMeaning header certified.selected.member form certified.sequence certified.nativeTypes packed)
-        (bodyMeaning header certified.selected.member form) evaluated within
-    have dictionary : Dynamic.DirectCallProducesEvidence context evidence node.requirements []
-        header.instantiation.predicates header.function.evidence := by
-      simpa only [metadata.coercions, instantiationEq] using certified.dictionary
-    obtain ⟨sourceSize, independent⟩ := RecursiveNamedArgumentTraceBounds.source_intro_with_evidence metadata.found
-      metadata.coercions form certified.calleeFound certified.calleeForm certified.calleeRequirements certified.calleeCoercions
-      certified.valid dictionary trace
-    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, independent,
-      by simpa only [certified.sourceType, congrArg (fun code : SourceCoreBasic.LoweredExpr => code.type) emitted] using represented,
-      finalHeaps, maps, worlds, preserved, heapMetadata, transition⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, preserved, heapMetadata, transition, _route⟩ :=
+    reflects_at_with_sequence_with_body_post functions owner sameLayouts conditions authorized callerBridge
+      budget size within head found initial environments heaps locals agrees typed
+      argumentMeaning NamedInvocationFaultPostContracts.Trivial
+      (fun header member callee ids form sourceSize arguments middle middleMap middleWorld middleStore payloads
+        argumentsEvaluated argumentState argumentRelated maps worlds frame metadata capture related heaps =>
+        NamedCallBodyFaultPostContracts.native_trivial
+          (bodyMeaning header member form argumentsEvaluated argumentState argumentRelated maps worlds frame metadata capture related heaps)) evaluated
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, preserved, heapMetadata, transition⟩
 
 theorem reflects_at_with_caller
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)

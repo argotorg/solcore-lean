@@ -1038,6 +1038,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSequentialNamedB
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenNestedLambdaBodyContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryStoredMembers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryReadMembers
+import Solcore.SourceSemantics.CoreLowering.NamedExpressionBodyFaultPostContracts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedBodyPostProviders
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
