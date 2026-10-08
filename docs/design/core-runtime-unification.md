@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-08.
+Created: 2026-09-30. Updated: 2026-10-09.
 
 ## Current Implementation Status
 
@@ -10,9 +10,9 @@ Created: 2026-09-30. Updated: 2026-10-08.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest implementation commit | `32cbe6b1`. The original index folds retain primitive failure posts; diagnostic preparation retains actual ordered issuers; contextual lambda generation and transport supply a joint typed/prepared body. |
-| Latest verification of all registered modules | Verified on 2026-10-08 at `32cbe6b1`: registered Solcore and Tests.Main build (5457 jobs), strict audit of 11194 declarations, 477 module-attributed declarations in eleven new or modified modules, and 71 signatures. Parent and two independent reviews, policy and 4994 protected-file checks pass. All 271 original axiom arrays match: 259 same-name raw types and nine relocated raw types are exact; three relocated binder-name changes are recorded literally. Actual registered executions passed at `3ff3daf4`; subsequent changes add proofs and static receipts. |
-| Working implementation | Derive scalar fragment failure posts through the original five support cores and genuine literal/read providers. Compose actual contextual reasonAt/receiver observations and retain MissingSite authority. Connect joint contextual lambda prepared bodies to typed invocation through the existing measured family. General dispatch, stage/coercion routes, public Source admission, all-pass composition and the final theorem remain incomplete. |
+| Latest implementation commit | `52999450`. Scalar folds retain genuine primitive failure origins; contextual lambda execution consumes the actual joint prepared body; public and Session diagnostic observations use the receiving registry and rebuilt table. |
+| Latest verification of all registered modules | Verified on 2026-10-09 at `52999450`: registered Solcore and Tests.Main build (5469 jobs), strict audit of 11491 declarations, 297 module-attributed declarations in seventeen new or modified modules, and 97 signatures. Parent and two independent reviews, policy and 4989 protected-file checks pass. All 141 original axiom arrays match; 131 same-name raw types match, and ten strengthened generated matcher types are recorded literally. Actual registered executions passed at `3ff3daf4`; subsequent changes add proofs and static receipts. |
+| Working implementation | Retain the joint prepared lambda body through actual formation, storage and selected invocation in the shared measured family. Retain the selected MissingSite and Source/type-mapping issuer in the original diagnostic preparation. Extend scalar posts through larger expression folds. General dispatch, stage/coercion routes, public Source admission, all-pass composition and the final theorem remain incomplete. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Anyone resuming implementation should first read the current status and the handoff at the end of the [implementation record](core-runtime-unification-progress.md). Public API users should consult the [API migration record](core-runtime-unification-api.md); see the [T0 audit](core-runtime-unification-audit.md) for the initial compatibility and semantics investigation.

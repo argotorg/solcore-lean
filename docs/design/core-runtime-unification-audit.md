@@ -1,10 +1,10 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-08.
+Initial audit: 2026-09-30. Last updated: 2026-10-09.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
-Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the final section, "2026-10-08: Current status," describe the latest commits, validation, and uncommitted work.
+Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the latest dated audit section describe the latest commits, validation, and uncommitted work.
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
@@ -673,3 +673,19 @@ At `32cbe6b1`, the registered Solcore modules and `Tests.Main` build passed **54
 All **271 original axiom arrays** match against saved actual normal source and regular objects. **259 same-name raw types** match exactly. Twelve generated helpers have explicit relocation pairs: nine raw types match exactly, and three retain enumerated raw binder-name differences. Comparisons preserve the complete literal types and axiom arrays; no normalized comparison or obsolete generated alias is used.
 
 Next: derive the stronger scalar Members fragment from its actual literal/read producers through the five original support cores. Compose real contextual reasonAt/receiver observations, retaining MissingSite/metadata authority. Consume the joint contextual lambda prepared body in the existing strict measured family. Complete callee classification, general rejection/coercion and stage coverage, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: scalar failure origins, prepared lambda execution and Session diagnostic observations
+
+The latest implementation checkpoint is `52999450`, following `bd7f9250` and `7cf8c705`.
+
+The five original scalar expression proof modules now retain primitive failure posts in their existing preservation and reflection inductions. Actual grouping, ordered products, primitive operations, conditional branches, constructor arguments and member bases carry the same failure token, reached heap, map, world, store and model association. Concrete literal and read adapters supply their stronger results internally. The scalar index fold consumes this stronger fragment and preserves the successful base prefix when a key fails. Larger general, builtin, recursive and named expression folds remain to be connected.
+
+Contextual lambda execution now consumes the actual joint prepared body. The owning Source's real assignment and diagnostic preparations supply finite operand and projected-fault laws. Genuine Source typing and reached readiness feed the original head, loop and flow producers. The actual prepared eliminator yields bounded flow preservation and reflection; strict admitted expression children then yield typed parameter-entry and body-finish continuations with independent Source and native grades. Precise reached-table interpretation remains an input. The actual function formation, storage and selection path must still retain this stronger body receipt inside the shared mixed family.
+
+Public and Session diagnostic observations now compose the genuine contextual factory and callable allocation bounds with the actual receiving registry and rebuilt table. Local reads retain the exact diagnostic binder, identifier and span. Missing-index observations retain the first literal index issuer and the raw missing-type error. A sealed Artifact's real compiler authority is extracted only into a proof proposition. The selected MissingSite's membership, provider base, receiving metadata and runtime views remain genuine inputs; decoding alone does not establish a Source fault origin or heap association.
+
+At `52999450`, the registered Solcore modules and `Tests.Main` build passed **5469 jobs**. Strict verification checked **11491 declarations**, including **297 declarations attributed to seventeen new or modified modules**, and **97 signatures**. Every final new source and complete original-module diff passed parent and two independent semantic reviews. Policy, whitespace, exact source hashes, regular normal objects and **4989 protected original-file checks** pass. This checkpoint factors five existing proof modules and adds twelve proof modules. The most recent actual native and interpreted test executions remain those at `3ff3daf4`.
+
+All **141 original axiom arrays** match saved actual normal source and regular objects. **131 same-name raw types** match exactly. Ten generated support matchers move to the strengthened proof cores and have genuinely changed raw types, recorded in explicit pairs. The comparison retains complete literal types and axiom arrays without normalization, renamed binders or obsolete generated aliases.
+
+Next: retain the joint prepared lambda body through actual function formation, local storage and selected invocation, then close its strict expression children in the shared measured family. Retain the actual selected MissingSite and its Source/type-mapping issuer in the original diagnostic preparation. Connect the stronger scalar post to larger general, builtin, recursive and named folds. General callee classification, rejection/coercion and staging coverage, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
