@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Dynamic.Control
+import Solcore.SourceSemantics.Dynamic.ControlTransferFacts
 
 /-!
 # Constructive whole-language preservation
@@ -1433,9 +1434,9 @@ mutual
               residual_variables_open := code.residual_variables_open
               requirements := code.requirement_ledger
             }
-            rcases preserveFunctionStatementsRec program_well_formed
+            rcases (preserveFunctionStatementsRecWithControl program_well_formed
                 (closure_runtime.transport fields) call_evidence bound_environment
-                bound_at_call body_type body_completes execute with
+                bound_at_call body_type body_completes execute).1 with
               ⟨after_typed, execution_extension, outcome_typed⟩
             rw [returned] at outcome_typed
             cases outcome_typed with
@@ -1515,9 +1516,9 @@ mutual
               residual_variables_open := code.residual_variables_open
               requirements := code.requirement_ledger
             }
-            rcases preserveFunctionStatementsRec program_well_formed
+            rcases (preserveFunctionStatementsRecWithControl program_well_formed
                 (closure_runtime.transport fields) call_evidence bound_environment
-                bound_at_call body_type body_completes execute with
+                bound_at_call body_type body_completes execute).1 with
               ⟨after_typed, execution_extension, outcome_typed⟩
             rcases fell_through with ⟨finalEnvironment, rfl⟩
             cases outcome_typed with
@@ -1590,10 +1591,10 @@ mutual
           (fields.targetResidualVariablesOpen
             certificate.residual_type_variables_open)
         have lexical_evidence := fields.covers evidence_covers
-        rcases preserveFunctionStatementsRec program_well_formed
+        rcases (preserveFunctionStatementsRecWithControl program_well_formed
             (certificate.sourceRuntimeValid.transport fields) lexical_evidence
             bound_environment bound_at_lexical aligned_body_type completes
-            execute with
+            execute).1 with
           ⟨after_typed, execution_extension, outcome_typed⟩
         rw [returned] at outcome_typed
         cases outcome_typed with
@@ -1653,10 +1654,10 @@ mutual
           (fields.targetResidualVariablesOpen
             certificate.residual_type_variables_open)
         have lexical_evidence := fields.covers evidence_covers
-        rcases preserveFunctionStatementsRec program_well_formed
+        rcases (preserveFunctionStatementsRecWithControl program_well_formed
             (certificate.sourceRuntimeValid.transport fields) lexical_evidence
             bound_environment bound_at_lexical aligned_body_type completes
-            execute with
+            execute).1 with
           ⟨after_typed, execution_extension, outcome_typed⟩
         rcases fell_through with ⟨finalEnvironment, rfl⟩
         cases outcome_typed with
@@ -2275,10 +2276,10 @@ mutual
               runtime.variables_closed
               (aligned_loop_fields.targetResidualVariablesOpen
                 runtime.residual_variables_open)
-            rcases preserveForLoopRec program_well_formed
+            rcases (preserveForLoopRecWithControl program_well_formed
                 (runtime.transport aligned_loop_fields) loop_evidence
                 aligned_loop_environment_agrees initialized_at_loop
-                aligned_condition_type aligned_post_type aligned_body_type iterate with
+                aligned_condition_type aligned_post_type aligned_body_type iterate).1 with
               ⟨loop_heap_typed, loop_extension, loop_outcome⟩
             have loop_heap_at_outer := loop_heap_typed.transportClosed
               aligned_loop_fields.signatures.symm loop_closed closed
@@ -2305,9 +2306,9 @@ mutual
         rw [form_eq] at form_typing
         cases form_typing with
         | whileLoop condition_type body_type =>
-            rcases preserveWhileRec program_well_formed runtime
+            rcases (preserveWhileRecWithControl program_well_formed runtime
                 evidence_covers environment_agrees before_typed condition_type
-                body_type iterate with
+                body_type iterate).1 with
               ⟨loop_heap_typed, extension, loop_outcome⟩
             exact {
               heap_typed := loop_heap_typed
@@ -2478,7 +2479,7 @@ mutual
             }
     termination_by structural evaluation
 
-  private theorem preserveStatementControlRec
+  private theorem preserveStatementControlSummaryRec
       {program : Program}
       (program_well_formed : ProgramWellFormed program)
       {context staticFinalContext runtimeFinalContext : Context}
@@ -2494,50 +2495,48 @@ mutual
         facts)
       (evaluation : StatementExecutes program context evidence source environment
         before statement runtimeFinalContext outcome after) :
-      outcome.IsFallthrough → facts.control.canFallthrough = true :=
+      ControlSummary.AllowsTransfers facts.control outcome :=
     match evaluation with
     | .letUninitialized contains form_eq runtime_monomorphic extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        exact fun _ => rfl
+        rfl
     | .letInitialized contains form_eq evaluate runtime_monomorphic extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        exact fun _ => rfl
+        rfl
     | .letInitializedGeneralized contains form_eq captures runtime_polymorphic
         extension allocate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        exact fun _ => rfl
+        rfl
     | .returnUnit contains form_eq => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        intro falls
-        cases falls
+        exact True.intro
     | .returnValue contains form_eq evaluate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        intro falls
-        cases falls
+        exact True.intro
     | .expression contains form_eq evaluate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
-        cases control_typing <;> exact fun _ => rfl
+        cases control_typing <;> rfl
     | .assignValue contains form_eq assignment_executes => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        exact fun _ => rfl
+        rfl
     | .assignBitNot contains form_eq assignment_executes => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        exact fun _ => rfl
+        rfl
     | .ifTrue contains form_eq condition_evaluates body_executes => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
@@ -2547,31 +2546,28 @@ mutual
                 evidence_covers environment_agrees before_typed condition_type
                 condition_evaluates with
               ⟨condition_typed, middle_typed, condition_extension⟩
-            have body_falls := preserveStatementsControlRec
+            have body_allowed := preserveStatementsControlSummaryRec
               program_well_formed runtime evidence_covers
               (environment_agrees.mono condition_extension) middle_typed then_type
               body_executes
-            intro falls
-            exact ControlSummary.branches_canFallthrough_left
-              (body_falls falls.of_restore)
+            exact body_allowed.branches_left.restore _
         | ifWithElse condition_type then_type else_type =>
             rcases preserveExpressionRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed condition_type
                 condition_evaluates with
               ⟨condition_typed, middle_typed, condition_extension⟩
-            have body_falls := preserveStatementsControlRec
+            have body_allowed := preserveStatementsControlSummaryRec
               program_well_formed runtime evidence_covers
               (environment_agrees.mono condition_extension) middle_typed then_type
               body_executes
-            intro falls
-            exact ControlSummary.branches_canFallthrough_left
-              (body_falls falls.of_restore)
+            exact body_allowed.branches_left.restore _
     | .ifFalseWithoutElse contains form_eq condition_evaluates => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing with
         | ifWithoutElse condition_type then_type =>
-            exact fun _ => ControlSummary.branches_canFallthrough_right rfl
+            exact (show ControlSummary.AllowsTransfers (.ordinary .unit)
+              (.fallthrough environment) from rfl).branches_right
     | .ifFalseWithElse contains form_eq condition_evaluates body_executes => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
@@ -2581,24 +2577,20 @@ mutual
                 evidence_covers environment_agrees before_typed condition_type
                 condition_evaluates with
               ⟨condition_typed, middle_typed, condition_extension⟩
-            have body_falls := preserveStatementsControlRec
+            have body_allowed := preserveStatementsControlSummaryRec
               program_well_formed runtime evidence_covers
               (environment_agrees.mono condition_extension) middle_typed else_type
               body_executes
-            intro falls
-            exact ControlSummary.branches_canFallthrough_right
-              (body_falls falls.of_restore)
+            exact body_allowed.branches_right.restore _
     | .block contains form_eq body_executes => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing with
         | block body_type =>
-            have body_falls := preserveStatementsControlRec
+            have body_allowed := preserveStatementsControlSummaryRec
               program_well_formed runtime evidence_covers environment_agrees
               before_typed body_type body_executes
-            intro falls
-            exact ControlSummary.eraseValue_canFallthrough
-              (body_falls falls.of_restore)
+            exact body_allowed.eraseValue.restore _
     | .matchArm contains form_eq scrutinee_contains scrutinee_evaluates
         allocate_hidden select binders_eq values_eq binders_extend
         allocate_bindings execute => by
@@ -2692,14 +2684,12 @@ mutual
         have bound_heap_at_arm := bound_heap_typed.transportClosed
           arm_fields.signatures runtime.closed arm_closed runtime.variables_closed
           (arm_fields.targetResidualVariablesOpen runtime.residual_variables_open)
-        have arm_falls := preserveStatementsControlRec
+        have arm_allowed := preserveStatementsControlSummaryRec
           program_well_formed (runtime.transport arm_fields) arm_evidence
           aligned_arm_environment_agrees bound_heap_at_arm aligned_arm_type execute
-        intro falls
         rw [control_eq]
-        exact ControlSummary.eraseValue_canFallthrough
-          (MergeBodyControls.canFallthrough_of_mem merged arm_member
-            (arm_falls falls.of_restore))
+        exact (MergeBodyControls.allows_of_mem merged arm_member
+          arm_allowed).eraseValue.restore _
     | .matchDefault contains form_eq scrutinee_contains scrutinee_evaluates
         allocate_hidden select execute => by
         have control_typing := statementControlFormTyping
@@ -2732,15 +2722,13 @@ mutual
             have hidden_heap_typed := scrutinee_heap_typed.allocate
               (.some hidden_value_typed) allocate_hidden
             have hidden_extension := HeapTypesExtend.of_allocation allocate_hidden
-            have body_falls := preserveStatementsControlRec
+            have body_allowed := preserveStatementsControlSummaryRec
               program_well_formed runtime evidence_covers
               (environment_agrees.mono
                 (scrutinee_extension.trans hidden_extension))
               hidden_heap_typed default_type execute
-            intro falls
-            exact ControlSummary.eraseValue_canFallthrough
-              (MergeBodyControls.canFallthrough_of_fallback merged
-                (body_falls falls.of_restore))
+            exact (MergeBodyControls.allows_of_fallback merged
+              body_allowed).eraseValue.restore _
     | .matchNoBranch contains form_eq scrutinee_contains scrutinee_evaluates
         allocate_hidden select => by
         have control_typing := statementControlFormTyping
@@ -2765,28 +2753,84 @@ mutual
     | .forLoop contains form_eq initializer_executes iterate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
-        cases control_typing
-        exact fun _ => rfl
+        rcases
+            Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
+          ⟨typedNode, typed_contains, form_typing⟩
+        have node_eq := containsStatement_unique runtime.graph.nodeOccurrencesUnique
+          typed_contains contains
+        subst typedNode
+        rw [form_eq] at form_typing
+        rename_i initialized dynamicNode initializer condition post body
+          runtimeLoopContext loopFinalContext loopEnvironment outcome
+        cases form_typing with
+        | forLoop initializer_type condition_type body_type post_type =>
+            rcases preserveForItemsRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed initializer_type
+                initializer_executes with
+              ⟨loop_context_eq, initialized_typed, initializer_extension,
+                loop_environment_agrees⟩
+            have loop_fields :=
+              Solcore.SourceSemantics.Dynamic.ForItemsHaveType.runtimeContextFields
+                initializer_type
+            have aligned_loop_fields :
+                RuntimeContextFields context runtimeLoopContext :=
+              loop_context_eq.symm ▸ loop_fields
+            have aligned_loop_environment_agrees :
+                EnvironmentAgrees initialized runtimeLoopContext.locals
+                  loopEnvironment :=
+              loop_context_eq.symm ▸ loop_environment_agrees
+            have aligned_condition_type :
+                ExpressionHasType source runtimeLoopContext condition .bool :=
+              loop_context_eq.symm ▸ condition_type
+            have aligned_post_type := loop_context_eq.symm ▸ post_type
+            have aligned_body_type := loop_context_eq.symm ▸ body_type
+            have loop_closed := aligned_loop_fields.targetClosed runtime.closed
+            have loop_evidence := aligned_loop_fields.covers evidence_covers
+            have initialized_at_loop := initialized_typed.transportClosed
+              aligned_loop_fields.signatures runtime.closed loop_closed
+              runtime.variables_closed
+              (aligned_loop_fields.targetResidualVariablesOpen
+                runtime.residual_variables_open)
+            have loop_closed_control :=
+              (preserveForLoopRecWithControl program_well_formed
+                (runtime.transport aligned_loop_fields) loop_evidence
+                aligned_loop_environment_agrees initialized_at_loop
+                aligned_condition_type aligned_post_type aligned_body_type iterate).2
+            cases control_typing
+            exact ControlSummary.allows_of_noEscape
+              (loop_closed_control.restore _) (fun _ => rfl)
     | .whileLoop contains form_eq iterate => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
-        cases control_typing
-        exact fun _ => rfl
+        rcases
+            Solcore.SourceSemantics.Dynamic.StatementHasType.formTyping typing with
+          ⟨typedNode, typed_contains, form_typing⟩
+        have node_eq := containsStatement_unique runtime.graph.nodeOccurrencesUnique
+          typed_contains contains
+        subst typedNode
+        rw [form_eq] at form_typing
+        cases form_typing with
+        | whileLoop condition_type body_type =>
+            have loop_closed_control :=
+              (preserveWhileRecWithControl program_well_formed runtime
+                evidence_covers environment_agrees before_typed condition_type
+                body_type iterate).2
+            cases control_typing
+            exact ControlSummary.allows_of_noEscape
+              (loop_closed_control.restore _) (fun _ => rfl)
     | .breakStmt contains form_eq => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        intro falls
-        cases falls
+        rfl
     | .continueStmt contains form_eq => by
         have control_typing := statementControlFormTyping
           runtime.graph.nodeOccurrencesUnique typing contains form_eq
         cases control_typing
-        intro falls
-        cases falls
+        rfl
     termination_by structural evaluation
 
-  private theorem preserveStatementsControlRec
+  private theorem preserveStatementsControlSummaryRec
       {program : Program}
       (program_well_formed : ProgramWellFormed program)
       {context staticFinalContext runtimeFinalContext : Context}
@@ -2802,11 +2846,11 @@ mutual
         staticFinalContext facts)
       (evaluation : StatementsExecute program context evidence source environment
         before statements runtimeFinalContext outcome after) :
-      outcome.IsFallthrough → facts.control.canFallthrough = true :=
+      ControlSummary.AllowsTransfers facts.control outcome :=
     match evaluation with
     | .nil => by
         cases typing
-        exact fun _ => rfl
+        rfl
     | @StatementsExecute.cons program context middleContext finalContext evidence
         source environment before middle after statement statements nextEnvironment
         outcome head tail => by
@@ -2819,15 +2863,21 @@ mutual
           fun head_type =>
             preserveStatementRec program_well_formed runtime
               evidence_covers environment_agrees before_typed head_type head
+        have control_head_summary :
+            ∀ {staticHeadFinal headFacts},
+              StatementHasType source control context statement staticHeadFinal
+                headFacts →
+              ControlSummary.AllowsTransfers headFacts.control (.fallthrough nextEnvironment) :=
+          fun head_type =>
+            preserveStatementControlSummaryRec program_well_formed runtime
+              evidence_covers environment_agrees before_typed head_type head
         have control_head :
             ∀ {staticHeadFinal headFacts},
               StatementHasType source control context statement staticHeadFinal
                 headFacts →
               headFacts.control.canFallthrough = true :=
           fun head_type =>
-            preserveStatementControlRec program_well_formed runtime
-              evidence_covers environment_agrees before_typed head_type head
-              (.intro nextEnvironment)
+            (control_head_summary head_type).canFallthrough (.intro nextEnvironment)
         have control_tail :
             ∀ {staticTailFinal tailFacts},
               SourceRuntimeValid program middleContext source →
@@ -2836,15 +2886,14 @@ mutual
               HeapWellTyped middleContext middle →
               StatementsHaveType source control middleContext statements
                 staticTailFinal tailFacts →
-              outcome.IsFallthrough →
-              tailFacts.control.canFallthrough = true :=
+              ControlSummary.AllowsTransfers tailFacts.control outcome :=
           fun tail_runtime tail_evidence tail_environment tail_heap tail_type =>
-            preserveStatementsControlRec program_well_formed tail_runtime
+            preserveStatementsControlSummaryRec program_well_formed tail_runtime
               tail_evidence tail_environment tail_heap tail_type tail
         cases typing with
         | singleton head_type =>
             cases tail
-            exact fun _ => control_head head_type
+            exact control_head_summary head_type
         | cons head_type tail_type =>
             have middle_context_eq := statementFinalContext_eq
               runtime.graph head_type head
@@ -2870,20 +2919,25 @@ mutual
                   runtime.variables_closed
                   (aligned_fields.targetResidualVariablesOpen
                     runtime.residual_variables_open)
-                intro falls
-                exact ControlSummary.sequence_canFallthrough
-                  (control_head head_type)
-                  (control_tail (runtime.transport aligned_fields)
-                    middle_evidence aligned_middle_environment_agrees middle_typed'
-                    aligned_tail_type falls)
+                exact (control_tail (runtime.transport aligned_fields)
+                  middle_evidence aligned_middle_environment_agrees middle_typed'
+                  aligned_tail_type).sequence (control_head head_type)
     | @StatementsExecute.terminal program context finalContext evidence source
         environment before after statement statements outcome head terminal => by
-        intro falls
-        rcases falls.exists_eq with ⟨finalEnvironment, outcome_eq⟩
-        exact (terminal.not_fallthrough outcome_eq).elim
+        have control_head :
+            ∀ {staticHeadFinal headFacts},
+              StatementHasType source control context statement staticHeadFinal
+                headFacts → ControlSummary.AllowsTransfers headFacts.control outcome :=
+          fun head_type => preserveStatementControlSummaryRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed head_type head
+        cases typing with
+        | singleton head_type =>
+            exact control_head head_type
+        | cons head_type tail_type =>
+            exact (control_head head_type).sequence_terminal terminal
     termination_by structural evaluation
 
-  private theorem preserveFunctionStatementsRec
+  private theorem preserveFunctionStatementsRecWithControl
       {program : Program}
       (program_well_formed : ProgramWellFormed program)
       {context staticFinalContext runtimeFinalContext : Context}
@@ -2901,15 +2955,15 @@ mutual
       (evaluation : FunctionStatementsExecute program context evidence source
         environment before statements runtimeFinalContext outcome after) :
       StatementEvaluationPreserved context staticFinalContext control.returnType
-        before after outcome :=
+        before after outcome ∧ outcome.NoEscapedControl :=
     match evaluation with
     | .nil => by
         cases typing
-        exact {
+        exact ⟨{
           heap_typed := before_typed
           heap_extends := .refl before
           outcome_typed := .fallthrough environment_agrees
-        }
+        }, .fallthrough _⟩
     | .tailExpression contains form_eq evaluate => by
         cases typing with
         | singleton head_type =>
@@ -2923,16 +2977,23 @@ mutual
                 evidence_covers environment_agrees before_typed expression_type
                 evaluate with
               ⟨value_typed, after_typed, extension⟩
-            exact {
+            exact ⟨{
               heap_typed := after_typed
               heap_extends := extension
               outcome_typed := .returned (completes ▸ value_typed)
-            }
+            }, .returned _⟩
     | .singleton contains not_tail execute => by
+        have control_head :
+            ∀ {staticHeadFinal headFacts},
+              StatementHasType source control context _ staticHeadFinal headFacts →
+              ControlSummary.AllowsTransfers headFacts.control outcome :=
+          fun head_type => preserveStatementControlSummaryRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed head_type execute
         cases typing with
         | singleton head_type =>
-            exact preserveStatementRec program_well_formed runtime
-              evidence_covers environment_agrees before_typed head_type execute
+            refine ⟨preserveStatementRec program_well_formed runtime
+              evidence_covers environment_agrees before_typed head_type execute, ?_⟩
+            exact (control_head head_type).noEscape_of_complete completes
     | @FunctionStatementsExecute.cons program context middleContext finalContext
         evidence source environment before middle after statement next rest
         nextEnvironment outcome head tail => by
@@ -2951,8 +3012,8 @@ mutual
                 headFacts →
               headFacts.control.canFallthrough = true :=
           fun head_type =>
-            preserveStatementControlRec program_well_formed runtime
-              evidence_covers environment_agrees before_typed head_type head
+            (preserveStatementControlSummaryRec program_well_formed runtime
+              evidence_covers environment_agrees before_typed head_type head).canFallthrough
               (.intro nextEnvironment)
         have preserve_tail :
             ∀ {staticTailFinal tailFacts},
@@ -2964,10 +3025,10 @@ mutual
                 staticTailFinal tailFacts →
               BodyCompletes control.returnType tailFacts →
               StatementEvaluationPreserved middleContext staticTailFinal
-                control.returnType middle after outcome :=
+                control.returnType middle after outcome ∧ outcome.NoEscapedControl :=
           fun tail_runtime tail_evidence tail_environment tail_heap tail_type
               tail_completes =>
-            preserveFunctionStatementsRec program_well_formed
+            preserveFunctionStatementsRecWithControl program_well_formed
               tail_runtime tail_evidence tail_environment tail_heap tail_type
               tail_completes tail
         cases typing with
@@ -3002,8 +3063,8 @@ mutual
                 rcases preserve_tail (runtime.transport aligned_fields)
                     middle_evidence aligned_middle_environment_agrees middle_typed'
                     aligned_tail_type tail_completes with
-                  ⟨after_typed, tail_extension, tail_outcome⟩
-                exact {
+                  ⟨⟨after_typed, tail_extension, tail_outcome⟩, tail_noEscape⟩
+                exact ⟨{
                   heap_typed := after_typed.transportClosed
                     aligned_fields.signatures.symm middle_closed runtime.closed
                     (aligned_fields.targetVariablesClosed runtime.variables_closed)
@@ -3012,18 +3073,24 @@ mutual
                   outcome_typed := tail_outcome.transportEntry aligned_fields
                     runtime.closed runtime.variables_closed
                     runtime.residual_variables_open
-                }
+                }, tail_noEscape⟩
     | .terminal head terminal => by
+        have control_head :
+            ∀ {staticHeadFinal headFacts},
+              StatementHasType source control context _ staticHeadFinal headFacts →
+              ControlSummary.AllowsTransfers headFacts.control outcome :=
+          fun head_type => preserveStatementControlSummaryRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed head_type head
         cases typing with
         | cons head_type tail_type =>
             rcases preserveStatementRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed head_type head with
               ⟨after_typed, extension, head_outcome⟩
-            exact {
+            exact ⟨{
               heap_typed := after_typed
               heap_extends := extension
               outcome_typed := head_outcome.retargetTerminal terminal
-            }
+            }, (control_head head_type).noEscape_of_cons_complete completes⟩
     termination_by structural evaluation
 
   private theorem preserveForItemRec
@@ -3183,6 +3250,288 @@ mutual
               final_environment_agrees⟩
     termination_by structural evaluation
 
+  private theorem preserveWhileRecWithControl
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context runtimeFinalContext : Context} {evidence : EvidenceEnvironment}
+      {source : TypedSource} {environment : Environment} {before after : Heap}
+      {condition : ExpressionId} {body : List StatementId}
+      {outcome : ControlOutcome} {control : ControlContext}
+      {bodyFinal : Context} {bodyFacts : BodyFacts}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (condition_type : ExpressionHasType source context condition .bool)
+      (body_type : StatementsHaveType source control.enterLoop context body
+        bodyFinal bodyFacts)
+      (evaluation : WhileExecutes program context evidence source environment before
+        condition body runtimeFinalContext outcome after) :
+      StatementEvaluationPreserved context context control.returnType before after
+        outcome ∧ outcome.NoEscapedControl :=
+    match evaluation with
+    | .done condition_evaluates => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, after_typed, extension⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := extension
+          outcome_typed := .fallthrough (environment_agrees.mono extension)
+        }, .fallthrough _⟩
+    | .nextFallthrough condition_evaluates body_executes next => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨body_heap_typed, body_extension, body_outcome⟩
+        have prefix_extension := condition_extension.trans body_extension
+        rcases preserveWhileRecWithControl program_well_formed runtime
+            evidence_covers (environment_agrees.mono prefix_extension)
+            body_heap_typed condition_type body_type next with
+          ⟨⟨after_typed, next_extension, next_outcome⟩, next_noEscape⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := prefix_extension.trans next_extension
+          outcome_typed := next_outcome
+        }, next_noEscape⟩
+    | .nextContinue condition_evaluates body_executes next => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨body_heap_typed, body_extension, body_outcome⟩
+        have prefix_extension := condition_extension.trans body_extension
+        rcases preserveWhileRecWithControl program_well_formed runtime
+            evidence_covers (environment_agrees.mono prefix_extension)
+            body_heap_typed condition_type body_type next with
+          ⟨⟨after_typed, next_extension, next_outcome⟩, next_noEscape⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := prefix_extension.trans next_extension
+          outcome_typed := next_outcome
+        }, next_noEscape⟩
+    | .breaks condition_evaluates body_executes => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨after_typed, body_extension, body_outcome⟩
+        have extension := condition_extension.trans body_extension
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := extension
+          outcome_typed := .fallthrough (environment_agrees.mono extension)
+        }, .fallthrough _⟩
+    | .returns condition_evaluates body_executes => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨after_typed, body_extension, body_outcome⟩
+        have extension := condition_extension.trans body_extension
+        cases body_outcome with
+        | returned result_typed =>
+            exact ⟨{
+              heap_typed := after_typed
+              heap_extends := extension
+              outcome_typed := .returned result_typed
+            }, .returned _⟩
+    termination_by structural evaluation
+
+  private theorem preserveForLoopRecWithControl
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context runtimeFinalContext : Context} {evidence : EvidenceEnvironment}
+      {source : TypedSource} {environment : Environment} {before after : Heap}
+      {condition : ExpressionId} {post : List ForItemForm}
+      {body : List StatementId} {outcome : ControlOutcome}
+      {control : ControlContext} {postContext bodyFinal : Context}
+      {bodyFacts : BodyFacts}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (condition_type : ExpressionHasType source context condition .bool)
+      (post_type : ForItemsHaveType source control.enterLoop context post postContext)
+      (body_type : StatementsHaveType source control.enterLoop context body bodyFinal
+        bodyFacts)
+      (evaluation : ForLoopExecutes program context evidence source environment
+        before condition post body runtimeFinalContext outcome after) :
+      StatementEvaluationPreserved context context control.returnType before after
+        outcome ∧ outcome.NoEscapedControl :=
+    match evaluation with
+    | .done condition_evaluates => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, after_typed, extension⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := extension
+          outcome_typed := .fallthrough (environment_agrees.mono extension)
+        }, .fallthrough _⟩
+    | .nextFallthrough condition_evaluates body_executes post_executes next => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨body_heap_typed, body_extension, body_outcome⟩
+        have body_prefix := condition_extension.trans body_extension
+        rcases preserveForItemsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono body_prefix)
+            body_heap_typed post_type post_executes with
+          ⟨post_context_eq, post_heap_typed, post_extension,
+            post_environment_agrees⟩
+        have iteration_extension := body_prefix.trans post_extension
+        rcases preserveForLoopRecWithControl program_well_formed runtime
+            evidence_covers (environment_agrees.mono iteration_extension)
+            post_heap_typed condition_type post_type body_type next with
+          ⟨⟨after_typed, next_extension, next_outcome⟩, next_noEscape⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := iteration_extension.trans next_extension
+          outcome_typed := next_outcome
+        }, next_noEscape⟩
+    | .nextContinue condition_evaluates body_executes post_executes next => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨body_heap_typed, body_extension, body_outcome⟩
+        have body_prefix := condition_extension.trans body_extension
+        rcases preserveForItemsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono body_prefix)
+            body_heap_typed post_type post_executes with
+          ⟨post_context_eq, post_heap_typed, post_extension,
+            post_environment_agrees⟩
+        have iteration_extension := body_prefix.trans post_extension
+        rcases preserveForLoopRecWithControl program_well_formed runtime
+            evidence_covers (environment_agrees.mono iteration_extension)
+            post_heap_typed condition_type post_type body_type next with
+          ⟨⟨after_typed, next_extension, next_outcome⟩, next_noEscape⟩
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := iteration_extension.trans next_extension
+          outcome_typed := next_outcome
+        }, next_noEscape⟩
+    | .breaks condition_evaluates body_executes => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨after_typed, body_extension, body_outcome⟩
+        have extension := condition_extension.trans body_extension
+        exact ⟨{
+          heap_typed := after_typed
+          heap_extends := extension
+          outcome_typed := .fallthrough (environment_agrees.mono extension)
+        }, .fallthrough _⟩
+    | .returns condition_evaluates body_executes => by
+        rcases preserveExpressionRec program_well_formed runtime
+            evidence_covers environment_agrees before_typed condition_type
+            condition_evaluates with
+          ⟨condition_typed, condition_heap_typed, condition_extension⟩
+        rcases preserveStatementsRec program_well_formed runtime
+            evidence_covers (environment_agrees.mono condition_extension)
+            condition_heap_typed body_type body_executes with
+          ⟨after_typed, body_extension, body_outcome⟩
+        have extension := condition_extension.trans body_extension
+        cases body_outcome with
+        | returned result_typed =>
+            exact ⟨{
+              heap_typed := after_typed
+              heap_extends := extension
+              outcome_typed := .returned result_typed
+            }, .returned _⟩
+    termination_by structural evaluation
+
+end
+
+  private theorem preserveStatementControlRec
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context staticFinalContext runtimeFinalContext : Context}
+      {evidence : EvidenceEnvironment}
+      {source : TypedSource} {environment : Environment}
+      {before after : Heap} {statement : StatementId} {outcome : ControlOutcome}
+      {control : ControlContext} {facts : StatementFacts}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (typing : StatementHasType source control context statement staticFinalContext
+        facts)
+      (evaluation : StatementExecutes program context evidence source environment
+        before statement runtimeFinalContext outcome after) :
+      outcome.IsFallthrough → facts.control.canFallthrough = true :=
+  (preserveStatementControlSummaryRec program_well_formed runtime evidence_covers
+    environment_agrees before_typed typing evaluation).canFallthrough
+
+  private theorem preserveStatementsControlRec
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context staticFinalContext runtimeFinalContext : Context}
+      {evidence : EvidenceEnvironment} {source : TypedSource}
+      {environment : Environment} {before after : Heap}
+      {statements : List StatementId} {outcome : ControlOutcome}
+      {control : ControlContext} {facts : BodyFacts}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (typing : StatementsHaveType source control context statements
+        staticFinalContext facts)
+      (evaluation : StatementsExecute program context evidence source environment
+        before statements runtimeFinalContext outcome after) :
+      outcome.IsFallthrough → facts.control.canFallthrough = true :=
+  (preserveStatementsControlSummaryRec program_well_formed runtime evidence_covers
+    environment_agrees before_typed typing evaluation).canFallthrough
+
+  private theorem preserveFunctionStatementsRec
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context staticFinalContext runtimeFinalContext : Context}
+      {evidence : EvidenceEnvironment} {source : TypedSource}
+      {environment : Environment} {before after : Heap}
+      {statements : List StatementId} {outcome : ControlOutcome}
+      {control : ControlContext} {facts : BodyFacts}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (typing : StatementsHaveType source control context statements
+        staticFinalContext facts)
+      (completes : BodyCompletes control.returnType facts)
+      (evaluation : FunctionStatementsExecute program context evidence source
+        environment before statements runtimeFinalContext outcome after) :
+      StatementEvaluationPreserved context staticFinalContext control.returnType
+        before after outcome :=
+  (preserveFunctionStatementsRecWithControl program_well_formed runtime evidence_covers
+    environment_agrees before_typed typing completes evaluation).1
+
   private theorem preserveWhileRec
       {program : Program}
       (program_well_formed : ProgramWellFormed program)
@@ -3202,88 +3551,8 @@ mutual
         condition body runtimeFinalContext outcome after) :
       StatementEvaluationPreserved context context control.returnType before after
         outcome :=
-    match evaluation with
-    | .done condition_evaluates => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, after_typed, extension⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := extension
-          outcome_typed := .fallthrough (environment_agrees.mono extension)
-        }
-    | .nextFallthrough condition_evaluates body_executes next => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨body_heap_typed, body_extension, body_outcome⟩
-        have prefix_extension := condition_extension.trans body_extension
-        rcases preserveWhileRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono prefix_extension)
-            body_heap_typed condition_type body_type next with
-          ⟨after_typed, next_extension, next_outcome⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := prefix_extension.trans next_extension
-          outcome_typed := next_outcome
-        }
-    | .nextContinue condition_evaluates body_executes next => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨body_heap_typed, body_extension, body_outcome⟩
-        have prefix_extension := condition_extension.trans body_extension
-        rcases preserveWhileRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono prefix_extension)
-            body_heap_typed condition_type body_type next with
-          ⟨after_typed, next_extension, next_outcome⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := prefix_extension.trans next_extension
-          outcome_typed := next_outcome
-        }
-    | .breaks condition_evaluates body_executes => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨after_typed, body_extension, body_outcome⟩
-        have extension := condition_extension.trans body_extension
-        exact {
-          heap_typed := after_typed
-          heap_extends := extension
-          outcome_typed := .fallthrough (environment_agrees.mono extension)
-        }
-    | .returns condition_evaluates body_executes => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨after_typed, body_extension, body_outcome⟩
-        have extension := condition_extension.trans body_extension
-        cases body_outcome with
-        | returned result_typed =>
-            exact {
-              heap_typed := after_typed
-              heap_extends := extension
-              outcome_typed := .returned result_typed
-            }
-    termination_by structural evaluation
+  (preserveWhileRecWithControl program_well_formed runtime evidence_covers
+    environment_agrees before_typed condition_type body_type evaluation).1
 
   private theorem preserveForLoopRec
       {program : Program}
@@ -3306,102 +3575,8 @@ mutual
         before condition post body runtimeFinalContext outcome after) :
       StatementEvaluationPreserved context context control.returnType before after
         outcome :=
-    match evaluation with
-    | .done condition_evaluates => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, after_typed, extension⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := extension
-          outcome_typed := .fallthrough (environment_agrees.mono extension)
-        }
-    | .nextFallthrough condition_evaluates body_executes post_executes next => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨body_heap_typed, body_extension, body_outcome⟩
-        have body_prefix := condition_extension.trans body_extension
-        rcases preserveForItemsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono body_prefix)
-            body_heap_typed post_type post_executes with
-          ⟨post_context_eq, post_heap_typed, post_extension,
-            post_environment_agrees⟩
-        have iteration_extension := body_prefix.trans post_extension
-        rcases preserveForLoopRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono iteration_extension)
-            post_heap_typed condition_type post_type body_type next with
-          ⟨after_typed, next_extension, next_outcome⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := iteration_extension.trans next_extension
-          outcome_typed := next_outcome
-        }
-    | .nextContinue condition_evaluates body_executes post_executes next => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨body_heap_typed, body_extension, body_outcome⟩
-        have body_prefix := condition_extension.trans body_extension
-        rcases preserveForItemsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono body_prefix)
-            body_heap_typed post_type post_executes with
-          ⟨post_context_eq, post_heap_typed, post_extension,
-            post_environment_agrees⟩
-        have iteration_extension := body_prefix.trans post_extension
-        rcases preserveForLoopRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono iteration_extension)
-            post_heap_typed condition_type post_type body_type next with
-          ⟨after_typed, next_extension, next_outcome⟩
-        exact {
-          heap_typed := after_typed
-          heap_extends := iteration_extension.trans next_extension
-          outcome_typed := next_outcome
-        }
-    | .breaks condition_evaluates body_executes => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨after_typed, body_extension, body_outcome⟩
-        have extension := condition_extension.trans body_extension
-        exact {
-          heap_typed := after_typed
-          heap_extends := extension
-          outcome_typed := .fallthrough (environment_agrees.mono extension)
-        }
-    | .returns condition_evaluates body_executes => by
-        rcases preserveExpressionRec program_well_formed runtime
-            evidence_covers environment_agrees before_typed condition_type
-            condition_evaluates with
-          ⟨condition_typed, condition_heap_typed, condition_extension⟩
-        rcases preserveStatementsRec program_well_formed runtime
-            evidence_covers (environment_agrees.mono condition_extension)
-            condition_heap_typed body_type body_executes with
-          ⟨after_typed, body_extension, body_outcome⟩
-        have extension := condition_extension.trans body_extension
-        cases body_outcome with
-        | returned result_typed =>
-            exact {
-              heap_typed := after_typed
-              heap_extends := extension
-              outcome_typed := .returned result_typed
-            }
-    termination_by structural evaluation
-
-end
+  (preserveForLoopRecWithControl program_well_formed runtime evidence_covers
+    environment_agrees before_typed condition_type post_type body_type evaluation).1
 
 namespace StatementExecutes
 
@@ -3504,6 +3679,28 @@ theorem preserved
       before statements runtimeFinalContext outcome after) :
     StatementEvaluationPreserved context staticFinalContext control.returnType before after outcome :=
   preserveFunctionStatementsRec wellFormed runtime covers locals heap typing completes execution
+
+/-- A complete typed function body cannot leave a break or continue transfer.
+The original mutual preservation core supplies this observation at the actual
+Source heap and environment; implicit tail-expression returns remain valid. -/
+theorem noEscapedControl
+    {program : Program} (wellFormed : ProgramWellFormed program)
+    {context staticFinalContext runtimeFinalContext : Context}
+    {evidence : EvidenceEnvironment} {source : TypedSource}
+    {environment : Environment} {before after : Heap}
+    {statements : List StatementId} {outcome : ControlOutcome}
+    {control : ControlContext} {facts : BodyFacts}
+    (runtime : SourceRuntimeValid program context source)
+    (covers : evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment)
+    (heap : HeapWellTyped context before)
+    (typing : StatementsHaveType source control context statements staticFinalContext facts)
+    (completes : BodyCompletes control.returnType facts)
+    (execution : FunctionStatementsExecute program context evidence source environment
+      before statements runtimeFinalContext outcome after) :
+    outcome.NoEscapedControl :=
+  (preserveFunctionStatementsRecWithControl wellFormed runtime covers locals heap
+    typing completes execution).2
 
 end FunctionStatementsExecute
 
