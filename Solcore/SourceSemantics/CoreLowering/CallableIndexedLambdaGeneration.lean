@@ -191,6 +191,72 @@ private theorem descriptor_exists (table : SourceCoreStageCodebook.Table)
     · cases accepted
   | ok descriptor => exact ⟨descriptor⟩
 
+/-- A genuine same-policy lambda certificate constructs one literal Site.
+The policy and child fuel are retained before any contextual forgetting. -/
+theorem of_certificate {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : CallableIndexedNamedGeneration.Prepared checked)
+    {named : Named} {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {view : TypedSource} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+    {id : ExpressionId} {sourceNode node : ExpressionNode} {parameters : List TypedBinder}
+    {result : TypeSystem.Ty} {body : List StatementId} {reported : Ty}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (sourceContext : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment) (captured : Dynamic.Environment)
+    (receipt : CallableIndexedLambdaCertificates.Certificate policy lowerBody fuel (context prepared named)
+      view scope id node parameters result body reported reasonAt lowered)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1)
+      (context prepared named) view scope id reasonAt = .ok lowered)
+    (profile : checked.catalog.callableContracts = true)
+    (viewOfSource : LambdaMetadataViews.MetadataView (source named) view)
+    (sourceFound : (source named).lookupExpression? id = some sourceNode)
+    (sourceForm : sourceNode.form = .lambda parameters result body)
+    (found : view.lookupExpression? id = some node) (form : node.form = sourceNode.form)
+    (allocationProfile : policy.sourceCells = some (allocator prepared named))
+    (manifest : policy.rawLambdaBody = SourceCoreLambdaTemplates.hook prepared.ancestry.templates named.signature.key [])
+    (expressionProfile : policy.rawLambdaExpression = SourceCoreCallableIndexedAncestry.expressionHook prepared.ancestry named.signature.key [])
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some prepared.ancestry.graph.inputs.callable) [])
+    (projector : policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+      (LanguageResult.resultType lowered.type) prepared.layouts.definitions) :
+    ∃ site : Site prepared named parameters result body sourceContext evidence captured scope administrative,
+      site.code.id = id ∧ site.code.lowered = lowered ∧ site.code.policy = policy ∧
+      site.code.lowerBody = lowerBody ∧ site.code.fuel = fuel ∧ site.code.view = view ∧
+      site.code.reasonAt = reasonAt ∧ site.code.sourceNode = sourceNode ∧ site.code.node = node ∧
+      HEq site.code.receipt receipt := by
+  have parameterProjected := receipt.parameterProjected
+  have resultProjected := receipt.resultProjected
+  rw [projector] at parameterProjected resultProjected
+  have parameterProjected := CompatibleExpressionReads.projectType_of_accepted parameterProjected
+  have resultProjected := CompatibleExpressionReads.projectType_of_accepted resultProjected
+  have projection : checked.catalog.project (FunctionValues.sourceType
+      (closure named parameters result body sourceContext evidence captured)) =
+      .ok (CallableContract.functionType receipt.parameterCore receipt.resultCore) := by
+    change checked.catalog.project (.function (TypeSystem.Ty.productMany (parameters.map (·.scheme.body))) result) = _
+    rw [receipt.parameterTypes]
+    simp [SourceCoreCompatibleCatalog.Catalog.project, parameterProjected, resultProjected,
+      SourceCoreCompatibleCatalog.Catalog.functionType, profile, bind, Except.bind, pure, Except.pure]
+  have reportedType : reported = CallableContract.functionType receipt.parameterCore receipt.resultCore := by
+    have h := receipt.checked
+    rw [callables] at h
+    unfold SourceCoreBasic.ensureType at h
+    split at h
+    · assumption
+    · cases h
+  have typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
+      (LanguageResult.resultType (CallableContract.functionType receipt.parameterCore receipt.resultCore))
+      prepared.layouts.definitions := by
+    simpa only [congrArg SourceCoreBasic.LoweredExpr.type receipt.emitted, reportedType] using typed
+  have hook := receipt.expressionHook
+  rw [expressionProfile] at hook
+  obtain ⟨origin, _, selected, _, _, _, _, _⟩ := CallableIndexedFormation.expressionHook_receipt prepared.ancestry hook
+  rw [(lookupExpression?_sound found).2] at selected
+  obtain ⟨descriptor⟩ := descriptor_exists _ selected
+  let code : Code prepared (closure named parameters result body sourceContext evidence captured) scope administrative := {
+    policy, lowerBody, fuel, compilation := context prepared named, active := [], view, viewOfSource,
+    id, sourceNode, sourceFound, sourceForm, node, found, form, reported, reasonAt, lowered, receipt, accepted,
+    allocationError := fun error => .sourceAllocation (reprStr error), allocationProfile, manifest, expressionProfile,
+    callables, descriptor, projection, typed }
+  exact ⟨⟨code, rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl receipt⟩
+
 /-- Build every static code field from the actual named callback's accepted
 ordinary lambda branch. Canonical metadata and native checking remain explicit,
 but no generation-history alignment is assumed. -/
@@ -232,40 +298,11 @@ theorem of_contextual_with_body_recipe {checked : SourceCoreCompatibleCatalog.Ch
             ((representation prepared).atContext named.signature.key []) prepared.base.locals named.signature.key []) := by
   obtain ⟨policy, lowerBody, accepted, ⟨receipt⟩, allocationProfile, manifest, expressionProfile, callables, projector, binderPolicy, bodyRecipe⟩ :=
     contextual_certificate_with_body_recipe prepared compiled record found (form.trans sourceForm) owner requirements coercions ordinary read accepted
-  have parameterProjected := receipt.parameterProjected
-  have resultProjected := receipt.resultProjected
-  rw [projector] at parameterProjected resultProjected
-  have parameterProjected := CompatibleExpressionReads.projectType_of_accepted parameterProjected
-  have resultProjected := CompatibleExpressionReads.projectType_of_accepted resultProjected
-  have projection : checked.catalog.project (FunctionValues.sourceType
-      (closure named parameters result body sourceContext evidence captured)) =
-      .ok (CallableContract.functionType receipt.parameterCore receipt.resultCore) := by
-    change checked.catalog.project (.function (TypeSystem.Ty.productMany (parameters.map (·.scheme.body))) result) = _
-    rw [receipt.parameterTypes]
-    simp [SourceCoreCompatibleCatalog.Catalog.project, parameterProjected, resultProjected,
-      SourceCoreCompatibleCatalog.Catalog.functionType, profile, bind, Except.bind, pure, Except.pure]
-  have reportedType : reported = CallableContract.functionType receipt.parameterCore receipt.resultCore := by
-    have h := receipt.checked
-    rw [callables] at h
-    unfold SourceCoreBasic.ensureType at h
-    split at h
-    · assumption
-    · cases h
-  have typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression
-      (LanguageResult.resultType (CallableContract.functionType receipt.parameterCore receipt.resultCore))
-      prepared.layouts.definitions := by
-    simpa only [congrArg SourceCoreBasic.LoweredExpr.type receipt.emitted, reportedType] using typed
-  have hook := receipt.expressionHook
-  rw [expressionProfile] at hook
-  obtain ⟨origin, _, selected, _, _, _, _, _⟩ := CallableIndexedFormation.expressionHook_receipt prepared.ancestry hook
-  rw [(lookupExpression?_sound found).2] at selected
-  obtain ⟨descriptor⟩ := descriptor_exists _ selected
-  let code : Code prepared (closure named parameters result body sourceContext evidence captured) scope administrative := {
-    policy, lowerBody, fuel, compilation := context prepared named, active := [], view, viewOfSource,
-    id, sourceNode, sourceFound, sourceForm, node, found, form, reported, reasonAt, lowered, receipt, accepted,
-    allocationError := fun error => .sourceAllocation (reprStr error), allocationProfile, manifest, expressionProfile,
-    callables, descriptor, projection, typed }
-  exact ⟨⟨code, rfl, rfl⟩, rfl, rfl, binderPolicy, bodyRecipe⟩
+  obtain ⟨site, identifier, emitted, samePolicy, sameBody, _fuel, _view, _reasonAt, _sourceNode, _node, _receipt⟩ :=
+    of_certificate prepared sourceContext evidence captured receipt accepted profile viewOfSource
+      sourceFound sourceForm found form allocationProfile manifest expressionProfile callables projector typed
+  exact ⟨site, identifier, emitted, (congrArg SourceCoreFunctions.Policy.lowerBinder samePolicy).trans binderPolicy,
+    sameBody.trans bodyRecipe⟩
 
 
 /-- Forget only the selected Code body recipe. -/
