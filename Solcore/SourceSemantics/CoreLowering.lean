@@ -922,6 +922,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedAs
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicCoupledForHeaderBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectApplicationPrefix
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
