@@ -1000,6 +1000,7 @@ import Solcore.SourceSemantics.CoreLowering.ReachedBuiltinFragmentOutcomePorts
 import Solcore.SourceSemantics.CoreLowering.ReachedIndexMissingDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredFunctionModelReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStoredIndirectParentPrefix
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaCompilerReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
