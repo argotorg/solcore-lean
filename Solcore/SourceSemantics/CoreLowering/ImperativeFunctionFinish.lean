@@ -72,10 +72,16 @@ theorem input {environment : Environment} {before after : Store} {type : Ty}
     cases control with
     | caseLeft input branch | caseRight input branch => exact ⟨_, _, input⟩
 
+/-- Only a reached break or continue requests the escaped-control token. -/
+def TransferFaults (faults : FunctionCalls.FaultRep) (escaped : Word)
+    (outcome : Dynamic.ControlOutcome) : Prop :=
+  (∀ next, outcome = .breaking next → faults .controlEscapedFunction escaped) ∧
+  (∀ next, outcome = .continuing next → faults .controlEscapedFunction escaped)
+
 /-- The caller derives the raw Unit condition from its source grammar and
 actual successful fallthrough. Escaped control uses the real diagnostic token
 and is reflected as the independent controlEscapedFunction fault. -/
-theorem from_flow {values : SourceCoreCompatibleValues.Context}
+theorem from_flow_with_transfers {values : SourceCoreCompatibleValues.Context}
     {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions values.checked.catalog.definitions}
     (functions : FunctionModel values.checked.catalog ambient)
@@ -86,7 +92,7 @@ theorem from_flow {values : SourceCoreCompatibleValues.Context}
     (rawUnit : ∀ next, outcome = .fallthrough next → expected = .unit)
     (projection : values.checked.catalog.project expected = .ok type)
     (fellThrough escaped : Word)
-    (escapedFault : faults .controlEscapedFunction escaped)
+    (transferFaults : TransferFaults faults escaped outcome)
     (related : TypedLexicalWhile.FlowRep (registry := registry) functions
       mapping world faults expected type outcome value)
     (evaluated : Evaluates environment before flow value after) :
@@ -116,9 +122,32 @@ theorem from_flow {values : SourceCoreCompatibleValues.Context}
       (LocalLoop.toControl_failure _ escaped evaluated), .fault matched⟩
   | breaking next =>
     exact ⟨_, LocalControl.finish_failure _
-      (LocalLoop.toControl_transfer _ escaped evaluated), .breaking next escapedFault⟩
+      (LocalLoop.toControl_transfer _ escaped evaluated), .breaking next (transferFaults.1 next rfl)⟩
   | continuing next =>
     exact ⟨_, LocalControl.finish_failure _
-      (LocalLoop.toControl_transfer _ escaped evaluated), .continuing next escapedFault⟩
+      (LocalLoop.toControl_transfer _ escaped evaluated), .continuing next (transferFaults.2 next rfl)⟩
+
+
+theorem from_flow {values : SourceCoreCompatibleValues.Context}
+    {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions values.checked.catalog.definitions}
+    (functions : FunctionModel values.checked.catalog ambient)
+    {mapping : LocationMap} {world : StoreTyping} {faults : FunctionCalls.FaultRep}
+    {environment : Environment} {before after : Store}
+    {expected : TypeSystem.Ty} {type : Ty} {outcome : Dynamic.ControlOutcome}
+    {flow : Expr} {value : Value}
+    (rawUnit : ∀ next, outcome = .fallthrough next → expected = .unit)
+    (projection : values.checked.catalog.project expected = .ok type)
+    (fellThrough escaped : Word)
+    (escapedFault : faults .controlEscapedFunction escaped)
+    (related : TypedLexicalWhile.FlowRep (registry := registry) functions
+      mapping world faults expected type outcome value)
+    (evaluated : Evaluates environment before flow value after) :
+    ∃ result, Evaluates environment before
+      (CompatibleStatements.finish type flow fellThrough escaped) result after ∧
+      FinishedRep (registry := registry) functions mapping world faults
+        expected type outcome result := by
+  exact from_flow_with_transfers functions rawUnit projection fellThrough escaped
+    ⟨fun _ _ => escapedFault, fun _ _ => escapedFault⟩ related evaluated
 
 end Solcore.SourceSemantics.CoreLowering.ImperativeFunctionFinish
