@@ -830,6 +830,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReadyOperatorSou
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicEmittedReadyNamedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaExpressionHeadsWithFunctions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaExpressionRuntimeBoundsWithFunctions
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpressionRuntimeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
