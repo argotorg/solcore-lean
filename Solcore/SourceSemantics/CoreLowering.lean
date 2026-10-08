@@ -838,6 +838,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedRankedOrdinarySu
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralFunctionSelection
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticTokenPlan
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderTokenExtraction
+import Solcore.SourceSemantics.CoreLowering.EmittedMatchTokenExtraction
+import Solcore.SourceSemantics.CoreLowering.EmittedImperativeMatchTokenCertificates
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
