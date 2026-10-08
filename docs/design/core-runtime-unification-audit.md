@@ -516,6 +516,10 @@ At `8d187247`, strict callee bounds construct the actual reached state and retai
 
 Terminal-to-inventory membership and catalog Source type closure remain separate static obligations. Header occurrence graph closure does not establish type closure. Successful stored-call composition currently requires genuine strong ordinary/principal provenance, same-Code body syntax, actual guard acceptance and independent raw Source bundle/count facts. It does not cover every legacy, rejected or coerced call.
 
+At `108f6af3`, the same original registration fold retains closed Source entries, and actual factory/projection/description proves the concrete assignment gate. The genuine lambda Site identifies the native binder pack, while concrete ordinary/principal receipts build invocation association at the actual callee post. Actual route collection and Source projection typing associate the reached mapping terminal with its precise MissingSite/base and raw table error. Verification passed 5294 normal jobs, 6800 strict declarations, 186 fresh module-attributed declarations and 27 signatures. All 48 original registration-prefix raw types and axioms remain exact against independently saved original normal objects. Three exact source/diff reviews, policy, whitespace and 5010 other protected-file checks passed. Runtime and registered tests remain unchanged since their actual native and interpreted executions at `3ff3daf4`.
+
+The public adapter must still produce its authentic selected catalog factory and full Source inventory membership from actual compilation. The terminal proof now closes for a real collected prepared assignment, while Source projection typing, actual extended raw metadata and the same generated path remain genuine inputs. Stored-call raw Source bundle/count/result production, full rejection/coercion/stage coverage and all-pass composition remain unfinished.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
