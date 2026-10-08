@@ -1033,6 +1033,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryFo
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBodyRuntimeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryStoredMembers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryReadMembers
+import Solcore.SourceSemantics.CoreLowering.ReachedNamedSequentialBodyFaultPaths
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSequentialNamedBodyFaultBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
