@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderReady
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateWhileReady
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateForHeaderControl
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateAllocationReadiness
@@ -476,6 +477,260 @@ variable (readiness : Readiness protocol)
   (transfers : AllocationTransfers protocol readiness stateBindings source)
 
 include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+theorem Tree.preserves_fault_reachable_bounded_for_with_eliminator
+    (AP : GenericForHeader.Structural.AssignmentPayload values source certificates administrative ambient.definitions)
+    (UP : GenericForHeader.Structural.UnaryPayload)
+    (unaryErrors : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment),
+      UP head → head.Errors faults)
+    (validity : SourceSemantics.Context → Prop)
+    (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
+    (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
+      validity context → BinderExtends source.owner context binder next → validity next) (budget : Nat)
+    (assignments : ∀ context, validity context → AssignmentPrefixPreservesAt protocol readiness assignmentFacts functions (registry := registry)
+      program evidence source (certificates context) context administrative budget)
+    (assignmentFaults : ∀ context, validity context → AssignmentFaultPreservesWithPayloadAt protocol readiness assignmentFacts functions (registry := registry)
+      program evidence source (certificates context) context administrative faults budget (fun head => AP head))
+    (boundedMeaning : ∀ context, validity context →
+      RecursiveNamedBoundedContracts.Below budget (fun size => ExpressionPreservesAt protocol readiness program evidence
+        (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts (certificates context)
+        (source := source) (context := context) (faults := faults) size)) {context finalContext : SourceSemantics.Context} {scope : Scope}
+    {items : List ForItemForm} {code : Expr}
+    (eliminator : GenericForHeader.Structural.Eliminates
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := source) (certificates := certificates)
+      (definitions := ambient.definitions) (administrative := administrative) (type := type)
+      (continuation := continuation) AP UP context scope items code)
+    (valid : validity context) (itemsFacts : facts context items)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (state : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (gate : condition contextLocation native) (ready : readiness.Ready context state) {reason : Dynamic.SemanticFault}
+    {size : Nat} (trace : SourceExecutionSize.ForItemsFault program size context evidence source environment before items finalContext reason after) (bounded : size ≤ budget) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧
+      faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      FaultTransition readiness state ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  let M : SourceSemantics.Context → Scope → List ForItemForm → Expr → Prop :=
+    fun context scope items code =>
+    ∀ {finalContext : SourceSemantics.Context},
+    ∀ (valid : validity context) (itemsFacts : facts context items)
+    {mapping : LocationMap} {world : StoreTyping} {actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment}
+    {before after : Dynamic.Heap} {store : Store} {ξ : Renaming} {contextLocation : Location} {native : NativeFrame}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog values.checked.catalog)
+      mapping world administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents values.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
+    (reference : canonical[scope.length + 1 + globals]? = some (.cellRef frame.type contextLocation))
+    (read : store.read? contextLocation = some (SourceCoreCallableIndexedFrames.encode frame native))
+    (unmapped : contextLocation ∉ mapping)
+    (state : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (gate : condition contextLocation native) (ready : readiness.Ready context state) {reason : Dynamic.SemanticFault}
+    {size : Nat} (trace : SourceExecutionSize.ForItemsFault program size context evidence source environment before items finalContext reason after) (bounded : size ≤ budget),
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store (code.rename ξ) (.inLeft (LocalLoop.controlType type) (.word token)) finalStore ∧
+      faults reason token ∧ CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      FaultTransition readiness state ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩
+  have algebra : GenericForHeader.Structural.BranchAlgebra
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (type := type) (continuation := continuation) AP UP M := by
+    clear eliminator ready gate state unmapped read reference actualTyped agrees locals heaps environments
+      bounded trace itemsFacts valid
+    clear finalContext reason after size mapping world actualContext environment canonical actual before store ξ contextLocation native
+      context scope items code
+    constructor
+    · intro context scope code next
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      cases trace
+    · intro context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same ih
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      cases trace with
+      | head failed => cases failed with | polymorphicLet poly unsupported => exact False.elim (poly mono)
+      | tail first rest =>
+        cases first with | letUninitialized _ other allocated =>
+          cases binder_context_eq extended other
+          obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation, allocationTransition⟩ :=
+            TypedLexicalControl.Stateful.allocate_absent functions definitions registered protocol producer mono extended ordinary projected allocation annotation same
+              environments heaps locals agrees actualTyped reference read allocated state ((acquire _ _ gate) state read)
+          obtain ⟨nextState, allocationRelated⟩ := allocationTransition
+          have nextReady := transfers.absent state nextState ready extended allocated preservation
+          have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.letUninitialized mono extended allocated)
+          obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, maps, worlds, lastFrame, metadata, tailTransition⟩ :=
+            ih (extend valid extended) nextFacts nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              nextState gate nextReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+          obtain ⟨tailState, tailRelated, tailPost⟩ := tailTransition
+          let reached := stateBindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+            (id := binder.id) (type := payload) tailState
+          have restoredRelated := stateBindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+            (id := binder.id) (type := payload) tailState
+          have restoredPost := transfers.restore_fault (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+            (binder := binder) (type := payload) tailState tailPost
+          exact ⟨token, finalStore, finalMap, finalWorld, .letE allocationEval completed, matched, finalHeaps,
+            (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩).trans maps,
+            (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩).trans worlds,
+            preservation.trans lastFrame, (Dynamic.HeapMetadataExtend.of_allocation allocated).trans metadata, ⟨reached, protocol.trans allocationRelated (protocol.trans tailRelated restoredRelated), restoredPost⟩⟩
+    · intro context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary found sourceType child allocation annotation same ih
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      have itemFact := sites.head itemsFacts
+      rw [sequence_rename]
+      cases trace with
+      | head failed =>
+        cases failed with
+        | polymorphicLet poly unsupported => exact False.elim (poly mono)
+        | letInitializer _ failed =>
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
+            boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact (.initialized mono) found)
+              environments heaps locals agrees actualTyped state ready (.fault failed)
+          cases represented with | fault matched =>
+            exact ⟨_, finalStore, finalMap, finalWorld, LanguageResult.bind_failure _ evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩
+      | tail first rest =>
+        cases first with
+        | letInitialized initialTrace _ other allocated =>
+          cases binder_context_eq extended other
+          obtain ⟨value, middleStore, middleMap, middleWorld, initialEval, represented, middleHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
+            boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact (.initialized mono) found)
+              environments heaps locals agrees actualTyped state ready (.value initialTrace)
+          cases represented with
+          | value payload =>
+            obtain ⟨middleState, expressionRelated, middlePost⟩ := expressionTransition
+            have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
+            obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame, allocationTransition⟩ :=
+              TypedLexicalControl.Stateful.allocate_initialized functions definitions registered protocol producer mono extended ordinary allocation annotation same (sourceType ▸ payload)
+                (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated middleState ((acquire _ _ gate) middleState frameRead)
+            obtain ⟨nextState, allocationRelated⟩ := allocationTransition
+            have nextReady := transfers.initialized middleState nextState middlePost.1 extended
+              (sourceType ▸ middlePost.2) allocated allocationFrame
+            have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.letInitialized initialTrace.sound mono extended allocated)
+            obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, tailTransition⟩ :=
+              ih (extend valid extended) nextFacts nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
+                (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+                  (List.getElem?_eq_some_iff.mp frameRead).1).1
+                nextState gate nextReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+            obtain ⟨tailState, tailRelated, tailPost⟩ := tailTransition
+            let reached := stateBindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+              (id := binder.id) (type := lowered.type) tailState
+            have restoredRelated := stateBindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+              (id := binder.id) (type := lowered.type) tailState
+            have restoredPost := transfers.restore_fault (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
+              (binder := binder) (type := lowered.type) tailState tailPost
+            exact ⟨token, finalStore, finalMap, finalWorld, LanguageResult.bind_success _ initialEval (.letE allocationEval completed), matched, finalHeaps,
+              maps.trans ((show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩).trans finalMaps),
+              worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
+              preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata),
+              ⟨reached, protocol.trans expressionRelated (protocol.trans allocationRelated (protocol.trans tailRelated restoredRelated)), restoredPost⟩⟩
+        | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
+    · intro context scope expression expressionNode rest lowered body found child ih
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      have itemFact := sites.head itemsFacts
+      rw [LoopRenaming.discard]
+      cases trace with
+      | head failed =>
+        cases failed with | expression failed =>
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
+            boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact .discard found)
+              environments heaps locals agrees actualTyped state ready (.fault failed)
+          cases represented with | fault matched =>
+            exact ⟨_, finalStore, finalMap, finalWorld, LocalSequence.discard_failure _ evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩
+      | tail first rest =>
+        cases first with | expression childTrace =>
+          obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
+            boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact .discard found)
+              environments heaps locals agrees actualTyped state ready (.value childTrace)
+          cases represented with
+          | @value _ coreValue payload =>
+            obtain ⟨middleState, expressionRelated, middlePost⟩ := expressionTransition
+            have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.expression childTrace.sound)
+            obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
+              ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+                (GenericExpressionMeaning.agree_prefix agrees coreValue) (.cons payload.runtime_hasType (actualTyped.weaken worlds)) reference
+                ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+                (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+                middleState gate middlePost.1 rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+            obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
+            refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
+              ⟨reached, protocol.trans expressionRelated tailRelated, tailPost⟩⟩
+            rw [GenericExpressionMeaning.rename_prefix] at completed
+            exact LocalSequence.discard_success _ first completed
+    · intro context scope assignment operator rhs rest body head headPayload ih
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      have itemFact := sites.head itemsFacts
+      cases trace with
+      | head failed =>
+        cases failed with | assignValue failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, assignmentTransition⟩ :=
+            assignmentFaults _ valid head (sites.assignment itemFact)
+              environments heaps locals agrees actualTyped state ready headPayload failed (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) body (LocalLoop.controlType type)
+          exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, assignmentTransition⟩
+      | tail first rest =>
+        cases first with | assignValue assigned =>
+          obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentTransition, prefixAgreement⟩ :=
+            assignments _ valid head (sites.assignment itemFact)
+              environments heaps locals agrees actualTyped state ready assigned (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+          obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
+          have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue assigned.sound)
+          obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
+            ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 middleState gate middleReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+          obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
+          refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
+            ⟨reached, protocol.trans assignmentRelated tailRelated, tailPost⟩⟩
+          exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+
+    · intro context scope assignment rest body head headPayload ih
+      intro finalContext valid itemsFacts mapping world actualContext environment canonical actual before after store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped state gate ready reason size trace bounded
+      have headErrors := unaryErrors head headPayload
+      have itemFact := sites.head itemsFacts
+      cases trace with
+      | head failed =>
+        cases failed with | assignBitNot failed =>
+          obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩ :=
+            head.preserves_fault functions program evidence observations
+              environments heaps locals agrees headErrors failed.sound body (LocalLoop.controlType type)
+          exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
+            ⟨stateTransport.extend state maps worlds preservation metadata, stateTransport.related state maps worlds preservation metadata,
+              readiness.fault_after state (stateTransport.extend state maps worlds preservation metadata) (readiness.ready_fault ready) preservation⟩⟩
+      | tail first rest =>
+        cases first with | assignBitNot assigned =>
+          obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
+            head.preserves_prefix functions program evidence observations
+              environments heaps locals agrees actualTyped assigned.sound
+          let middleState := stateTransport.extend state maps worlds preservation metadata
+          have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
+          have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
+          obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
+            ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+                middleState gate middleReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+          obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
+          refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
+            ⟨reached, protocol.trans (stateTransport.related state maps worlds preservation metadata) tailRelated, tailPost⟩⟩
+          exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
+            simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+  exact eliminator M algebra valid itemsFacts environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
+
+include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
 theorem Tree.preserves_fault_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -514,172 +769,17 @@ theorem Tree.preserves_fault_reachable_bounded_for
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       FaultTransition readiness state ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  induction errors generalizing mapping world actualContext environment canonical actual before store ξ contextLocation native finalContext after size with
-  | nil => cases trace
-  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocation annotation same remaining remainingErrors ih =>
-    cases trace with
-    | head failed => cases failed with | polymorphicLet poly unsupported => exact False.elim (poly mono)
-    | tail first rest =>
-      cases first with | letUninitialized _ other allocated =>
-        cases binder_context_eq extended other
-        obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, preservation, allocationTransition⟩ :=
-          TypedLexicalControl.Stateful.allocate_absent functions definitions registered protocol producer mono extended ordinary projected allocation annotation same
-            environments heaps locals agrees actualTyped reference read allocated state ((acquire _ _ gate) state read)
-        obtain ⟨nextState, allocationRelated⟩ := allocationTransition
-        have nextReady := transfers.absent state nextState ready extended allocated preservation
-        have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.letUninitialized mono extended allocated)
-        obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, maps, worlds, lastFrame, metadata, tailTransition⟩ :=
-          ih (extend valid extended) nextFacts nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
-            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-            nextState gate nextReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-        obtain ⟨tailState, tailRelated, tailPost⟩ := tailTransition
-        let reached := stateBindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-          (id := binder.id) (type := payload) tailState
-        have restoredRelated := stateBindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-          (id := binder.id) (type := payload) tailState
-        have restoredPost := transfers.restore_fault (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-          (binder := binder) (type := payload) tailState tailPost
-        exact ⟨token, finalStore, finalMap, finalWorld, .letE allocationEval completed, matched, finalHeaps,
-          (show LocationMap.Extends mapping (mapping ++ [store.length + 2]) from ⟨_, rfl⟩).trans maps,
-          (show WorldExtends world (world ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType payload]) from ⟨_, rfl⟩).trans worlds,
-          preservation.trans lastFrame, (Dynamic.HeapMetadataExtend.of_allocation allocated).trans metadata, ⟨reached, protocol.trans allocationRelated (protocol.trans tailRelated restoredRelated), restoredPost⟩⟩
-  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary found sourceType child allocation annotation same remaining remainingErrors ih =>
-    have itemFact := sites.head itemsFacts
-    rw [sequence_rename]
-    cases trace with
-    | head failed =>
-      cases failed with
-      | polymorphicLet poly unsupported => exact False.elim (poly mono)
-      | letInitializer _ failed =>
-        obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
-          boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact (.initialized mono) found)
-            environments heaps locals agrees actualTyped state ready (.fault failed)
-        cases represented with | fault matched =>
-          exact ⟨_, finalStore, finalMap, finalWorld, LanguageResult.bind_failure _ evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩
-    | tail first rest =>
-      cases first with
-      | letInitialized initialTrace _ other allocated =>
-        cases binder_context_eq extended other
-        obtain ⟨value, middleStore, middleMap, middleWorld, initialEval, represented, middleHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
-          boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact (.initialized mono) found)
-            environments heaps locals agrees actualTyped state ready (.value initialTrace)
-        cases represented with
-        | value payload =>
-          obtain ⟨middleState, expressionRelated, middlePost⟩ := expressionTransition
-          have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
-          obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals, nextAgrees, nextTyped, nextReference, nextRead, allocationFrame, allocationTransition⟩ :=
-            TypedLexicalControl.Stateful.allocate_initialized functions definitions registered protocol producer mono extended ordinary allocation annotation same (sourceType ▸ payload)
-              (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds) reference frameRead allocated middleState ((acquire _ _ gate) middleState frameRead)
-          obtain ⟨nextState, allocationRelated⟩ := allocationTransition
-          have nextReady := transfers.initialized middleState nextState middlePost.1 extended
-            (sourceType ▸ middlePost.2) allocated allocationFrame
-          have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.letInitialized initialTrace.sound mono extended allocated)
-          obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, tailTransition⟩ :=
-            ih (extend valid extended) nextFacts nextEnvironments nextHeaps nextLocals nextAgrees nextTyped nextReference nextRead
-              (allocationFrame contextLocation (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-                (List.getElem?_eq_some_iff.mp frameRead).1).1
-              nextState gate nextReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-          obtain ⟨tailState, tailRelated, tailPost⟩ := tailTransition
-          let reached := stateBindings.restore (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-            (id := binder.id) (type := lowered.type) tailState
-          have restoredRelated := stateBindings.restore_related (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-            (id := binder.id) (type := lowered.type) tailState
-          have restoredPost := transfers.restore_fault (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-            (binder := binder) (type := lowered.type) tailState tailPost
-          exact ⟨token, finalStore, finalMap, finalWorld, LanguageResult.bind_success _ initialEval (.letE allocationEval completed), matched, finalHeaps,
-            maps.trans ((show LocationMap.Extends middleMap (middleMap ++ [middleStore.length + 2]) from ⟨_, rfl⟩).trans finalMaps),
-            worlds.trans ((show WorldExtends middleWorld (middleWorld ++ [frame.type, allocation.entry.layout.type, OptionalCell.cellType lowered.type]) from ⟨_, rfl⟩).trans finalWorlds),
-            preservation.trans (allocationFrame.trans finalFrame), metadata.trans ((Dynamic.HeapMetadataExtend.of_allocation allocated).trans finalMetadata),
-            ⟨reached, protocol.trans expressionRelated (protocol.trans allocationRelated (protocol.trans tailRelated restoredRelated)), restoredPost⟩⟩
-      | letInitializedGeneralized captures poly other allocated => exact False.elim (poly mono)
-  | @discard context scope expression expressionNode rest lowered body found child remaining remainingErrors ih =>
-    have itemFact := sites.head itemsFacts
-    rw [LoopRenaming.discard]
-    cases trace with
-    | head failed =>
-      cases failed with | expression failed =>
-        obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
-          boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact .discard found)
-            environments heaps locals agrees actualTyped state ready (.fault failed)
-        cases represented with | fault matched =>
-          exact ⟨_, finalStore, finalMap, finalWorld, LocalSequence.discard_failure _ evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, expressionTransition⟩
-    | tail first rest =>
-      cases first with | expression childTrace =>
-        obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps, maps, worlds, preservation, metadata, expressionTransition⟩ :=
-          boundedMeaning _ valid _ (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) child found (sites.expression itemFact .discard found)
-            environments heaps locals agrees actualTyped state ready (.value childTrace)
-        cases represented with
-        | @value _ coreValue payload =>
-          obtain ⟨middleState, expressionRelated, middlePost⟩ := expressionTransition
-          have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.expression childTrace.sound)
-          obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
-            ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-              (GenericExpressionMeaning.agree_prefix agrees coreValue) (.cons payload.runtime_hasType (actualTyped.weaken worlds)) reference
-              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-              middleState gate middlePost.1 rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-          obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
-          refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
-            ⟨reached, protocol.trans expressionRelated tailRelated, tailPost⟩⟩
-          rw [GenericExpressionMeaning.rename_prefix] at completed
-          exact LocalSequence.discard_success _ first completed
-  | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
-    have itemFact := sites.head itemsFacts
-    cases trace with
-    | head failed =>
-      cases failed with | assignValue failed =>
-        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, assignmentTransition⟩ :=
-          assignmentFaults _ valid head (sites.assignment itemFact)
-            environments heaps locals agrees actualTyped state ready headErrors failed (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) body (LocalLoop.controlType type)
-        exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, assignmentTransition⟩
-    | tail first rest =>
-      cases first with | assignValue assigned =>
-        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, assignmentTransition, prefixAgreement⟩ :=
-          assignments _ valid head (sites.assignment itemFact)
-            environments heaps locals agrees actualTyped state ready assigned (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-        obtain ⟨middleState, assignmentRelated, middleReady⟩ := assignmentTransition
-        have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignValue assigned.sound)
-        obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
-          ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
-            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1 middleState gate middleReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-        obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
-        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
-          ⟨reached, protocol.trans assignmentRelated tailRelated, tailPost⟩⟩
-        exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
-          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
-
-  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
-    have itemFact := sites.head itemsFacts
-    cases trace with
-    | head failed =>
-      cases failed with | assignBitNot failed =>
-        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata⟩ :=
-          head.preserves_fault functions program evidence observations
-            environments heaps locals agrees headErrors failed.sound body (LocalLoop.controlType type)
-        exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
-          ⟨stateTransport.extend state maps worlds preservation metadata, stateTransport.related state maps worlds preservation metadata,
-            readiness.fault_after state (stateTransport.extend state maps worlds preservation metadata) (readiness.ready_fault ready) preservation⟩⟩
-    | tail first rest =>
-      cases first with | assignBitNot assigned =>
-        obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
-          head.preserves_prefix functions program evidence observations
-            environments heaps locals agrees actualTyped assigned.sound
-        let middleState := stateTransport.extend state maps worlds preservation metadata
-        have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
-        have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
-        obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, tailTransition⟩ :=
-          ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
-            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
-            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
-            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
-              middleState gate middleReady rest (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-        obtain ⟨reached, tailRelated, tailPost⟩ := tailTransition
-        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata,
-          ⟨reached, protocol.trans (stateTransport.related state maps worlds preservation metadata) tailRelated, tailPost⟩⟩
-        exact (prefixAgreement body (LocalLoop.controlType type)).wrap (by
-          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using completed)
+  exact Tree.preserves_fault_reachable_bounded_for_with_eliminator
+    (functions := functions) (definitions := definitions) (registered := registered)
+    (program := program) (evidence := evidence) (observations := observations)
+    (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
+    (stateTransport := stateTransport) (stateBindings := stateBindings)
+    (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
+    (assignmentFacts := assignmentFacts) (snapshotFacts := snapshotFacts) (sites := sites) (transfers := transfers)
+    (fun head => head.ReachableErrors registry faults) (fun head => head.Errors faults) (fun _ receipt => receipt)
+    validity snapshots extend budget assignments assignmentFaults boundedMeaning
+    (GenericForHeader.Structural.of_reachable_errors errors)
+    valid itemsFacts environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
 
 end WithReady
 

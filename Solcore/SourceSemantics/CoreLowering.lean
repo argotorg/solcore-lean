@@ -915,6 +915,9 @@ import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupling
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupledExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectNativePrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPointwiseBareAssignmentHeads
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderStructuralElimination
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderAssignmentPayloadContracts
+import Solcore.SourceSemantics.CoreLowering.ProtectedForHeaderCoupledReadyBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
