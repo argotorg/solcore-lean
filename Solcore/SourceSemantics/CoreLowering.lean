@@ -866,6 +866,8 @@ import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingDiagnosticRows
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathMissingTerminal
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredCallSourcePrefix
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedCallCodebookReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedCallStageAcceptance
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
