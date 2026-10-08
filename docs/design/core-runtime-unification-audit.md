@@ -549,6 +549,14 @@ At `5faa387e`, the proof umbrella and `Tests.Main` build passed **5338 jobs**. S
 
 The Catalog common cores preserve actual initializer code and continuation and exact loop post-header receipts. The compiler extraction carries genuine Source signatures and full solved-row ledger identity through binder and selected-child contexts. Prepared endpoints consume that same static receipt internally; a bare coupled receipt still needs an explicit match-field supplier. Prepared Head/loop providers, precise diagnostics, strict general body closure and all-pass/public-entry composition remain separate obligations. No runtime code or tests changed; actual executions remain those at `3ff3daf4`.
 
+At `4e9cd0ae`, the proof umbrella and `Tests.Main` build passed **5344 jobs**. Strict verification checked **7767 declarations**, with **89 fresh module-attributed declarations** across eight new or modified modules and **16 signatures**. All 24 original declarations have exact same-name raw types and axiom arrays against independently saved normal objects. Every final source and both modified original-module diffs passed parent and two independent reviews. Policy, whitespace, final source hashes and **5009 protected original-file checks** pass.
+
+Public Catalog extraction now retains the exact generated flow, finish equation and chosen compiler receipt at the actual ordinary BodyState. Prepared for-header adapters keep genuine Source typing, reached readiness and the original static payloads. The same measured closer is publicly reusable without a new induction.
+
+Accepted stored-call adapters retain the real callee-to-argument effects from one ordered argument proof and use only strict body induction. They derive genuine Source and staged outcomes and preserve the complete body pool through caller restoration. The original 15 argument declarations and nine measured-family declarations retain exact raw types and axiom arrays. The whole parent must still pass the stronger receipt to these adapters; accepted intermediates do not establish complete callee classification.
+
+Prepared Head/loop production, public flow/finish family closure, precise diagnostics, nonempty coercion and stage routes, Source admission and all-pass compiler closure remain incomplete. Runtime code and tests are unchanged; actual native and interpreted executions remain those at `3ff3daf4`.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
