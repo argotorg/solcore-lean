@@ -962,6 +962,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedL
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFailedSessionFaultObservation
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionPrimitiveOutcomeProviders
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicDiagnosticPriority
+import Solcore.SourceSemantics.CoreLowering.ReachedLoweredReadOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.ReachedIndexSuccessOutcomePorts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
