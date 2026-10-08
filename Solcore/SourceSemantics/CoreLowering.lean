@@ -945,6 +945,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedCa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedBodyBounds
 import Solcore.SourceSemantics.Dynamic.ControlTransferFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedTypedFunctionFinishBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedNamedFamilyClosure
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
