@@ -1029,6 +1029,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBod
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedPrimitiveBodyFaultPaths
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrimitiveNamedBodyFaultBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedRuntimeHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryFormedMembers
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBodyRuntimeBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
