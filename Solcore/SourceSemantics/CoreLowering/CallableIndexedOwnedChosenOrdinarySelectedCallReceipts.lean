@@ -207,6 +207,73 @@ theorem ArgumentAt.factory {i : OrdinaryIndex compiled} {history : History i.cod
   ChosenAt.factory root expressionSyntax (ArgumentAt.chosen root expressionSyntax profile receipt)
 end Arguments
 
+namespace ForModel
+section ArgumentPacket
+variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+
+/-- The owner is the one retained by the actual positive constructor.
+Every dynamic input is at this same argument heap, store and current row. -/
+inductive ArgumentReceipt (i : OrdinaryIndex compiled) (history : History i.code)
+    {callerScope : SourceCoreLocalCell.Scope} {canonical : Environment}
+    {heap : Dynamic.Heap} {store : Store}
+    (state : State headers keys ⟨callerScope, i.mapping, i.world, heap, store, canonical⟩)
+    (sources : List Dynamic.Value) (payloads : List Value) : Prop where
+  | ordinary
+      (owner : OwnedKey keys) (factory : FactoryMember root expressionSyntax i)
+      (origin : SourceOrigin i.support history)
+      (prefixContext : i.captured.administrative = RecursiveNamedLambdaFormationHeads.nativePrefix
+        (values := .initial compiled.compatible.checked) i.support.caller)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 i.scope i.captured.canonical owner.key.frameLocation)
+      (referenceIndex : i.code.referenceIndex = i.scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType i.world (CallableIndexedLambdaValues.value i.code i.captured.embedding history.native i.capturedActual)
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) compiled.indexed.layouts.definitions)
+      (represented : CallableIndexedParameterMeaning.Arguments
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+          functions)
+        i.mapping i.world i.code.receipt.loweredParameters sources payloads)
+      (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+        functions i.mapping i.world heap store)
+      (raw : CallableIndexedOwnedStoredClosureSourceArguments.SourceArguments i.function heap sources)
+      (argumentsTyped : Dynamic.ValuesHaveTypes i.function.context heap sources i.support.body.types)
+      (stable : CallableIndexedOwnedIndirectExpressionHeads.StableRows state)
+      (reference : i.captured.canonical[i.code.referenceIndex]? =
+        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation))
+      (currentMetadata : Option MetadataState)
+      (currentCarried : Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table
+        (state.rows owner.position).authority.current (state.rows owner.position).authority.ghost currentMetadata)
+      (allowed : SourceCoreCallableAncestryPairedPreparation.lambdaAllowed compiled.indexed.ancestry.graph.inputs
+        history.metadata i.code.descriptor.id = true) : ArgumentReceipt i history state sources payloads
+
+/-- This projection reconstructs the same positive constructor, without extracting data from Prop. -/
+theorem ArgumentReceipt.chosen_member {i : OrdinaryIndex compiled} {history : History i.code}
+    {callerScope : SourceCoreLocalCell.Scope} {canonical : Environment} {heap : Dynamic.Heap} {store : Store}
+    {state : State headers keys ⟨callerScope, i.mapping, i.world, heap, store, canonical⟩}
+    {sources : List Dynamic.Value} {payloads : List Value}
+    (receipt : ArgumentReceipt (registry := registry) root expressionSyntax functions i history state sources payloads) :
+    ChosenAt root expressionSyntax headers keys registry faults i history := by
+  cases receipt with
+  | ordinary owner factory origin prefixContext globals referenceIndex typed represented heaps raw argumentsTyped stable reference currentMetadata currentCarried allowed =>
+    exact .ordinary owner factory origin prefixContext globals referenceIndex typed
+
+/-- The chosen compiler factory remains attached to the literal future index. -/
+theorem ArgumentReceipt.factory_member {i : OrdinaryIndex compiled} {history : History i.code}
+    {callerScope : SourceCoreLocalCell.Scope} {canonical : Environment} {heap : Dynamic.Heap} {store : Store}
+    {state : State headers keys ⟨callerScope, i.mapping, i.world, heap, store, canonical⟩}
+    {sources : List Dynamic.Value} {payloads : List Value}
+    (receipt : ArgumentReceipt (registry := registry) root expressionSyntax functions i history state sources payloads) :
+    FactoryMember root expressionSyntax i :=
+by
+  cases receipt with
+  | ordinary owner factory origin prefixContext globals referenceIndex typed represented heaps raw argumentsTyped stable reference currentMetadata currentCarried allowed =>
+    exact factory
+end ArgumentPacket
+end ForModel
+
 section ParentArguments
 variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -277,6 +344,132 @@ variable {sidecar : SourceCoreStageContracts.Sidecar}
   (admitted : Admission bridge context first)
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
 
+namespace ForModel
+variable
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  (genericPost : CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+    (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context) bridge
+    functions compiler first (.closure i.function) calleeHeap calleeNative calleeStore i.mapping i.world)
+
+/-- This is the original complete argument tuple with one additional positive receipt. -/
+def SuccessfulArgumentPost (budget : Nat) (value : Value) (finalStore : Store) : Prop :=
+  ∃ nativeSize sourceSize sources payloads middle argumentStore finalMap finalWorld,
+    EvaluationSize nativeSize (.unit :: calleeNative :: actual) calleeStore
+      ((((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ).weakenAt 0).weakenAt 0)
+      (.inRight .word (DataPatternValues.packValues payloads)) argumentStore ∧ nativeSize < budget ∧
+    SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) sourceSize
+      context evidence source environment calleeHeap ids sources middle ∧
+    DataExpressionSequence.Values
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
+        functions)
+      finalMap finalWorld sourceTypes (compiler.codes.map (·.type)) sources payloads ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functions finalMap finalWorld middle argumentStore ∧
+    ∃ stepMaps : LocationMap.Extends i.mapping finalMap, ∃ stepWorlds : WorldExtends i.world finalWorld,
+    AdministrativePreserved i.mapping calleeStore finalMap argumentStore ∧ Dynamic.HeapMetadataExtend calleeHeap middle ∧
+    LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+    AdministrativePreserved firstMap firstStore finalMap argumentStore ∧ Dynamic.HeapMetadataExtend before middle ∧
+    ∃ argumentState : callerProtocol.State ⟨scope, finalMap, finalWorld, middle, argumentStore, canonical⟩,
+    callerProtocol.Relates first argumentState ∧ Admission bridge context argumentState ∧
+    ∃ remainingSize,
+    EvaluationSize remainingSize (DataPatternValues.packValues payloads :: .unit :: calleeNative :: actual) argumentStore
+      (LanguageResult.bind compiler.resultType
+        (CallableContract.dispatch prepared.site.gates .beforeApplication native.diagnostics.unknown (.second (.var 2)))
+        (.apply (.second (.first (.var 3))) (.var 1))) value finalStore ∧ remainingSize < budget ∧
+    ArgumentReceipt (registry := registry) root expressionSyntax functions (extendIndex i stepMaps stepWorlds) history (bridge.pool argumentState) sources payloads
+
+
+include functions profile member calleeTrace genericPost sameNative parentTyped tree unique wellFormed runtime covers locals admitted actualFunctionType in
+/-- The same successful argument witness supplies all invocation inputs.
+This endpoint invokes neither a callee/argument semantic producer nor a body. -/
+theorem at_argument_post (budget : Nat) {value : Value} {finalStore : Store}
+    (original : CallableIndexedOwnedStoredIndirectArgumentPrefix.ForModel.SuccessPrefix
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge functions compiler prepared first budget value finalStore)
+    (step : CallableIndexedOwnedStoredFunctionModelReceipts.SuccessStep
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      (calleeMap := i.mapping) (calleeWorld := i.world)
+      bridge functions compiler prepared first budget value finalStore)
+    (passed : CallableIndexedOwnedStoredIndirectApplicationPrefix.PassedAt (actual := actual)
+      compiler prepared dispatch budget value finalStore) :
+    CallableIndexedOwnedStoredIndirectArgumentPrefix.ForModel.SuccessPrefix
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge functions compiler prepared first budget value finalStore ∧
+    CallableIndexedOwnedStoredFunctionModelReceipts.SuccessStep
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      (calleeMap := i.mapping) (calleeWorld := i.world)
+      bridge functions compiler prepared first budget value finalStore ∧
+    CallableIndexedOwnedStoredIndirectApplicationPrefix.PassedAt (actual := actual)
+      compiler prepared dispatch budget value finalStore ∧
+    SuccessfulArgumentPost (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      (functions := functions) root expressionSyntax bridge compiler prepared first i history budget value finalStore := by
+  refine ⟨original, step, passed, ?_⟩
+  obtain ⟨nativeSize, sourceSize, sources, payloads, middle, argumentStore, finalMap, finalWorld,
+    nativeTrace, strict, argumentsTrace, represented, argumentHeaps, stepMaps, stepWorlds, stepFrame, stepMetadata,
+    maps, worlds, frame, metadataExtended, ⟨argumentState, related, argumentAdmission⟩,
+    ⟨remainingSize, remaining, remainingStrict⟩⟩ := step
+  have future := ChosenAt.extend root expressionSyntax member stepMaps stepWorlds
+  cases future with
+  | ordinary owner factory origin prefixContext globals referenceIndex typed =>
+    have parameters := CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) i.code
+    have sourceBinders : i.code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body) =
+        i.function.parameters.map (fun binding => binding.scheme.body) := by
+      simpa only [List.map_map, Function.comp_def] using
+        (congrArg (List.map (fun binding : TypedBinder => binding.scheme.body)) parameters).symm
+    have sourceBundle := CallableIndexedOwnedStoredSourceBundleReceipts.source_bundle_of_trace
+      unique compiler.found compiler.originalForm parentTyped tree compiler.argumentCoercions
+      wellFormed runtime covers locals admitted.heap calleeTrace sourceBinders
+    have selectedType : RuntimeValueHasType finalWorld calleeNative
+        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) compiled.indexed.layouts.definitions := by
+      rw [sameNative]
+      exact typed
+    have actualType := genericPost.2.1.runtime_hasType.type_eq
+    have callableType := compiler.callableType
+    rw [actualFunctionType] at callableType
+    have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters
+      (callableType.trans (actualType.symm.trans selectedType.type_eq))
+    have nativeBundle := (CompatibleExpressionConstructorNativeTyping.packed_type compiler.codes).symm.trans
+      (compiler.packedType.symm.trans nativeTypes.1)
+    have nativeCount : (compiler.codes.map (·.type)).length = i.function.parameters.length := by
+      simpa only [List.length_map] using compiler.ordered_children.1.symm.trans passed.1.symm
+    have arity : sources.length = i.function.parameters.length := represented.length.1.symm.trans nativeCount
+    have representedArguments := CallableIndexedOwnedPreparedOrdinaryLambdaInvocation.arguments_of_bundles
+      (i.captured.extend stepMaps stepWorlds) i.code i.support i.prepared
+      functions profile represented arity.symm
+      (by simpa only [sourceBinders] using sourceBundle) nativeBundle
+    obtain ⟨parameter, sourceResult, rawTypes, _calleeTyping, _argumentsTyping, _application,
+      _calleeTyped, _calleeHeapTyped, _calleeExtension, _calleeLocals, _rawTyped, _argumentHeapTyped,
+      _heapExtension, _argumentLocals, _fullExtension, _rawArity, _packed, _packing, _packedTyped, raw⟩ :=
+      CallableIndexedOwnedStoredCallSourcePrefix.from_admission_with_arity bridge first wellFormed runtime covers locals admitted
+        unique compiler.found compiler.originalForm parentTyped compiler.argumentCoercions arity calleeTrace argumentsTrace
+    have rawArguments : Dynamic.ValuesHaveTypes i.function.context middle sources i.support.body.types := by
+      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq i.support.body.extended] using raw.arguments
+    have reference : i.captured.canonical[i.code.referenceIndex]? =
+        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
+      have actualReferenceIndex : i.code.referenceIndex =
+          i.scope.length + 1 + compiled.indexed.base.globals.length := referenceIndex
+      rw [actualReferenceIndex]
+      exact globals.reference
+    obtain ⟨currentMetadata, currentCarried⟩ := argumentAdmission.rows owner.position
+    exact ⟨nativeSize, sourceSize, sources, payloads, middle, argumentStore, finalMap, finalWorld,
+      nativeTrace, strict, argumentsTrace, represented, argumentHeaps, stepMaps, stepWorlds, stepFrame, stepMetadata,
+      maps, worlds, frame, metadataExtended, argumentState, related, argumentAdmission,
+      remainingSize, remaining, remainingStrict,
+      .ordinary owner factory origin prefixContext globals referenceIndex typed representedArguments argumentHeaps
+        raw rawArguments argumentAdmission.rows reference currentMetadata currentCarried
+        (CallableIndexedLambdaTemplatePermission.lambda_allowed i.code history)⟩
+end ForModel
+
 include member calleeTrace post sameNative parentTyped tree unique wellFormed runtime covers locals admitted actualFunctionType in
 /-- The same successful argument witness supplies all invocation inputs.
 This endpoint invokes neither a callee/argument semantic producer nor a body. -/
@@ -311,61 +504,27 @@ theorem at_successful_arguments (budget : Nat) {value : Value} {finalStore : Sto
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
       root expressionSyntax bridge profile compiler prepared first i history budget value finalStore := by
-  refine ⟨original, step, passed, ?_⟩
+  obtain ⟨sameOriginal, sameStep, samePassed, qualified⟩ :=
+    ForModel.at_argument_post (functions := (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile))
+      (genericPost := post) (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
+      (compiler := compiler) (prepared := prepared) (first := first) (i := i) (history := history) (dispatch := dispatch)
+      (member := member) (calleeTrace := calleeTrace) (sameNative := sameNative) (parentTyped := parentTyped)
+      (tree := tree) (unique := unique) (wellFormed := wellFormed) (runtime := runtime) (covers := covers)
+      (locals := locals) (admitted := admitted) (actualFunctionType := actualFunctionType) budget original step passed
+  refine ⟨sameOriginal, sameStep, samePassed, ?_⟩
   obtain ⟨nativeSize, sourceSize, sources, payloads, middle, argumentStore, finalMap, finalWorld,
     nativeTrace, strict, argumentsTrace, represented, argumentHeaps, stepMaps, stepWorlds, stepFrame, stepMetadata,
-    maps, worlds, frame, metadataExtended, ⟨argumentState, related, argumentAdmission⟩,
-    ⟨remainingSize, remaining, remainingStrict⟩⟩ := step
-  have future := ChosenAt.extend root expressionSyntax member stepMaps stepWorlds
-  cases future with
-  | ordinary owner factory origin prefixContext globals referenceIndex typed =>
-    have parameters := CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) i.code
-    have sourceBinders : i.code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body) =
-        i.function.parameters.map (fun binding => binding.scheme.body) := by
-      simpa only [List.map_map, Function.comp_def] using
-        (congrArg (List.map (fun binding : TypedBinder => binding.scheme.body)) parameters).symm
-    have sourceBundle := CallableIndexedOwnedStoredSourceBundleReceipts.source_bundle_of_trace
-      unique compiler.found compiler.originalForm parentTyped tree compiler.argumentCoercions
-      wellFormed runtime covers locals admitted.heap calleeTrace sourceBinders
-    have selectedType : RuntimeValueHasType finalWorld calleeNative
-        (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) compiled.indexed.layouts.definitions := by
-      rw [sameNative]
-      exact typed
-    have actualType := post.2.1.runtime_hasType.type_eq
-    have callableType := compiler.callableType
-    rw [actualFunctionType] at callableType
-    have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters
-      (callableType.trans (actualType.symm.trans selectedType.type_eq))
-    have nativeBundle := (CompatibleExpressionConstructorNativeTyping.packed_type compiler.codes).symm.trans
-      (compiler.packedType.symm.trans nativeTypes.1)
-    have nativeCount : (compiler.codes.map (·.type)).length = i.function.parameters.length := by
-      simpa only [List.length_map] using compiler.ordered_children.1.symm.trans passed.1.symm
-    have arity : sources.length = i.function.parameters.length := represented.length.1.symm.trans nativeCount
-    have representedArguments := CallableIndexedOwnedPreparedOrdinaryLambdaInvocation.arguments_of_bundles
-      (i.captured.extend stepMaps stepWorlds) i.code i.support i.prepared
-      (CallableIndexedOwnedPreparedOrdinaryLambdaValues.model headers keys registry faults profile) profile represented arity.symm
-      (by simpa only [sourceBinders] using sourceBundle) nativeBundle
-    obtain ⟨parameter, sourceResult, rawTypes, _calleeTyping, _argumentsTyping, _application,
-      _calleeTyped, _calleeHeapTyped, _calleeExtension, _calleeLocals, _rawTyped, _argumentHeapTyped,
-      _heapExtension, _argumentLocals, _fullExtension, _rawArity, _packed, _packing, _packedTyped, raw⟩ :=
-      CallableIndexedOwnedStoredCallSourcePrefix.from_admission_with_arity bridge first wellFormed runtime covers locals admitted
-        unique compiler.found compiler.originalForm parentTyped compiler.argumentCoercions arity calleeTrace argumentsTrace
-    have rawArguments : Dynamic.ValuesHaveTypes i.function.context middle sources i.support.body.types := by
-      simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq i.support.body.extended] using raw.arguments
-    have reference : i.captured.canonical[i.code.referenceIndex]? =
-        some (.cellRef compiled.indexed.ancestry.layout.frame.type owner.key.frameLocation) := by
-      have actualReferenceIndex : i.code.referenceIndex =
-          i.scope.length + 1 + compiled.indexed.base.globals.length := referenceIndex
-      rw [actualReferenceIndex]
-      exact globals.reference
-    obtain ⟨currentMetadata, currentCarried⟩ := argumentAdmission.rows owner.position
+    maps, worlds, frame, metadataExtended, argumentState, related, argumentAdmission,
+    remainingSize, remaining, remainingStrict, receipt⟩ := qualified
+  cases receipt with
+  | ordinary owner factory origin prefixContext globals referenceIndex typed representedArguments heaps raw argumentsTyped stable reference currentMetadata currentCarried allowed =>
     exact ⟨nativeSize, sourceSize, sources, payloads, middle, argumentStore, finalMap, finalWorld,
       nativeTrace, strict, argumentsTrace, represented, argumentHeaps, stepMaps, stepWorlds, stepFrame, stepMetadata,
       maps, worlds, frame, metadataExtended, argumentState, related, argumentAdmission,
       remainingSize, remaining, remainingStrict,
-      .ordinary owner factory origin prefixContext globals referenceIndex typed representedArguments argumentHeaps
-        raw rawArguments argumentAdmission.rows reference currentMetadata currentCarried
-        (CallableIndexedLambdaTemplatePermission.lambda_allowed i.code history)⟩
+      .ordinary owner factory origin prefixContext globals referenceIndex typed representedArguments heaps
+        raw argumentsTyped stable reference currentMetadata currentCarried allowed⟩
+
 end ParentArguments
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinarySelectedCallReceipts

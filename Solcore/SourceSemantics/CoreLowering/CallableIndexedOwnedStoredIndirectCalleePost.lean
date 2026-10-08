@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCallBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredFunctionModelReceipts
 
 /-! Strict callee children produce their actual value post and complete
 shared-model representation. Strong ordinary/principal provenance is inspected
@@ -62,6 +63,32 @@ def ValuePost (sourceValue : Dynamic.Value) (after : Dynamic.Heap) (value : Valu
   ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
     callerProtocol.Relates initial reached ∧ PostAdmission bridge context calleeNode.type (.value sourceValue) reached
 
+include certified found sourceTyped environments locals agrees typed admitted in
+/-- The preservation IH constructs the native value and state internally.
+No native value, selected association or callee execution is supplied. -/
+theorem ForModel.preserves_callee_value
+    (functionModel : FunctionModel compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+    (modelHeaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functionModel mapping world before store)
+    (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
+      bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functionModel) context evidence source certificate faults size)
+    {size : Nat} {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) size
+      context evidence source environment before callee sourceValue after)
+    (smaller : size < budget) :
+    ∃ value finalStore finalMap finalWorld,
+      CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry) (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context) bridge functionModel compiler initial
+        sourceValue after value finalStore finalMap finalWorld := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata, reached, related, post⟩ :=
+    children size smaller certified found sourceTyped environments modelHeaps locals agrees typed initial admitted (.value trace)
+  cases represented with
+  | value represented =>
+    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata, reached, related, post⟩
+
 include certified found sourceTyped environments heaps locals agrees typed admitted in
 /-- The preservation IH constructs the native value and state internally.
 No native value, selected association or callee execution is supplied. -/
@@ -77,11 +104,14 @@ theorem preserves_value (budget : Nat)
         sourceValue after value finalStore finalMap finalWorld := by
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
       maps, worlds, frame, metadata, reached, related, post⟩ :=
-    children size smaller certified found sourceTyped environments heaps locals agrees typed initial admitted (.value trace)
-  cases represented with
-  | value represented =>
-    exact ⟨_, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata, reached, related, post⟩
+    ForModel.preserves_callee_value
+    (bridge := bridge) (functionModel := functions) (compiler := compiler)
+    (certified := certified) (found := found) (sourceTyped := sourceTyped)
+    (environments := environments) (modelHeaps := heaps) (locals := locals)
+    (agrees := agrees) (typed := typed) (initial := initial) (admitted := admitted)
+    budget children trace smaller
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, reached, related, post⟩
 
 include certified found sourceTyped environments heaps locals agrees typed admitted in
 /-- Native reflection recovers the independently sized original callee
@@ -130,6 +160,45 @@ private theorem source_callee_fault {size : Nat} {reason : Dynamic.SemanticFault
   exact .indirectCallee fault
 
 include prepared certified found sourceTyped parentTyped wellFormed runtime covers
+  environments locals agrees typed admitted in
+/-- A Source callee fault invokes only its strict child and stops at the
+child's actual reached state, before either guard or the arguments. -/
+theorem ForModel.preserves_callee_fault
+    (functionModel : FunctionModel compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+    (modelHeaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+      functionModel mapping world before store)
+    (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
+      bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functionModel) context evidence source certificate faults size)
+    {size : Nat} {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
+    (fault : SourceExecutionSize.ExpressionFaults (Program.ofChecked compiled.sourceProgram) size
+      context evidence source environment before callee reason after)
+    (smaller : size < budget) :
+    ∃ sourceSize token finalStore finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+        context evidence source environment before id (.fault reason) after ∧
+      Evaluates actual store (lowered.expression.rename ξ) (.inLeft lowered.type (.word token)) finalStore ∧
+      CallableIndexedOwnedStoredIndirectCallBounds.ForModel.ResultAt (registry := registry) (faults := faults) (context := context)
+        bridge functionModel compiler initial (.fault reason) after (.inLeft lowered.type (.word token)) finalStore finalMap finalWorld := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+      maps, worlds, frame, metadata, reached, related, _post⟩ :=
+    children size smaller certified found sourceTyped environments modelHeaps locals agrees typed initial admitted (.fault fault)
+  cases represented with
+  | fault matched =>
+    obtain ⟨sourceSize, original⟩ := source_callee_fault compiler fault
+    have whole := CallableContract.call_callee_failure (result := compiler.resultType)
+      (arguments := (SourceCoreCalls.packArguments compiler.codes).expression.rename ξ)
+      prepared.site.gates native.diagnostics.unknown evaluated
+    rw [← prepared.lowered_rename compiler ξ] at whole
+    have loweredType : lowered.type = compiler.resultType :=
+      (congrArg (fun output => output.type) compiler.output).trans compiler.resultTypeEq.symm
+    rw [← loweredType] at whole
+    exact ⟨sourceSize, _, finalStore, finalMap, finalWorld, original, whole, .fault matched,
+      finalHeaps, maps, worlds, frame, metadata, reached, related,
+      after_expression_sized initial reached admitted wellFormed runtime covers locals parentTyped original frame⟩
+
+include prepared certified found sourceTyped parentTyped wellFormed runtime covers
   environments heaps locals agrees typed admitted in
 /-- A Source callee fault invokes only its strict child and stops at the
 child's actual reached state, before either guard or the arguments. -/
@@ -146,22 +215,17 @@ theorem preserves_fault (budget : Nat)
       Evaluates actual store (lowered.expression.rename ξ) (.inLeft lowered.type (.word token)) finalStore ∧
       CallableIndexedOwnedStoredIndirectCallBounds.ResultAt (registry := registry) (faults := faults) (context := context)
         bridge profile compiler initial (.fault reason) after (.inLeft lowered.type (.word token)) finalStore finalMap finalWorld := by
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-      maps, worlds, frame, metadata, reached, related, _post⟩ :=
-    children size smaller certified found sourceTyped environments heaps locals agrees typed initial admitted (.fault fault)
-  cases represented with
-  | fault matched =>
-    obtain ⟨sourceSize, original⟩ := source_callee_fault compiler fault
-    have whole := CallableContract.call_callee_failure (result := compiler.resultType)
-      (arguments := (SourceCoreCalls.packArguments compiler.codes).expression.rename ξ)
-      prepared.site.gates native.diagnostics.unknown evaluated
-    rw [← prepared.lowered_rename compiler ξ] at whole
-    have loweredType : lowered.type = compiler.resultType :=
-      (congrArg (fun output => output.type) compiler.output).trans compiler.resultTypeEq.symm
-    rw [← loweredType] at whole
-    exact ⟨sourceSize, _, finalStore, finalMap, finalWorld, original, whole, .fault matched,
-      finalHeaps, maps, worlds, frame, metadata, reached, related,
-      after_expression_sized initial reached admitted wellFormed runtime covers locals parentTyped original frame⟩
+  obtain ⟨sourceSize, token, finalStore, finalMap, finalWorld, original, evaluated,
+      represented, finalHeaps, maps, worlds, frame, metadata, reached, related, post⟩ :=
+    ForModel.preserves_callee_fault
+    (bridge := bridge) (functionModel := functions) (compiler := compiler) (prepared := prepared)
+    (certified := certified) (found := found) (sourceTyped := sourceTyped)
+    (parentTyped := parentTyped) (wellFormed := wellFormed) (runtime := runtime) (covers := covers)
+    (environments := environments) (modelHeaps := heaps) (locals := locals)
+    (agrees := agrees) (typed := typed) (initial := initial) (admitted := admitted)
+    budget children fault smaller
+  exact ⟨sourceSize, token, finalStore, finalMap, finalWorld, original, evaluated,
+    represented, finalHeaps, maps, worlds, frame, metadata, reached, related, post⟩
 
 include prepared certified found sourceTyped parentTyped wellFormed runtime covers
   environments heaps locals agrees typed admitted in
