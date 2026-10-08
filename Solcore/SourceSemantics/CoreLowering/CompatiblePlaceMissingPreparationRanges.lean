@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingDiagnosticAssociation
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingReservedReceipts
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexSourceReceipts
 
 /-! Static range receipts follow actual allocation and reuse of diagnostic
 reasons. The original preparation performs each checked conversion. -/
@@ -359,12 +360,12 @@ private theorem route_ranges {capacity next : Nat} {owner : Key} {source : Typed
       apply place_resume issued _ ran
       exact issued.reused_place (List.mem_append_right _ (List.mem_singleton_self _)) rfl
 
-/-- The same preparation proof retains its actual base, final numeric bounds
-and separation of original reads from every fixed diagnostic. -/
-theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSites.Context} {plan : Plan} {root : Key}
+/-- The same preparation proof retains numeric bounds and the literal source
+issuer of every selected index, including actual ordered prefix coverage. -/
+theorem prepare_index_origins {context : SourceCoreCompatibleDataPlaceFaultSites.Context} {plan : Plan} {root : Key}
     {sources : List (Key × TypedSource)} {program : SourceCoreCompatibleDataPlaceFaultSites.Program context}
     (accepted : SourceCoreCompatibleDataPlaceFaultSites.prepare context plan root sources = .ok program) :
-    CompatiblePlaceMissingReservedReceipts.ReservedReceipt context plan root program := by
+    CompatibleExpressionIndexSourceReceipts.Receipt plan root sources program := by
   unfold SourceCoreCompatibleDataPlaceFaultSites.prepare at accepted
   obtain ⟨base, _baseAccepted, accepted⟩ := bind_ok accepted
   have baseAccepted : SourceCoreProgramFaultSites.prepare plan root = .ok base := by
@@ -382,15 +383,18 @@ theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSi
   obtain ⟨state, loop, accepted⟩ := bind_ok accepted
   let original := base.rootTable.reads.map (·.reason) ++ [base.rootTable.escapedReason]
   let capacity := context.registry.limits.maxEntries
-  let invariant := fun (_ : List (Key × TypedSource))
+  let actualSources := plan.specializations.map (fun specialized =>
+    (specialized.key, specialized.function.typedBody)) ++ sources
+  let invariant := fun (seen : List (Key × TypedSource))
     (state : Nat × List SourceCoreDataFaultSites.IndexSite × List SourceCoreDataPlaceFaultSites.Site ×
       List MissingSite × List (Word × Diagnostic)) =>
-    Inventory capacity state.1 state.2.1 state.2.2.1 state.2.2.2.1 (original ++ state.2.2.2.2.map Prod.fst) ∧
-      CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads state.2.2.2.2
+    (Inventory capacity state.1 state.2.1 state.2.2.1 state.2.2.2.1 (original ++ state.2.2.2.2.map Prod.fst) ∧
+      CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads state.2.2.2.2) ∧
+      CompatibleExpressionIndexSourceReceipts.Inventory actualSources seen state.2.1
   have generated : invariant (plan.specializations.map (fun specialized =>
       (specialized.key, specialized.function.typedBody)) ++ sources) state := by
     apply CompatibleMemberCertificates.forIn_preserves loop invariant
-    · refine ⟨?_, initialSafe⟩
+    · refine ⟨⟨?_, initialSafe⟩, CompatibleExpressionIndexSourceReceipts.Inventory.empty actualSources⟩
       change Inventory capacity _ [] [] [] (original ++ base.rootTable.additional.map Prod.fst)
       refine ⟨by omega, ?_, ?_⟩
       · refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
@@ -407,7 +411,8 @@ theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSi
         · intro left member; cases member
         · intro token member; cases member
       · intro site member; cases member
-    · intro seen item remaining current outcome _split previous ran
+    · intro seen item remaining current outcome sourceSplit previous ran
+      obtain ⟨previous, sourceOrigins⟩ := previous
       obtain ⟨next, indices, places, missing, fixed⟩ := current
       obtain ⟨owner, source⟩ := item
       dsimp only at ran
@@ -417,125 +422,154 @@ theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSi
           Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
         cases ran
       · rw [if_neg ownerMismatch] at ran
+        have issuer : (owner, source) ∈ actualSources := by
+          change (owner, source) ∈ plan.specializations.map (fun specialized =>
+            (specialized.key, specialized.function.typedBody)) ++ sources
+          rw [sourceSplit]
+          exact List.mem_append_right _ List.mem_cons_self
+        have owns : source.owner = owner.declaration := Classical.not_not.mp ownerMismatch
         obtain ⟨current, nodesLoop, finished⟩ := bind_ok ran
         refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
-        let nodeInvariant := fun (_ : List Node)
+        let nodeInvariant := fun (seenNodes : List Node)
           (state : Nat × List SourceCoreDataFaultSites.IndexSite × List SourceCoreDataPlaceFaultSites.Site ×
             List MissingSite × List (Word × Diagnostic) × List ExpressionId) =>
-          Inventory capacity state.1 state.2.1 state.2.2.1 state.2.2.2.1 (original ++ state.2.2.2.2.1.map Prod.fst) ∧
-            CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads state.2.2.2.2.1
-        change nodeInvariant source.nodes current
-        apply CompatibleMemberCertificates.forIn_preserves nodesLoop nodeInvariant previous
-        intro seen retained remaining current outcome _split previous ran
-        obtain ⟨next, indices, places, missing, fixed, seenIndices⟩ := current
-        dsimp only at ran
-        cases retained with
-        | expression node =>
-          cases form : node.form <;> simp only [form] at ran
-          all_goals first
-            | exact ⟨_, (Except.ok.inj ran).symm, previous⟩
-            | skip
-          case index mapping key =>
-            by_cases nodeOwner : node.id.occurrence.owner ≠ source.owner
-            · rw [if_pos nodeOwner] at ran
-              change (Except.error (.ownerMismatch node.id) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
-              cases ran
-            · rw [if_neg nodeOwner] at ran
-              by_cases mappingOwner : mapping.occurrence.owner ≠ source.owner
-              · rw [if_pos mappingOwner] at ran
-                change (Except.error (.ownerMismatch mapping) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
-                cases ran
-              · rw [if_neg mappingOwner] at ran
-                by_cases keyOwner : key.occurrence.owner ≠ source.owner
-                · rw [if_pos keyOwner] at ran
-                  change (Except.error (.ownerMismatch key) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
-                  cases ran
-                · rw [if_neg keyOwner] at ran
-                  by_cases duplicate : seenIndices.contains node.id = true
-                  · rw [if_pos duplicate] at ran
-                    change (Except.error (.duplicateOccurrence node.id) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
-                    cases ran
-                  · rw [if_neg duplicate] at ran
-                    split at ran
-                    · rename_i prior found
-                      have member := List.mem_of_find?_eq_some found
-                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                      obtain ⟨updated, same, numeric⟩ := expression_resume previous.1 (previous.1.reused_index member) ran
-                      refine ⟨updated, same, numeric, ?_⟩
-                      split at ran
-                      · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                        split at ran
-                        · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                          split at ran
-                          · cases (Except.ok.inj ran).trans same
-                            exact previous.2
-                          · cases ran
-                        · cases ran
-                      · cases ran
-                    · obtain ⟨reason, generated, ran⟩ := bind_ok ran
-                      have number : reason.val = next := by
-                        apply word_number
-                        exact generated
-                      obtain ⟨endpoint, checked, ran⟩ := bind_ok ran
-                      have within : next + capacity < wordModulus := by
-                        have bounded := checked_word checked
-                        omega
-                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                      have issued := previous.1.index_range (index := ⟨owner, node.id, reason,
-                        ⟨.typeMismatch node.type none, .occurrence node.id.occurrence, some node.span⟩⟩) number within
-                      simp only [Nat.add_assoc] at issued
-                      obtain ⟨updated, same, numeric⟩ := expression_resume issued
-                        (issued.reused_index (List.mem_append_right _ (List.mem_singleton_self _))) ran
-                      refine ⟨updated, same, numeric, ?_⟩
-                      split at ran
-                      · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                        split at ran
-                        · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                          split at ran
-                          · cases (Except.ok.inj ran).trans same
-                            exact previous.2
-                          · cases ran
-                        · cases ran
-                      · cases ran
-        | statement node =>
-          obtain ⟨current, targetsLoop, finished⟩ := bind_ok ran
-          refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
-          change Inventory capacity current.1 indices current.2.1 current.2.2.1
-            (original ++ current.2.2.2.map Prod.fst) ∧
-            CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads current.2.2.2
-          apply CompatibleMemberCertificates.forIn_preserves targetsLoop (fun _ current =>
-            Inventory capacity current.1 indices current.2.1 current.2.2.1
-              (original ++ current.2.2.2.map Prod.fst) ∧
-              CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads current.2.2.2) previous
-          intro seen assignment remaining current outcome _split previous ran
-          obtain ⟨next, places, missing, fixed⟩ := current
+          (Inventory capacity state.1 state.2.1 state.2.2.1 state.2.2.2.1 (original ++ state.2.2.2.2.1.map Prod.fst) ∧
+            CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads state.2.2.2.2.1) ∧
+            CompatibleExpressionIndexSourceReceipts.NodeInventory actualSources seen owner seenNodes state.2.1
+        have nodesGenerated : nodeInvariant source.nodes current := by
+          apply CompatibleMemberCertificates.forIn_preserves nodesLoop nodeInvariant
+            ⟨previous, CompatibleExpressionIndexSourceReceipts.NodeInventory.start sourceOrigins owner⟩
+          intro seenNodes retained remaining current outcome nodeSplit previous ran
+          obtain ⟨previous, nodeOrigins⟩ := previous
+          obtain ⟨next, indices, places, missing, fixed, seenIndices⟩ := current
           dsimp only at ran
-          split at ran
-          · obtain ⟨route, _described, ran⟩ := bind_ok ran
-            split at ran
-            · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous.1 stepsLoop, previous.2⟩
-            · obtain ⟨reason, generated, ran⟩ := bind_ok ran
-              have number := word_number generated
-              have issued := previous.1.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
-                assignment.target.root, none, reason,
-                ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) rfl number
-              try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-              obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              refine ⟨_, (Except.ok.inj finished).symm, ?_, ?_⟩
-              · apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
-                simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued
-              · apply CompatiblePlaceMissingReservedReceipts.ReadSafe.append previous.2 _ number
-                intro read member
-                exact previous.1.bounds.blockedBelow read.reason
-                  (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, member, rfl⟩)))
-          · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
+          cases retained with
+          | expression node =>
+            cases form : node.form <;> simp only [form] at ran
+            all_goals first
+              | refine ⟨_, (Except.ok.inj ran).symm, previous, nodeOrigins.step ?_⟩
+                intro actual same base key actualForm
+                cases same
+                rw [form] at actualForm
+                cases actualForm
+              | skip
+            case index mapping key =>
+              have contains : SourceSemantics.ContainsExpression source node.id node := by
+                refine ⟨?_, rfl⟩
+                rw [nodeSplit]
+                exact List.mem_append_right _ List.mem_cons_self
+              by_cases nodeOwner : node.id.occurrence.owner ≠ source.owner
+              · rw [if_pos nodeOwner] at ran
+                change (Except.error (.ownerMismatch node.id) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
+                cases ran
+              · rw [if_neg nodeOwner] at ran
+                by_cases mappingOwner : mapping.occurrence.owner ≠ source.owner
+                · rw [if_pos mappingOwner] at ran
+                  change (Except.error (.ownerMismatch mapping) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
+                  cases ran
+                · rw [if_neg mappingOwner] at ran
+                  by_cases keyOwner : key.occurrence.owner ≠ source.owner
+                  · rw [if_pos keyOwner] at ran
+                    change (Except.error (.ownerMismatch key) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
+                    cases ran
+                  · rw [if_neg keyOwner] at ran
+                    by_cases duplicate : seenIndices.contains node.id = true
+                    · rw [if_pos duplicate] at ran
+                      change (Except.error (.duplicateOccurrence node.id) : Except SourceCoreCompatibleDataPlaceFaultSites.Error _) = .ok outcome at ran
+                      cases ran
+                    · rw [if_neg duplicate] at ran
+                      split at ran
+                      · rename_i prior found
+                        have member := List.mem_of_find?_eq_some found
+                        try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                        obtain ⟨updated, same, numeric⟩ := expression_resume previous.1 (previous.1.reused_index member) ran
+                        refine ⟨updated, same, ?_⟩
+                        split at ran
+                        · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                          split at ran
+                          · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                            split at ran
+                            · cases (Except.ok.inj ran).trans same
+                              have selected : CompatibleExpressionIndexSourceReceipts.NodeSelected owner (.expression node) indices := by
+                                intro actual same base key actualForm
+                                cases same
+                                exact ⟨prior, found⟩
+                              exact ⟨⟨numeric, previous.2⟩, nodeOrigins.step selected⟩
+                            · cases ran
+                          · cases ran
+                        · cases ran
+                      · rename_i absent
+                        obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                        have number : reason.val = next := by
+                          apply word_number
+                          exact generated
+                        obtain ⟨endpoint, checked, ran⟩ := bind_ok ran
+                        have within : next + capacity < wordModulus := by
+                          have bounded := checked_word checked
+                          omega
+                        try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                        have issued := previous.1.index_range (index := ⟨owner, node.id, reason,
+                          ⟨.typeMismatch node.type none, .occurrence node.id.occurrence, some node.span⟩⟩) number within
+                        simp only [Nat.add_assoc] at issued
+                        obtain ⟨updated, same, numeric⟩ := expression_resume issued
+                          (issued.reused_index (List.mem_append_right _ (List.mem_singleton_self _))) ran
+                        refine ⟨updated, same, ?_⟩
+                        split at ran
+                        · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                          split at ran
+                          · try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                            split at ran
+                            · cases (Except.ok.inj ran).trans same
+                              exact ⟨⟨numeric, previous.2⟩,
+                                nodeOrigins.append_index issuer owns contains form absent reason⟩
+                            · cases ran
+                          · cases ran
+                        · cases ran
+          | statement node =>
+            obtain ⟨current, targetsLoop, finished⟩ := bind_ok ran
+            refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
+            have targetsGenerated : Inventory capacity current.1 indices current.2.1 current.2.2.1
+                (original ++ current.2.2.2.map Prod.fst) ∧
+                CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads current.2.2.2 := by
+              apply CompatibleMemberCertificates.forIn_preserves targetsLoop (fun _ current =>
+                Inventory capacity current.1 indices current.2.1 current.2.2.1
+                  (original ++ current.2.2.2.map Prod.fst) ∧
+                  CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads current.2.2.2) previous
+              intro seen assignment remaining current outcome _split previous ran
+              obtain ⟨next, places, missing, fixed⟩ := current
+              dsimp only at ran
+              split at ran
+              · obtain ⟨route, _described, ran⟩ := bind_ok ran
+                split at ran
+                · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                  exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous.1 stepsLoop, previous.2⟩
+                · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                  have number := word_number generated
+                  have issued := previous.1.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
+                    assignment.target.root, none, reason,
+                    ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) rfl number
+                  try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                  obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                  refine ⟨_, (Except.ok.inj finished).symm, ?_, ?_⟩
+                  · apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
+                    simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued
+                  · apply CompatiblePlaceMissingReservedReceipts.ReadSafe.append previous.2 _ number
+                    intro read member
+                    exact previous.1.bounds.blockedBelow read.reason
+                      (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, member, rfl⟩)))
+              · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
+            exact ⟨targetsGenerated, nodeOrigins.step
+              (CompatibleExpressionIndexSourceReceipts.NodeSelected.statement owner node indices)⟩
+        exact ⟨nodesGenerated.1, nodesGenerated.2.finish⟩
   obtain ⟨extra, _extraAccepted, finished⟩ := bind_ok accepted
   have same := Except.ok.inj finished
   subst program
   obtain ⟨next, indices, places, missing, fixed⟩ := state
-  change Inventory capacity next indices places missing (original ++ fixed.map Prod.fst) ∧
-    CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads fixed at generated
+  change (Inventory capacity next indices places missing (original ++ fixed.map Prod.fst) ∧
+    CompatiblePlaceMissingReservedReceipts.ReadSafe base.rootTable.reads fixed) ∧
+    CompatibleExpressionIndexSourceReceipts.Inventory actualSources actualSources indices at generated
+  refine ⟨?_, generated.2⟩
+  obtain ⟨generated, _⟩ := generated
   refine ⟨base, extra, baseAccepted, rfl, rfl, rfl, rfl, _extraAccepted, ?_,
     generated.1.positive, ?_, ?_, ?_, ?_, ?_, generated.2⟩
   ·
@@ -565,6 +599,13 @@ theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSi
   · intro site member read readMember
     exact generated.1.bounds.outside site.base (generated.1.missing site member) read.reason
       (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, readMember, rfl⟩)))
+
+/-- The original numeric receipt is the finite projection of the same producer. -/
+theorem prepare_reserved_receipt {context : SourceCoreCompatibleDataPlaceFaultSites.Context} {plan : Plan} {root : Key}
+    {sources : List (Key × TypedSource)} {program : SourceCoreCompatibleDataPlaceFaultSites.Program context}
+    (accepted : SourceCoreCompatibleDataPlaceFaultSites.prepare context plan root sources = .ok program) :
+    CompatiblePlaceMissingReservedReceipts.ReservedReceipt context plan root program := by
+  exact (prepare_index_origins accepted).1
 
 /-- The accepted producer checks all actual reserved ranges, including reused
 reasons, and separates them from its original and later fixed diagnostics. -/
