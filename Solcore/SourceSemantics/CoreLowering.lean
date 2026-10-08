@@ -408,6 +408,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchReflection
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchPreservation
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchControlShape
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchFallthrough
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchReadyFactory
@@ -910,6 +911,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectSt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectStageChildren
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupling
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderCoupledExtraction
+import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupling
+import Solcore.SourceSemantics.CoreLowering.EmittedMatchCoupledExtraction
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
