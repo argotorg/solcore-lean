@@ -39,9 +39,61 @@ private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α →
   | error error => cases accepted
   | ok value => exact ⟨value, rfl, accepted⟩
 
-theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
-    (∀ before original after type, registerType signatures fuel before original = .ok (after, type) → EntriesExtend before after) ∧
-    (∀ before originals after types, registerTypes signatures fuel before originals = .ok (after, types) → EntriesExtend before after) := by
+/-- Only registered Source types are used to justify concrete preparation. -/
+def ClosedSources (catalog : Catalog) : Prop :=
+  ∀ entry, entry ∈ catalog.entries → SourceCoreDataCatalog.closed entry.sourceType = true
+
+/-- The same registration fold retains its source closure invariant beside
+its original append-only entry prefix. -/
+structure Registered (before after : Catalog) : Prop where
+  entries : EntriesExtend before after
+  closed : ClosedSources before → ClosedSources after
+
+theorem Registered.refl (catalog : Catalog) : Registered catalog catalog :=
+  ⟨EntriesExtend.refl catalog, fun closed => closed⟩
+
+theorem Registered.trans {before middle after : Catalog}
+    (first : Registered before middle) (last : Registered middle after) : Registered before after :=
+  ⟨first.entries.trans last.entries, fun closed => last.closed (first.closed closed)⟩
+
+private theorem closed_modify (entries : List Entry) (index : Nat) (update : Entry → Entry)
+    (same : ∀ entry, (update entry).sourceType = entry.sourceType)
+    (closed : ∀ entry, entry ∈ entries → SourceCoreDataCatalog.closed entry.sourceType = true) :
+    ∀ entry, entry ∈ entries.modify index update → SourceCoreDataCatalog.closed entry.sourceType = true := by
+  induction entries generalizing index with
+  | nil => intro entry member; simp only [List.modify_nil, List.not_mem_nil] at member
+  | cons head tail ih =>
+    cases index with
+    | zero =>
+      intro entry member
+      simp only [List.modify_zero_cons, List.mem_cons] at member
+      rcases member with rfl | member
+      · rw [same]; exact closed head List.mem_cons_self
+      · exact closed entry (List.mem_cons_of_mem _ member)
+    | succ index =>
+      intro entry member
+      simp only [List.modify_succ_cons, List.mem_cons] at member
+      rcases member with rfl | member
+      · exact closed _ List.mem_cons_self
+      · exact ih index (fun entry member => closed entry (List.mem_cons_of_mem _ member)) entry member
+
+private theorem installed {before middle : Catalog} {entry : Entry} (update : Entry → Entry)
+    (same : ∀ item, (update item).sourceType = item.sourceType)
+    (entryClosed : SourceCoreDataCatalog.closed entry.sourceType = true)
+    (extension : Registered {before with entries := before.entries ++ [entry]} middle) :
+    Registered before {middle with entries := middle.entries.modify before.entries.length update} := by
+  refine ⟨install_suffix update extension.entries, ?_⟩
+  intro beforeClosed
+  apply closed_modify _ _ _ same
+  apply extension.closed
+  intro item member
+  rcases List.mem_append.mp member with old | fresh
+  · exact beforeClosed item old
+  · exact List.mem_singleton.mp fresh ▸ entryClosed
+
+theorem registered_prefix_with_closed (signatures : ProgramSignatures) (fuel : Nat) :
+    (∀ before original after type, registerType signatures fuel before original = .ok (after, type) → Registered before after) ∧
+    (∀ before originals after types, registerTypes signatures fuel before originals = .ok (after, types) → Registered before after) := by
   induction fuel with
   | zero =>
     constructor
@@ -49,7 +101,8 @@ theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
       unfold registerType at accepted
       simp only [bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted
       split at accepted
-      · split at accepted
+      · rename_i closed
+        split at accepted
         · obtain ⟨native, _, accepted⟩ := bind_ok accepted
           cases accepted
           exact .refl _
@@ -65,7 +118,8 @@ theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
       unfold registerType at accepted
       simp only [bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted
       split at accepted
-      · split at accepted
+      · rename_i closed
+        split at accepted
         · obtain ⟨native, _, accepted⟩ := bind_ok accepted
           cases accepted
           exact .refl _
@@ -84,12 +138,12 @@ theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
           · obtain ⟨registered, child, accepted⟩ := bind_ok accepted
             cases accepted
             have extension := ih.1 _ _ _ _ child
-            exact install_suffix _ extension
+            exact installed _ (fun _ => rfl) closed extension
           · obtain ⟨first, initial, remaining⟩ := bind_ok accepted
             obtain ⟨last, final, accepted⟩ := bind_ok remaining
             cases accepted
             have extension := (ih.1 _ _ _ _ initial).trans (ih.1 _ _ _ _ final)
-            exact install_suffix _ extension
+            exact installed _ (fun _ => rfl) closed extension
           · split at accepted
             · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
               split at accepted
@@ -97,7 +151,7 @@ theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
                 · obtain ⟨_, _, accepted⟩ := bind_ok accepted
                   obtain ⟨registered, child, accepted⟩ := bind_ok accepted
                   cases accepted
-                  exact install_suffix _ (ih.2 _ _ _ _ child)
+                  exact installed _ (fun _ => rfl) closed (ih.2 _ _ _ _ child)
                 · cases accepted
               · cases accepted
             · cases accepted
@@ -110,6 +164,13 @@ theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
         obtain ⟨tail, final, accepted⟩ := bind_ok remaining
         cases accepted
         exact (ih.1 _ _ _ _ initial).trans (ih.2 _ _ _ _ final)
+
+/-- The original registration interface forgets only the closed-source invariant. -/
+theorem registered_prefix (signatures : ProgramSignatures) (fuel : Nat) :
+    (∀ before original after type, registerType signatures fuel before original = .ok (after, type) → EntriesExtend before after) ∧
+    (∀ before originals after types, registerTypes signatures fuel before originals = .ok (after, types) → EntriesExtend before after) := by
+  exact ⟨fun _ _ _ _ accepted => ((registered_prefix_with_closed signatures fuel).1 _ _ _ _ accepted).entries,
+    fun _ _ _ _ accepted => ((registered_prefix_with_closed signatures fuel).2 _ _ _ _ accepted).entries⟩
 
 theorem EntriesExtend.definitions {before after : Catalog} (extension : EntriesExtend before after) :
     before.definitions.Extends after.definitions := by
