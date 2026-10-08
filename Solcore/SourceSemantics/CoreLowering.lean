@@ -978,6 +978,10 @@ import Solcore.SourceSemantics.CoreLowering.ScalarMemberFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.ReachedLiteralOutcomePorts
 import Solcore.SourceSemantics.CoreLowering.ReachedScalarExpressionFaultPaths
 import Solcore.SourceSemantics.CoreLowering.ReachedScalarFragmentOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaSourceDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaAssignmentReadiness
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedFlowBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedBodyBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
