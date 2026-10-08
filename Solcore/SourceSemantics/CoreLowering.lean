@@ -928,6 +928,8 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchStructuralEl
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeCatalogPayloadContracts
 import Solcore.SourceSemantics.CoreLowering.EmittedMatchCatalogCoupledExtraction
 import Solcore.SourceSemantics.CoreLowering.ProtectedImperativeMatchCoupledReadyBounds
+import Solcore.SourceSemantics.CoreLowering.GenericForHeaderStructuralTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedForHeaderBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
