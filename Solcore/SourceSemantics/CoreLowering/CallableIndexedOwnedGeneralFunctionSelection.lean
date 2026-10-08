@@ -104,6 +104,40 @@ inductive Selection (headers : List (Header compiled (Program.ofChecked compiled
       Selection headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
         (value code captured.embedding history.native actual)
         (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+  | contextual_principal_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+      {actual : Environment}
+      (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
+      (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+      (body : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults)
+      (origin : CallableIndexedOwnedMethodLambdaSupport.SourceOrigin body history)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (leading : captured.administrative[0]? = some body.principal.named.signature.parameterType)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions)
+      (provenance : CallableIndexedOwnedContextualLambdaProvenance.PrincipalAt code body) :
+      Selection headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+  | contextual_ordinary_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
+      (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
+      (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+      (body : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults)
+      (origin : CallableIndexedOwnedOrdinaryLambdaSupport.SourceOrigin body history)
+      (prefixContext : captured.administrative = RecursiveNamedLambdaFormationHeads.nativePrefix
+        (values := .initial compiled.compatible.checked) body.caller)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions)
+      (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code body) :
+      Selection headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
 
 variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -131,8 +165,13 @@ theorem of_represents
       exact .method_lambda owner captured code history body origin globals referenceIndex typed
   | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
     exact .principal_lambda owner captured code history body origin globals leading referenceIndex typed
+  | contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance =>
+    exact .contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
     exact .ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed
+
+  | contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
+    exact .contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance
 
 /-- The retained receipts reconstruct exactly the same rich relation. This
 uses the full witnesses in this selection, rather than a model inclusion. -/
@@ -148,8 +187,13 @@ theorem represents (selected : Selection headers keys registry faults mapping wo
     exact .prior (.method_lambda owner captured code history body origin globals referenceIndex typed)
   | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
     exact .principal_lambda owner captured code history body origin globals leading referenceIndex typed
+  | contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance =>
+    exact .contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
     exact .ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed
+
+  | contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
+    exact .contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance
 
 /-- The exact model's actual value relation supplies finite selected provenance.
 All heaps and maps remain those of the caller; no reverse inclusion is assumed. -/

@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaValues
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
 
 /-! One shared owned function relation includes the complete method model and
 ordinary closures with unrestricted genuine same-Code body support. New closures
@@ -54,6 +55,38 @@ inductive Represents (headers : List (Header compiled (Program.ofChecked compile
       Represents headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
         (value code captured.embedding history.native actual)
         (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+  | contextual_principal_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
+      (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
+      (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+      (body : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults)
+      (origin : CallableIndexedOwnedMethodLambdaSupport.SourceOrigin body history)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (leading : captured.administrative[0]? = some body.principal.named.signature.parameterType)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions)
+      (provenance : CallableIndexedOwnedContextualLambdaProvenance.PrincipalAt code body) :
+      Represents headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
+  | contextual_ordinary_lambda {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {actual : Environment}
+      (owner : OwnedKey keys) (captured : Captures compiled.indexed mapping world scope function.captured actual)
+      (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+      (body : Support code registry faults) (origin : SourceOrigin body history)
+      (prefixContext : captured.administrative = RecursiveNamedLambdaFormationHeads.nativePrefix
+        (values := .initial compiled.compatible.checked) body.caller)
+      (globals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers owner.key.locations 1 scope captured.canonical owner.key.frameLocation)
+      (referenceIndex : code.referenceIndex = scope.length + 1 + compiled.indexed.base.globals.length)
+      (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore) compiled.indexed.layouts.definitions)
+      (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code body) :
+      Represents headers keys registry faults mapping world (FunctionValues.sourceType function) (.closure function)
+        (value code captured.embedding history.native actual)
+        (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
 
 theorem Represents.forget {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {mapping : LocationMap} {world : StoreTyping}
@@ -64,7 +97,12 @@ theorem Represents.forget {keys : List (Key compiled (Program.ofChecked compiled
   | prior original => exact original.forget
   | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
     exact .lambda captured code history typed
+  | contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance =>
+    exact .lambda captured code history typed
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
+    exact .lambda captured code history typed
+
+  | contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
     exact .lambda captured code history typed
 
 def model (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
@@ -86,8 +124,13 @@ def model (headers : List (Header compiled (Program.ofChecked compiled.sourcePro
         original registries maps worlds)
     | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
       exact .principal_lambda owner (captured.extend maps worlds) code history body origin globals leading referenceIndex (typed.weaken worlds)
+    | contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance =>
+      exact .contextual_principal_lambda owner (captured.extend maps worlds) code history body origin globals leading referenceIndex (typed.weaken worlds) provenance
     | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
       exact .ordinary_lambda owner (captured.extend maps worlds) code history body origin prefixContext globals referenceIndex (typed.weaken worlds)
+
+    | contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
+      exact .contextual_ordinary_lambda owner (captured.extend maps worlds) code history body origin prefixContext globals referenceIndex (typed.weaken worlds) provenance
 
 theorem observations (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
     (bodyRegistry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
@@ -134,6 +177,13 @@ theorem Represents.map_keys {keys futureKeys : List (Key compiled (Program.ofChe
       rw [embedding.same owner]
       exact globals
     exact .principal_lambda (embedding.map owner) captured code history body origin actualGlobals leading referenceIndex typed
+  | @contextual_principal_lambda function scope actual owner captured code history body origin globals leading referenceIndex typed provenance =>
+    have actualGlobals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers (embedding.map owner).key.locations 1 scope captured.canonical (embedding.map owner).key.frameLocation := by
+      rw [embedding.same owner]
+      exact globals
+    exact .contextual_principal_lambda (embedding.map owner) captured code history body origin actualGlobals leading referenceIndex typed provenance
   | @ordinary_lambda function scope actual owner captured code history body origin prefixContext globals referenceIndex typed =>
     have actualGlobals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
         (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
@@ -141,6 +191,14 @@ theorem Represents.map_keys {keys futureKeys : List (Key compiled (Program.ofChe
       rw [embedding.same owner]
       exact globals
     exact .ordinary_lambda (embedding.map owner) captured code history body origin prefixContext actualGlobals referenceIndex typed
+
+  | @contextual_ordinary_lambda function scope actual owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
+    have actualGlobals : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+        (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+        headers (embedding.map owner).key.locations 1 scope captured.canonical (embedding.map owner).key.frameLocation := by
+      rw [embedding.same owner]
+      exact globals
+    exact .contextual_ordinary_lambda (embedding.map owner) captured code history body origin prefixContext actualGlobals referenceIndex typed provenance
 
 theorem includes {keys futureKeys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
     (embedding : CallableIndexedOwnedFunctionValues.KeyEmbedding keys futureKeys)
@@ -175,7 +233,12 @@ theorem Represents.closure_cases {keys : List (Key compiled (Program.ofChecked c
   | prior original => exact Or.inl original
   | principal_lambda owner captured code history body origin globals leading referenceIndex typed =>
     exact Or.inl (.method_lambda owner captured code history body origin globals referenceIndex typed)
+  | contextual_principal_lambda owner captured code history body origin globals leading referenceIndex typed provenance =>
+    exact Or.inl (.method_lambda owner captured code history body origin globals referenceIndex typed)
   | ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed =>
+    exact Or.inr ⟨owner, _, _, captured, code, history, body, origin, prefixContext, globals, referenceIndex, rfl, rfl, rfl, typed⟩
+
+  | contextual_ordinary_lambda owner captured code history body origin prefixContext globals referenceIndex typed provenance =>
     exact Or.inr ⟨owner, _, _, captured, code, history, body, origin, prefixContext, globals, referenceIndex, rfl, rfl, rfl, typed⟩
 
 /-- Actual ordinary formation reads its existing physical frame and retains
