@@ -968,6 +968,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualDiagno
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
 import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.ReachedIndexMeaningOutcomePorts
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPreparedStaticTransport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaJointStaticReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

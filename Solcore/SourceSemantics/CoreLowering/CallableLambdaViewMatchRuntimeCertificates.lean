@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionBuiltinRuntime
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewStaticTyping
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSourceTyping
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPreparedStaticTransport
 
 /-! Static runtime certificates cross local lambda views only at the reached
 body occurrences. Numeric selectors retain their complete node and solved row;
@@ -634,18 +635,46 @@ private theorem index_site {checked : SourceCoreCompatibleCatalog.Checked}
                    node := ⟨node, (expression_lookup edited avoids reached).symm.trans found, projected⟩}
 
 include avoids in
+private theorem prepared_path_with_routes {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
+    {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
+    {steps : List SourceCoreCompatibleDataPlaces.PreparedStep} {keys : List (ExpressionId × Ty)}
+    (path : CompatibleMixedRoute.PreparedPath checked source site root projections position steps keys leaf)
+    (reached : ∀ key ∈ DataPlaceKeyOrder.sourceKeys projections, Reaches source roots (.expression key)) :
+    CompatibleMixedRoute.PreparedPath checked view site root projections position steps keys leaf ∧
+      (∀ (signatures : ProgramSignatures) (binder : Resolved.LocalId) (initial : TypeSystem.Ty),
+        SourceCoreCompatibleDataPlaces.routeSteps checked signatures view site binder initial projections =
+          SourceCoreCompatibleDataPlaces.routeSteps checked signatures source site binder initial projections) ∧
+      CallableLambdaViewStaticTyping.Within source roots (projections.flatMap PlaceProjection.references) := by
+  induction path with
+  | nil =>
+    exact ⟨.nil, (fun _ _ _ => rfl), fun _ member => by cases member⟩
+  | member nominal selected certificate _ ih =>
+    refine ⟨.member nominal selected certificate (ih reached).1, ?_, ?_⟩
+    · intro signatures binder initial
+      simp only [SourceCoreCompatibleDataPlaces.routeSteps, (ih reached).2.1]
+    · simpa only [List.flatMap_cons, PlaceProjection.references, List.nil_append] using (ih reached).2.2
+  | @index root keySource valueSource leaf key layout projections steps position keys comparison missing certificate generated tail ih =>
+    have child := reached _ (by simp only [DataPlaceKeyOrder.sourceKeys, List.mem_cons]; exact Or.inl rfl)
+    have rest : ∀ key ∈ DataPlaceKeyOrder.sourceKeys projections, Reaches source roots (.expression key) :=
+      fun key member => reached key (by simp [DataPlaceKeyOrder.sourceKeys, member])
+    refine ⟨.index (index_site edited avoids certificate child) generated (ih rest).1, ?_, ?_⟩
+    · intro signatures binder initial
+      simp only [SourceCoreCompatibleDataPlaces.routeSteps, edited.metadata.owner,
+        expression_lookup edited avoids child, (ih rest).2.1]
+    · intro id member
+      simp only [List.flatMap_cons, PlaceProjection.references, List.singleton_append, List.mem_cons] at member
+      rcases member with rfl | member
+      · exact child
+      · exact (ih rest).2.2 id member
+
+include avoids in
 private theorem prepared_path {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
     {steps : List SourceCoreCompatibleDataPlaces.PreparedStep} {keys : List (ExpressionId × Ty)}
     (path : CompatibleMixedRoute.PreparedPath checked source site root projections position steps keys leaf)
     (reached : ∀ key ∈ DataPlaceKeyOrder.sourceKeys projections, Reaches source roots (.expression key)) :
     CompatibleMixedRoute.PreparedPath checked view site root projections position steps keys leaf := by
-  induction path with
-  | nil => exact .nil
-  | member nominal selected certificate _ ih => exact .member nominal selected certificate (ih reached)
-  | index certificate generated _ ih =>
-    exact .index (index_site edited avoids certificate (reached _ (by simp [DataPlaceKeyOrder.sourceKeys]))) generated
-      (ih (fun key member => reached key (by simp [DataPlaceKeyOrder.sourceKeys, member])))
+  exact (prepared_path_with_routes edited avoids path reached).1
 
 include avoids in
 private theorem key_views {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
@@ -711,6 +740,108 @@ private def assignment_head {values : SourceCoreCompatibleValues.Context} {conte
   {head with shape := assignment_shape edited avoids expressions head.shape (fun id member => reached id (List.mem_cons_of_mem _ member))
              found := (expression_lookup edited avoids (reached rhs (by simp))).symm.trans head.found
              right := expressions _ _ _ (reached rhs (by simp)) head.right}
+
+
+include avoids in
+private theorem assignment_prepared_at {values : SourceCoreCompatibleValues.Context} {context : SourceSemantics.Context}
+    {before after : GenericExpressionMeaning.Certificate}
+    (expressions : ∀ scope id lowered, Reaches source roots (.expression id) → before scope id lowered → after scope id lowered)
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {head : GenericAssignmentStatements.Head values source context before scope administrative definitions assignment operator rhs}
+    {site : SourceCoreElaboration.ErrorSite} {fuel : Nat} {invalid : Word} {missing : TypeSystem.Ty → Word}
+    (receipt : head.PreparedAt site fuel invalid missing)
+    (reached : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, Reaches source roots (.expression id)) :
+    (assignment_head edited avoids expressions head reached).PreparedAt site fuel invalid missing := by
+  cases receipt with
+  | bare empty => exact .bare empty
+  | @projected sourceTypes route layout ordinary shape described preparedBy =>
+    have keys := fun id member => reached id (List.mem_cons_of_mem _ member)
+    let mapped : CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) values view after
+        scope site assignment.target head.prepared head.codes sourceTypes head.leaf administrative :=
+      {layout with path := prepared_path edited avoids layout.path keys,
+                   views := key_views edited avoids layout.views keys,
+                   children := sequence_tree edited avoids expressions layout.children keys}
+    refine .projected route mapped ordinary ?_ ?_ preparedBy
+    · dsimp only [assignment_head]
+    · have routes := (prepared_path_with_routes edited avoids layout.path keys).2.1
+      have rootEq : SourceCoreCompatibleDataPlaces.rootBinder view assignment.target.root =
+          SourceCoreCompatibleDataPlaces.rootBinder source assignment.target.root :=
+        (CallableLambdaBodyReachability.rootBinder edited.metadata _).symm
+      simpa only [SourceCoreCompatibleDataPlaces.describe, rootEq, routes] using described
+
+private theorem assignment_occurs {tracked : Bool} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    (origin : AssignmentDiagnosticOrigins.OccursFor tracked source site assignment operator rhs) :
+    AssignmentDiagnosticOrigins.OccursFor tracked view site assignment operator rhs := by
+  cases tracked with
+  | false => trivial
+  | true => cases origin with
+    | statement found form => exact .statement (edited.metadata.symm.statement found) form
+    | header found form member => exact .header (edited.metadata.symm.statement found) form member
+
+private theorem unary_occurs {tracked : Bool} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution}
+    (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment) :
+    EmittedDiagnosticTokenPlan.UnaryOccursFor tracked view site assignment := by
+  cases tracked with
+  | false => trivial
+  | true => cases origin with
+    | statement found form => exact .statement (edited.metadata.symm.statement found) form
+    | header found form member => exact .header (edited.metadata.symm.statement found) form member
+
+omit edited avoids in
+private theorem projections_nil_type {context : SourceSemantics.Context} {initial final : TypeSystem.Ty}
+    (typing : SourceProjectionsHaveType source context initial [] final) : initial = final := by
+  cases typing
+  rfl
+
+include avoids in
+/-- The packet crosses only the actual reached keys and RHS of this chosen head. -/
+theorem assignment_payload {values : SourceCoreCompatibleValues.Context} {context : SourceSemantics.Context}
+    {before after : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    (expressions : ∀ context scope id lowered, Reaches source roots (.expression id) → before context scope id lowered → after context scope id lowered)
+    (unique : NodeOccurrencesUnique source)
+    {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context} {definitions : DataEnvironment}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {head : GenericAssignmentStatements.Head values source context (before context) scope administrative definitions assignment operator rhs}
+    {tracked : Bool} {diagnosticPolicy : AssignmentDiagnosticPolicy}
+    {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Syntax.ValueAssignOp → Word}
+    {factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand}
+    {targetFactory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy view invalidOperand}
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    (receipt : GenericForHeader.Structural.PreparedAssignment (values := values) (certificates := before) (administrative := administrative) (definitions := definitions) factory invalidProjection missingDefault head)
+    (reached : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, Reaches source roots (.expression id)) :
+    GenericForHeader.Structural.PreparedAssignment (values := values) (certificates := after) (administrative := administrative) (definitions := definitions) targetFactory invalidProjection missingDefault
+      (assignment_head edited avoids (expressions context) head reached) := by
+  cases receipt with
+  | intro site origin same sourceTyped rightTyped profile fuel prepared =>
+    refine .intro site (assignment_occurs edited origin) same ?_
+      (CallableLambdaViewStaticTyping.expression edited avoids unique rightTyped (reached rhs (by simp))) profile fuel
+      (assignment_prepared_at edited avoids (expressions context) prepared reached)
+    intro binder declared
+    have original := sourceTyped binder ((CallableLambdaBodyReachability.rootBinder edited.metadata _).trans declared)
+    cases prepared with
+    | bare empty =>
+      rw [empty] at original ⊢
+      rw [← projections_nil_type original]
+      exact .nil _
+    | projected route layout ordinary shape described preparedBy =>
+      exact CallableLambdaViewStaticTyping.projections edited avoids unique original
+        (prepared_path_with_routes edited avoids layout.path (fun id member => reached id (List.mem_cons_of_mem _ member))).2.2
+
+/-- Unary payloads keep their exact owning occurrence and original token. -/
+theorem unary_payload {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {assignment : AssignmentResolution} {head : CompatibleBitNotStatements.Head context scope assignment}
+    {tracked : Bool} {invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    (receipt : GenericForHeader.Structural.PreparedUnary tracked source invalidUnary head) :
+    GenericForHeader.Structural.PreparedUnary tracked view invalidUnary head := by
+  cases receipt with
+  | intro writable bare profile site origin same =>
+    refine .intro ?_ bare profile site (unary_occurs edited origin) same
+    intro binder declared
+    exact writable binder ((CallableLambdaBodyReachability.rootBinder edited.metadata _).trans declared)
 
 omit edited in
 private theorem sourceKeys_references {projections : List PlaceProjection} {id : ExpressionId}
@@ -792,21 +923,44 @@ private theorem header_tree {type : Ty} {continuation : SourceSemantics.Context 
   | bitNot head remaining ih =>
     exact .bitNot head
       (ih (fun child member => reached child (List.mem_append_right _ member)))
-private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {type : Ty} {continuation : SourceSemantics.Context → SourceCoreLocalCell.Scope → Expr → Prop}
+/-- The original header mapping carries a constructor payload on the same target tree. -/
+theorem header_payload_with {type : Ty} {continuation : SourceSemantics.Context → SourceCoreLocalCell.Scope → Expr → Prop}
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {items : List ForItemForm} {code : Expr}
-    {tree : GenericForHeader.Tree layouts owner active frame globals onError values source before definitions administrative type continuation context scope items code}
-    (sites : tree.ErrorsFor diagnosticPolicy registry faults)
+
+    (AP : GenericForHeader.Structural.AssignmentPayload values source before administrative definitions)
+    (UP : GenericForHeader.Structural.UnaryPayload)
+    (mappedAP : GenericForHeader.Structural.AssignmentPayload values view after administrative definitions)
+    (mappedUP : GenericForHeader.Structural.UnaryPayload)
+    (P : CallableLambdaViewPreparedStaticTransport.Header.PacketMotive
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := view) (certificates := after)
+      (definitions := definitions) (administrative := administrative) (type := type) (continuation := continuation))
+    (target : CallableLambdaViewPreparedStaticTransport.Header.PacketAlgebra
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (type := type) (continuation := continuation) mappedAP mappedUP P)
+    (assignments : ∀ {context scope assignment operator rhs}
+      (head : GenericAssignmentStatements.Head values source context (before context) scope administrative definitions assignment operator rhs)
+      (children : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, Reaches source roots (.expression id)),
+      AP head → mappedAP (assignment_head edited avoids (expressions context) head children))
+    (unaries : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment), UP head → mappedUP head)
+    (sites : GenericForHeader.Structural.Eliminates
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (type := type) (continuation := continuation) AP UP context scope items code)
     (reached : Within source roots (items.flatMap ForItemForm.references)) :
     ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values view after definitions administrative type continuation context scope items code,
-      tree.ErrorsFor diagnosticPolicy registry faults := by
+      P tree := by
   classical
-  induction sites with
-  | @nil context scope code next =>
+  apply sites (fun context scope items code => Within source roots (items.flatMap ForItemForm.references) →
+    ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values view after definitions administrative type continuation context scope items code, P tree) ?_ reached
+  refine { nil := ?_, uninitialized := ?_, initialized := ?_, discard := ?_, assign := ?_, bitNot := ?_ }
+  · intro context scope code next
+    intro reached
     refine ⟨.nil next, ?_⟩
-    exact .nil
+    exact target.nil
       (next := next)
 
-  | @uninitialized context nextContext scope binder rest body payload mono extended ordinary projected allocated annotation same remaining remainingErrors ih =>
+  · intro context nextContext scope binder rest body payload mono extended ordinary projected allocated annotation same ih
+    intro reached
     let allocation := CallableLambdaViewAllocations.allocation
       (request := absentRequest source scope binder payload)
       (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata) allocated
@@ -818,7 +972,7 @@ private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (by simpa only [edited.metadata.inputs] using ordinary) projected allocation annotated
       (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same)
       (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose, ?_⟩
-    exact .uninitialized
+    exact target.uninitialized
       (monomorphic := mono)
       (extended := (by simpa only [edited.metadata.owner] using extended))
       (ordinary := (by simpa only [edited.metadata.inputs] using ordinary))
@@ -828,7 +982,8 @@ private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (same := (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same))
       (remaining := (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose)
       ((ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose_spec)
-  | @initialized context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initializerFound sourceType initial allocated annotation same remaining remainingErrors ih =>
+  · intro context nextContext scope binder initializer initializerNode lowered body rest mono extended ordinary initializerFound sourceType initial allocated annotation same ih
+    intro reached
     have child : Reaches source roots (.expression initializer) := reached _ (by simp [ForItemForm.references])
     let allocation := CallableLambdaViewAllocations.allocation
       (request := initializedRequest source scope binder lowered.type)
@@ -843,7 +998,7 @@ private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (expressions context scope initializer lowered child initial) allocation annotated
       (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same)
       (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose, ?_⟩
-    exact .initialized
+    exact target.initialized
       (monomorphic := mono)
       (extended := (by simpa only [edited.metadata.owner] using extended))
       (ordinary := (by simpa only [edited.metadata.inputs] using ordinary))
@@ -855,17 +1010,19 @@ private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (same := (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same))
       (remaining := (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose)
       ((ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose_spec)
-  | @discard context scope expression expressionNode rest lowered body found value remaining remainingErrors ih =>
+  · intro context scope expression expressionNode rest lowered body found value ih
+    intro reached
     have child : Reaches source roots (.expression expression) := reached _ (by simp [ForItemForm.references])
     refine ⟨.discard ((expression_lookup edited avoids child).symm.trans found)
       (expressions context scope expression lowered child value)
       (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose, ?_⟩
-    exact .discard
+    exact target.discard
       (found := ((expression_lookup edited avoids child).symm.trans found))
       (value := (expressions context scope expression lowered child value))
       (remaining := (ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose)
       ((ih (fun child member => reached child (by simp [ForItemForm.references, member]))).choose_spec)
-  | @assign context scope assignment operator rhs rest body head remaining remainingErrors headErrors ih =>
+  · intro context scope assignment operator rhs rest body head headErrors ih
+    intro reached
     have children : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
         Reaches source roots (.expression id) := by
       intro id member
@@ -875,17 +1032,34 @@ private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
           PlaceResolution.references, List.mem_append]; exact Or.inl (Or.inl (sourceKeys_references member)))
     refine ⟨.assign (assignment_head edited avoids (expressions context) head children)
       (ih (fun child member => reached child (List.mem_append_right _ member))).choose, ?_⟩
-    exact .assign
+    exact target.assign
       (head := (assignment_head edited avoids (expressions context) head children))
       (remaining := (ih (fun child member => reached child (List.mem_append_right _ member))).choose)
-      ((ih (fun child member => reached child (List.mem_append_right _ member))).choose_spec) (by cases diagnosticPolicy <;> exact ⟨headErrors.missing, headErrors.uninitialized, headErrors.operands⟩)
-  | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
+      ((ih (fun child member => reached child (List.mem_append_right _ member))).choose_spec) (assignments head children headErrors)
+  · intro context scope assignment rest body head headErrors ih
+    intro reached
     refine ⟨.bitNot head
       (ih (fun child member => reached child (List.mem_append_right _ member))).choose, ?_⟩
-    exact .bitNot
+    exact target.bitNot
       (head := head)
       (remaining := (ih (fun child member => reached child (List.mem_append_right _ member))).choose)
-      ((ih (fun child member => reached child (List.mem_append_right _ member))).choose_spec) (headErrors)
+      ((ih (fun child member => reached child (List.mem_append_right _ member))).choose_spec) (unaries head headErrors)
+
+private theorem header_sites {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {type : Ty} {continuation : SourceSemantics.Context → SourceCoreLocalCell.Scope → Expr → Prop}
+    {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {items : List ForItemForm} {code : Expr}
+    {tree : GenericForHeader.Tree layouts owner active frame globals onError values source before definitions administrative type continuation context scope items code}
+    (sites : tree.ErrorsFor diagnosticPolicy registry faults)
+    (reached : Within source roots (items.flatMap ForItemForm.references)) :
+    ∃ tree : GenericForHeader.Tree layouts owner active frame globals onError values view after definitions administrative type continuation context scope items code,
+      tree.ErrorsFor diagnosticPolicy registry faults := by
+  exact header_payload_with edited avoids expressions
+    (fun head => head.ErrorsFor diagnosticPolicy registry faults) (fun head => head.Errors faults)
+    (fun head => head.ErrorsFor diagnosticPolicy registry faults) (fun head => head.Errors faults)
+    (fun tree => tree.ErrorsFor diagnosticPolicy registry faults)
+    CallableLambdaViewPreparedStaticTransport.Header.legacy_algebra
+    (fun head children receipt => by cases diagnosticPolicy <;> exact ⟨receipt.missing, receipt.uninitialized, receipt.operands⟩)
+    (fun _ receipt => receipt)
+    (CallableLambdaViewPreparedStaticTransport.Header.of_errors sites) reached
 
 end Headers
 
@@ -1168,25 +1342,60 @@ theorem transport_with {context : SourceSemantics.Context} {scope : SourceCoreLo
     · exact stops.transport (statement_identity edited)
     · exact issued.transport (statement_identity edited)
 
-theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+/-- The original static position mapping carries a payload on its exact target tree. -/
+theorem transport_payload_with {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
-    {tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
-      beforeSyntax before definitions administrative context scope position expected type code}
-    (sites : tree.CatalogSites diagnosticPolicy registry faults)
+
+    (AP : Structural.AssignmentPayload (values := values) (source := source) (certificates := before) (administrative := administrative) (definitions := definitions))
+    (UP : Structural.UnaryPayload)
+    (HP : Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := source) (certificates := before) (definitions := definitions) (administrative := administrative))
+    (MP : Structural.MatchPayload)
+    (mappedAP : Structural.AssignmentPayload (values := values) (source := view) (certificates := after) (administrative := administrative) (definitions := definitions))
+    (mappedUP : Structural.UnaryPayload)
+    (mappedHP : Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := view) (certificates := after) (definitions := definitions) (administrative := administrative))
+    (mappedMP : Structural.MatchPayload)
+    (P : CallableLambdaViewPreparedStaticTransport.Match.PacketMotive
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := view) (expressionSyntax := afterSyntax)
+      (certificates := after) (definitions := definitions) (administrative := administrative))
+    (target : CallableLambdaViewPreparedStaticTransport.Match.PacketAlgebra
+      (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := view) (expressionSyntax := afterSyntax)
+      (certificates := after) (definitions := definitions) (administrative := administrative) mappedAP mappedUP mappedHP mappedMP P)
+    (assignments : ∀ {context scope assignment operator rhs}
+      (head : GenericAssignmentStatements.Head values source context (before context) scope administrative definitions assignment operator rhs)
+      (children : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections, Reaches source roots (.expression id)),
+      AP head → mappedAP (assignment_head edited avoids (expressions context) head children))
+    (unaries : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment), UP head → mappedUP head)
+    (headers : ∀ {context scope items type code}
+      (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source before definitions administrative
+        type (TypedForHeader.Fallthrough type) context scope items code),
+      HP postTree → Within source roots (items.flatMap ForItemForm.references) →
+      ∃ postTree : GenericForHeader.Tree layouts owner active frame globals onError values view after definitions administrative
+        type (TypedForHeader.Fallthrough type) context scope items code, mappedHP postTree)
+    (matchPayloads : ∀ compilation context, MP compilation context → mappedMP compilation context)
+    (sites : Structural.Eliminates (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals)
+      (onError := onError) (values := values) (source := source) (expressionSyntax := beforeSyntax)
+      (certificates := before) (definitions := definitions) (administrative := administrative) AP UP HP MP context scope position expected type code)
     (reached : PositionReached source roots position) :
     ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
-      afterSyntax after definitions administrative context scope position expected type code,
-      tree.CatalogSites diagnosticPolicy registry faults := by
+      afterSyntax after definitions administrative context scope position expected type code, P tree := by
   classical
-  induction sites with
-  | @body context scope mode statements expected type code syntaxTree body =>
+  apply sites (fun context scope position expected type code => PositionReached source roots position →
+    ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
+      afterSyntax after definitions administrative context scope position expected type code, P tree) ?_ reached
+  refine { body := ?_, uninitialized := ?_, initialized := ?_, discard := ?_, block := ?_, ifThen := ?_, terminalBlock := ?_, terminalIf := ?_, breaking := ?_, continuing := ?_, whileLoop := ?_, assign := ?_, bitNot := ?_, forLoop := ?_, initializersDone := ?_, initializerUninitialized := ?_, initializerInitialized := ?_, initializerDiscard := ?_, initializerAssign := ?_, initializerBitNot := ?_, matchWith := ?_, terminalMatch := ?_ }
+  · intro context scope mode statements expected type code syntaxTree body
+    intro reached
     refine ⟨.body (CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique syntaxTransport syntaxTree reached)
       (CallableLambdaViewBodyTree.transport edited avoids expressions body reached), ?_⟩
-    exact .body
+    exact target.body
       (syntaxTree := (CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique syntaxTransport syntaxTree reached))
       (body := (CallableLambdaViewBodyTree.transport edited avoids expressions body reached))
-
-  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocated annotation same remaining remainingErrors ih =>
+  · intro context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocated annotation same remaining ih
+    intro reached
     let allocation := CallableLambdaViewAllocations.allocation
       (request := absentRequest source scope binder payload)
       (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata) allocated
@@ -1197,7 +1406,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (by simpa only [edited.metadata.owner] using extended)
       (by simpa only [edited.metadata.inputs] using ordinary) projected allocation annotated
       (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same) (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .uninitialized
+    exact target.uninitialized
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (monomorphic := mono)
@@ -1209,7 +1418,8 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (same := (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same))
       (remaining := (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initializerFound sourceType initial allocated annotation same remaining remainingErrors ih =>
+  · intro context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initializerFound sourceType initial allocated annotation same remaining ih
+    intro reached
     have child : Reaches source roots (.expression initializer) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
     let allocation := CallableLambdaViewAllocations.allocation
@@ -1224,7 +1434,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       ((expression_lookup edited avoids child).symm.trans initializerFound) sourceType
       (expressions context scope initializer lowered child initial) allocation annotated (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same)
       (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .initialized
+    exact target.initialized
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (monomorphic := mono)
@@ -1238,14 +1448,15 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (same := (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same))
       (remaining := (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @discard context scope mode id node expression expressionNode semicolon rest expected lowered type body found form notTail expressionFound value remaining remainingErrors ih =>
+  · intro context scope mode id node expression expressionNode semicolon rest expected lowered type body found form notTail expressionFound value remaining ih
+    intro reached
     have child : Reaches source roots (.expression expression) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
     refine ⟨.discard (edited.metadata.symm.statement found) form notTail
       ((expression_lookup edited avoids child).symm.trans expressionFound)
       (expressions context scope expression lowered child value)
       (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .discard
+    exact target.discard
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (notTail := notTail)
@@ -1253,19 +1464,21 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (value := (expressions context scope expression lowered child value))
       (remaining := (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH restIH =>
+  · intro context scope mode id node statements rest expected type innerCode body found form inner remaining innerIH restIH
+    intro reached
     refine ⟨.block (edited.metadata.symm.statement found) form
       (innerIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member]))).choose
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .block
+    exact target.block
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (inner := (innerIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member]))).choose)
       (remaining := (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((innerIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @ifThen context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenErrors elseErrors remainingErrors thenIH elseIH restIH =>
+  · intro context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH restIH
+    intro reached
     have child : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
     refine ⟨.ifThen (edited.metadata.symm.statement found) form
@@ -1276,7 +1489,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (elseIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member]))).choose
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .ifThen
+    exact target.ifThen
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (conditionFound := ((expression_lookup edited avoids child).symm.trans conditionFound))
@@ -1288,60 +1501,20 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
         (by simp [form, StatementForm.references, member]))).choose)
       (remaining := (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((thenIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((elseIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerErrors innerIH =>
-    refine ⟨.terminalBlock (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
-      (innerIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose
-      (stops.transport (statement_identity edited)) (issued.transport (statement_identity edited)), ?_⟩
-    exact .terminalBlock
-      (unique := (edited.metadata.unique exactUnique))
-      (found := (edited.metadata.symm.statement found))
-      (form := form)
-      (inner := (innerIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose)
-      (stops := (stops.transport (statement_identity edited)))
-      (issued := (issued.transport (statement_identity edited)))
-      ((innerIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec)
-  | @terminalIf context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
-    have child : Reaches source roots (.expression condition) :=
-      .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
-    refine ⟨.terminalIf (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
-      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType
-      (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree)
-      (thenIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose
-      (elseIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose
-      (thenStops.transport (statement_identity edited)) (elseStops.transport (statement_identity edited))
-      (issued.transport (statement_identity edited)), ?_⟩
-    exact .terminalIf
-      (unique := (edited.metadata.unique exactUnique))
-      (found := (edited.metadata.symm.statement found))
-      (form := form)
-      (conditionFound := ((expression_lookup edited avoids child).symm.trans conditionFound))
-      (conditionType := conditionType)
-      (conditionTree := (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree))
-      (thenTree := (thenIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose)
-      (elseTree := (elseIH (fun child member => .statement (reached id (by simp)) found
-        (by simp [form, StatementForm.references, member]))).choose)
-      (thenStops := (thenStops.transport (statement_identity edited)))
-      (elseStops := (elseStops.transport (statement_identity edited)))
-      (issued := (issued.transport (statement_identity edited)))
-      ((thenIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((elseIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec)
-  | @breaking context scope mode id node rest expected type found form =>
+  · intro context scope mode id node rest expected type found form
+    intro reached
     refine ⟨.breaking (edited.metadata.symm.statement found) form, ?_⟩
-    exact .breaking
+    exact target.breaking
       (found := (edited.metadata.symm.statement found))
       (form := form)
-
-  | @continuing context scope mode id node rest expected type found form =>
+  · intro context scope mode id node rest expected type found form
+    intro reached
     refine ⟨.continuing (edited.metadata.symm.statement found) form, ?_⟩
-    exact .continuing
+    exact target.continuing
       (found := (edited.metadata.symm.statement found))
       (form := form)
-
-  | @whileLoop context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopBody nativeTyped remaining loopErrors remainingErrors loopIH restIH =>
+  · intro context scope mode id node condition conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopBody nativeTyped remaining loopIH restIH
+    intro reached
     have child : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
     refine ⟨.whileLoop (edited.metadata.symm.statement found) form
@@ -1350,7 +1523,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (loopIH (fun child member => .statement (reached id (by simp)) found
         (by simp [form, StatementForm.references, member]))).choose nativeTyped
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .whileLoop
+    exact target.whileLoop
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (conditionFound := ((expression_lookup edited avoids child).symm.trans conditionFound))
@@ -1361,7 +1534,8 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (nativeTyped := nativeTyped)
       (remaining := (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((loopIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
+  · intro context scope mode id node assignment operator rhs rest expected type body found form head remaining ih headErrors
+    intro reached
     have children : ∀ child ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
         Reaches source roots (.expression child) := by
       intro child member
@@ -1374,48 +1548,52 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
     refine ⟨.assign (edited.metadata.symm.statement found) form
       (assignment_head edited avoids (expressions context) head children)
       (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .assign
+    exact target.assign
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (head := (assignment_head edited avoids (expressions context) head children))
       (remaining := (ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
-      ((ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec) (by cases diagnosticPolicy <;> exact ⟨headErrors.missing, headErrors.uninitialized, headErrors.operands⟩)
-  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
+      ((ih (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec) (assignments head children headErrors)
+  · intro context scope mode id node assignment rest expected type body found form head remaining ih headErrors
+    intro reached
     refine ⟨.bitNot (edited.metadata.symm.statement found) form head
       (ih (fun child member => reached child (List.mem_cons_of_mem _ member))).choose, ?_⟩
-    exact .bitNot
+    exact target.bitNot
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (head := head)
       (remaining := (ih (fun child member => reached child (List.mem_cons_of_mem _ member))).choose)
-      ((ih (fun child member => reached child (List.mem_cons_of_mem _ member))).choose_spec) (headErrors)
-  | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>
+      ((ih (fun child member => reached child (List.mem_cons_of_mem _ member))).choose_spec) (unaries head headErrors)
+  · intro context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialIH restIH
+    intro reached
     refine ⟨.forLoop (edited.metadata.symm.statement found) form
       (initialIH (fun child member => .statement (reached id (by simp)) found
         (by simpa only [form, StatementForm.references] using member))).choose
       (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .forLoop
+    exact target.forLoop
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (initial := (initialIH (fun child member => .statement (reached id (by simp)) found
         (by simpa only [form, StatementForm.references] using member))).choose)
       (remaining := (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
       ((initialIH (fun child member => .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member))).choose_spec) ((restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec)
-  | @initializersDone context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopBody postTree nativeTyped loopErrors postErrors loopIH =>
+  · intro context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason conditionFound conditionType conditionTree loopBody postTree nativeTyped loopIH postErrors
+    intro reached
     have child : Reaches source roots (.expression condition) := reached _ (by simp)
     refine ⟨.initializersDone ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType
       (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree)
       (loopIH (fun child member => reached _ (by simp [member]))).choose
-      (header_sites edited avoids expressions postErrors (fun child member => reached child (by simp [member]))).choose nativeTyped, ?_⟩
-    exact .initializersDone
+      (headers postTree postErrors (fun child member => reached child (by simp [member]))).choose nativeTyped, ?_⟩
+    exact target.initializersDone
       (conditionFound := ((expression_lookup edited avoids child).symm.trans conditionFound))
       (conditionType := conditionType)
       (conditionTree := (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree))
       (loopBody := (loopIH (fun child member => reached _ (by simp [member]))).choose)
-      (postTree := (header_sites edited avoids expressions postErrors (fun child member => reached child (by simp [member]))).choose)
+      (postTree := (headers postTree postErrors (fun child member => reached child (by simp [member]))).choose)
       (nativeTyped := nativeTyped)
-      ((loopIH (fun child member => reached _ (by simp [member]))).choose_spec) ((header_sites edited avoids expressions postErrors (fun child member => reached child (by simp [member]))).choose_spec)
-  | @initializerUninitialized context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocated annotation same remaining remainingErrors ih =>
+      ((loopIH (fun child member => reached _ (by simp [member]))).choose_spec) ((headers postTree postErrors (fun child member => reached child (by simp [member]))).choose_spec)
+  · intro context nextContext scope binder rest body payload condition post statements expected type mono extended ordinary projected allocated annotation same remaining ih
+    intro reached
     let allocation := CallableLambdaViewAllocations.allocation
       (request := absentRequest source scope binder payload)
       (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata) allocated
@@ -1427,7 +1605,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (by simpa only [edited.metadata.inputs] using ordinary) projected allocation annotated
       (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same)
       (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references, Option.map_none, Option.toList_none, List.nil_append] using member))).choose, ?_⟩
-    exact .initializerUninitialized
+    exact target.initializerUninitialized
       (monomorphic := mono)
       (extended := (by simpa only [edited.metadata.owner] using extended))
       (ordinary := (by simpa only [edited.metadata.inputs] using ordinary))
@@ -1437,7 +1615,8 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (same := (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same))
       (remaining := (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references, Option.map_none, Option.toList_none, List.nil_append] using member))).choose)
       ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references, Option.map_none, Option.toList_none, List.nil_append] using member))).choose_spec)
-  | @initializerInitialized context nextContext scope binder initializer initializerNode lowered body rest condition post statements expected type mono extended ordinary initializerFound sourceType initial allocated annotation same remaining remainingErrors ih =>
+  · intro context nextContext scope binder initializer initializerNode lowered body rest condition post statements expected type mono extended ordinary initializerFound sourceType initial allocated annotation same remaining ih
+    intro reached
     have child : Reaches source roots (.expression initializer) := reached _ (by simp [ForItemForm.references])
     let allocation := CallableLambdaViewAllocations.allocation
       (request := initializedRequest source scope binder lowered.type)
@@ -1453,7 +1632,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (by simpa only [allocation, CallableLambdaViewAllocations.allocation] using original.trans same)
       (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references,
         Option.map_some, Option.toList_some, List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose, ?_⟩
-    exact .initializerInitialized
+    exact target.initializerInitialized
       (monomorphic := mono)
       (extended := (by simpa only [edited.metadata.owner] using extended))
       (ordinary := (by simpa only [edited.metadata.inputs] using ordinary))
@@ -1466,19 +1645,21 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (remaining := (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references,
         Option.map_some, Option.toList_some, List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose)
       ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references, Option.map_some, Option.toList_some, List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose_spec)
-  | @initializerDiscard context scope expression expressionNode rest lowered body condition post statements expected type found value remaining remainingErrors ih =>
+  · intro context scope expression expressionNode rest lowered body condition post statements expected type found value remaining ih
+    intro reached
     have child : Reaches source roots (.expression expression) := reached _ (by simp [ForItemForm.references])
     refine ⟨.initializerDiscard ((expression_lookup edited avoids child).symm.trans found)
       (expressions context scope expression lowered child value)
       (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references,
         List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose, ?_⟩
-    exact .initializerDiscard
+    exact target.initializerDiscard
       (found := ((expression_lookup edited avoids child).symm.trans found))
       (value := (expressions context scope expression lowered child value))
       (remaining := (ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references,
         List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose)
       ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, ForItemForm.references, List.singleton_append, List.cons_append, List.nil_append, List.mem_cons] using Or.inr member))).choose_spec)
-  | @initializerAssign context scope assignment operator rhs rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
+  · intro context scope assignment operator rhs rest body condition post statements expected type head remaining ih headErrors
+    intro reached
     have children : ∀ id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections,
         Reaches source roots (.expression id) := by
       intro id member
@@ -1491,20 +1672,22 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
     refine ⟨.initializerAssign (assignment_head edited avoids (expressions context) head children)
       (ih (fun child member => reached child (by
         simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose, ?_⟩
-    exact .initializerAssign
+    exact target.initializerAssign
       (head := (assignment_head edited avoids (expressions context) head children))
       (remaining := (ih (fun child member => reached child (by
         simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose)
-      ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose_spec) (by cases diagnosticPolicy <;> exact ⟨headErrors.missing, headErrors.uninitialized, headErrors.operands⟩)
-  | @initializerBitNot context scope assignment rest body condition post statements expected type head remaining remainingErrors headErrors ih =>
+      ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose_spec) (assignments head children headErrors)
+  · intro context scope assignment rest body condition post statements expected type head remaining ih headErrors
+    intro reached
     refine ⟨.initializerBitNot head (ih (fun child member => reached child (by
       simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose, ?_⟩
-    exact .initializerBitNot
+    exact target.initializerBitNot
       (head := head)
       (remaining := (ih (fun child member => reached child (by
       simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose)
-      ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose_spec) (headErrors)
-  | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining catalog patternContext childErrors remainingErrors childrenIH restIH =>
+      ((ih (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using List.mem_append_right _ member))).choose_spec) (unaries head headErrors)
+  · intro context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children remaining matchPayload childrenIH restIH
+    intro reached
     have refs : Within source roots resolution.references :=
       fun child member => .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member)
     have scrutineeReached : Reaches source roots (.expression resolution.scrutinee) := refs _ (by simp [MatchResolution.references])
@@ -1524,7 +1707,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
         ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
             afterSyntax after definitions administrative childContext request.scope
             (.statements false request.statements) expected type request.code,
-          tree.CatalogSites diagnosticPolicy registry faults := by
+          P tree := by
       intro request member childContext related
       have original := scoped_context edited related
       apply childrenIH request member childContext original
@@ -1543,7 +1726,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (CallableLambdaViewStaticTyping.matchCases edited avoids unique casesTyped casesReached)
       typedDefault compilation sameValues sameDefinitions allocator requests transformed (match_ordinary edited ordinary)
       (fun request member childContext related => (transportedChildren request member childContext related).choose) (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose, ?_⟩
-    exact .matchWith
+    exact target.matchWith
       (found := (edited.metadata.symm.statement found))
       (form := form)
       (scrutineeFound := ((expression_lookup edited avoids scrutineeReached).symm.trans scrutineeFound))
@@ -1559,8 +1742,52 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (ordinary := (match_ordinary edited ordinary))
       (children := (fun request member childContext related => (transportedChildren request member childContext related).choose))
       (remaining := (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose)
-       catalog patternContext (fun request member childContext related => (transportedChildren request member childContext related).choose_spec) (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec
-  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued catalog patternContext childErrors childrenIH =>
+       (matchPayloads compilation context matchPayload) (fun request member childContext related => (transportedChildren request member childContext related).choose_spec) (restIH (fun child member => reached child (List.mem_cons_of_mem id member))).choose_spec
+  · intro context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerIH
+    intro reached
+    refine ⟨.terminalBlock (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
+      (innerIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose
+      (stops.transport (statement_identity edited)) (issued.transport (statement_identity edited)), ?_⟩
+    exact target.terminalBlock
+      (unique := (edited.metadata.unique exactUnique))
+      (found := (edited.metadata.symm.statement found))
+      (form := form)
+      (inner := (innerIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose)
+      (stops := (stops.transport (statement_identity edited)))
+      (issued := (issued.transport (statement_identity edited)))
+      ((innerIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec)
+  · intro context scope mode id node condition conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH
+    intro reached
+    have child : Reaches source roots (.expression condition) :=
+      .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
+    refine ⟨.terminalIf (edited.metadata.unique exactUnique) (edited.metadata.symm.statement found) form
+      ((expression_lookup edited avoids child).symm.trans conditionFound) conditionType
+      (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree)
+      (thenIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose
+      (elseIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose
+      (thenStops.transport (statement_identity edited)) (elseStops.transport (statement_identity edited))
+      (issued.transport (statement_identity edited)), ?_⟩
+    exact target.terminalIf
+      (unique := (edited.metadata.unique exactUnique))
+      (found := (edited.metadata.symm.statement found))
+      (form := form)
+      (conditionFound := ((expression_lookup edited avoids child).symm.trans conditionFound))
+      (conditionType := conditionType)
+      (conditionTree := (expressions context scope condition ⟨.bool, conditionCode⟩ child conditionTree))
+      (thenTree := (thenIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose)
+      (elseTree := (elseIH (fun child member => .statement (reached id (by simp)) found
+        (by simp [form, StatementForm.references, member]))).choose)
+      (thenStops := (thenStops.transport (statement_identity edited)))
+      (elseStops := (elseStops.transport (statement_identity edited)))
+      (issued := (issued.transport (statement_identity edited)))
+      ((thenIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec) ((elseIH (fun child member => .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member]))).choose_spec)
+  · intro context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary children stops issued matchPayload childrenIH
+    intro reached
     have refs : Within source roots resolution.references :=
       fun child member => .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member)
     have scrutineeReached : Reaches source roots (.expression resolution.scrutinee) := refs _ (by simp [MatchResolution.references])
@@ -1580,7 +1807,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
         ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
             afterSyntax after definitions administrative childContext request.scope
             (.statements false request.statements) expected type request.code,
-          tree.CatalogSites diagnosticPolicy registry faults := by
+          P tree := by
       intro request member childContext related
       have original := scoped_context edited related
       apply childrenIH request member childContext original
@@ -1599,7 +1826,7 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (CallableLambdaViewStaticTyping.matchCases edited avoids unique casesTyped casesReached)
       typedDefault compilation sameValues sameDefinitions allocator requests transformed (match_ordinary edited ordinary)
       (fun request member childContext related => (transportedChildren request member childContext related).choose) (stops.transport (statement_identity edited)) (issued.transport (statement_identity edited)), ?_⟩
-    exact .terminalMatch
+    exact target.terminalMatch
       (unique := (edited.metadata.unique exactUnique))
       (found := (edited.metadata.symm.statement found))
       (form := form)
@@ -1617,7 +1844,32 @@ theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {re
       (children := (fun request member childContext related => (transportedChildren request member childContext related).choose))
       (stops := (stops.transport (statement_identity edited)))
       (issued := (issued.transport (statement_identity edited)))
-       catalog patternContext (fun request member childContext related => (transportedChildren request member childContext related).choose_spec)
+       (matchPayloads compilation context matchPayload) (fun request member childContext related => (transportedChildren request member childContext related).choose_spec)
+
+
+theorem transport_sites_with {diagnosticPolicy : AssignmentDiagnosticPolicy} {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep} {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {position : Position} {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
+    {tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values source
+      beforeSyntax before definitions administrative context scope position expected type code}
+    (sites : tree.CatalogSites diagnosticPolicy registry faults)
+    (reached : PositionReached source roots position) :
+    ∃ tree : GenericImperativeMatch.Tree layouts owner active frame globals onError values view
+      afterSyntax after definitions administrative context scope position expected type code,
+      tree.CatalogSites diagnosticPolicy registry faults := by
+  exact transport_payload_with edited avoids unique syntaxTransport expressions
+    (fun head => head.ErrorsFor diagnosticPolicy registry faults) (fun head => head.Errors faults)
+    (fun tree => tree.ErrorsFor diagnosticPolicy registry faults)
+    (fun compilation context => SignatureCatalogWellFormed values.checked.signatures ∧ GenericImperativeMatch.Tree.MatchContextFields compilation context)
+    (fun head => head.ErrorsFor diagnosticPolicy registry faults) (fun head => head.Errors faults)
+    (fun tree => tree.ErrorsFor diagnosticPolicy registry faults)
+    (fun compilation context => SignatureCatalogWellFormed values.checked.signatures ∧ GenericImperativeMatch.Tree.MatchContextFields compilation context)
+    (fun tree => tree.CatalogSites diagnosticPolicy registry faults)
+    CallableLambdaViewPreparedStaticTransport.Match.legacy_algebra
+    (fun head children receipt => by cases diagnosticPolicy <;> exact ⟨receipt.missing, receipt.uninitialized, receipt.operands⟩)
+    (fun _ receipt => receipt)
+    (fun _ receipt reached => header_sites edited avoids expressions receipt reached)
+    (fun _ _ receipt => receipt)
+    (Structural.of_catalog_sites sites) reached
 
 omit syntaxTransport in
 theorem transport {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
