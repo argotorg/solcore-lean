@@ -4,6 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAllocationReadin
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBodyRestoration
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyStaticOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableRuntimeBodyEntryContracts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaEntryBodyContracts
 
 /-! Anonymous invocation uses the real selected pool row, its original caller
 history and the full stored captures. Actual frame installation and marked
@@ -236,6 +237,23 @@ private theorem source_body {size : Nat} {callContext : SourceSemantics.Context}
       subst same
       exact ⟨_, _, _, allocated, .escaped executed escaped, SourceExecutionSize.child_lt_stepSize (by simp)⟩
 
+include inputs in
+/-- Native reflection reconstructs the original four closure exit receipts at
+its independent Source grade, using the authentic full parameter allocation. -/
+private theorem call_of_body_with_frame (frame : Dynamic.ClosureFrame program function) {size : Nat} {callContext : SourceSemantics.Context}
+    {callerEvidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {heap after : Dynamic.Heap} {outcome : Dynamic.ExpressionOutcome}
+    (allocated : Dynamic.BindersAllocate function.captured before function.parameters arguments environment heap)
+    (trace : RecursiveNamedCallBounds.BodyTrace program size function inputs.context environment heap outcome after) :
+    RecursiveNamedCallBounds.CallOutcome program (SourceExecutionSize.stepSize [size]) callContext callerEvidence function.evidence before
+      (.closure function) arguments outcome after := by
+  cases trace with
+  | returned executed => exact .value (.closure rfl frame inputs.extended allocated executed rfl)
+  | unit same executed => exact .value (.closureUnit rfl frame same inputs.extended allocated executed ⟨_, rfl⟩)
+  | fault failed => exact .fault (.closureBody rfl frame inputs.extended allocated failed)
+  | escaped executed escape => exact .fault (.closureControlEscape rfl frame inputs.extended allocated executed escape)
+
+
 include body in
 /-- Native reflection reconstructs the original four closure exit receipts at
 its independent Source grade, using the authentic full parameter allocation. -/
@@ -246,11 +264,7 @@ private theorem call_of_body {size : Nat} {callContext : SourceSemantics.Context
     (trace : RecursiveNamedCallBounds.BodyTrace program size function inputs.context environment heap outcome after) :
     RecursiveNamedCallBounds.CallOutcome program (SourceExecutionSize.stepSize [size]) callContext callerEvidence function.evidence before
       (.closure function) arguments outcome after := by
-  cases trace with
-  | returned executed => exact .value (.closure rfl body.frame inputs.extended allocated executed rfl)
-  | unit same executed => exact .value (.closureUnit rfl body.frame same inputs.extended allocated executed ⟨_, rfl⟩)
-  | fault failed => exact .fault (.closureBody rfl body.frame inputs.extended allocated failed)
-  | escaped executed escape => exact .fault (.closureControlEscape rfl body.frame inputs.extended allocated executed escape)
+  exact call_of_body_with_frame captured code inputs body.frame allocated trace
 
 /-- The source-produced entry is packaged without changing its reached pool,
 captured canonical spine or selected physical frame. -/
@@ -355,12 +369,12 @@ def NativeContinuation (budget : Nat) : Prop :=
       (origin := body.origin) functions program
       (native_entry captured code history inputs functions owner caller body entry reached))
 
-include body inputs represented heaps locals reference currentCarried allowed in
+include inputs represented heaps locals reference currentCarried allowed in
 /-- The original strict Source child is proved by the shared actual body
 family, then the saved caller frame is restored in that exact reached pool. -/
-theorem invocation_preserves_bounded_at (budget : Nat)
-    (bodyMeaning : SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
-      captured code history inputs functions owner caller body budget)
+theorem invocation_preserves_bounded_at_with_continuation (budget : Nat)
+    (bodyMeaning : CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
+      (registry := registry) (faults := faults) captured code history inputs functions owner caller budget)
     {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
     {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.CallOutcome program size callContext callerEvidence function.evidence before
@@ -383,21 +397,9 @@ theorem invocation_preserves_bounded_at (budget : Nat)
     parameters_with_state captured code history inputs functions represented owner caller heaps locals reference currentCarried allowed
   obtain ⟨sameEnvironment, sameHeap⟩ := FunctionCallBody.allocations_same entry.entry.allocation allocated
   rw [← sameEnvironment, ← sameHeap] at bodyTrace
-  let actualEntry := source_entry captured code history inputs functions owner caller body entry parameterState
-  have actualTrace : RecursiveNamedCallBounds.BodyTrace program child body.origin.function body.origin.context
-      actualEntry.environment actualEntry.heap outcome after := by
-    simpa only [body.function_eq, body.context_eq, actualEntry, source_entry] using bodyTrace
-  obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
+  obtain ⟨value, bodyStore, finalMap, finalWorld, originalBody, representedResult, finalHeaps,
       bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
-    bodyMeaning entry added length spine parameterState child (Nat.lt_of_lt_of_le smaller within) actualTrace
-  have originalBody : Evaluates entry.entry.actualBody entry.entry.store
-      (code.receipt.body.rename entry.entry.embedding) value bodyStore := by
-    simpa only [body.code_eq, actualEntry, source_entry] using bodyEvaluation
-  have representedResult : FunctionCalls.ResultRepresents
-      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
-      finalMap finalWorld function.resultType code.receipt.resultCore faults outcome value := by
-    rw [body.function_eq, body.output_eq] at result
-    exact result
+    bodyMeaning entry added length spine parameterState child (Nat.lt_of_lt_of_le smaller within) bodyTrace
   have maps := entry.entry.maps.trans bodyMaps
   have worlds := entry.entry.worlds.trans bodyWorlds
   have frame := entry.entry.frame.trans bodyFrame
@@ -408,6 +410,88 @@ theorem invocation_preserves_bounded_at (budget : Nat)
       (CallableIndexedAmbient.frame_registered compiled.indexed) finalHeaps worlds frame related
   exact ⟨value, _, finalMap, finalWorld, entry.wrap originalBody, representedResult,
     restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
+
+
+include body inputs represented heaps locals reference currentCarried allowed in
+/-- The original strict Source child is proved by the shared actual body
+family, then the saved caller frame is restored in that exact reached pool. -/
+theorem invocation_preserves_bounded_at (budget : Nat)
+    (bodyMeaning : SourceContinuation (arguments := arguments) (nativeArguments := nativeArguments)
+      captured code history inputs functions owner caller body budget)
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.CallOutcome program size callContext callerEvidence function.evidence before
+      (.closure function) arguments outcome after) (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (DataPatternValues.packValues nativeArguments :: encode compiled.indexed.ancestry.layout.frame history.native :: capturedActual)
+        store (code.body.rename captured.embedding.lift.lift) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld function.resultType code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
+  apply invocation_preserves_bounded_at_with_continuation captured code history inputs functions represented
+    owner caller heaps locals reference currentCarried allowed budget
+  · intro entry added length spine reached child strict outcome after trace
+    have actualTrace : RecursiveNamedCallBounds.BodyTrace program child body.origin.function body.origin.context
+        (source_entry captured code history inputs functions owner caller body entry reached).environment
+        (source_entry captured code history inputs functions owner caller body entry reached).heap outcome after := by
+      simpa only [body.function_eq, body.context_eq, source_entry] using trace
+    obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result, finalHeaps,
+        maps, worlds, frame, metadata, exit, finalState, related⟩ :=
+      bodyMeaning entry added length spine reached child strict actualTrace
+    refine ⟨value, finalStore, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, metadata, ?_, ?_⟩
+    · simpa only [body.code_eq, source_entry] using evaluated
+    · simpa only [body.function_eq, body.output_eq, SourceCoreCompatibleValues.Context.initial] using result
+    · simpa only [body.administrative_eq, body.function_eq, body.context_eq, body.scope_eq, source_entry,
+        CallableIndexedAmbient.ambientDefinitions, SourceCoreCompatibleValues.Context.initial] using exit
+    · simpa only [body.scope_eq, source_entry] using (show ProtectedStateTransition.Transition (protocol headers keys)
+        reached ⟨body.origin.scope, finalMap, finalWorld, after, finalStore,
+          (source_entry captured code history inputs functions owner caller body entry reached).canonical⟩ from ⟨finalState, related⟩)
+  · exact trace
+  · exact within
+
+include inputs represented heaps locals reference currentCarried allowed in
+/-- The original native completion exposes a strict body child. Its actual
+post pool is restored, while the Source call grade is reconstructed separately. -/
+theorem invocation_reflects_bounded_at_with_continuation
+    (frame : Dynamic.ClosureFrame program function) (budget : Nat)
+    (bodyMeaning : CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation (arguments := arguments)
+      (registry := registry) (faults := faults) captured code history inputs functions owner caller budget)
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      (DataPatternValues.packValues nativeArguments :: encode compiled.indexed.ancestry.layout.frame history.native :: capturedActual)
+      store (code.body.rename captured.embedding.lift.lift) value finalStore) (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.CallOutcome program sourceSize callContext callerEvidence function.evidence before
+        (.closure function) arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld function.resultType code.receipt.resultCore faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
+  obtain ⟨entry, child, bodyStore, smaller, bodyCompleted, restored, parameterState, parameterRelated⟩ :=
+    body_prefix_with_state captured code history inputs functions represented owner caller heaps locals reference currentCarried allowed completed
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, originalTrace, representedResult, finalHeaps,
+      bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
+    bodyMeaning entry parameterState child (Nat.lt_of_lt_of_le smaller within) bodyCompleted
+  have maps := entry.maps.trans bodyMaps
+  have worlds := entry.worlds.trans bodyWorlds
+  have administrativeFrame := entry.frame.trans bodyFrame
+  have sourceMetadata := entry.metadata.trans bodyMetadata
+  have related : Relates caller bodyState := parameterRelated.trans bodyRelated
+  obtain ⟨restoredHeaps, restoredFrame, _cell, _bodyRelated, _callerRelated, _records, returned⟩ :=
+    CallableIndexedOwnedBodyRestoration.restore_return caller bodyState owner.position
+      (CallableIndexedAmbient.frame_registered compiled.indexed) finalHeaps worlds administrativeFrame related
+  subst finalStore
+  exact ⟨_, outcome, after, finalMap, finalWorld, call_of_body_with_frame captured code inputs frame entry.allocation originalTrace,
+    representedResult, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
+
 
 include body inputs represented heaps locals reference currentCarried allowed in
 /-- The original native completion exposes a strict body child. Its actual
@@ -429,34 +513,28 @@ theorem invocation_reflects_bounded_at (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition (protocol headers keys) caller
         ⟨callerScope, finalMap, finalWorld, after, finalStore, callerCanonical⟩ := by
-  obtain ⟨entry, child, bodyStore, smaller, bodyCompleted, restored, parameterState, parameterRelated⟩ :=
-    body_prefix_with_state captured code history inputs functions represented owner caller heaps locals reference currentCarried allowed completed
-  let actualEntry := native_entry captured code history inputs functions owner caller body entry parameterState
-  have actualCompleted : EvaluationSize child actualEntry.actual actualEntry.store
-      (body.origin.code.rename actualEntry.embedding) value bodyStore := by
-    simpa only [body.code_eq, actualEntry, native_entry] using bodyCompleted
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps,
-      bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _exit, bodyState, bodyRelated⟩ :=
-    bodyMeaning entry parameterState child (Nat.lt_of_lt_of_le smaller within) actualCompleted
-  have originalTrace : RecursiveNamedCallBounds.BodyTrace program sourceSize function inputs.context
-      entry.environment entry.heap outcome after := by
-    simpa only [body.function_eq, body.context_eq, actualEntry, native_entry] using bodyTrace
-  have representedResult : FunctionCalls.ResultRepresents
-      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
-      finalMap finalWorld function.resultType code.receipt.resultCore faults outcome value := by
-    rw [body.function_eq, body.output_eq] at result
-    exact result
-  have maps := entry.maps.trans bodyMaps
-  have worlds := entry.worlds.trans bodyWorlds
-  have frame := entry.frame.trans bodyFrame
-  have sourceMetadata := entry.metadata.trans bodyMetadata
-  have related : Relates caller bodyState := parameterRelated.trans bodyRelated
-  obtain ⟨restoredHeaps, restoredFrame, _cell, _bodyRelated, _callerRelated, _records, returned⟩ :=
-    CallableIndexedOwnedBodyRestoration.restore_return caller bodyState owner.position
-      (CallableIndexedAmbient.frame_registered compiled.indexed) finalHeaps worlds frame related
-  subst finalStore
-  exact ⟨_, outcome, after, finalMap, finalWorld, call_of_body captured code inputs body entry.allocation originalTrace,
-    representedResult, restoredHeaps, maps, worlds, restoredFrame, sourceMetadata, returned⟩
+  apply invocation_reflects_bounded_at_with_continuation captured code history inputs functions represented
+    owner caller heaps locals reference currentCarried allowed body.frame budget
+  · intro entry reached child strict value finalStore completed
+    have actualCompleted : EvaluationSize child
+        (native_entry captured code history inputs functions owner caller body entry reached).actual
+        (native_entry captured code history inputs functions owner caller body entry reached).store
+        (body.origin.code.rename
+          (native_entry captured code history inputs functions owner caller body entry reached).embedding) value finalStore := by
+      simpa only [body.code_eq, native_entry] using completed
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps,
+        maps, worlds, frame, metadata, exit, finalState, related⟩ :=
+      bodyMeaning entry reached child strict actualCompleted
+    refine ⟨sourceSize, outcome, after, finalMap, finalWorld, ?_, ?_, finalHeaps, maps, worlds, frame, metadata, ?_, ?_⟩
+    · simpa only [body.function_eq, body.context_eq, native_entry] using trace
+    · simpa only [body.function_eq, body.output_eq, SourceCoreCompatibleValues.Context.initial] using result
+    · simpa only [body.administrative_eq, body.function_eq, body.context_eq, body.scope_eq, native_entry,
+        CallableIndexedAmbient.ambientDefinitions, SourceCoreCompatibleValues.Context.initial] using exit
+    · simpa only [body.scope_eq, native_entry] using (show ProtectedStateTransition.Transition (protocol headers keys)
+        reached ⟨body.origin.scope, finalMap, finalWorld, after, finalStore,
+          (native_entry captured code history inputs functions owner caller body entry reached).canonical⟩ from ⟨finalState, related⟩)
+  · exact completed
+  · exact within
 
 include body inputs represented heaps locals reference currentCarried allowed in
 /-- The original strict Source child is proved by the shared actual body
