@@ -1017,6 +1017,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompil
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSamePolicyCompilerLeafReceipts
 import Solcore.SourceSemantics.CoreLowering.NamedInvocationFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedInvocationFaultReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedRuntimeFamilyMembers
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrimitiveBodyBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
