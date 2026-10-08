@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.BuiltinFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallCertificates
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallProtocol
 import Solcore.SourceSemantics.CoreLowering.BuiltinCallSource
@@ -92,11 +93,15 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
 variable {certificate : GenericExpressionMeaning.Certificate}
 
 include functionLeaves unique in
-theorem Head.preserves
-    (argumentMeaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source certificate faults) :
-    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Head values source certificate) faults := by
+theorem Head.preserves_with_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (builtinJoins : BuiltinFaultPostContracts.Joins post listPost values program context evidence source)
+    (argumentMeaning : ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults post) :
+    ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults post := by
   intro scope id lowered tree
   cases tree with
   | @contracted callee arguments function node codes identity contract unknown metadata form sourceType children nativeTypes =>
@@ -111,17 +116,18 @@ theorem Head.preserves
     have sourceTrace := source_inv metadata form unique trace
     cases sourceTrace with
     | argumentsFault failed =>
-      obtain ⟨token, finalStore, finalMap, finalWorld, argumentEval, matched, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-        TypedDataExpressionSequence.preserves_fault children argumentMeaning environments heaps locals prefixedLayout prefixedTyped failed
+      obtain ⟨token, finalStore, finalMap, finalWorld, argumentEval, matched, finalHeaps, maps, worlds, frame, heapMetadata, retained⟩ :=
+        TypedDataExpressionSequence.preserves_fault_with_post children sequenceJoins argumentMeaning environments heaps locals prefixedLayout prefixedTyped failed
       rw [rename_prefix, rename_prefix] at argumentEval
       refine ⟨.inLeft _ (.word token), finalStore, finalMap, finalWorld, ?_, .fault matched,
-        finalHeaps, maps, worlds, frame, heapMetadata⟩
+        finalHeaps, maps, worlds, frame, heapMetadata,
+        BuiltinFaultPostContracts.arguments_fault_outcome builtinJoins metadata form sourceType children nativeTypes failed retained⟩
       rw [call_rename]
       exact CallableContract.call_argument_failure [⟨contract, none, none⟩] unknown
         (contracted_evaluates function identity contract actual store) (gates_accept contract unknown .beforeArguments) argumentEval
     | apply argumentsEvaluated application =>
       obtain ⟨payloads, argumentStore, finalMap, finalWorld, argumentEval, represented, finalHeaps, maps, worlds, frame, heapMetadata⟩ :=
-        TypedDataExpressionSequence.preserves_values children argumentMeaning environments heaps locals prefixedLayout prefixedTyped argumentsEvaluated
+        TypedDataExpressionSequence.preserves_values children (ExpressionFailurePostContracts.TypedPreserves.forget argumentMeaning) environments heaps locals prefixedLayout prefixedTyped argumentsEvaluated
       have related := values_rep represented
       rw [nativeTypes] at related
       have inputs := CompatibleBuiltinMeaning.input_of_values functionLeaves related
@@ -134,17 +140,33 @@ theorem Head.preserves
           have same := appliedAgain.functional applied
           subst sourceResult
           refine ⟨.inRight .word nativeResult, argumentStore, finalMap, finalWorld, ?_, ?_,
-            finalHeaps, maps, worlds, frame, heapMetadata⟩
+            finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
           · rw [call_rename]; exact completed
           · rw [sourceType]; exact .value (CompatibleBuiltinMeaning.result_represents inputs applied resultRep)
       | fault failed => exact False.elim (InputRep.excludes_callable_fault inputs failed)
 
-include functionLeaves in
-theorem Head.reflects
-    (argumentMeaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+include functionLeaves unique in
+theorem Head.preserves
+    (argumentMeaning : TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source certificate faults) :
-    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
       program context evidence source (Head values source certificate) faults := by
+  exact ExpressionFailurePostContracts.TypedPreserves.forget
+    (Head.preserves_with_post functions functionLeaves program evidence unique
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (BuiltinFaultPostContracts.trivial_joins values program context evidence source)
+      (ExpressionFailurePostContracts.TypedPreserves.of_trivial argumentMeaning))
+
+include functionLeaves in
+theorem Head.reflects_with_post
+    {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    {listPost : ExpressionFailurePostContracts.ExpressionsFaultPost}
+    (sequenceJoins : ExpressionFailurePostContracts.SequenceJoins post listPost program context evidence source)
+    (builtinJoins : BuiltinFaultPostContracts.Joins post listPost values program context evidence source)
+    (argumentMeaning : ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults post) :
+    ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults post := by
   intro scope id lowered tree
   cases tree with
   | @contracted callee arguments function node codes identity contract unknown metadata form sourceType children nativeTypes =>
@@ -161,8 +183,8 @@ theorem Head.reflects
     have prefixedTyped := RuntimeEnvironmentHasTypes.cons (RuntimeValueHasType.unit (definitions := ambient.definitions))
       (.cons (contracted_typed actualTyped function identity contract) actualTyped)
     obtain ⟨argumentOutcome, middle, finalMap, finalWorld, argumentTrace, represented, finalHeaps,
-      maps, worlds, frame, heapMetadata⟩ :=
-      TypedDataExpressionSequence.reflects children argumentMeaning environments heaps locals prefixedLayout prefixedTyped shifted
+      maps, worlds, frame, heapMetadata, retained⟩ :=
+      TypedDataExpressionSequence.reflects_with_post children sequenceJoins argumentMeaning environments heaps locals prefixedLayout prefixedTyped shifted
     cases represented with
     | values represented =>
       cases argumentTrace with
@@ -175,7 +197,7 @@ theorem Head.reflects
         subst finalStore
         refine ⟨.value sourceResult, middle, finalMap, finalWorld,
           source_intro metadata form (.apply sourceArgs (.value (.builtin applied))), ?_,
-          finalHeaps, maps, worlds, frame, heapMetadata⟩
+          finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
         rw [sourceType]; exact .value (CompatibleBuiltinMeaning.result_represents inputs applied resultRep)
     | fault matched =>
       cases argumentTrace with
@@ -185,7 +207,21 @@ theorem Head.reflects
           (gates_accept contract unknown .beforeArguments) argumentEval
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed failed
         exact ⟨.fault _, middle, finalMap, finalWorld, source_intro metadata form (.argumentsFault sourceArgs),
-          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata⟩
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata,
+          BuiltinFaultPostContracts.arguments_fault_outcome builtinJoins metadata form sourceType children nativeTypes sourceArgs
+            (ExpressionFailurePostContracts.ListOutcomePost.fault retained)⟩
+
+include functionLeaves in
+theorem Head.reflects
+    (argumentMeaning : TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source certificate faults) :
+    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Head values source certificate) faults := by
+  exact ExpressionFailurePostContracts.TypedReflects.forget
+    (Head.reflects_with_post functions functionLeaves program evidence
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source)
+      (BuiltinFaultPostContracts.trivial_joins values program context evidence source)
+      (ExpressionFailurePostContracts.TypedReflects.of_trivial argumentMeaning))
 
 include extension faithful functionLeaves functionTypes valid unique uninitialized missing in
 /-- Concrete recursive General arguments close every runtime child obligation. -/
