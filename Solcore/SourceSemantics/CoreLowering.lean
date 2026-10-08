@@ -859,6 +859,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicTypedToken
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedObservedGeneralCallee
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureSourceArguments
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureInvocation
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

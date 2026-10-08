@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ProtectedStatePlaceAssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPlaceAssignmentContracts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceTailReflection
@@ -44,7 +45,7 @@ priority. Raw default/token metadata remain authenticated throughout. -/
 namespace Stateful
 universe u v
 
-theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Context}
+theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -60,8 +61,6 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
     (functionTypes : FunctionRuntimeViews functions)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
-    (missingTokens : ∀ {root resolved reason token count},
-      FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     {operator : Syntax.ValueAssignOp}
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -81,6 +80,8 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (rhsState : protocol.State ⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩)
     (rhsRelated : protocol.Relates initialState rhsState)
+    (missingFor : ProtectedPlaceReachedDiagnostics.MissingFor compilation.checked registry functions protocol
+      source site place prepared leaf initialState faults)
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : CoreProof.EvaluationSize size (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
       (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
@@ -138,18 +139,31 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
     | caseLeft setterEvaluated failed =>
       obtain ⟨futureWorld, _, represented, finalHeaps, extension, frame, _⟩ := reflectSetter setterEvaluated.sound
       cases represented with
-      | missing root fault receipt =>
+      | @missing sourceRoot reason token count root fault receipt =>
         cases failed with
         | inLeft valueEvaluated =>
           cases valueEvaluated with
           | var found =>
             simp only [List.getElem?_cons_zero, Option.some.injEq] at found
             subst_vars
-            exact .fault (.structuralUpdate sourceTrace rhsTrace latest.read cellType root fault) rfl (missingTokens receipt)
+            obtain ⟨optional, rootValue, live⟩ := ProtectedPlaceReachedDiagnostics.root_of_initial
+              right.meaning.heaps reference latest.read root
+              (fun k v same => layout.virtual k v (latest.type.symm.trans same)) registryExtension
+            obtain ⟨otherToken, otherCount, otherReceipt, tree⟩ := currentArguments.faultTree live.payload fault prepared
+            obtain ⟨rfl, rfl⟩ := receipt.functional otherReceipt
+            let reached := transport.extend rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl right.heap)
+            have phaseRelated := transport.related rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl right.heap)
+            have witness : ProtectedPlaceReachedDiagnostics.MissingWitness compilation.checked registry functions protocol
+                source site place prepared leaf initialState reached reason token :=
+              ⟨⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩, rhsState,
+                target.location, resolution.target, latest.cell, optional, sourceRoot, rootValue,
+                resolution.values, target.projections, count, currentPath, rhsRelated, phaseRelated,
+                rfl, rfl, rfl, extension, frame, live, latest.type, currentArguments, fault, receipt, tree⟩
+            exact .fault (.structuralUpdate sourceTrace rhsTrace latest.read cellType root fault) rfl
+              (missingFor reached (protocol.trans rhsRelated phaseRelated) witness)
               finalHeaps (resolution.maps.trans right.meaning.maps) ((resolution.worlds.trans right.meaning.worlds).trans extension)
               ((resolution.frame.trans right.meaning.frame).trans frame) (resolution.metadata.trans right.meaning.metadata)
-              ⟨transport.extend rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl right.heap),
-                protocol.trans rhsRelated (transport.related rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl right.heap))⟩
+              ⟨reached, protocol.trans rhsRelated phaseRelated⟩
       | uninitialized empty notMapping nonempty =>
         have absent := absent_initial latest.related empty notMapping
         exact (DataPlaceSourceOrder.latest_uninitialized_impossible sourceTrace.sound rhsTrace.sound latest.read cellType absent nonempty).elim
@@ -181,6 +195,56 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
                   (transport.related rhsState (.refl _) extension helperFrame (Dynamic.HeapMetadataExtend.refl right.heap)))
                   (transport.related helperState (.refl _) (.refl _) writeFrame metadata)⟩
               (by omega) continuation
+
+
+theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (functionTypes : FunctionRuntimeViews functions)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (missingTokens : ∀ {root resolved reason token count},
+      FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
+    {operator : Syntax.ValueAssignOp}
+    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before targetHeap : Dynamic.Heap} {store finalStore : Store}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    {target : Dynamic.ResolvedPlace}
+    {sourceSize rhsSize size : Nat}
+    (sourceTrace : SourceExecutionSize.SourcePlaceResolves program sourceSize context evidence source environment before place target targetHeap)
+    (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared (renamedCodes codes ξ) sourceTypes place leaf target
+      coreEnvironment store mapping world before targetHeap)
+    {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
+      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+    (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (rhsState : protocol.State ⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩)
+    (rhsRelated : protocol.Relates initialState rhsState)
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
+    (completed : CoreProof.EvaluationSize size (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+      (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
+      (CompatiblePlaceRhsReflection.remainder prepared (SourceCoreCalls.packArguments codes).type next outputType
+        (binaryOperator (prepared.route.leafType = .integer) operator) invalid) result finalStore) :
+    ProtectedStatePlaceAssignmentContracts.ResultAt protocol size compilation.checked registry functions program context evidence source faults
+      prepared (SourceCoreCalls.packArguments codes).type actualContext place operator rhs environment coreEnvironment
+      before store mapping world scope canonical initialState next outputType result finalStore := by
+  exact reflects_ready_sized_with_diagnostics protocol transport layout ordinary registryExtension functionTypes faithful observations
+    profile environments agrees actualTyped sourceTrace resolution right rhsTrace initialState rhsState rhsRelated
+    (ProtectedPlaceReachedDiagnostics.MissingFor.of_uniform missingTokens) completed
 
 end Stateful
 

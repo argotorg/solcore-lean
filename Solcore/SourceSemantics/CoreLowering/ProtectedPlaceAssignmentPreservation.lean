@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceResolution
 import Solcore.SourceSemantics.CoreLowering.ProtectedPlaceRhs
 import Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceFaults
@@ -1015,6 +1016,113 @@ assignment's failure before its RHS, modifier, setter or continuation starts. -/
 namespace Stateful
 universe u v
 
+theorem projection_bounded_with_sequence_with_receipt (budget : Nat)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (_heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequenceMeaning : ∀ target,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target) →
+      RuntimeEnvironmentHasTypes world
+        (.cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (OptionalCell.referenceType prepared.route.rootType :: actualContext) ambient.definitions →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (ids := DataPlaceKeyOrder.sourceKeys place.projections) (sourceTypes := sourceTypes) (codes := codes) (faults := faults)
+        (environment := environment) (actual := .cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (ξ := DataPlaceChildExpressions.prefixRenaming 1 ξ)
+        (payloadModel compilation.checked registry functions) initialState budget)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    (lookup : Dynamic.Environment.LooksUp environment place.root location)
+    (initialRead : Dynamic.Heap.Reads before location initialCell)
+    {size : Nat} (trace : SourceExecutionSize.SourceProjectionsEvaluate program size context evidence source environment before place.projections resolved after) (bounded : size ≤ budget)
+    (currentRead : Dynamic.Heap.Reads after location currentCell)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
+    (initialValue : Dynamic.RootInitialValue currentCell initial)
+    (fault : Dynamic.ProjectionsFaults initial resolved reason)
+    (operator : Syntax.ValueAssignOp) (rhsId : ExpressionId) (rhs next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    ∃ token count sourceRoot finalStore finalMap finalWorld,
+      Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhsId reason after ∧
+      Dynamic.RootInitialValue currentCell (some sourceRoot) ∧
+      FaultToken compilation.checked registry sourceRoot prepared.steps resolved reason token count ∧
+      Evaluates coreEnvironment store
+        (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+        (.inLeft outputType (.word token)) finalStore ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedPlaceReachedDiagnostics.MissingPost compilation.checked registry functions protocol source site place prepared leaf initialState
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ reason token := by
+  have getterTyped := getter_typed layout (virtual_closed layout ordinary) (environment_respects environments.runtime_hasTypes actualTyped agrees)
+  obtain ⟨keys, keyPost⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded
+  obtain ⟨keyState, keyStateRelated⟩ := keyPost
+  have cellEq := currentRead.functional keys.read
+  have cellType : currentCell.type = prepared.route.rootSourceType := cellEq ▸ keys.type
+  have present : ∃ sourceRoot, initial = some sourceRoot := by
+    cases initial with
+    | some value => exact ⟨value, rfl⟩
+    | none => cases fault
+  obtain ⟨sourceRoot, rfl⟩ := present
+  have rootExists : ∃ optional rootValue,
+      RootRead compilation.checked registry functions keys.keyMap keys.keyWorld prepared after keys.keyStore location keys.target
+        currentCell optional sourceRoot rootValue := by
+    cases initialValue with
+    | initialized =>
+      obtain ⟨value, root⟩ := CompatibleHeap.HeapRepresents.initialized_root keys.heaps keys.reference currentRead
+      exact ⟨_, value, root⟩
+    | emptyMapping key value =>
+      obtain ⟨native, root⟩ := CompatibleHeap.HeapRepresents.virtual_root keys.heaps keys.reference currentRead
+        (layout.virtual key value cellType.symm) registryExtension
+      exact ⟨_, native, root⟩
+  obtain ⟨optional, rootValue, root⟩ := rootExists
+  have keyRelated : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) keys.keyMap keys.keyWorld sourceTypes (codes.map (·.type)) keys.sources keys.values := by
+    simpa only [renamedCodes_types] using keys.related
+  have arguments := layout.views.arguments keys.shaped keyRelated (fun _ _ found => by simpa only [Nat.zero_add] using found)
+  have currentPath : PreparedPath compilation.checked source site currentCell.type place.projections
+      0 prepared.steps prepared.keys leaf := cellType ▸ layout.path
+  have currentArguments : Arguments compilation.checked registry functions keys.keyMap keys.keyWorld source site keys.values
+      currentPath resolved := by simpa only [cellType] using arguments
+  obtain ⟨token, count, receipt, tree⟩ := currentArguments.faultTree root.payload fault prepared
+  have keyLength : prepared.keyTypes.length = keys.values.length := layout.keyTypes ▸ keyRelated.length.2
+  obtain ⟨finalStore, administrative, _, _, evaluated, appended, _⟩ :=
+    faultTree_at root tree layout.nonempty faithful observations keyLength
+      (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
+      (SourceCoreCalls.packArguments codes).type (.var 1) (.var 0) (.var rfl) (.var rfl)
+  have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
+      (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
+      ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
+        actualContext) ambient.definitions :=
+    .cons (CompatiblePlaceResolution.values_typed keyRelated)
+      (.cons (.cellRef keys.reference.typed) (actualTyped.weaken keys.worlds))
+  obtain ⟨finalWorld, extension, typedStore, _, frame⟩ :=
+    evaluation_frame (mapping := keys.keyMap) keys.heaps.runtime_hasTypes typedEnvironment getterTyped evaluated appended
+  let reached := transport.extend keyState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl after)
+  have phaseRelated := transport.related keyState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl after)
+  refine ⟨token, count, sourceRoot, finalStore, keys.keyMap, finalWorld,
+    .target (.projectionRead lookup initialRead trace.sound currentRead initialValue fault), initialValue, receipt, ?_,
+    CompatibleHeap.HeapRepresents.after_snapshot keys.heaps extension typedStore appended,
+    keys.maps, keys.worlds.trans extension, keys.frame.trans frame, keys.metadata,
+    reached, protocol.trans keyStateRelated phaseRelated,
+    ⟨⟨scope, keys.keyMap, keys.keyWorld, after, keys.keyStore, canonical⟩, keyState, location, keys.target,
+      currentCell, optional, sourceRoot, rootValue, keys.values, resolved, count, currentPath,
+      keyStateRelated, phaseRelated, rfl, rfl, rfl, extension, frame, root, cellType, currentArguments, fault, receipt, tree⟩⟩
+  unfold execute
+  simp only [packed_renamed_type]
+  exact .letE (.var keys.selected)
+    (LanguageResult.bind_success _ keys.evaluated (LanguageResult.bind_failure _ evaluated))
+
+
 theorem projection_bounded_with_sequence (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
@@ -1062,59 +1170,13 @@ theorem projection_bounded_with_sequence (budget : Nat)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  have getterTyped := getter_typed layout (virtual_closed layout ordinary) (environment_respects environments.runtime_hasTypes actualTyped agrees)
-  obtain ⟨keys, keyPost⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded
-  obtain ⟨keyState, keyStateRelated⟩ := keyPost
-  have cellEq := currentRead.functional keys.read
-  have cellType : currentCell.type = prepared.route.rootSourceType := cellEq ▸ keys.type
-  have present : ∃ sourceRoot, initial = some sourceRoot := by
-    cases initial with
-    | some value => exact ⟨value, rfl⟩
-    | none => cases fault
-  obtain ⟨sourceRoot, rfl⟩ := present
-  have rootExists : ∃ optional rootValue,
-      RootRead compilation.checked registry functions keys.keyMap keys.keyWorld prepared after keys.keyStore location keys.target
-        currentCell optional sourceRoot rootValue := by
-    cases initialValue with
-    | initialized =>
-      obtain ⟨value, root⟩ := CompatibleHeap.HeapRepresents.initialized_root keys.heaps keys.reference currentRead
-      exact ⟨_, value, root⟩
-    | emptyMapping key value =>
-      obtain ⟨native, root⟩ := CompatibleHeap.HeapRepresents.virtual_root keys.heaps keys.reference currentRead
-        (layout.virtual key value cellType.symm) registryExtension
-      exact ⟨_, native, root⟩
-  obtain ⟨optional, rootValue, root⟩ := rootExists
-  have keyRelated : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) keys.keyMap keys.keyWorld sourceTypes (codes.map (·.type)) keys.sources keys.values := by
-    simpa only [renamedCodes_types] using keys.related
-  have arguments := layout.views.arguments keys.shaped keyRelated (fun _ _ found => by simpa only [Nat.zero_add] using found)
-  have currentPath : PreparedPath compilation.checked source site currentCell.type place.projections
-      0 prepared.steps prepared.keys leaf := cellType ▸ layout.path
-  have currentArguments : Arguments compilation.checked registry functions keys.keyMap keys.keyWorld source site keys.values
-      currentPath resolved := by simpa only [cellType] using arguments
-  obtain ⟨token, count, receipt, tree⟩ := currentArguments.faultTree root.payload fault prepared
-  have keyLength : prepared.keyTypes.length = keys.values.length := layout.keyTypes ▸ keyRelated.length.2
-  obtain ⟨finalStore, administrative, _, _, evaluated, appended, _⟩ :=
-    faultTree_at root tree layout.nonempty faithful observations keyLength
-      (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
-      (SourceCoreCalls.packArguments codes).type (.var 1) (.var 0) (.var rfl) (.var rfl)
-  have typedEnvironment : RuntimeEnvironmentHasTypes keys.keyWorld
-      (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
-      ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType ::
-        actualContext) ambient.definitions :=
-    .cons (CompatiblePlaceResolution.values_typed keyRelated)
-      (.cons (.cellRef keys.reference.typed) (actualTyped.weaken keys.worlds))
-  obtain ⟨finalWorld, extension, typedStore, _, frame⟩ :=
-    evaluation_frame (mapping := keys.keyMap) keys.heaps.runtime_hasTypes typedEnvironment getterTyped evaluated appended
-  refine ⟨token, count, sourceRoot, finalStore, keys.keyMap, finalWorld,
-    .target (.projectionRead lookup initialRead trace.sound currentRead initialValue fault), initialValue, receipt, ?_,
-    CompatibleHeap.HeapRepresents.after_snapshot keys.heaps extension typedStore appended,
-    keys.maps, keys.worlds.trans extension, keys.frame.trans frame, keys.metadata,
-    transport.extend keyState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl after),
-    protocol.trans keyStateRelated (transport.related keyState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl after))⟩
-  unfold execute
-  simp only [packed_renamed_type]
-  exact .letE (.var keys.selected)
-    (LanguageResult.bind_success _ keys.evaluated (LanguageResult.bind_failure _ evaluated))
+  obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, sourceFault, present, receipt,
+    evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    projection_bounded_with_sequence_with_receipt budget layout ordinary protocol transport environments _heaps
+      locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded currentRead
+      registryExtension faithful observations initialValue fault operator rhsId rhs next outputType invalidOperand
+  exact ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, sourceFault, present, receipt,
+    evaluated, finalHeaps, maps, worlds, frame, metadata, post.forget⟩
 
 theorem projection_bounded (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
@@ -1277,6 +1339,82 @@ claim that native type equality recovers the source declaration. -/
 namespace Stateful
 universe u v
 
+theorem uninitialized_bounded_with_sequence_with_receipt (budget : Nat)
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (_heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequenceMeaning : ∀ target,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target) →
+      RuntimeEnvironmentHasTypes world
+        (.cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (OptionalCell.referenceType prepared.route.rootType :: actualContext) ambient.definitions →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (ids := DataPlaceKeyOrder.sourceKeys place.projections) (sourceTypes := sourceTypes) (codes := codes) (faults := faults)
+        (environment := environment) (actual := .cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (ξ := DataPlaceChildExpressions.prefixRenaming 1 ξ)
+        (payloadModel compilation.checked registry functions) initialState budget)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    (lookup : Dynamic.Environment.LooksUp environment place.root location)
+    (initialRead : Dynamic.Heap.Reads before location initialCell)
+    {size : Nat} (trace : SourceExecutionSize.SourceProjectionsEvaluate program size context evidence source environment before place.projections resolved after) (bounded : size ≤ budget)
+    (currentRead : Dynamic.Heap.Reads after location currentCell)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (empty : currentCell.value = none)
+    (notMapping : ¬ ∃ key value, currentCell.type = .mapping key value)
+    (hasProjection : resolved ≠ [])
+    (operator : Syntax.ValueAssignOp) (rhsId : ExpressionId) (rhs next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    ∃ finalStore finalMap finalWorld,
+      Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhsId
+        (.uninitializedLocation location) after ∧
+      Evaluates coreEnvironment store
+        (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+        (.inLeft outputType (.word prepared.invalidProjection)) finalStore ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedPlaceReachedDiagnostics.UninitializedPost compilation.checked registry functions protocol environment place prepared initialState
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ location := by
+  obtain ⟨keys, post⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded
+  have cellEq := currentRead.functional keys.read
+  have cellType : currentCell.type = prepared.route.rootSourceType := cellEq ▸ keys.type
+  have noVirtual : prepared.route.rootMapping = none := ordinary (fun key value same => notMapping ⟨key, value, cellType.trans same⟩)
+  obtain ⟨optional, native, represented⟩ := CompatibleHeap.HeapRepresents.read_at keys.heaps keys.reference currentRead
+  have absent : optional = .inLeft prepared.route.rootType .unit := by
+    cases represented with
+    | uninitialized => rfl
+    | initialized => cases empty
+  rw [absent] at native
+  have evaluated : Evaluates (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
+      keys.keyStore (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
+      (.inLeft prepared.optionalLeaf (.word prepared.invalidProjection)) keys.keyStore := by
+    apply Evaluates.apply .lambda (.pair (.loadCell (.var rfl) native) (.var rfl))
+    cases steps : prepared.steps with
+    | nil => exact (layout.nonempty steps).elim
+    | cons head tail =>
+      simp only [normalizeRoot, noVirtual, LanguageResult.failure]
+      exact .caseLeft (.first (.var rfl)) (.inLeft .word)
+  obtain ⟨keyState, keyRelated⟩ := post
+  refine ⟨keys.keyStore, keys.keyMap, keys.keyWorld,
+    .target (.uninitialized lookup initialRead trace.sound currentRead empty notMapping hasProjection), ?_,
+    keys.heaps, keys.maps, keys.worlds, keys.frame, keys.metadata,
+    keyState, keyRelated,
+    ⟨⟨scope, keys.keyMap, keys.keyWorld, after, keys.keyStore, canonical⟩, keyState, keys.target, currentCell,
+      .inLeft prepared.route.rootType .unit, keys.sources, resolved, keyRelated, protocol.refl keyState, rfl, rfl, rfl,
+      .refl _, .refl _ _, lookup, currentRead, keys.reference, native, absent ▸ represented, cellType, empty, notMapping, layout.nonempty, keys.shaped, hasProjection⟩⟩
+  unfold execute
+  simp only [packed_renamed_type]
+  exact .letE (.var keys.selected)
+    (LanguageResult.bind_success _ keys.evaluated (LanguageResult.bind_failure _ evaluated))
+
+
 theorem uninitialized_bounded_with_sequence (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
@@ -1319,32 +1457,11 @@ theorem uninitialized_bounded_with_sequence (budget : Nat)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  obtain ⟨keys, post⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded
-  have cellEq := currentRead.functional keys.read
-  have cellType : currentCell.type = prepared.route.rootSourceType := cellEq ▸ keys.type
-  have noVirtual : prepared.route.rootMapping = none := ordinary (fun key value same => notMapping ⟨key, value, cellType.trans same⟩)
-  obtain ⟨optional, native, represented⟩ := CompatibleHeap.HeapRepresents.read_at keys.heaps keys.reference currentRead
-  have absent : optional = .inLeft prepared.route.rootType .unit := by
-    cases represented with
-    | uninitialized => rfl
-    | initialized => cases empty
-  rw [absent] at native
-  have evaluated : Evaluates (keysEnvironment prepared.route.rootType keys.target (packValues keys.values) coreEnvironment)
-      keys.keyStore (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
-      (.inLeft prepared.optionalLeaf (.word prepared.invalidProjection)) keys.keyStore := by
-    apply Evaluates.apply .lambda (.pair (.loadCell (.var rfl) native) (.var rfl))
-    cases steps : prepared.steps with
-    | nil => exact (layout.nonempty steps).elim
-    | cons head tail =>
-      simp only [normalizeRoot, noVirtual, LanguageResult.failure]
-      exact .caseLeft (.first (.var rfl)) (.inLeft .word)
-  refine ⟨keys.keyStore, keys.keyMap, keys.keyWorld,
-    .target (.uninitialized lookup initialRead trace.sound currentRead empty notMapping hasProjection), ?_,
-    keys.heaps, keys.maps, keys.worlds, keys.frame, keys.metadata, post⟩
-  unfold execute
-  simp only [packed_renamed_type]
-  exact .letE (.var keys.selected)
-    (LanguageResult.bind_success _ keys.evaluated (LanguageResult.bind_failure _ evaluated))
+  obtain ⟨finalStore, finalMap, finalWorld, sourceFault, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    uninitialized_bounded_with_sequence_with_receipt budget layout protocol environments _heaps locals agrees actualTyped
+      initialState sequenceMeaning slot rootTyped lookup initialRead trace bounded currentRead ordinary empty notMapping
+      hasProjection operator rhsId rhs next outputType invalidOperand
+  exact ⟨finalStore, finalMap, finalWorld, sourceFault, evaluated, finalHeaps, maps, worlds, frame, metadata, post.forget⟩
 
 theorem uninitialized_bounded (budget : Nat)
     (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
@@ -1508,6 +1625,165 @@ stopped; no decoder or source evaluator supplies the semantic result. -/
 namespace Stateful
 universe u v
 
+theorem preserves_bounded_with_producers_with_receipt (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
+    {operator : Syntax.ValueAssignOp}
+    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
+      SourceCoreRawMetadata.runtimeType leaf = .integer)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
+    {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (_heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (sequenceMeaning : ∀ target,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target) →
+      RuntimeEnvironmentHasTypes world
+        (.cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (OptionalCell.referenceType prepared.route.rootType :: actualContext) ambient.definitions →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (ids := DataPlaceKeyOrder.sourceKeys place.projections) (sourceTypes := sourceTypes) (codes := codes) (faults := faults)
+        (environment := environment) (actual := .cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (ξ := DataPlaceChildExpressions.prefixRenaming 1 ξ)
+        (payloadModel compilation.checked registry functions) initialState budget)
+    (rhsMeaning : ProtectedPlaceRhs.PreservesAfter (checked := compilation.checked) (registry := registry) (functions := functions)
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (prepared := prepared) (place := place) (codes := codes) (sourceTypes := sourceTypes) (leaf := leaf)
+      (faults := faults) (id := rhs) (node := node) (lowered := lowered) (environment := environment)
+      (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initialState budget)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {resolveSize rhsSize : Nat}
+    (resolve : SourceExecutionSize.SourcePlaceResolves program resolveSize context evidence source environment before place sourceTarget targetHeap)
+    (evaluate : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right rhsHeap)
+    (resolveBound : resolveSize ≤ budget) (rhsBound : rhsSize < budget)
+    (sourceRead : Dynamic.Heap.Reads rhsHeap sourceTarget.location cell)
+    (rootType : cell.type = sourceTarget.rootType)
+    (initialValue : Dynamic.RootInitialValue cell initial)
+    (fault : Dynamic.ProjectionsFaults initial sourceTarget.projections reason)
+    (next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    ∃ token count sourceRoot finalStore finalMap finalWorld,
+      Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhs reason rhsHeap ∧
+      Dynamic.RootInitialValue cell (some sourceRoot) ∧
+      FaultToken compilation.checked registry sourceRoot prepared.steps sourceTarget.projections reason token count ∧
+      Evaluates coreEnvironment store
+        (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) (lowered.expression.rename ξ) next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+        (.inLeft outputType (.word token)) finalStore ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld rhsHeap finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before rhsHeap ∧
+      ProtectedPlaceReachedDiagnostics.MissingPost compilation.checked registry functions protocol source site place prepared leaf initialState
+        ⟨scope, finalMap, finalWorld, rhsHeap, finalStore, canonical⟩ reason token := by
+  have closed := virtual_closed layout ordinary
+  have respects := environment_respects environments.runtime_hasTypes actualTyped agrees
+  have getterTyped := getter_typed layout closed respects
+  have setterTyped := setter_typed layout closed respects
+  have sourceFault := Dynamic.SourcePlaceAssignmentFaults.structuralUpdate (operator := operator) resolve.sound evaluate.sound sourceRead rootType initialValue fault
+  obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
+    layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
+    environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve resolveBound
+  obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
+  obtain ⟨rightResult, rhsStore, rhsMap, rhsWorld, rhsResult, rhsPost⟩ :=
+    rhsMeaning resolve.sound resolution resolutionState resolutionRelated rhsBound (.value evaluate)
+  cases represented : rhsResult.represented with
+  | @value _ rightValue rightRep =>
+    obtain ⟨rhsState, rhsRelated⟩ := rhsPost
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
+      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have snapshotRep := rhsResult.saved_snapshot
+    have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
+      simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
+    have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
+    have arguments := layout.views.arguments resolution.shaped keyRep (fun _ _ _found => by simpa only [Nat.zero_add] using _found)
+    obtain ⟨latest⟩ := rhsResult.latest
+    have cellEq := sourceRead.functional latest.read
+    have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
+    obtain ⟨replacement, replacementValue, replacementRep, _, modifiedEvaluated, valid⟩ :=
+      CompatiblePlaceModifier.initialized_success observations operatorProfile snapshotRep rightRep
+        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
+        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
+    have present : ∃ sourceRoot, initial = some sourceRoot := by
+      cases initial with
+      | some value => exact ⟨value, rfl⟩
+      | none => cases fault
+    obtain ⟨sourceRoot, rfl⟩ := present
+    have rootExists : ∃ optional rootValue,
+        RootRead compilation.checked registry functions rhsMap rhsWorld prepared rhsHeap rhsStore sourceTarget.location resolution.target
+          cell optional sourceRoot rootValue := by
+      cases initialValue with
+      | initialized =>
+        obtain ⟨value, root⟩ := CompatibleHeap.HeapRepresents.initialized_root rhsResult.heaps reference sourceRead
+        exact ⟨_, value, root⟩
+      | emptyMapping key value =>
+        obtain ⟨native, root⟩ := CompatibleHeap.HeapRepresents.virtual_root rhsResult.heaps reference sourceRead
+          (layout.virtual key value cellType.symm) registryExtension
+        exact ⟨_, native, root⟩
+    obtain ⟨optional, rootValue, root⟩ := rootExists
+    have keyLength : prepared.keyTypes.length = resolution.values.length := layout.keyTypes ▸ keyRep.length.2
+    have typedEnvironment : RuntimeEnvironmentHasTypes rhsWorld
+        (modifiedEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+          (.inRight .unit resolution.snapshot) rightValue replacementValue coreEnvironment)
+        (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
+          OptionalCell.referenceType prepared.route.rootType :: actualContext)
+        ambient.definitions :=
+      .cons replacementRep.runtime_hasType (.cons rightRep.runtime_hasType (.cons (.inRight snapshotRep.runtime_hasType)
+        (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
+          (actualTyped.weaken (resolution.worlds.trans rhsResult.worlds))))))
+    have currentPath : PreparedPath compilation.checked source site cell.type place.projections
+        0 prepared.steps prepared.keys leaf := cellType ▸ layout.path
+    have currentArguments : Arguments compilation.checked registry functions rhsMap rhsWorld source site resolution.values
+        currentPath sourceTarget.projections := by simpa only [cellType] using arguments
+    obtain ⟨token, count, finalStore, administrative, finalWorld, receipt, setterEvaluated,
+      finalHeaps, extension, frame, _, _, _⟩ :=
+      CompatiblePlaceSetterFault.preserves root rhsResult.heaps currentArguments fault layout.nonempty
+        faithful observations keyLength typedEnvironment setterTyped (.var rfl) (.var rfl) (.var rfl)
+    obtain ⟨otherToken, otherCount, otherReceipt, tree⟩ := currentArguments.faultTree root.payload fault prepared
+    obtain ⟨rfl, rfl⟩ := receipt.functional otherReceipt
+    let reached := transport.extend rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap)
+    have phaseRelated := transport.related rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap)
+    refine ⟨token, count, sourceRoot, finalStore, rhsMap, finalWorld, sourceFault, initialValue, receipt, ?_, finalHeaps,
+      resolution.maps.trans rhsResult.maps, (resolution.worlds.trans rhsResult.worlds).trans extension,
+      (resolution.frame.trans rhsResult.frame).trans frame, resolution.metadata.trans rhsResult.metadata,
+      reached, protocol.trans (protocol.trans resolutionRelated rhsRelated) phaseRelated,
+      ⟨⟨scope, rhsMap, rhsWorld, rhsHeap, rhsStore, canonical⟩, rhsState, sourceTarget.location, resolution.target,
+        cell, optional, sourceRoot, rootValue, resolution.values, sourceTarget.projections, count, currentPath,
+        protocol.trans resolutionRelated rhsRelated, phaseRelated, rfl, rfl, rfl, extension, frame, root, cellType,
+        currentArguments, fault, receipt, tree⟩⟩
+    unfold execute
+    simp only [packed_renamed_type]
+    have snapshotEvaluated := resolution.snapshotEvaluated
+    simp only [packed_renamed_type] at snapshotEvaluated
+    exact .letE (.var coreLookup)
+      (LanguageResult.bind_success _ resolution.keysEvaluated
+        (LanguageResult.bind_success _ snapshotEvaluated
+          (LanguageResult.bind_success _ rhsResult.evaluated
+            (LanguageResult.bind_success _ modifiedEvaluated
+              (LanguageResult.bind_failure _ setterEvaluated)))))
+
+
 theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient}
@@ -1578,86 +1854,13 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before rhsHeap ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, rhsHeap, finalStore, canonical⟩ := by
-  have closed := virtual_closed layout ordinary
-  have respects := environment_respects environments.runtime_hasTypes actualTyped agrees
-  have getterTyped := getter_typed layout closed respects
-  have setterTyped := setter_typed layout closed respects
-  have sourceFault := Dynamic.SourcePlaceAssignmentFaults.structuralUpdate (operator := operator) resolve.sound evaluate.sound sourceRead rootType initialValue fault
-  obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
-    layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
-    environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve resolveBound
-  obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
-  obtain ⟨rightResult, rhsStore, rhsMap, rhsWorld, rhsResult, rhsPost⟩ :=
-    rhsMeaning resolve.sound resolution resolutionState resolutionRelated rhsBound (.value evaluate)
-  cases represented : rhsResult.represented with
-  | @value _ rightValue rightRep =>
-    obtain ⟨rhsState, rhsRelated⟩ := rhsPost
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
-    have snapshotRep := rhsResult.saved_snapshot
-    have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
-      simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
-    have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
-    have arguments := layout.views.arguments resolution.shaped keyRep (fun _ _ _found => by simpa only [Nat.zero_add] using _found)
-    obtain ⟨latest⟩ := rhsResult.latest
-    have cellEq := sourceRead.functional latest.read
-    have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
-    obtain ⟨replacement, replacementValue, replacementRep, _, modifiedEvaluated, valid⟩ :=
-      CompatiblePlaceModifier.initialized_success observations operatorProfile snapshotRep rightRep
-        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
-          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
-        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
-    have present : ∃ sourceRoot, initial = some sourceRoot := by
-      cases initial with
-      | some value => exact ⟨value, rfl⟩
-      | none => cases fault
-    obtain ⟨sourceRoot, rfl⟩ := present
-    have rootExists : ∃ optional rootValue,
-        RootRead compilation.checked registry functions rhsMap rhsWorld prepared rhsHeap rhsStore sourceTarget.location resolution.target
-          cell optional sourceRoot rootValue := by
-      cases initialValue with
-      | initialized =>
-        obtain ⟨value, root⟩ := CompatibleHeap.HeapRepresents.initialized_root rhsResult.heaps reference sourceRead
-        exact ⟨_, value, root⟩
-      | emptyMapping key value =>
-        obtain ⟨native, root⟩ := CompatibleHeap.HeapRepresents.virtual_root rhsResult.heaps reference sourceRead
-          (layout.virtual key value cellType.symm) registryExtension
-        exact ⟨_, native, root⟩
-    obtain ⟨optional, rootValue, root⟩ := rootExists
-    have keyLength : prepared.keyTypes.length = resolution.values.length := layout.keyTypes ▸ keyRep.length.2
-    have typedEnvironment : RuntimeEnvironmentHasTypes rhsWorld
-        (modifiedEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
-          (.inRight .unit resolution.snapshot) rightValue replacementValue coreEnvironment)
-        (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
-          OptionalCell.referenceType prepared.route.rootType :: actualContext)
-        ambient.definitions :=
-      .cons replacementRep.runtime_hasType (.cons rightRep.runtime_hasType (.cons (.inRight snapshotRep.runtime_hasType)
-        (.cons (CompatiblePlaceResolution.values_typed keyRep) (.cons (.cellRef reference.typed)
-          (actualTyped.weaken (resolution.worlds.trans rhsResult.worlds))))))
-    have currentPath : PreparedPath compilation.checked source site cell.type place.projections
-        0 prepared.steps prepared.keys leaf := cellType ▸ layout.path
-    have currentArguments : Arguments compilation.checked registry functions rhsMap rhsWorld source site resolution.values
-        currentPath sourceTarget.projections := by simpa only [cellType] using arguments
-    obtain ⟨token, count, finalStore, administrative, finalWorld, receipt, setterEvaluated,
-      finalHeaps, extension, frame, _, _, _⟩ :=
-      CompatiblePlaceSetterFault.preserves root rhsResult.heaps currentArguments fault layout.nonempty
-        faithful observations keyLength typedEnvironment setterTyped (.var rfl) (.var rfl) (.var rfl)
-    refine ⟨token, count, sourceRoot, finalStore, rhsMap, finalWorld, sourceFault, initialValue, receipt, ?_, finalHeaps,
-      resolution.maps.trans rhsResult.maps, (resolution.worlds.trans rhsResult.worlds).trans extension,
-      (resolution.frame.trans rhsResult.frame).trans frame, resolution.metadata.trans rhsResult.metadata,
-      transport.extend rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap),
-      protocol.trans (protocol.trans resolutionRelated rhsRelated)
-        (transport.related rhsState (.refl _) extension frame (Dynamic.HeapMetadataExtend.refl rhsHeap))⟩
-    unfold execute
-    simp only [packed_renamed_type]
-    have snapshotEvaluated := resolution.snapshotEvaluated
-    simp only [packed_renamed_type] at snapshotEvaluated
-    exact .letE (.var coreLookup)
-      (LanguageResult.bind_success _ resolution.keysEvaluated
-        (LanguageResult.bind_success _ snapshotEvaluated
-          (LanguageResult.bind_success _ rhsResult.evaluated
-            (LanguageResult.bind_success _ modifiedEvaluated
-              (LanguageResult.bind_failure _ setterEvaluated)))))
+  obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, sourceFault, present, receipt,
+    evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+    preserves_bounded_with_producers_with_receipt budget layout ordinary registryExtension protocol transport faithful observations
+      _rhsGenerated _found rhsView rhsCoreType operatorProfile environments _heaps locals agrees actualTyped initialState
+      sequenceMeaning rhsMeaning slot rootTyped resolve evaluate resolveBound rhsBound sourceRead rootType initialValue fault next outputType invalidOperand
+  exact ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, sourceFault, present, receipt,
+    evaluated, finalHeaps, maps, worlds, frame, metadata, post.forget⟩
 
 theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -1890,6 +2093,139 @@ open SourceCoreCompatibleDataPlaces DataPlaceExecution
 namespace Stateful
 universe u v
 
+theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
+    {operator : Syntax.ValueAssignOp}
+    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
+      SourceCoreRawMetadata.runtimeType leaf = .integer)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before after : Dynamic.Heap} {store : Store} {index : Nat}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (_heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (missingFor : ProtectedPlaceReachedDiagnostics.MissingFor compilation.checked registry functions protocol
+      source site place prepared leaf initialState faults)
+    (uninitializedFor : ProtectedPlaceReachedDiagnostics.UninitializedFor compilation.checked registry functions protocol
+      environment place prepared initialState faults)
+    (sequenceMeaning : ∀ target,
+      coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target) →
+      RuntimeEnvironmentHasTypes world
+        (.cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (OptionalCell.referenceType prepared.route.rootType :: actualContext) ambient.definitions →
+      ProtectedStateExpressionSequenceProducer.Preserves
+        (program := program) (context := context) (evidence := evidence) (source := source)
+        (ids := DataPlaceKeyOrder.sourceKeys place.projections) (sourceTypes := sourceTypes) (codes := codes) (faults := faults)
+        (environment := environment) (actual := .cellRef (OptionalCell.cellType prepared.route.rootType) target :: coreEnvironment)
+        (ξ := DataPlaceChildExpressions.prefixRenaming 1 ξ)
+        (payloadModel compilation.checked registry functions) initialState budget)
+    (rhsMeaning : ProtectedPlaceRhs.PreservesAfter (checked := compilation.checked) (registry := registry) (functions := functions)
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (prepared := prepared) (place := place) (codes := codes) (sourceTypes := sourceTypes) (leaf := leaf)
+      (faults := faults) (id := rhs) (node := node) (lowered := lowered) (environment := environment)
+      (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initialState budget)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator rhs reason after) (bounded : size ≤ budget)
+    (next : Expr) (outputType : Ty) (invalid : Word) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates coreEnvironment store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  simp only [execute_rename layout.path (virtual_closed layout ordinary), renamed_packed, Expr.rename]
+  have getterTyped := getter_typed layout (virtual_closed layout ordinary) (environment_respects environments.runtime_hasTypes actualTyped agrees)
+  obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
+  obtain ⟨sourceLocation, sourceCell, sourceLookup, sourceRead, _, _⟩ := locals.lookup staticLookup
+  cases trace with
+  | target fault =>
+    cases fault with
+    | unbound missing => exact (missing.excludes_lookup sourceLookup).elim
+    | dangling lookup missing =>
+      have same := lookup.functional sourceLookup
+      cases same
+      exact (missing.excludes_read sourceRead).elim
+    | projectionExpression lookup read fault =>
+      obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+        ProtectedPlaceAssignmentFailures.Stateful.keys_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot lookup read fault (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+          operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
+      exact ⟨token, finalStore, finalMap, finalWorld, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩
+    | danglingAfterProjections lookup read evaluated missing =>
+      obtain ⟨keys, _⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup read evaluated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+      exact (missing.excludes_read keys.read).elim
+    | projectionRead lookup initialRead evaluate currentRead initialValue fault =>
+      obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+        ProtectedPlaceAssignmentTargetFaults.Stateful.projection_bounded_with_sequence_with_receipt budget layout ordinary protocol transport environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead
+          registryExtension faithful observations initialValue fault operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
+      obtain ⟨reached, related, witness⟩ := post
+      exact ⟨token, finalStore, finalMap, finalWorld, evaluated, missingFor reached related witness, finalHeaps, maps, worlds, frame, metadata, reached, related⟩
+    | uninitialized lookup initialRead evaluate currentRead empty notMapping projected =>
+      obtain ⟨finalStore, finalMap, finalWorld, _, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+        ProtectedPlaceAssignmentTargetFaults.Stateful.uninitialized_bounded_with_sequence_with_receipt budget layout protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead
+          ordinary empty notMapping projected operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
+      obtain ⟨reached, related, witness⟩ := post
+      exact ⟨prepared.invalidProjection, finalStore, finalMap, finalWorld, evaluated, uninitializedFor reached related witness, finalHeaps, maps, worlds, frame, metadata, reached, related⟩
+  | rhs resolve fault =>
+    obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
+      layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
+      environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+    obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
+    obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+      ProtectedPlaceAssignmentFailures.Stateful.rhs_at_with_rhs _ resolution protocol _rhsGenerated _found rhsCoreType environments agrees actualTyped resolutionState
+        (rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)) locals resolve.sound coreLookup fault
+        operator (next.rename ξ) outputType invalid
+    obtain ⟨reached, related⟩ := post
+    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, reached, protocol.trans resolutionRelated related⟩
+  | operands resolve evaluate _ _ _ _ invalidOperands =>
+    obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
+      layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
+      environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
+    obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
+    obtain ⟨rightResult, rhsStore, rhsMap, rhsWorld, rhsResult, _⟩ :=
+      rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (.value evaluate)
+    cases represented : rhsResult.represented with
+    | @value _ rightValue rightRep =>
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
+        .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceModifier.initialized_success observations operatorProfile
+        rhsResult.saved_snapshot rightRep
+        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
+          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
+        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
+      rw [resolution.selectedEq] at invalidOperands
+      exact (valid invalidOperands).elim
+  | structuralUpdate resolve evaluate currentRead sameType initialValue fault =>
+    obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
+      ProtectedPlaceAssignmentStructuralFault.Stateful.preserves_bounded_with_producers_with_receipt budget layout ordinary registryExtension protocol transport faithful observations _rhsGenerated _found rhsView rhsCoreType
+        operatorProfile environments _heaps locals agrees actualTyped initialState sequenceMeaning rhsMeaning slot rootTyped resolve evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead sameType initialValue fault (next.rename ξ) outputType invalid
+    obtain ⟨reached, related, witness⟩ := post
+    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, missingFor reached related witness, finalHeaps, maps, worlds, frame, metadata, reached, related⟩
+
+
 theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient}
@@ -1953,70 +2289,98 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  simp only [execute_rename layout.path (virtual_closed layout ordinary), renamed_packed, Expr.rename]
-  have getterTyped := getter_typed layout (virtual_closed layout ordinary) (environment_respects environments.runtime_hasTypes actualTyped agrees)
-  obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
-  obtain ⟨sourceLocation, sourceCell, sourceLookup, sourceRead, _, _⟩ := locals.lookup staticLookup
-  cases trace with
-  | target fault =>
-    cases fault with
-    | unbound missing => exact (missing.excludes_lookup sourceLookup).elim
-    | dangling lookup missing =>
-      have same := lookup.functional sourceLookup
-      cases same
-      exact (missing.excludes_read sourceRead).elim
-    | projectionExpression lookup read fault =>
-      obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-        ProtectedPlaceAssignmentFailures.Stateful.keys_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot lookup read fault (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-          operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
-      exact ⟨token, finalStore, finalMap, finalWorld, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩
-    | danglingAfterProjections lookup read evaluated missing =>
-      obtain ⟨keys, _⟩ := ProtectedPlaceAssignmentTargetKeys.Stateful.preserves_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup read evaluated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-      exact (missing.excludes_read keys.read).elim
-    | projectionRead lookup initialRead evaluate currentRead initialValue fault =>
-      obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-        ProtectedPlaceAssignmentTargetFaults.Stateful.projection_bounded_with_sequence budget layout ordinary protocol transport environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead
-          registryExtension faithful observations initialValue fault operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
-      exact ⟨token, finalStore, finalMap, finalWorld, evaluated, missingTokens receipt, finalHeaps, maps, worlds, frame, metadata, post⟩
-    | uninitialized lookup initialRead evaluate currentRead empty notMapping projected =>
-      obtain ⟨finalStore, finalMap, finalWorld, _, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-        ProtectedPlaceAssignmentTargetFaults.Stateful.uninitialized_bounded_with_sequence budget layout protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead
-          ordinary empty notMapping projected operator rhs (lowered.expression.rename ξ) (next.rename ξ) outputType invalid
-      exact ⟨prepared.invalidProjection, finalStore, finalMap, finalWorld, evaluated, invalidTokens _, finalHeaps, maps, worlds, frame, metadata, post⟩
-  | rhs resolve fault =>
-    obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
-      layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
-      environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-    obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
-    obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-      ProtectedPlaceAssignmentFailures.Stateful.rhs_at_with_rhs _ resolution protocol _rhsGenerated _found rhsCoreType environments agrees actualTyped resolutionState
-        (rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)) locals resolve.sound coreLookup fault
-        operator (next.rename ξ) outputType invalid
-    obtain ⟨reached, related⟩ := post
-    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, reached, protocol.trans resolutionRelated related⟩
-  | operands resolve evaluate _ _ _ _ invalidOperands =>
-    obtain ⟨resolution, coreLookup, resolutionPost⟩ := ProtectedPlaceResolution.Stateful.preserves_bounded_with_sequence budget layout.path layout.views layout.keyTypes
-      layout.leafProjected layout.virtual registryExtension layout.nonempty getterTyped protocol transport faithful observations
-      environments locals agrees actualTyped initialState sequenceMeaning slot rootTyped resolve (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
-    obtain ⟨resolutionState, resolutionRelated⟩ := resolutionPost
-    obtain ⟨rightResult, rhsStore, rhsMap, rhsWorld, rhsResult, _⟩ :=
-      rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (.value evaluate)
-    cases represented : rhsResult.represented with
-    | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
-        .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
-      obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceModifier.initialized_success observations operatorProfile
-        rhsResult.saved_snapshot rightRep
-        (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
-          (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
-        (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
-      rw [resolution.selectedEq] at invalidOperands
-      exact (valid invalidOperands).elim
-  | structuralUpdate resolve evaluate currentRead sameType initialValue fault =>
-    obtain ⟨token, count, sourceRoot, finalStore, finalMap, finalWorld, _, _, receipt, evaluated, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
-      ProtectedPlaceAssignmentStructuralFault.Stateful.preserves_bounded_with_producers budget layout ordinary registryExtension protocol transport faithful observations _rhsGenerated _found rhsView rhsCoreType
-        operatorProfile environments _heaps locals agrees actualTyped initialState sequenceMeaning rhsMeaning slot rootTyped resolve evaluate (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) currentRead sameType initialValue fault (next.rename ξ) outputType invalid
-    exact ⟨token, finalStore, finalMap, finalWorld, evaluated, missingTokens receipt, finalHeaps, maps, worlds, frame, metadata, post⟩
+  exact preserves_bounded_with_producers_with_diagnostics budget layout ordinary registryExtension protocol transport faithful observations
+    _rhsGenerated _found rhsView rhsCoreType operatorProfile environments _heaps locals agrees actualTyped initialState
+    (ProtectedPlaceReachedDiagnostics.MissingFor.of_uniform missingTokens)
+    (ProtectedPlaceReachedDiagnostics.UninitializedFor.of_uniform invalidTokens)
+    sequenceMeaning rhsMeaning slot rootTyped trace bounded next outputType invalid
+
+theorem preserves_bounded_with_diagnostics (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (layout : CompatiblePlaceAssignmentSuccess.Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
+    (transport : ProtectedStateTransition.AdministrativeTransport protocol)
+    (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel compilation.checked registry functions) program context evidence source certificate faults size))
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
+    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
+    {operator : Syntax.ValueAssignOp}
+    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
+      SourceCoreRawMetadata.runtimeType leaf = .integer)
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before after : Dynamic.Heap} {store : Store} {index : Nat}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (missingFor : ProtectedPlaceReachedDiagnostics.MissingFor compilation.checked registry functions protocol
+      source site place prepared leaf initialState faults)
+    (uninitializedFor : ProtectedPlaceReachedDiagnostics.UninitializedFor compilation.checked registry functions protocol
+      environment place prepared initialState faults)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    {reason : Dynamic.SemanticFault}
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator rhs reason after) (bounded : size ≤ budget)
+    (next : Expr) (outputType : Ty) (invalid : Word) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates coreEnvironment store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
+          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
+  exact preserves_bounded_with_producers_with_diagnostics    (budget := budget)
+    (layout := layout)
+    (ordinary := ordinary)
+    (registryExtension := registryExtension)
+    (protocol := protocol)
+    (transport := transport)
+    (faithful := faithful)
+    (observations := observations)
+    (missingFor := missingFor)
+    (uninitializedFor := uninitializedFor)
+    (_rhsGenerated := rhsGenerated)
+    (_found := found)
+    (rhsView := rhsView)
+    (rhsCoreType := rhsCoreType)
+    (operatorProfile := operatorProfile)
+    (environments := environments)
+    (_heaps := heaps)
+    (locals := locals)
+    (agrees := agrees)
+    (actualTyped := actualTyped)
+    (initialState := initialState)
+    (slot := slot)
+    (rootTyped := rootTyped)
+    (trace := trace)
+    (bounded := bounded)
+    (next := next)
+    (outputType := outputType)
+    (invalid := invalid)
+    (sequenceMeaning := (by
+      intro target _ hiddenTyped
+      exact ProtectedStateExpressionSequenceProducer.Preserves.of_uniform (initial := initialState) budget layout.children
+        (fun size bounded => ProtectedStateTransition.SequenceBridge.preserves_at protocol (meaning size bounded))
+        environments heaps locals (DataPlaceChildExpressions.prefix_agrees agrees
+          [.cellRef (OptionalCell.cellType prepared.route.rootType) target]) hiddenTyped))
+    (rhsMeaning := (ProtectedPlaceRhs.PreservesAfter.of_uniform budget protocol meaning rhsGenerated found
+      environments agrees actualTyped locals initialState))
+
 
 theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -2066,42 +2430,11 @@ theorem preserves_bounded (budget : Nat) {compilation : SourceCoreCompatibleData
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  exact preserves_bounded_with_producers    (budget := budget)
-    (layout := layout)
-    (ordinary := ordinary)
-    (registryExtension := registryExtension)
-    (protocol := protocol)
-    (transport := transport)
-    (faithful := faithful)
-    (observations := observations)
-    (missingTokens := missingTokens)
-    (invalidTokens := invalidTokens)
-    (_rhsGenerated := rhsGenerated)
-    (_found := found)
-    (rhsView := rhsView)
-    (rhsCoreType := rhsCoreType)
-    (operatorProfile := operatorProfile)
-    (environments := environments)
-    (_heaps := heaps)
-    (locals := locals)
-    (agrees := agrees)
-    (actualTyped := actualTyped)
-    (initialState := initialState)
-    (slot := slot)
-    (rootTyped := rootTyped)
-    (trace := trace)
-    (bounded := bounded)
-    (next := next)
-    (outputType := outputType)
-    (invalid := invalid)
-    (sequenceMeaning := (by
-      intro target _ hiddenTyped
-      exact ProtectedStateExpressionSequenceProducer.Preserves.of_uniform (initial := initialState) budget layout.children
-        (fun size bounded => ProtectedStateTransition.SequenceBridge.preserves_at protocol (meaning size bounded))
-        environments heaps locals (DataPlaceChildExpressions.prefix_agrees agrees
-          [.cellRef (OptionalCell.cellType prepared.route.rootType) target]) hiddenTyped))
-    (rhsMeaning := (ProtectedPlaceRhs.PreservesAfter.of_uniform budget protocol meaning rhsGenerated found
-      environments agrees actualTyped locals initialState))
+  exact preserves_bounded_with_diagnostics budget layout ordinary registryExtension protocol transport meaning faithful observations
+    rhsGenerated found rhsView rhsCoreType operatorProfile environments heaps locals agrees actualTyped initialState
+    (ProtectedPlaceReachedDiagnostics.MissingFor.of_uniform missingTokens)
+    (ProtectedPlaceReachedDiagnostics.UninitializedFor.of_uniform invalidTokens)
+    slot rootTyped trace bounded next outputType invalid
 
 end Stateful
 
