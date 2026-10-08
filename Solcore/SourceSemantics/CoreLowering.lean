@@ -844,6 +844,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedEmittedTokenRuntimePro
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedTokenProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPrincipalLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrincipalLambdaExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicTokenReadyNamedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryLambdaSelectedCall
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
