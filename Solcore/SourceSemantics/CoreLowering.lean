@@ -819,6 +819,10 @@ import Solcore.SourceSemantics.CoreLowering.EmittedImperativeMatchCertificates
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedEmittedRuntimeProfileFactory
 import Solcore.SourceSemantics.CoreLowering.EmittedPreparedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedEmittedProfileExtraction
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaEntries
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralLambdaValues
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaBuiltinReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
