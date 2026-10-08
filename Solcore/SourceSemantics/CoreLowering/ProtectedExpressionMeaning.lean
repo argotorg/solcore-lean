@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedReadyExpressionFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.SourceExecutionSize
 import Solcore.SourceSemantics.CoreLowering.CoreEvaluationSize
 import Solcore.SourceSemantics.CoreLowering.TypedGenericExpressionMeaning
@@ -371,6 +372,232 @@ theorem preserves_values_bounded (budget : Nat) (tree : Tree source certificate 
           (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
         simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
 
+theorem preserves_fault_bounded_with_post
+    (expressionPost : ExpressionFailurePostContracts.ExpressionFaultPost)
+    (listPost : ExpressionFailurePostContracts.ExpressionsFaultPost)
+    (joins : ExpressionFailurePostContracts.SequenceJoins expressionPost listPost program context evidence source)
+    (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ id, id ∈ ids → ∀ size, size < budget →
+      ProtectedReadyExpressionFaultPostContracts.ExpressionPreservesAt ExpressionTraceAt protocol ready expressionPost size model program context evidence source
+        (fun current expression code => expression = id ∧ certificate current expression code) faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {reason : Dynamic.SemanticFault}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (initialReady : ready initial)
+    {size : Nat}
+    (execution : SourceExecutionSize.ExpressionsFault program size context evidence source environment before ids reason after) (bounded : size ≤ budget) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      listPost program context evidence source environment before ids reason after token finalMap finalWorld finalStore := by
+  induction tree generalizing size mapping world actual actualContext before store ξ after with
+  | nil => cases execution
+  | single found generated =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition, childPost⟩ := meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.fault failed)
+      cases represented with
+      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
+          finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related⟩, joins.head failed.sound (ExpressionFailurePostContracts.OutcomePost.fault childPost)⟩
+    | tail _ failed => cases failed
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    cases execution with
+    | head failed =>
+      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition, childPost⟩ := meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.fault failed)
+      cases represented with
+      | fault matched =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related⟩, joins.head failed.sound (ExpressionFailurePostContracts.OutcomePost.fault childPost)⟩
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
+    | tail head failed =>
+      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition, _firstPost⟩ :=
+        meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.value head)
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        obtain ⟨middleState, firstRelated, firstReady⟩ := firstTransition
+        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
+          maps, worlds, frame, metadata, lastTransition, tailPost⟩ := ih
+            (fun child member => meaning child (List.mem_cons_of_mem _ member))
+            (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix layout coreValue)
+            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+            middleState (firstReady _ rfl) failed
+            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
+        obtain ⟨finalState, lastRelated⟩ := lastTransition
+        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
+          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+          ⟨finalState, protocol.trans firstRelated lastRelated⟩, joins.tail head.sound failed.sound tailPost⟩
+        rw [rename_prefix] at second
+        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
+          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+
+theorem reflects_bounded_with_post
+    (expressionPost : ExpressionFailurePostContracts.ExpressionFaultPost)
+    (listPost : ExpressionFailurePostContracts.ExpressionsFaultPost)
+    (joins : ExpressionFailurePostContracts.SequenceJoins expressionPost listPost program context evidence source)
+    (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
+    (meaning : ∀ id, id ∈ ids → ∀ size, size < budget →
+      ProtectedReadyExpressionFaultPostContracts.ExpressionReflectsAt ExpressionTraceAt protocol ready expressionPost size model program context evidence source
+        (fun current expression code => expression = id ∧ certificate current expression code) faults)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
+    {store finalStore : Store} {ξ : Renaming} {value : Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (initialReady : ready initial)
+    {size : Nat}
+    (evaluated : EvaluationSize size actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) (bounded : size < budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      TraceAt program sourceSize context evidence source environment before ids outcome after ∧
+      Result model finalMap finalWorld sourceTypes codes faults outcome value ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      (∃ reached : protocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        protocol.Relates initial reached ∧ ∀ sources, outcome = .ok sources → ready reached) ∧
+      ExpressionFailurePostContracts.ListOutcomePost listPost program context evidence source environment before ids
+        (SourceCoreCalls.packArguments codes).type outcome after value finalMap finalWorld finalStore := by
+  induction tree generalizing size mapping world actual actualContext before store ξ value finalStore with
+  | nil =>
+    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (show Evaluates actual store
+      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
+    exact ⟨_, .ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
+      .refl _, .refl _, .refl _ _, .refl _, ⟨initial, protocol.refl initial, fun _ _ => initialReady⟩, True.intro⟩
+  | single found generated =>
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+      maps, worlds, frame, metadata, transition, childPost⟩ := meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady evaluated
+    cases represented with
+    | value payload =>
+      cases execution with
+      | value trace => exact ⟨_, .ok [_], after, finalMap, finalWorld,
+          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, finalReady⟩ := transition; exact ⟨reached, related, fun _ _ => finalReady _ rfl⟩, True.intro⟩
+    | fault matched =>
+      cases execution with
+      | fault trace => exact ⟨_, .error _, after, finalMap, finalWorld,
+          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related, fun _ impossible => nomatch impossible⟩, ⟨_, rfl, joins.head trace.sound (ExpressionFailurePostContracts.OutcomePost.fault childPost)⟩⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+    change EvaluationSize size actual store ((LocalSequence.pair lowered.type
+      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
+      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
+    rw [pair_rename] at evaluated
+    have complete := evaluated
+    cases evaluated with
+    | caseLeft first _ =>
+      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+        maps, worlds, frame, metadata, transition, childPost⟩ := meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady first
+      cases represented with
+      | fault matched =>
+        cases execution with
+        | fault trace =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.pair_left_failure lowered.type
+            (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound)
+          exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
+            finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related, fun _ impossible => nomatch impossible⟩, ⟨_, rfl, joins.head trace.sound (ExpressionFailurePostContracts.OutcomePost.fault childPost)⟩⟩
+    | caseRight first continuation =>
+      obtain ⟨sourceSize, outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
+        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition, _firstPost⟩ :=
+        meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady first
+      cases represented with
+      | @value sourceValue coreValue payload =>
+        rename_i middleStore coreValue
+        obtain ⟨middleState, firstRelated, firstReady⟩ := firstTransition
+        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
+            (coreValue :: actual) := agree_prefix layout coreValue
+        cases execution with
+        | value firstSource =>
+          cases continuation with
+          | caseLeft second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata, lastTransition, tailPost⟩ := ih
+                (fun child member => meaning child (List.mem_cons_of_mem _ member))
+                (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                middleState (firstReady _ rfl) shifted (by omega)
+            obtain ⟨finalState, lastRelated, lastReady⟩ := lastTransition
+            cases result with
+            | fault matched =>
+              cases sourceTrace with
+              | fault tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_right_failure lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
+                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata,
+                  ⟨finalState, protocol.trans firstRelated lastRelated, lastReady⟩, ⟨_, rfl, joins.tail firstSource.sound tailSource.sound (ExpressionFailurePostContracts.ListOutcomePost.fault tailPost)⟩⟩
+          | caseRight second _ =>
+            have shifted := second
+            rw [← rename_prefix] at shifted
+            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
+              maps, worlds, frame, metadata, lastTransition, tailPost⟩ := ih
+                (fun child member => meaning child (List.mem_cons_of_mem _ member))
+                (environments.extend firstMaps firstWorlds) middleHeaps
+                (locals.mono firstMetadata) nextLayout
+                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                middleState (firstReady _ rfl) shifted (by omega)
+            obtain ⟨finalState, lastRelated, lastReady⟩ := lastTransition
+            cases result with
+            | @values sources values restRep =>
+              cases sourceTrace with
+              | values tailSource =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
+                  (LocalSequence.pair_success lowered.type
+                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
+                have nonempty : values ≠ [] := by
+                  intro absent
+                  have lengths := restRep.length.2
+                  simp [absent] at lengths
+                refine ⟨_, .ok (sourceValue :: sources), after, finalMap, finalWorld,
+                  .values (.cons firstSource tailSource), ?_, finalHeaps,
+                  firstMaps.trans maps, firstWorlds.trans worlds,
+                  firstFrame.trans frame, firstMetadata.trans metadata,
+                  ⟨finalState, protocol.trans firstRelated lastRelated, fun _ _ => lastReady _ rfl⟩, True.intro⟩
+                simpa [packValues, nonempty] using
+                  Result.values (codes := lowered :: nextCode :: codes)
+                    (.cons (model.extend payload maps worlds) restRep)
+
+private theorem preserves_child_trivial_post {size : Nat}
+    (meaning : ExpressionPreservesAt protocol ready size model program context evidence source certificate faults) :
+    ProtectedReadyExpressionFaultPostContracts.ExpressionPreservesAt ExpressionTraceAt protocol ready
+      ExpressionFailurePostContracts.TrivialExpressionPost size model program context evidence source certificate faults := by
+  intro scope id lowered certified node found mapping world admin environment canonical actual actualContext
+    before store ξ outcome after environments heaps locals agrees typed initial admitted trace
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition⟩ := meaning certified found environments heaps locals agrees typed initial admitted trace
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition, ExpressionFailurePostContracts.OutcomePost.of_trivial represented⟩
+
+private theorem reflects_child_trivial_post {size : Nat}
+    (meaning : ExpressionReflectsAt protocol ready size model program context evidence source certificate faults) :
+    ProtectedReadyExpressionFaultPostContracts.ExpressionReflectsAt ExpressionTraceAt protocol ready
+      ExpressionFailurePostContracts.TrivialExpressionPost size model program context evidence source certificate faults := by
+  intro scope id lowered certified node found mapping world admin environment canonical actual actualContext
+    before store ξ value finalStore environments heaps locals agrees typed initial admitted trace
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition⟩ := meaning certified found environments heaps locals agrees typed initial admitted trace
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition, ExpressionFailurePostContracts.OutcomePost.of_trivial represented⟩
+
 theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ id, id ∈ ids → ∀ size, size < budget →
       ExpressionPreservesAt protocol ready size model program context evidence source
@@ -394,49 +621,14 @@ theorem preserves_fault_bounded (budget : Nat) (tree : Tree source certificate s
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  induction tree generalizing size mapping world actual actualContext before store ξ after with
-  | nil => cases execution
-  | single found generated =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata, transition⟩ := meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.fault failed)
-      cases represented with
-      | fault matched => exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched,
-          finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related⟩⟩
-    | tail _ failed => cases failed
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    cases execution with
-    | head failed =>
-      obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
-        maps, worlds, frame, metadata, transition⟩ := meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.fault failed)
-      cases represented with
-      | fault matched =>
-        refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related⟩⟩
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type evaluated
-    | tail head failed =>
-      obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
-        meaning _ (by simp) _ (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady (.value head)
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        obtain ⟨middleState, firstRelated, firstReady⟩ := firstTransition
-        obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
-          maps, worlds, frame, metadata, lastTransition⟩ := ih
-            (fun child member => meaning child (List.mem_cons_of_mem _ member))
-            (environments.extend firstMaps firstWorlds) middleHeaps
-            (locals.mono firstMetadata) (agree_prefix layout coreValue)
-            (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-            middleState (firstReady _ rfl) failed
-            (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) bounded)
-        obtain ⟨finalState, lastRelated⟩ := lastTransition
-        refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
-          firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
-          ⟨finalState, protocol.trans firstRelated lastRelated⟩⟩
-        rw [rename_prefix] at second
-        simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
-          (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+  obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition, _post⟩ := preserves_fault_bounded_with_post protocol ready
+      ExpressionFailurePostContracts.TrivialExpressionPost ExpressionFailurePostContracts.TrivialExpressionsPost
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source) budget tree
+      (fun id member size smaller => preserves_child_trivial_post protocol ready (meaning id member size smaller))
+      environments heaps locals layout actualTyped initial initialReady execution bounded
+  exact ⟨token, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition⟩
 
 theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ id, id ∈ ids → ∀ size, size < budget →
@@ -462,107 +654,14 @@ theorem reflects_bounded (budget : Nat) (tree : Tree source certificate scope id
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : protocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         protocol.Relates initial reached ∧ ∀ sources, outcome = .ok sources → ready reached := by
-  induction tree generalizing size mapping world actual actualContext before store ξ value finalStore with
-  | nil =>
-    obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluated.sound (show Evaluates actual store
-      ((SourceCoreCalls.packArguments []).expression.rename ξ) (.inRight .word .unit) store from .inRight .unit)
-    exact ⟨_, .ok [], before, mapping, world, .values .nil, .values (values := []) .nil, heaps,
-      .refl _, .refl _, .refl _ _, .refl _, ⟨initial, protocol.refl initial, fun _ _ => initialReady⟩⟩
-  | single found generated =>
-    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-      maps, worlds, frame, metadata, transition⟩ := meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady evaluated
-    cases represented with
-    | value payload =>
-      cases execution with
-      | value trace => exact ⟨_, .ok [_], after, finalMap, finalWorld,
-          .values (.cons trace .nil), .values (values := [_]) (.cons payload .nil), finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, finalReady⟩ := transition; exact ⟨reached, related, fun _ _ => finalReady _ rfl⟩⟩
-    | fault matched =>
-      cases execution with
-      | fault trace => exact ⟨_, .error _, after, finalMap, finalWorld,
-          .fault (.head trace), .fault matched, finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related, fun _ impossible => nomatch impossible⟩⟩
-  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
-    change EvaluationSize size actual store ((LocalSequence.pair lowered.type
-      (SourceCoreCalls.packArguments (nextCode :: codes)).type lowered.expression
-      (SourceCoreCalls.packArguments (nextCode :: codes)).expression).rename ξ) value finalStore at evaluated
-    rw [pair_rename] at evaluated
-    have complete := evaluated
-    cases evaluated with
-    | caseLeft first _ =>
-      obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, execution, represented, finalHeaps,
-        maps, worlds, frame, metadata, transition⟩ := meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady first
-      cases represented with
-      | fault matched =>
-        cases execution with
-        | fault trace =>
-          obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound (LocalSequence.pair_left_failure lowered.type
-            (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound)
-          exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.head trace), .fault matched,
-            finalHeaps, maps, worlds, frame, metadata, by obtain ⟨reached, related, _⟩ := transition; exact ⟨reached, related, fun _ impossible => nomatch impossible⟩⟩
-    | caseRight first continuation =>
-      obtain ⟨sourceSize, outcome, middle, middleMap, middleWorld, execution, represented, middleHeaps,
-        firstMaps, firstWorlds, firstFrame, firstMetadata, firstTransition⟩ :=
-        meaning _ (by simp) _ (by omega) ⟨rfl, generated⟩ found environments heaps locals layout actualTyped initial initialReady first
-      cases represented with
-      | @value sourceValue coreValue payload =>
-        rename_i middleStore coreValue
-        obtain ⟨middleState, firstRelated, firstReady⟩ := firstTransition
-        have nextLayout : EnvironmentsAgree (Renaming.comp (Renaming.insertion 0) ξ) canonical
-            (coreValue :: actual) := agree_prefix layout coreValue
-        cases execution with
-        | value firstSource =>
-          cases continuation with
-          | caseLeft second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata, lastTransition⟩ := ih
-                (fun child member => meaning child (List.mem_cons_of_mem _ member))
-                (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                middleState (firstReady _ rfl) shifted (by omega)
-            obtain ⟨finalState, lastRelated, lastReady⟩ := lastTransition
-            cases result with
-            | fault matched =>
-              cases sourceTrace with
-              | fault tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
-                  (LocalSequence.pair_right_failure lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
-                exact ⟨_, .error _, after, finalMap, finalWorld, .fault (.tail firstSource tailSource), .fault matched,
-                  finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata,
-                  ⟨finalState, protocol.trans firstRelated lastRelated, lastReady⟩⟩
-          | caseRight second _ =>
-            have shifted := second
-            rw [← rename_prefix] at shifted
-            obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, result, finalHeaps,
-              maps, worlds, frame, metadata, lastTransition⟩ := ih
-                (fun child member => meaning child (List.mem_cons_of_mem _ member))
-                (environments.extend firstMaps firstWorlds) middleHeaps
-                (locals.mono firstMetadata) nextLayout
-                (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
-                middleState (firstReady _ rfl) shifted (by omega)
-            obtain ⟨finalState, lastRelated, lastReady⟩ := lastTransition
-            cases result with
-            | @values sources values restRep =>
-              cases sourceTrace with
-              | values tailSource =>
-                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete.sound
-                  (LocalSequence.pair_success lowered.type
-                    (SourceCoreCalls.packArguments (nextCode :: codes)).type first.sound second.sound)
-                have nonempty : values ≠ [] := by
-                  intro absent
-                  have lengths := restRep.length.2
-                  simp [absent] at lengths
-                refine ⟨_, .ok (sourceValue :: sources), after, finalMap, finalWorld,
-                  .values (.cons firstSource tailSource), ?_, finalHeaps,
-                  firstMaps.trans maps, firstWorlds.trans worlds,
-                  firstFrame.trans frame, firstMetadata.trans metadata,
-                  ⟨finalState, protocol.trans firstRelated lastRelated, fun _ _ => lastReady _ rfl⟩⟩
-                simpa [packValues, nonempty] using
-                  Result.values (codes := lowered :: nextCode :: codes)
-                    (.cons (model.extend payload maps worlds) restRep)
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition, _post⟩ := reflects_bounded_with_post protocol ready
+      ExpressionFailurePostContracts.TrivialExpressionPost ExpressionFailurePostContracts.TrivialExpressionsPost
+      (ExpressionFailurePostContracts.trivial_sequence_joins program context evidence source) budget tree
+      (fun id member size smaller => reflects_child_trivial_post protocol ready (meaning id member size smaller))
+      environments heaps locals layout actualTyped initial initialReady evaluated bounded
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata, transition⟩
 
 theorem preserves_bounded (budget : Nat) (tree : Tree source certificate scope ids sourceTypes codes)
     (meaning : ∀ id, id ∈ ids → ∀ size, size < budget →
