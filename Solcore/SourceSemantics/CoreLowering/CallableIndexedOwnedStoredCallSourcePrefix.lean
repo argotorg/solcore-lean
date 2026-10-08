@@ -52,6 +52,44 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 /-- Original parent typing and both actual successful measured Source children
 close the callee and raw argument receipts internally. No execution law or
 native-to-Source typing conversion is supplied. -/
+theorem from_traces_with_arity
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+    (covers : evidence.Covers context)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (heapTyped : Dynamic.HeapWellTyped context before)
+    (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? root = some node)
+    (form : node.form = .call callee ids (.indirect metadata))
+    (typed : ExpressionHasType source context root type)
+    (empty : metadata.argumentCoercions = [])
+    (arity : arguments.length = function.parameters.length)
+    (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+      context evidence source environment before callee (.closure function) calleeHeap)
+    (argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) argumentsSize
+      context evidence source environment calleeHeap ids arguments argumentsHeap) :
+    Receipts source context callee ids metadata environment before calleeHeap argumentsHeap function arguments := by
+  obtain ⟨parameter, result, types, calleeTyping, argumentsTyping, application⟩ :=
+    original_facts unique found form typed
+  obtain ⟨calleeTyped, calleeHeapTyped, calleeExtension⟩ :=
+    wellFormed.wholeLanguagePreservation.expression context evidence source environment
+      before calleeHeap callee (.closure function) (.function parameter result)
+      runtime covers locals heapTyped calleeTyping calleeTrace.sound
+  have calleeLocals := locals.mono calleeExtension
+  obtain ⟨packed, packing, argumentsTyped, argumentsHeapTyped, argumentsExtension, packedTyped⟩ :=
+    after_trace wellFormed runtime covers calleeLocals calleeHeapTyped argumentsTyping argumentsTrace
+  have bundle := empty_bundle application empty
+  have packedParameter : Dynamic.ValueHasType context argumentsHeap packed parameter := by
+    rw [← bundle]
+    exact packedTyped
+  have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime
+    (calleeTyped.mono argumentsExtension) argumentsHeapTyped argumentsTyped packing bundle arity
+  exact ⟨parameter, result, types, calleeTyping, argumentsTyping, application,
+    calleeTyped, calleeHeapTyped, calleeExtension, calleeLocals, argumentsTyped,
+    argumentsHeapTyped, argumentsExtension, calleeLocals.mono argumentsExtension,
+    calleeExtension.trans argumentsExtension, arity, packed, packing, packedParameter, raw⟩
+
+/-- The original association supplies only the actual physical arity. -/
 theorem from_traces
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
@@ -71,26 +109,8 @@ theorem from_traces
     (argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) argumentsSize
       context evidence source environment calleeHeap ids arguments argumentsHeap) :
     Receipts source context callee ids metadata environment before calleeHeap argumentsHeap function arguments := by
-  obtain ⟨parameter, result, types, calleeTyping, argumentsTyping, application⟩ :=
-    original_facts unique found form typed
-  obtain ⟨calleeTyped, calleeHeapTyped, calleeExtension⟩ :=
-    wellFormed.wholeLanguagePreservation.expression context evidence source environment
-      before calleeHeap callee (.closure function) (.function parameter result)
-      runtime covers locals heapTyped calleeTyping calleeTrace.sound
-  have calleeLocals := locals.mono calleeExtension
-  obtain ⟨packed, packing, argumentsTyped, argumentsHeapTyped, argumentsExtension, packedTyped⟩ :=
-    after_trace wellFormed runtime covers calleeLocals calleeHeapTyped argumentsTyping argumentsTrace
-  have bundle := empty_bundle application empty
-  have packedParameter : Dynamic.ValueHasType context argumentsHeap packed parameter := by
-    rw [← bundle]
-    exact packedTyped
-  have arity := arity_of_association association represented
-  have raw := CallableIndexedOwnedStoredClosureSourceArguments.at_arguments runtime
-    (calleeTyped.mono argumentsExtension) argumentsHeapTyped argumentsTyped packing bundle arity
-  exact ⟨parameter, result, types, calleeTyping, argumentsTyping, application,
-    calleeTyped, calleeHeapTyped, calleeExtension, calleeLocals, argumentsTyped,
-    argumentsHeapTyped, argumentsExtension, calleeLocals.mono argumentsExtension,
-    calleeExtension.trans argumentsExtension, arity, packed, packing, packedParameter, raw⟩
+  exact from_traces_with_arity wellFormed runtime covers locals heapTyped unique found form typed empty
+    (arity_of_association association represented) calleeTrace argumentsTrace
 
 universe u
 variable {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (CallableIndexedOwnedFunctionState.Records keys)}
@@ -119,6 +139,28 @@ theorem from_admission
       context evidence source environment calleeHeap ids arguments argumentsHeap) :
     Receipts source context callee ids metadata environment index.heap calleeHeap argumentsHeap function arguments :=
   from_traces wellFormed runtime covers locals admitted.heap unique found form typed empty association represented
+    calleeTrace argumentsTrace
+
+/-- Current Source heap admission and actual physical arity suffice for the
+original two successful Source traces, without a legacy closure association. -/
+theorem from_admission_with_arity
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+    (covers : evidence.Covers context)
+    (locals : Dynamic.EnvironmentAgrees index.heap context.locals environment)
+    (admitted : CallableIndexedOwnedSourceAdmission.Admission bridge context initial)
+    (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? root = some node)
+    (form : node.form = .call callee ids (.indirect metadata))
+    (typed : ExpressionHasType source context root type)
+    (empty : metadata.argumentCoercions = [])
+    (arity : arguments.length = function.parameters.length)
+    (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+      context evidence source environment index.heap callee (.closure function) calleeHeap)
+    (argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) argumentsSize
+      context evidence source environment calleeHeap ids arguments argumentsHeap) :
+    Receipts source context callee ids metadata environment index.heap calleeHeap argumentsHeap function arguments :=
+  from_traces_with_arity wellFormed runtime covers locals admitted.heap unique found form typed empty arity
     calleeTrace argumentsTrace
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredCallSourcePrefix

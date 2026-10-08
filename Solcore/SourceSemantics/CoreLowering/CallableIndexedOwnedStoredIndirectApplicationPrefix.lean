@@ -71,6 +71,8 @@ theorem resolve_application
       cases same
 end Gate
 
+section
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -158,22 +160,102 @@ def PassedAt (budget : Nat) (value : Value) (finalStore : Store) : Prop :=
     EvaluationSize applicationSize (.unit :: DataPatternValues.packValues values :: .unit :: calleeNative :: actual) argumentStore
       (.apply (.second (.first (.var 3))) (.var 1)) value finalStore ∧ applicationSize < budget
 
+end
+
+namespace ForModel
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functionModel : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+  {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+  (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope id callee ids metadata reasonAt lowered)
+  {native : SourceCoreGeneralFunctions.CallableContext}
+  (prepared : CallableIndexedOwnedIndirectSourceAdapters.Prepared compiler native)
+  {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+  {certificate : GenericExpressionMeaning.Certificate} {calleeNode : ExpressionNode}
+  (certified : certificate scope callee compiler.calleeCode)
+  (found : source.lookupExpression? callee = some calleeNode)
+  (sourceTyped : ExpressionHasType source context callee calleeNode.type)
+  (parentTyped : ExpressionHasType source context id compiler.original.type)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+  (covers : evidence.Covers context)
+  {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+  {administrative actualContext : Core.Context} {environment : Dynamic.Environment}
+  {canonical actual : Environment} {ξ : Renaming}
+  (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+    mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+    functionModel mapping world before store)
+  (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+  (agrees : EnvironmentsAgree ξ canonical actual)
+  (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
+  (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+  (admitted : Admission bridge context initial)
+
+local notation "functions" => functionModel
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+
+variable {sidecar : SourceCoreStageContracts.Sidecar}
+  (caller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar)
+  (sidecarSource : sidecar.source = source)
+
+variable {function : Dynamic.Closure} {calleeHeap : Dynamic.Heap} {calleeStore : Store} {calleeNative : Value}
+  {calleeMap : LocationMap} {calleeWorld : StoreTyping} {calleeSize : Nat}
+  (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+    context evidence source environment before callee (.closure function) calleeHeap)
+  (post : CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+    (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
+    bridge functionModel compiler initial (.closure function) calleeHeap calleeNative calleeStore calleeMap calleeWorld)
+  (accepted : Staging.CallBoundary.GuardAccepts (CallableLedger.frame sidecar) prepared.site.call ids (.closure function))
+  {sourceTypes : List TypeSystem.Ty}
+  (unique : NodeOccurrencesUnique source) (parent : SourceParent compiler)
+  (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids (.closure function) calleeNative)
+  (selected : CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata compiler.original dispatch.row)
+
+local notation "arityToken" => prepared.site.reasonAt dispatch.row.caller dispatch.row.call dispatch.row.entry.id
+  CallableContract.Phase.beforeApplication (SourceTypedRuntime.RuntimeError.argumentArityMismatch function.parameters.length ids.length)
+
+/-- The exact rejection keeps the independently graded Source fault, actual
+argument post and cumulative caller pool. Its token is the selected raw error. -/
+def RejectedAt (value : Value) (finalStore : Store) : Prop :=
+  ∃ sourceSize after finalMap finalWorld,
+    function.parameters.length ≠ ids.length ∧
+    dispatch.row.afterArguments = .error (.argumentArityMismatch function.parameters.length ids.length) ∧
+    RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+      context evidence source environment before id (.fault (.argumentArityMismatch function.parameters.length ids.length)) after ∧
+    Staging.CallBoundary.Executes (Program.ofChecked compiled.sourceProgram) (CallableLedger.frame sidecar)
+      context evidence source environment before id callee ids metadata
+      (.semanticFault (.argumentArityMismatch function.parameters.length ids.length)) after ∧
+    value = .inLeft lowered.type (.word arityToken) ∧
+    CallableIndexedOwnedStoredFunctionModelReceipts.FaultPost (registry := registry) (context := context)
+      bridge functionModel compiler initial
+      (CallableIndexedOwnedStoredClosureArityBoundary.FaultToken (faults := faults) compiler prepared dispatch) (.argumentArityMismatch function.parameters.length ids.length)
+      after arityToken finalStore finalMap finalWorld
+
 include parentTyped wellFormed runtime covers locals admitted calleeTrace post accepted unique parent selected in
 /-- Resolve only the actual successful ordered argument receipt. The original
 receipt is returned verbatim; no semantic producer or body result is assumed. -/
 theorem resolve_success (budget : Nat) {value : Value} {finalStore : Store}
-    (receipt : CallableIndexedOwnedStoredIndirectArgumentPrefix.SuccessPrefix
-      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+    (receipt : CallableIndexedOwnedStoredIndirectArgumentPrefix.ForModel.SuccessPrefix
+      (registry := registry) (context := context) (evidence := evidence)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
-      bridge profile compiler prepared initial budget value finalStore) :
-    CallableIndexedOwnedStoredIndirectArgumentPrefix.SuccessPrefix
-      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      bridge functionModel compiler prepared initial budget value finalStore) :
+    CallableIndexedOwnedStoredIndirectArgumentPrefix.ForModel.SuccessPrefix
+      (registry := registry) (context := context) (evidence := evidence)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
-      bridge profile compiler prepared initial budget value finalStore ∧
+      bridge functionModel compiler prepared initial budget value finalStore ∧
     (RejectedAt (registry := registry) (faults := faults) (context := context) (evidence := evidence)
-      (environment := environment) (sidecar := sidecar) bridge profile compiler prepared initial dispatch value finalStore ∨
+      (environment := environment) (sidecar := sidecar) bridge functionModel compiler prepared initial dispatch value finalStore ∨
     PassedAt (actual := actual) compiler prepared dispatch budget value finalStore) := by
   refine ⟨receipt, ?_⟩
   obtain ⟨_nativeSize, argumentSize, sources, values, after, argumentStore, finalMap, finalWorld,
@@ -224,5 +306,85 @@ theorem resolve_success (budget : Nat) {value : Value} {finalStore : Store}
   · right
     exact ⟨same, passed, values, argumentStore, remainingSize, applicationSize, remaining, remainingStrict,
       application, applicationStrict⟩
+
+end ForModel
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+  {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+  (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope id callee ids metadata reasonAt lowered)
+  {native : SourceCoreGeneralFunctions.CallableContext}
+  (prepared : CallableIndexedOwnedIndirectSourceAdapters.Prepared compiler native)
+  {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+  {certificate : GenericExpressionMeaning.Certificate} {calleeNode : ExpressionNode}
+  (certified : certificate scope callee compiler.calleeCode)
+  (found : source.lookupExpression? callee = some calleeNode)
+  (sourceTyped : ExpressionHasType source context callee calleeNode.type)
+  (parentTyped : ExpressionHasType source context id compiler.original.type)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+  (covers : evidence.Covers context)
+  {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+  {administrative actualContext : Core.Context} {environment : Dynamic.Environment}
+  {canonical actual : Environment} {ξ : Renaming}
+  (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+    mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+    (CallableIndexedOwnedGeneralLambdaValues.model headers keys registry faults profile) mapping world before store)
+  (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+  (agrees : EnvironmentsAgree ξ canonical actual)
+  (typed : RuntimeEnvironmentHasTypes world actual actualContext compiled.indexed.layouts.definitions)
+  (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+  (admitted : Admission bridge context initial)
+
+local notation "functions" => CallableIndexedOwnedGeneralLambdaValues.model headers keys registry faults profile
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+
+variable {sidecar : SourceCoreStageContracts.Sidecar}
+  (caller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar)
+  (sidecarSource : sidecar.source = source)
+
+variable {function : Dynamic.Closure} {calleeHeap : Dynamic.Heap} {calleeStore : Store} {calleeNative : Value}
+  {calleeMap : LocationMap} {calleeWorld : StoreTyping} {calleeSize : Nat}
+  (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+    context evidence source environment before callee (.closure function) calleeHeap)
+  (post : CallableIndexedOwnedStoredIndirectCalleePost.ValuePost (registry := registry) (faults := faults)
+    (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
+    bridge profile compiler initial (.closure function) calleeHeap calleeNative calleeStore calleeMap calleeWorld)
+  (accepted : Staging.CallBoundary.GuardAccepts (CallableLedger.frame sidecar) prepared.site.call ids (.closure function))
+  {sourceTypes : List TypeSystem.Ty}
+  (unique : NodeOccurrencesUnique source) (parent : SourceParent compiler)
+  (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids (.closure function) calleeNative)
+  (selected : CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata compiler.original dispatch.row)
+
+local notation "arityToken" => prepared.site.reasonAt dispatch.row.caller dispatch.row.call dispatch.row.entry.id
+  CallableContract.Phase.beforeApplication (SourceTypedRuntime.RuntimeError.argumentArityMismatch function.parameters.length ids.length)
+
+include parentTyped wellFormed runtime covers locals admitted calleeTrace post accepted unique parent selected in
+/-- Resolve only the actual successful ordered argument receipt. The original
+receipt is returned verbatim; no semantic producer or body result is assumed. -/
+theorem resolve_success (budget : Nat) {value : Value} {finalStore : Store}
+    (receipt : CallableIndexedOwnedStoredIndirectArgumentPrefix.SuccessPrefix
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge profile compiler prepared initial budget value finalStore) :
+    CallableIndexedOwnedStoredIndirectArgumentPrefix.SuccessPrefix
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge profile compiler prepared initial budget value finalStore ∧
+    (RejectedAt (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (sidecar := sidecar) bridge profile compiler prepared initial dispatch value finalStore ∨
+    PassedAt (actual := actual) compiler prepared dispatch budget value finalStore) := by
+  exact ForModel.resolve_success (functionModel := functions) (bridge := bridge) (compiler := compiler) (prepared := prepared) (parentTyped := parentTyped) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals) (initial := initial) (admitted := admitted) (calleeTrace := calleeTrace) (post := post) (accepted := accepted) (unique := unique) (parent := parent) (dispatch := dispatch) (selected := selected) budget receipt
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectApplicationPrefix

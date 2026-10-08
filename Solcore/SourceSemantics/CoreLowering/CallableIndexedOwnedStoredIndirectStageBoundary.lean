@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCalleePost
 import Solcore.SourceSemantics.CoreLowering.CallableIndirectCallBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredFunctionModelReceipts
 
 /-! A real rejected first-stage guard stops at the actual successful callee
 post. Source staging faults retain their own CallBoundary outcome, beside the
@@ -73,6 +74,79 @@ theorem completed_rejected
       have same := (evaluation_deterministic gate.sound gateEvaluation).1
       cases same
 
+namespace ForModel
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functionModel : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+  {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+  (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope id callee ids metadata reasonAt lowered)
+  {native : SourceCoreGeneralFunctions.CallableContext} (prepared : Prepared compiler native)
+  {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment} {calleeNode : ExpressionNode}
+  {firstMap mapping : LocationMap} {firstWorld world : StoreTyping}
+  {before calleeHeap : Dynamic.Heap} {firstStore store : Store}
+  {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+  (first : callerProtocol.State ⟨scope, firstMap, firstWorld, before, firstStore, canonical⟩)
+  {sourceValue : Dynamic.Value} {calleeNative : Value}
+  (post : CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+    (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context) bridge functionModel compiler first
+    sourceValue calleeHeap calleeNative store mapping world)
+  {sidecar : SourceCoreStageContracts.Sidecar}
+  (caller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar)
+  (sidecarSource : sidecar.source = source)
+  (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids sourceValue calleeNative)
+  {reason : Staging.CallGuard.Fault}
+  (rejected : Staging.CallBoundary.GuardRejects (CallableLedger.frame sidecar) prepared.site.call ids sourceValue reason)
+  {calleeSize : Nat}
+  (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+    context evidence source environment before callee sourceValue calleeHeap)
+
+/-- The complete original value post remains beside the genuine staged fault.
+It is the callee's admission, not a plain Dynamic parent fault admission. -/
+def ResultAt (reason : Staging.CallGuard.Fault) (token : Word) (finalStore : Store) : Prop :=
+  SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar ∧
+  sidecar.source = source ∧
+  CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+    (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context) bridge functionModel compiler first
+    sourceValue calleeHeap calleeNative store mapping world ∧
+  SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+    context evidence source environment before callee sourceValue calleeHeap ∧
+  Staging.CallBoundary.Executes (Program.ofChecked compiled.sourceProgram) (CallableLedger.frame sidecar)
+    context evidence source environment before id callee ids metadata (.stageFault reason) calleeHeap ∧
+  token = dispatch.reason reason ∧ CallStageBoundary.ReasonRepresents prepared.site reason token ∧
+  finalStore = store ∧
+  Evaluates actual firstStore (lowered.expression.rename ξ)
+    (.inLeft compiler.resultType (.word token)) finalStore
+
+include caller sidecarSource post rejected calleeTrace in
+/-- The actual Source stage rejection emits its first-gate word at the same
+callee pool, before any argument or body computation. -/
+theorem preserves_rejected :
+    ResultAt (registry := registry) (context := context) (evidence := evidence)
+      (calleeNode := calleeNode) (mapping := mapping) (world := world) (calleeHeap := calleeHeap) (store := store)
+      (environment := environment) (actual := actual) (ξ := ξ) (calleeSize := calleeSize) bridge functionModel compiler prepared first dispatch reason (dispatch.reason reason) store := by
+  have failed := dispatch.rejected rejected
+  have calleeEvaluation := post.1
+  rw [dispatch.shape] at calleeEvaluation
+  have whole := prepared.site.lower_stage_failure (result := compiler.resultType)
+    (arguments := (SourceCoreCalls.packArguments compiler.codes).expression.rename ξ) native.diagnostics.unknown dispatch.row
+    (CallStageGuard.error dispatch.guard.sidecar.caller dispatch.guard.node dispatch.guard.contract.owner reason)
+    dispatch.found failed calleeEvaluation
+  have original : Staging.CallBoundary.Executes (Program.ofChecked compiled.sourceProgram) (CallableLedger.frame sidecar)
+      context evidence source environment before id callee ids metadata (.stageFault reason) calleeHeap :=
+    .stageRejected calleeTrace.sound (by simpa only [prepared.call] using rejected)
+  refine ⟨caller, sidecarSource, post, calleeTrace, original, rfl, dispatch.reason_represents reason, rfl, ?_⟩
+  simpa only [SourceCoreCallableContracts.Callsite.lower, CallStageBoundary.Dispatch.reason, prepared.lowered_rename compiler ξ] using whole
+
+end ForModel
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -129,18 +203,9 @@ theorem preserves_rejected :
     ResultAt (registry := registry) (faults := faults) (context := context) (evidence := evidence)
       (calleeNode := calleeNode) (mapping := mapping) (world := world) (calleeHeap := calleeHeap) (store := store)
       (environment := environment) (actual := actual) (ξ := ξ) (calleeSize := calleeSize) bridge profile compiler prepared first dispatch reason (dispatch.reason reason) store := by
-  have failed := dispatch.rejected rejected
-  have calleeEvaluation := post.1
-  rw [dispatch.shape] at calleeEvaluation
-  have whole := prepared.site.lower_stage_failure (result := compiler.resultType)
-    (arguments := (SourceCoreCalls.packArguments compiler.codes).expression.rename ξ) native.diagnostics.unknown dispatch.row
-    (CallStageGuard.error dispatch.guard.sidecar.caller dispatch.guard.node dispatch.guard.contract.owner reason)
-    dispatch.found failed calleeEvaluation
-  have original : Staging.CallBoundary.Executes (Program.ofChecked compiled.sourceProgram) (CallableLedger.frame sidecar)
-      context evidence source environment before id callee ids metadata (.stageFault reason) calleeHeap :=
-    .stageRejected calleeTrace.sound (by simpa only [prepared.call] using rejected)
-  refine ⟨caller, sidecarSource, post, calleeTrace, original, rfl, dispatch.reason_represents reason, rfl, ?_⟩
-  simpa only [SourceCoreCallableContracts.Callsite.lower, CallStageBoundary.Dispatch.reason, prepared.lowered_rename compiler ξ] using whole
+  exact ForModel.preserves_rejected bridge
+    (CallableIndexedOwnedGeneralLambdaValues.model headers keys registry faults profile) compiler prepared first post
+    caller sidecarSource dispatch rejected calleeTrace
 
 include caller sidecarSource post rejected calleeTrace in
 /-- A real bounded native completion reflects the exact same staged fault and
