@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedCallerProtocol
+import Solcore.SourceSemantics.CoreLowering.NamedCallBodyFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallEvidenceHeads
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateSequenceBridge
 import Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionSequenceProducer
@@ -289,11 +290,153 @@ theorem NativeInvocationsFor.of_uniform (budget : Nat)
     bodyValue bodyFinalStore completed
   exact meaning child strict entry reached allowed completed
 
+/-- The actual argument post supplies the stronger strict Source body child. -/
+def SourceInvocationsForWithPost (post : NamedInvocationFaultPostContracts.BodyFaultPost) (budget : Nat) : Prop :=
+  ∀ {sourceSize arguments middle middleMap middleWorld middleStore payloads}
+    (_evaluated : SourceExecutionSize.ExpressionsEvaluate program sourceSize context evidence source environment before ids arguments middle)
+    (argumentState : callerProtocol.State ⟨scope, middleMap, middleWorld, middle, middleStore, canonical⟩),
+    callerProtocol.Relates caller argumentState →
+    LocationMap.Extends mapping middleMap → WorldExtends world middleWorld →
+    AdministrativePreserved mapping store middleMap middleStore → Dynamic.HeapMetadataExtend before middle →
+  ∀ (_capture : Capture (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    headers owner.key.locations owner.key.capturePrefix ((callerBridge.pool argumentState).rows owner.position).authority.frameLocation
+    header middleMap middleWorld middle middleStore),
+    CallableIndexedParameterMeaning.Arguments (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+      middleMap middleWorld header.bindings arguments payloads →
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions middleMap middleWorld middle middleStore →
+    CallableIndexedOwnedInvocationBounds.SourceContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+      (header := header) (arguments := arguments) owner (callerBridge.pool argumentState) condition budget
+
+/-- The measured child retains its post at the same argument state. -/
+def NativeInvocationsForWithPost (post : NamedInvocationFaultPostContracts.BodyFaultPost) (budget : Nat) : Prop :=
+  ∀ {sourceSize arguments middle middleMap middleWorld middleStore payloads}
+    (_evaluated : SourceExecutionSize.ExpressionsEvaluate program sourceSize context evidence source environment before ids arguments middle)
+    (argumentState : callerProtocol.State ⟨scope, middleMap, middleWorld, middle, middleStore, canonical⟩),
+    callerProtocol.Relates caller argumentState →
+    LocationMap.Extends mapping middleMap → WorldExtends world middleWorld →
+    AdministrativePreserved mapping store middleMap middleStore → Dynamic.HeapMetadataExtend before middle →
+  ∀ (_capture : Capture (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    headers owner.key.locations owner.key.capturePrefix ((callerBridge.pool argumentState).rows owner.position).authority.frameLocation
+    header middleMap middleWorld middle middleStore),
+    CallableIndexedParameterMeaning.Arguments (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+      middleMap middleWorld header.bindings arguments payloads →
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions middleMap middleWorld middle middleStore →
+    CallableIndexedOwnedInvocationBounds.NativeContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+      (header := header) (arguments := arguments) owner (callerBridge.pool argumentState) condition budget
+
 end InvocationProviders
 
 include functions nativeTypes packedType in
 /-- The actual argument post supplies the selected live capture and the caller
 pool for the real invocation. Argument failure retains its reached witness. -/
+theorem call_preserves_bounded_with_sequence_with_body_post
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : header.layouts = compiled.indexed.layouts)
+    (condition : BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : CallableIndexedOwnedInvocationBounds.BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation condition)
+    (budget : Nat)
+    {callerPrefix : Nat}
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
+      (fun index => Globals (headers := headers) owner callerPrefix index.scope index.canonical) callerProtocol)
+    (owners : (program.functions.map (fun definition => definition.body.owner)).Nodup)
+    (member : header ∈ headers)
+    {mapping : LocationMap} {world : StoreTyping} {before after : Dynamic.Heap} {store : Store}
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    (caller : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (_environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) mapping world
+      administrative scope environment canonical (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (_heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world before store)
+    (_locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (_typed : RuntimeEnvironmentHasTypes world actual actualContext (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (argumentMeaning : ProtectedStateExpressionSequenceProducer.Preserves
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (environment := environment) (actual := actual) (ξ := ξ) (ids := ids)
+      (sourceTypes := header.bindings.map (fun binding => binding.1.scheme.body)) (codes := codes) (faults := faults)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) caller budget)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : SourceInvocationsForWithPost (post := post) (source := source) (context := context) (evidence := evidence) (faults := faults) functions owner condition callerBridge caller
+      (environment := environment) (ids := ids) budget)
+    {size : Nat} {reason : Word} {outcome : Dynamic.ExpressionOutcome}
+    (trace : RecursiveNamedArgumentTraceBounds.TraceAt program context evidence header.function.evidence source environment before ids
+      header.instantiation size outcome after) (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store (SourceCoreCalls.call header.named.signature (ξ (scope.length + callerPrefix + header.slot))
+        ((SourceCoreCalls.packArguments codes).expression.rename ξ) reason) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition callerProtocol caller
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedCallBodyFaultPostContracts.CallRouteAt (functions := functions) (registry := registry)
+        (header := header) (source := source) (context := context) (evidence := evidence)
+        (environment := environment) (ids := ids) (codes := codes) (actual := actual) (ξ := ξ)
+        post owner callerBridge caller size none outcome after value finalMap finalWorld finalStore := by
+  have globals := callerBridge.slots caller
+  cases trace with
+  | argumentFault failed smaller =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, argumentEvaluation, represented, finalHeaps,
+      maps, worlds, frame, metadata, argumentTransition⟩ :=
+      argumentMeaning (.fault failed) (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller within))
+    cases represented with
+    | fault matched =>
+      obtain ⟨reached, related⟩ := argumentTransition
+      refine ⟨_, finalStore, finalMap, finalWorld, SourceCoreCalls.call_argument_failure (packedType.symm ▸ argumentEvaluation),
+        (by simpa only [header.resultType] using (FunctionCalls.ResultRepresents.fault
+          (model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+          (mapping := finalMap) (world := finalWorld) (sourceType := header.function.resultType)
+          (type := header.named.signature.resultType) matched)), finalHeaps, maps, worlds, frame, metadata, ?_, ?_⟩
+      · exact ⟨reached, related⟩
+      · simpa only [header.resultType] using
+          (NamedCallBodyFaultPostContracts.CallRouteAt.argumentFailure (header := header)
+          (post := post) (owner := owner) (bridge := callerBridge) (nativeParent := none) failed smaller argumentEvaluation trivial reached related)
+  | @apply argumentsSize callSize arguments middle outcome after evaluated called argumentsSmaller callSmaller =>
+    obtain ⟨argumentValue, middleStore, middleMap, middleWorld, argumentEvaluation, represented, middleHeaps,
+      argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, argumentTransition⟩ :=
+      argumentMeaning (.values evaluated) (Nat.le_of_lt (Nat.lt_of_lt_of_le argumentsSmaller within))
+    cases represented with
+    | @values _ payloads represented =>
+      rw [nativeTypes] at represented
+      have related := values_arguments header.bindings represented
+      have arity : header.function.parameters.length = arguments.length := by
+        rw [header.parameters, List.length_map]; exact related.length.1
+      obtain ⟨bodySize, bodyTrace, bodySmaller⟩ := RecursiveNamedCallBounds.source_call_body owners header.frame arity called
+      obtain ⟨middleState, argumentRelated⟩ := argumentTransition
+      obtain ⟨capture⟩ := ((callerBridge.pool middleState).rows owner.position).authority.captures header member
+      obtain ⟨value, finalStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
+        bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyTransition, bodyReceipt⟩ :=
+        CallableIndexedOwnedInvocationBounds.invocation_preserves_bounded_at_with_post owner sameLayouts condition authorized budget
+          (callerBridge.pool middleState) member capture related middleHeaps
+          post (bodyMeaning evaluated middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata capture related middleHeaps) bodyTrace
+          (Nat.le_of_lt (Nat.lt_trans bodySmaller (Nat.lt_of_lt_of_le callSmaller within)))
+      have selected := OptionalCell.read_success reason
+        (show Evaluates (DataPatternValues.packValues payloads :: actual) middleStore
+          (.var (ξ (scope.length + callerPrefix + header.slot) + 1))
+          (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) middleStore
+          from .var (agrees (globals header member))) capture.read
+      obtain ⟨finalState, bodyRelated⟩ := bodyTransition
+      obtain ⟨returned, samePool, relatedCaller⟩ := callerBridge.restore caller finalState
+        (argumentMaps.trans bodyMaps) (argumentWorlds.trans bodyWorlds) (argumentFrame.trans bodyFrame)
+        (argumentMetadata.trans bodyMetadata) ((callerBridge.related argumentRelated).trans bodyRelated)
+      exact ⟨value, finalStore, finalMap, finalWorld, SourceCoreCalls.call_success argumentEvaluation selected bodyEvaluation,
+        result, finalHeaps, argumentMaps.trans bodyMaps, argumentWorlds.trans bodyWorlds, argumentFrame.trans bodyFrame,
+        argumentMetadata.trans bodyMetadata, ⟨returned, relatedCaller⟩,
+        .bodyApplied evaluated argumentsSmaller called callSmaller argumentEvaluation trivial
+          middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata
+          capture related middleHeaps bodyTrace bodySmaller bodyEvaluation none trivial bodyReceipt
+          finalState bodyRelated bodyMaps bodyWorlds bodyFrame bodyMetadata returned samePool relatedCaller⟩
+
+
+include functions nativeTypes packedType in
 theorem call_preserves_bounded_with_sequence
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
     (sameLayouts : header.layouts = compiled.indexed.layouts)
@@ -339,52 +482,14 @@ theorem call_preserves_bounded_with_sequence
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition callerProtocol caller
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  have globals := callerBridge.slots caller
-  cases trace with
-  | argumentFault failed smaller =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, argumentEvaluation, represented, finalHeaps,
-      maps, worlds, frame, metadata, argumentTransition⟩ :=
-      argumentMeaning (.fault failed) (Nat.le_of_lt (Nat.lt_of_lt_of_le smaller within))
-    cases represented with
-    | fault matched =>
-      refine ⟨_, finalStore, finalMap, finalWorld, SourceCoreCalls.call_argument_failure (packedType.symm ▸ argumentEvaluation),
-        (by simpa only [header.resultType] using (FunctionCalls.ResultRepresents.fault
-          (model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
-          (mapping := finalMap) (world := finalWorld) (sourceType := header.function.resultType)
-          (type := header.named.signature.resultType) matched)), finalHeaps, maps, worlds, frame, metadata, ?_⟩
-      obtain ⟨reached, related⟩ := argumentTransition
-      exact ⟨reached, related⟩
-  | @apply argumentsSize callSize arguments middle outcome after evaluated called argumentsSmaller callSmaller =>
-    obtain ⟨argumentValue, middleStore, middleMap, middleWorld, argumentEvaluation, represented, middleHeaps,
-      argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, argumentTransition⟩ :=
-      argumentMeaning (.values evaluated) (Nat.le_of_lt (Nat.lt_of_lt_of_le argumentsSmaller within))
-    cases represented with
-    | @values _ payloads represented =>
-      rw [nativeTypes] at represented
-      have related := values_arguments header.bindings represented
-      have arity : header.function.parameters.length = arguments.length := by
-        rw [header.parameters, List.length_map]; exact related.length.1
-      obtain ⟨bodySize, bodyTrace, bodySmaller⟩ := RecursiveNamedCallBounds.source_call_body owners header.frame arity called
-      obtain ⟨middleState, argumentRelated⟩ := argumentTransition
-      obtain ⟨capture⟩ := ((callerBridge.pool middleState).rows owner.position).authority.captures header member
-      obtain ⟨value, finalStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
-        bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyTransition⟩ :=
-        CallableIndexedOwnedInvocationBounds.invocation_preserves_bounded_at owner sameLayouts condition authorized budget
-          (callerBridge.pool middleState) member capture related middleHeaps
-          (bodyMeaning evaluated middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata capture related middleHeaps) bodyTrace
-          (Nat.le_of_lt (Nat.lt_trans bodySmaller (Nat.lt_of_lt_of_le callSmaller within)))
-      have selected := OptionalCell.read_success reason
-        (show Evaluates (DataPatternValues.packValues payloads :: actual) middleStore
-          (.var (ξ (scope.length + callerPrefix + header.slot) + 1))
-          (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) middleStore
-          from .var (agrees (globals header member))) capture.read
-      obtain ⟨finalState, bodyRelated⟩ := bodyTransition
-      obtain ⟨returned, _samePool, relatedCaller⟩ := callerBridge.restore caller finalState
-        (argumentMaps.trans bodyMaps) (argumentWorlds.trans bodyWorlds) (argumentFrame.trans bodyFrame)
-        (argumentMetadata.trans bodyMetadata) ((callerBridge.related argumentRelated).trans bodyRelated)
-      exact ⟨value, finalStore, finalMap, finalWorld, SourceCoreCalls.call_success argumentEvaluation selected bodyEvaluation,
-        result, finalHeaps, argumentMaps.trans bodyMaps, argumentWorlds.trans bodyWorlds, argumentFrame.trans bodyFrame,
-        argumentMetadata.trans bodyMetadata, ⟨returned, relatedCaller⟩⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluation, result, finalHeaps, maps, worlds, frame, metadata, reached, _route⟩ :=
+    call_preserves_bounded_with_sequence_with_body_post functions nativeTypes packedType owner sameLayouts condition authorized budget callerBridge owners member caller _environments _heaps _locals agrees _typed argumentMeaning
+      NamedInvocationFaultPostContracts.Trivial
+      (fun evaluated argumentState related maps worlds frame metadata capture represented heaps =>
+        NamedCallBodyFaultPostContracts.source_trivial
+          (bodyMeaning evaluated argumentState related maps worlds frame metadata capture represented heaps))
+      trace within
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluation, result, finalHeaps, maps, worlds, frame, metadata, reached⟩
 
 include functions children nativeTypes packedType in
 theorem call_preserves_bounded_with_caller
@@ -495,6 +600,118 @@ include functions nativeTypes packedType in
 /-- The measured native call chooses its real argument and body children.
 Reflection consumes their actual reached pools and preserves the independent
 source grade rather than comparing it with the native input grade. -/
+theorem call_reflects_bounded_with_sequence_with_body_post
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : header.layouts = compiled.indexed.layouts)
+    (condition : BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : CallableIndexedOwnedInvocationBounds.BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (headers := headers) (locations := owner.key.locations) (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation condition)
+    (budget : Nat)
+    {callerPrefix : Nat}
+    {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+    (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
+      (fun index => Globals (headers := headers) owner callerPrefix index.scope index.canonical) callerProtocol)
+    (member : header ∈ headers)
+    {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store finalStore : Store} {value : Value}
+    {administrative actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment} {ξ : Renaming}
+    (caller : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (_environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog) mapping world
+      administrative scope environment canonical (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (_heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world before store)
+    (_locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    (_typed : RuntimeEnvironmentHasTypes world actual actualContext (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+    (argumentMeaning : ProtectedStateExpressionSequenceProducer.Reflects
+      (program := program) (context := context) (evidence := evidence) (source := source)
+      (environment := environment) (actual := actual) (ξ := ξ) (ids := ids)
+      (sourceTypes := header.bindings.map (fun binding => binding.1.scheme.body)) (codes := codes) (faults := faults)
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions) caller budget)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : NativeInvocationsForWithPost (post := post) (source := source) (context := context) (evidence := evidence) (faults := faults) functions owner condition callerBridge caller
+      (environment := environment) (ids := ids) budget)
+    {size : Nat} {reason : Word}
+    (completed : EvaluationSize size actual store (SourceCoreCalls.call header.named.signature (ξ (scope.length + callerPrefix + header.slot))
+      ((SourceCoreCalls.packArguments codes).expression.rename ξ) reason) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedArgumentTraceBounds.TraceAt program context evidence header.function.evidence source environment before ids
+        header.instantiation sourceSize outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ProtectedStateTransition.Transition callerProtocol caller
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedCallBodyFaultPostContracts.CallRouteAt (functions := functions) (registry := registry)
+        (header := header) (source := source) (context := context) (evidence := evidence)
+        (environment := environment) (ids := ids) (codes := codes) (actual := actual) (ξ := ξ)
+        post owner callerBridge caller sourceSize (some size) outcome after value finalMap finalWorld finalStore := by
+  have globals := callerBridge.slots caller
+  obtain ⟨argumentSize, argumentValue, middleStore, argumentSmaller, argumentEvaluation⟩ := RecursiveNamedCallBounds.call_arguments completed
+  obtain ⟨sourceSize, argumentOutcome, middle, middleMap, middleWorld, argumentTrace, represented, middleHeaps,
+    argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, argumentTransition⟩ :=
+    argumentMeaning argumentEvaluation (Nat.lt_of_lt_of_le argumentSmaller within)
+  cases represented with
+  | fault matched =>
+    cases argumentTrace with
+    | fault failed =>
+      have evaluation := SourceCoreCalls.call_argument_failure (signature := header.named.signature)
+        (index := ξ (scope.length + callerPrefix + header.slot)) (internalReason := reason) (packedType.symm ▸ argumentEvaluation.sound)
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound evaluation
+      obtain ⟨reached, related⟩ := argumentTransition
+      refine ⟨SourceExecutionSize.stepSize [sourceSize], .fault _, middle, middleMap, middleWorld,
+        .argumentFault failed (SourceExecutionSize.child_lt_stepSize (by simp)),
+        (by simpa only [header.resultType] using (FunctionCalls.ResultRepresents.fault
+          (model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+          (mapping := middleMap) (world := middleWorld) (sourceType := header.function.resultType)
+          (type := header.named.signature.resultType) matched)),
+        middleHeaps, argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, ?_, ?_⟩
+      · exact ⟨reached, related⟩
+      · simpa only [header.resultType] using
+          (NamedCallBodyFaultPostContracts.CallRouteAt.argumentFailure (header := header)
+          (post := post) (owner := owner) (bridge := callerBridge) (sourceParent := SourceExecutionSize.stepSize [sourceSize]) (nativeParent := some size)
+          failed (SourceExecutionSize.child_lt_stepSize (by simp))
+          argumentEvaluation.sound ⟨argumentSize, argumentEvaluation, argumentSmaller⟩ reached related)
+  | values represented =>
+    cases argumentTrace with
+    | values evaluatedArguments =>
+      rw [nativeTypes] at represented
+      have related := values_arguments header.bindings represented
+      obtain ⟨middleState, argumentRelated⟩ := argumentTransition
+      obtain ⟨capture⟩ := ((callerBridge.pool middleState).rows owner.position).authority.captures header member
+      obtain ⟨bodyNativeSize, bodySmaller, bodyEvaluation⟩ := RecursiveNamedCallBounds.call_body
+        argumentEvaluation.sound (agrees (globals header member)) capture.read completed
+      obtain ⟨bodySourceSize, outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps,
+        bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyTransition, bodyReceipt⟩ :=
+        CallableIndexedOwnedInvocationBounds.invocation_reflects_bounded_at_with_post owner sameLayouts condition authorized budget
+          (callerBridge.pool middleState) member capture related middleHeaps
+          post (bodyMeaning evaluatedArguments middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata capture related middleHeaps)
+          bodyEvaluation
+          (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller within))
+      have called := RecursiveNamedCallBounds.call_of_body (context := context) (caller := evidence) header.frame bodyTrace
+      obtain ⟨finalState, bodyRelated⟩ := bodyTransition
+      obtain ⟨returned, samePool, relatedCaller⟩ := callerBridge.restore caller finalState
+        (argumentMaps.trans bodyMaps) (argumentWorlds.trans bodyWorlds) (argumentFrame.trans bodyFrame)
+        (argumentMetadata.trans bodyMetadata) ((callerBridge.related argumentRelated).trans bodyRelated)
+      exact ⟨SourceExecutionSize.stepSize [sourceSize, SourceExecutionSize.stepSize [bodySourceSize]], outcome, after, finalMap, finalWorld,
+        .apply evaluatedArguments called (SourceExecutionSize.child_lt_stepSize (by simp))
+          (SourceExecutionSize.child_lt_stepSize (by simp)), result, finalHeaps,
+        argumentMaps.trans bodyMaps, argumentWorlds.trans bodyWorlds, argumentFrame.trans bodyFrame,
+        argumentMetadata.trans bodyMetadata, ⟨returned, relatedCaller⟩,
+        .bodyApplied evaluatedArguments (SourceExecutionSize.child_lt_stepSize (by simp)) called
+          (SourceExecutionSize.child_lt_stepSize (by simp)) argumentEvaluation.sound
+          ⟨argumentSize, argumentEvaluation, argumentSmaller⟩
+          middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata
+          capture related middleHeaps bodyTrace (SourceExecutionSize.child_lt_stepSize (by simp))
+          bodyEvaluation.sound (some bodyNativeSize) bodySmaller bodyReceipt
+          finalState bodyRelated bodyMaps bodyWorlds bodyFrame bodyMetadata returned samePool relatedCaller⟩
+
+
+include functions nativeTypes packedType in
 theorem call_reflects_bounded_with_sequence
     (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
     (sameLayouts : header.layouts = compiled.indexed.layouts)
@@ -540,53 +757,14 @@ theorem call_reflects_bounded_with_sequence
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition callerProtocol caller
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  have globals := callerBridge.slots caller
-  obtain ⟨argumentSize, argumentValue, middleStore, argumentSmaller, argumentEvaluation⟩ := RecursiveNamedCallBounds.call_arguments completed
-  obtain ⟨sourceSize, argumentOutcome, middle, middleMap, middleWorld, argumentTrace, represented, middleHeaps,
-    argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, argumentTransition⟩ :=
-    argumentMeaning argumentEvaluation (Nat.lt_of_lt_of_le argumentSmaller within)
-  cases represented with
-  | fault matched =>
-    cases argumentTrace with
-    | fault failed =>
-      have evaluation := SourceCoreCalls.call_argument_failure (signature := header.named.signature)
-        (index := ξ (scope.length + callerPrefix + header.slot)) (internalReason := reason) (packedType.symm ▸ argumentEvaluation.sound)
-      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound evaluation
-      refine ⟨SourceExecutionSize.stepSize [sourceSize], .fault _, middle, middleMap, middleWorld,
-        .argumentFault failed (SourceExecutionSize.child_lt_stepSize (by simp)),
-        (by simpa only [header.resultType] using (FunctionCalls.ResultRepresents.fault
-          (model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
-          (mapping := middleMap) (world := middleWorld) (sourceType := header.function.resultType)
-          (type := header.named.signature.resultType) matched)),
-        middleHeaps, argumentMaps, argumentWorlds, argumentFrame, argumentMetadata, ?_⟩
-      obtain ⟨reached, related⟩ := argumentTransition
-      exact ⟨reached, related⟩
-  | values represented =>
-    cases argumentTrace with
-    | values evaluatedArguments =>
-      rw [nativeTypes] at represented
-      have related := values_arguments header.bindings represented
-      obtain ⟨middleState, argumentRelated⟩ := argumentTransition
-      obtain ⟨capture⟩ := ((callerBridge.pool middleState).rows owner.position).authority.captures header member
-      obtain ⟨bodyNativeSize, bodySmaller, bodyEvaluation⟩ := RecursiveNamedCallBounds.call_body
-        argumentEvaluation.sound (agrees (globals header member)) capture.read completed
-      obtain ⟨bodySourceSize, outcome, after, finalMap, finalWorld, bodyTrace, result, finalHeaps,
-        bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyTransition⟩ :=
-        CallableIndexedOwnedInvocationBounds.invocation_reflects_bounded_at owner sameLayouts condition authorized budget
-          (callerBridge.pool middleState) member capture related middleHeaps
-          (bodyMeaning evaluatedArguments middleState argumentRelated argumentMaps argumentWorlds argumentFrame argumentMetadata capture related middleHeaps)
-          bodyEvaluation
-          (Nat.le_of_lt (Nat.lt_of_lt_of_le bodySmaller within))
-      have called := RecursiveNamedCallBounds.call_of_body (context := context) (caller := evidence) header.frame bodyTrace
-      obtain ⟨finalState, bodyRelated⟩ := bodyTransition
-      obtain ⟨returned, _samePool, relatedCaller⟩ := callerBridge.restore caller finalState
-        (argumentMaps.trans bodyMaps) (argumentWorlds.trans bodyWorlds) (argumentFrame.trans bodyFrame)
-        (argumentMetadata.trans bodyMetadata) ((callerBridge.related argumentRelated).trans bodyRelated)
-      exact ⟨SourceExecutionSize.stepSize [sourceSize, SourceExecutionSize.stepSize [bodySourceSize]], outcome, after, finalMap, finalWorld,
-        .apply evaluatedArguments called (SourceExecutionSize.child_lt_stepSize (by simp))
-          (SourceExecutionSize.child_lt_stepSize (by simp)), result, finalHeaps,
-        argumentMaps.trans bodyMaps, argumentWorlds.trans bodyWorlds, argumentFrame.trans bodyFrame,
-        argumentMetadata.trans bodyMetadata, ⟨returned, relatedCaller⟩⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps, maps, worlds, frame, metadata, reached, _route⟩ :=
+    call_reflects_bounded_with_sequence_with_body_post functions nativeTypes packedType owner sameLayouts condition authorized budget callerBridge member caller _environments _heaps _locals agrees _typed argumentMeaning
+      NamedInvocationFaultPostContracts.Trivial
+      (fun evaluated argumentState related maps worlds frame metadata capture represented heaps =>
+        NamedCallBodyFaultPostContracts.native_trivial
+          (bodyMeaning evaluated argumentState related maps worlds frame metadata capture represented heaps))
+      completed within
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps, maps, worlds, frame, metadata, reached⟩
 
 include functions children nativeTypes packedType in
 theorem call_reflects_bounded_with_caller
