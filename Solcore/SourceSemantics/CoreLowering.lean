@@ -1054,6 +1054,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryCa
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalFlowFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.NamedLexicalFunctionFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.ReachedNamedLexicalBodyFaultPaths
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLexicalNamedBodyFaultBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
