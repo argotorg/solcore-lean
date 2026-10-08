@@ -875,6 +875,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCa
 import Solcore.SourceSemantics.CoreLowering.CompatiblePathMissingProvider
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaBinderProjections
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCalleePost
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingDiagnosticAssociation
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationRanges
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
