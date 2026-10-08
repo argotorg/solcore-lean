@@ -953,6 +953,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualOrdinaryLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualPrincipalLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultObservation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceiverTables
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicReadFaultObservation
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
