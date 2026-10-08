@@ -898,6 +898,9 @@ import Solcore.SourceSemantics.CoreLowering.GenericAssignmentPreparedOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicStoredClosureArityDiagnostics
 import Solcore.SourceSemantics.CoreLowering.EmittedDiagnosticPreparedPlan
 import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderPreparedExtraction
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceUninitializedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticCoverage
+import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticPreparation
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
