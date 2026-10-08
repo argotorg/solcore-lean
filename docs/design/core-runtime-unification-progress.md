@@ -32,7 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation commit is `c9078fd2`. The Header fault and reflection proofs now share one semantic branch algebra. Legacy wrappers derive their recursor from the original reachable error laws; coupled endpoints derive it from the same actual Tree/Plan receipt. Each assignment payload retains its complete selected head, Source occurrence, preparation fuel and token functions. The original successful-prefix proof and public theorem types remain available.
+The latest implementation commit is `a1bb3536`. The public Header feeds its actual Source typing and issued diagnostic table into the coupled semantic core. Stored-call application gates use the same selected row's physical closure and argument counts. Mismatch derives genuine Source and staged arity failures at the actual argument post; matching counts retain the original complete suffix and its strict application projection.
+
+At `a1bb3536`, the proof umbrella and `Tests.Main` build passed **5332 jobs**. Strict verification checked **7520 declarations**, with **15 fresh module-attributed declarations** across two new modules and **seven signatures**. Both final sources passed three exact full-source reviews. Policy, whitespace, final source hashes and **5009 protected original-file checks** pass. No original source modules changed in this checkpoint.
+
+The preceding `c9078fd2` checkpoint shares one Header semantic branch algebra. Legacy wrappers derive their recursor from the original reachable error laws; coupled endpoints derive it from the same actual Tree/Plan receipt. Each assignment payload retains its complete selected head, Source occurrence, preparation fuel and token functions. The original successful-prefix proof and public theorem types remain available.
 
 The preceding commits `8f66915f`, `25ca49e2` and `4d5aade5` derive projected assignment diagnostics from actual public preparation and connect strict callee children to first-stage rejection. The projected endpoints derive reached shape errors for that same head and real state, preserving the ordered key/RHS producers, complete pool, written prefix and strict continuation. The semantic fault relation still needs a precise interpretation of the actual decoded table entries.
 
@@ -42,9 +46,9 @@ At `c9078fd2`, the proof umbrella and `Tests.Main` build passed **5330 jobs**. S
 
 The preceding `6c6615af` checkpoint passed 5325 jobs, 7452 strict declarations, 22 fresh declarations and nine signatures for native callee reflection and bare assignment heads. The `744c1c40` checkpoint passed 5323 jobs, 7430 strict declarations, 301 fresh declarations and 65 signatures, including compatibility checks for 88 original declarations. Earlier preparation, Source-result and compatibility records remain separate.
 
-The next steps connect the public Header to these coupled endpoints and share the existing 22 Catalog semantic branches across legacy and prepared payloads. Initializer results must retain the actual emitted code and normalized continuation; loop post headers must retain their own receipt. Match catalog membership and context fields remain genuine static inputs. The stored-call work resolves the actual gate after arguments using physical counts, then connects strict body invocation. Precise interpretation of reached projected table entries, unary token interpretation, full rejection/coercion and stage coverage, public Source admission, all-pass composition and the final mutual compiler theorem are unfinished. Semantic child callbacks must come from the strict mutual induction.
+The next steps share the existing 22 Catalog semantic branches across legacy and prepared payloads. Initializer results must retain the actual emitted code and normalized continuation; loop post headers must retain their own receipt. Match catalog membership and full context fields must come from actual compilation. The stored-call work composes callee, argument and application prefixes through strict child induction, then connects accepted body invocation. Precise interpretation of reached projected table entries, unary token interpretation, full rejection/coercion and stage coverage, public Source admission, all-pass composition and the final mutual compiler theorem are unfinished. Semantic child callbacks must come from the strict mutual induction.
 
-Records: `/private/tmp/solcore-owned-functions-resume-20261007/header-public-argument-seven-validation.json`, `header-joint-root-normal-original-comparison.json`, `native-bare-two-validation.json`, `tree-prepared-coupling-six-validation.json`, and their logs.
+Records: `/private/tmp/solcore-owned-functions-resume-20261007/public-header-application-two-validation.json`, `header-public-argument-seven-validation.json`, `header-joint-root-normal-original-comparison.json`, `native-bare-two-validation.json`, and their logs.
 
 ### Implementation in progress
 
@@ -2362,3 +2366,13 @@ The coupling checkpoint includes both `9bc84639` and `744c1c40`. The latter rest
 The Header checkpoint preserves all 49 original types and axiom lists against independently saved normal objects. Thirty-eight raw types are exact. Eleven explicitly mapped generated helpers pass independent literal-expression equality checks; bound-name hygiene is the only raw representation difference. Fresh counts include every declaration attributed to the seven audited modules, including generated and retained declarations.
 
 Next: connect the public Header to these coupled endpoints; share the existing Catalog preservation/reflection branches using an initializer receipt family and actual post-header payload; retain genuine match catalog/context fields. Resolve the actual stored-call gate after arguments using physical arity, then connect its strict body continuation. Keep all semantic callbacks inside the existing measured mutual induction. General rejection/coercion/stage coverage, public admission, pass composition and the final compiler theorem remain incomplete.
+
+### 2026-10-08: public Header connection and the gate after arguments
+
+The combined checkpoint `676743ef` and `a1bb3536` passed 5332 build jobs, 7520 strict declarations, 15 fresh declarations and seven signatures. Both sources are new; no original source module changed. Three exact full-source reviews, policy, whitespace, final hashes and 5009 protected-file checks passed.
+
+`CallableIndexedOwnedPublicCoupledForHeaderBounds` derives assignment providers at each genuine validity context and unary typing/issued tokens from the actual public Header. Snapshot, allocation, successful-prefix and strict child proofs remain the existing ones.
+
+`CallableIndexedOwnedStoredIndirectApplicationPrefix` resolves the real gate after arguments using the selected row's physical parameter and argument counts. Source arity comes separately from the original Source parent and ordered argument trace. Rejection retains the true argument post, complete pool and Source/staged failure. Acceptance returns the original argument receipt verbatim, including the whole fourth-bind strict bound and the actual application trace.
+
+Next: compose these finite prefixes from strict child induction and connect accepted body invocation. For match, retain the actual compilation's full solved-row identity and transport genuine Source signature/ledger facts through lexical contexts. The current coupled receipt alone omits that information; matching emitted code cannot recover unused solved rows. Share the Catalog semantic core and preserve original theorem types. All-pass composition and the final public compiler theorem remain incomplete.
