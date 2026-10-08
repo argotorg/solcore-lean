@@ -871,6 +871,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedCallStag
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredArgumentAlignment
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredApplicationProjection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredNativePackReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCallBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
