@@ -208,3 +208,177 @@ def prepare (context : Context) (plan : Plan) (root : Key)
   pure {program, missing, fixed, nextReason := next}
 
 end Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
+
+namespace Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
+open SourceInference
+
+private def diagnosticStepResult {β : Type} : ForInStep β → β
+  | .done value | .yield value => value
+
+private theorem diagnosticLoopInvariant {α β ε : Type} {items : List α}
+    {before after : β} {step : α → β → Except ε (ForInStep β)} {invariant : β → Prop}
+    (initial : invariant before)
+    (keep : ∀ item ∈ items, ∀ previous next, invariant previous →
+      step item previous = .ok next → invariant (diagnosticStepResult next))
+    (accepted : forIn items before step = .ok after) : invariant after := by
+  induction items generalizing before with
+  | nil =>
+    simp only [List.forIn_nil, pure, Except.pure, Except.ok.injEq] at accepted
+    cases accepted
+    exact initial
+  | cons item rest ih =>
+    rw [List.forIn_cons] at accepted
+    cases produced : step item before with
+    | error error => simp [produced, bind, Except.bind] at accepted
+    | ok next =>
+      have kept := keep item (by simp) before next initial produced
+      cases next with
+      | done value =>
+        simp [produced, bind, Except.bind] at accepted
+        cases accepted
+        exact kept
+      | yield value =>
+        simp only [produced, bind, Except.bind] at accepted
+        exact ih kept (fun other member => keep other (by simp [member])) accepted
+
+/-- A returned missing-default diagnostic comes from an actual site and
+an actual raw mapping header in this receiver registry. The token conversion
+is the checked, non-wrapping conversion used by the original producer. -/
+def MissingDiagnosticOrigin (registry : SourceCoreRawMetadata.Registry)
+    (sites : List MissingSite) (entry : Core.Word × Diagnostic) : Prop :=
+  ∃ site ∈ sites, ∃ keyType valueType index,
+    (SourceCoreRawMetadata.Metadata.mapping keyType valueType, index) ∈ registry.entries.zipIdx ∧
+    SourceCoreRawMetadata.runtimeType keyType = SourceCoreRawMetadata.runtimeType site.keyType ∧
+    SourceCoreRawMetadata.runtimeType valueType = SourceCoreRawMetadata.runtimeType site.valueType ∧
+    Core.Word.ofNat? (site.base.val + index + 1) = some entry.1 ∧
+    entry.2 = {error := .typeMismatch valueType none, site := site.site, span := some site.span}
+
+private theorem diagnostic_word_issued {number : Nat} {reason : Core.Word}
+    (issued : word number = .ok reason) : Core.Word.ofNat? number = some reason := by
+  unfold word at issued
+  cases converted : Core.Word.ofNat? number with
+  | none => simp [converted, throw, throwThe, MonadExceptOf.throw] at issued
+  | some value =>
+    simp [converted] at issued
+    cases issued
+    rfl
+
+/-- Finite inventory traversal of the original table producer. It does not
+evaluate a Source expression or infer an origin from a runtime error. -/
+theorem missingDiagnostics_origins {registry : SourceCoreRawMetadata.Registry}
+    {sites : List MissingSite} {entries : List (Core.Word × Diagnostic)}
+    (accepted : missingDiagnostics registry sites = .ok entries) :
+    ∀ entry ∈ entries, MissingDiagnosticOrigin registry sites entry := by
+  unfold missingDiagnostics at accepted
+  split at accepted
+  next bounded =>
+    simp only [bind, Except.bind, pure, Except.pure] at accepted
+    generalize outer : forIn (m := Except Error) sites ([] : List (Core.Word × Diagnostic)) _ = result at accepted
+    cases result with
+    | error error => cases accepted
+    | ok result =>
+      cases accepted
+      apply diagnosticLoopInvariant (invariant := fun rows => ∀ entry ∈ rows,
+        MissingDiagnosticOrigin registry sites entry) (items := sites) (before := []) ?_ ?_ outer
+      · simp
+      · intro site siteMember previous next known step
+        generalize produced : forIn (m := Except Error) registry.entries.zipIdx previous _ = inner at step
+        cases inner with
+        | error error => cases step
+        | ok rows =>
+          cases step
+          change ∀ entry ∈ rows, MissingDiagnosticOrigin registry sites entry
+          apply diagnosticLoopInvariant known ?_ produced
+          intro metadata member current yielded currentKnown emitted
+          rcases metadata with ⟨metadata, index⟩
+          cases metadata <;> simp only at emitted
+          all_goals try { cases emitted; exact currentKnown }
+          next keyType valueType =>
+            split at emitted
+            next views =>
+              cases issued : word (site.base.val + index + 1) with
+              | error error => simp [issued] at emitted
+              | ok reason =>
+                simp only [issued] at emitted
+                split at emitted
+                next duplicate =>
+                  cases emitted
+                  exact currentKnown
+                next fresh =>
+                  cases emitted
+                  intro entry included
+                  rcases List.mem_append.mp included with earlier | added
+                  · exact currentKnown entry earlier
+                  · simp only [List.mem_singleton] at added
+                    cases added
+                    have viewsPair :
+                        SourceCoreRawMetadata.runtimeType keyType = SourceCoreRawMetadata.runtimeType site.keyType ∧
+                        SourceCoreRawMetadata.runtimeType valueType = SourceCoreRawMetadata.runtimeType site.valueType := by
+                      simpa using views
+                    exact ⟨site, siteMember, keyType, valueType, index, member,
+                      viewsPair.1, viewsPair.2,
+                      diagnostic_word_issued issued, rfl⟩
+            next unrelated =>
+              cases emitted
+              exact currentKnown
+  next overBudget =>
+    simp [throw, throwThe, MonadExceptOf.throw, bind, Except.bind] at accepted
+
+/-- The issued zip index identifies a genuine one-based header in this exact
+registry, and native addition produces the same checked diagnostic token. -/
+theorem MissingDiagnosticOrigin.mapping_header
+    {registry : SourceCoreRawMetadata.Registry} {sites : List MissingSite}
+    {entry : Core.Word × Diagnostic} (origin : MissingDiagnosticOrigin registry sites entry) :
+    ∃ site ∈ sites, ∃ keyType valueType, ∃ header : Core.Word,
+      registry.lookup header = some (.mapping keyType valueType) ∧
+      SourceCoreRawMetadata.runtimeType keyType = SourceCoreRawMetadata.runtimeType site.keyType ∧
+      SourceCoreRawMetadata.runtimeType valueType = SourceCoreRawMetadata.runtimeType site.valueType ∧
+      site.base.val + header.val < Core.wordModulus ∧
+      site.base.add header = entry.1 ∧
+      entry.2 = {error := .typeMismatch valueType none, site := site.site, span := some site.span} := by
+  obtain ⟨site, siteMember, keyType, valueType, index, member, keys, values, issued, diagnostic⟩ := origin
+  have tokenValue : entry.1.val = site.base.val + index + 1 := by
+    unfold Core.Word.ofNat? at issued
+    split at issued
+    · exact congrArg Fin.val (Option.some.inj issued).symm
+    · contradiction
+  have bounded : site.base.val + index + 1 < Core.wordModulus := by
+    rw [← tokenValue]
+    exact entry.1.isLt
+  let header : Core.Word := ⟨index + 1, by omega⟩
+  have indexed := List.mem_zipIdx member
+  have found : registry.entries[index]? = some (.mapping keyType valueType) := by
+    rw [List.getElem?_eq_getElem (by simpa using indexed.2.1)]
+    simpa only [Nat.sub_zero] using congrArg some indexed.2.2.symm
+  have lookup : registry.lookup header = some (.mapping keyType valueType) := by
+    simp [SourceCoreRawMetadata.Registry.lookup, header, found]
+  have reserved : site.base.val + header.val < Core.wordModulus := by
+    simpa only [header, Nat.add_assoc] using bounded
+  have added : site.base.add header = entry.1 := by
+    apply Fin.ext
+    change (site.base.val + (index + 1)) % Core.wordModulus = entry.1.val
+    rw [tokenValue]
+    simpa only [Nat.add_assoc] using
+      (Nat.mod_eq_of_lt (by simpa only [header, Nat.add_assoc] using bounded))
+  exact ⟨site, siteMember, keyType, valueType, header, lookup, keys, values, reserved, added, diagnostic⟩
+
+/-- The same successful rebuild keeps the original table fields, fixed
+diagnostics and exactly the newly issued raw-header diagnostics. -/
+theorem Program.tableForRegistry_receipt {context : Context} {program : Program context}
+    {registry : SourceCoreRawMetadata.Registry}
+    {extension : SourceCoreRawMetadata.Extends program.context.registry registry}
+    {table : SourceCoreFaultSites.Table}
+    (accepted : program.tableForRegistry registry extension = .ok table) :
+    ∃ extra,
+      missingDiagnostics registry program.missing = .ok extra ∧
+      table = {program.program.rootTable with additional := program.fixed ++ extra} ∧
+      ∀ entry ∈ extra, MissingDiagnosticOrigin registry program.missing entry := by
+  unfold Program.tableForRegistry at accepted
+  cases issued : missingDiagnostics registry program.missing with
+  | error error => simp [issued, bind, Except.bind] at accepted
+  | ok extra =>
+    simp only [issued, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+    cases accepted
+    exact ⟨extra, rfl, rfl, missingDiagnostics_origins issued⟩
+
+end Solcore.Frontend.SourceCoreCompatibleDataPlaceFaultSites
