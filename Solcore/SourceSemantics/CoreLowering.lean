@@ -853,6 +853,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPrincipalLambdaE
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPreparedTokenReadyNamedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralMethodMixedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralMethodMixedExpressionRuntimeBounds
+import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTyping
+import Solcore.SourceSemantics.CoreLowering.SourceDiagnosticTypingOrigins
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
