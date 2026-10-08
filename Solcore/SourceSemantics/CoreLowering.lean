@@ -991,6 +991,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaValues
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaInvocation
+import Solcore.SourceSemantics.CoreLowering.ReachedGeneralFragmentOutcomePorts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
