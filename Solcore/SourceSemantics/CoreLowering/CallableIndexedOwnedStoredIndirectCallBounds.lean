@@ -223,6 +223,222 @@ theorem Association.native_typed {mapping : LocationMap} {world : StoreTyping}
   | ordinary _ _ _ _ _ _ _ _ _ typed _ _ => exact typed
   | principal _ _ _ _ _ _ _ _ _ typed _ _ => exact typed
 
+namespace ForModel
+section Selected
+variable {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+  {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+  (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope id callee ids metadata reasonAt lowered)
+  {native : SourceCoreGeneralFunctions.CallableContext} (prepared : Prepared compiler native)
+  (parent : SourceParent compiler)
+  {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+  {certificate : GenericExpressionMeaning.Certificate} {sourceTypes : List TypeSystem.Ty}
+  (tree : DataExpressionSequence.Tree source certificate scope ids sourceTypes compiler.codes)
+  (unique : NodeOccurrencesUnique source)
+  (parentTyped : ExpressionHasType source context id compiler.original.type)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context source)
+  (covers : evidence.Covers context)
+  {firstMap mapping : LocationMap} {firstWorld world : StoreTyping}
+  {before calleeHeap : Dynamic.Heap} {firstStore store : Store}
+  {administrative actualContext : Core.Context} {environment : Dynamic.Environment}
+  {canonical actual : Environment} {ξ : Renaming}
+  (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
+    firstMap firstWorld administrative scope environment canonical compiled.indexed.layouts.definitions)
+  (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+  (agrees : EnvironmentsAgree ξ canonical actual)
+  (typed : RuntimeEnvironmentHasTypes firstWorld actual actualContext compiled.indexed.layouts.definitions)
+  (first : callerProtocol.State ⟨scope, firstMap, firstWorld, before, firstStore, canonical⟩)
+  (firstAdmission : Admission bridge context first)
+  (calleeState : callerProtocol.State ⟨scope, mapping, world, calleeHeap, store, canonical⟩)
+  (calleeRelated : callerProtocol.Relates first calleeState)
+  (calleeMaps : LocationMap.Extends firstMap mapping) (calleeWorlds : WorldExtends firstWorld world)
+  (calleeFrame : AdministrativePreserved firstMap firstStore mapping store)
+  (calleeMetadata : Dynamic.HeapMetadataExtend before calleeHeap)
+  {function : Dynamic.Closure} {calleeNative : Value}
+  {bindings : List CallableIndexedParameterCertificates.Binding} {parameterCore resultCore : Ty}
+  (nativeTyped : RuntimeValueHasType world calleeNative (CallableContract.functionType parameterCore resultCore) compiled.indexed.layouts.definitions)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
+    functions mapping world calleeHeap store)
+  (binderCount : ids.length = bindings.length)
+  (sourceBundle : TypeSystem.Ty.productMany sourceTypes = TypeSystem.Ty.productMany (bindings.map (fun binding => binding.1.scheme.body)))
+  (nativeBundle : SourceCoreCompatibleCatalog.packTypes (compiler.codes.map (·.type)) =
+    SourceCoreCompatibleCatalog.packTypes (bindings.map Prod.snd))
+  (rawResult : SourceCoreRawMetadata.runtimeType compiler.original.type = SourceCoreRawMetadata.runtimeType function.resultType)
+  (nativeResult : compiler.resultType = resultCore)
+  {sidecar : SourceCoreStageContracts.Sidecar}
+  (stages : RecursiveNamedPreparedStageContracts.Prepared compiled native)
+  (caller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar)
+  (sidecarSource : sidecar.source = source)
+  (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids (.closure function) calleeNative)
+  (accepted : Staging.CallBoundary.GuardAccepts (CallableLedger.frame sidecar) prepared.site.call ids (.closure function))
+  {calleeSize : Nat}
+  (calleeTrace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+    context evidence source environment before callee (.closure function) calleeHeap)
+  (calleeEvaluation : Evaluates actual firstStore (compiler.calleeCode.expression.rename ξ) (.inRight .word calleeNative) store)
+
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+
+/-- The whole parent keeps the actual returned caller witness and success-only
+Source admission. Its native and Source result types remain independent receipts. -/
+def ResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap) (value : Value) (finalStore : Store)
+    (finalMap : LocationMap) (finalWorld : StoreTyping) : Prop :=
+  GenericExpressionMeaning.ResultRepresents model finalMap finalWorld compiler.original.type lowered.type faults outcome value ∧
+  CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+  LocationMap.Extends firstMap finalMap ∧ WorldExtends firstWorld finalWorld ∧
+  AdministrativePreserved firstMap firstStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+  ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+    callerProtocol.Relates first reached ∧ PostAdmission bridge context compiler.original.type outcome reached
+
+include rawResult nativeResult in
+theorem parent_result {finalMap : LocationMap} {finalWorld : StoreTyping}
+    {outcome : Dynamic.ExpressionOutcome} {value : Value}
+    (related : FunctionCalls.ResultRepresents model finalMap finalWorld function.resultType resultCore faults outcome value) :
+    GenericExpressionMeaning.ResultRepresents model finalMap finalWorld compiler.original.type lowered.type faults outcome value := by
+  have loweredType : lowered.type = compiler.resultType :=
+    (congrArg (fun output => output.type) compiler.output).trans compiler.resultTypeEq.symm
+  rw [loweredType, nativeResult]
+  cases related with
+  | value payload => exact .value (.compatible rawResult payload)
+  | fault matched => exact .fault matched
+
+/-- A genuine called constructor at the same Source suffix and its exact grade. -/
+def CalledSuffix {suffixArgumentsSize suffixCallSize : Nat}
+    {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
+    (suffix : SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids function
+      suffixArgumentsSize suffixCallSize suffixOutcome suffixAfter) : Prop :=
+  ∃ (arguments : List Dynamic.Value) (middle : Dynamic.Heap),
+    ∃ argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) suffixArgumentsSize
+      context evidence source environment calleeHeap ids arguments middle,
+    ∃ called : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) suffixCallSize
+      context evidence function.evidence middle (.closure function) arguments suffixOutcome suffixAfter,
+      suffix = .called argumentsTrace called
+
+/-- An intermediate leaf at the actual admitted argument state. The final
+prepared endpoint constructs this leaf from strict body children. -/
+def ApplicationPreserves (budget : Nat)
+    {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
+    (suffix : SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids function
+      suffixArgumentsSize suffixCallSize suffixOutcome suffixAfter) : Prop :=
+  ∀ {middleMap : LocationMap} {middleWorld : StoreTyping} {middle : Dynamic.Heap} {middleStore : Store}
+    {arguments : List Dynamic.Value} {payloads : List Value} {types : List TypeSystem.Ty}
+    {parameter sourceResult : TypeSystem.Ty} {packed : Dynamic.Value},
+    (argumentState : callerProtocol.State ⟨scope, middleMap, middleWorld, middle, middleStore, canonical⟩) →
+    Admission bridge context argumentState →
+    LocationMap.Extends mapping middleMap → WorldExtends world middleWorld →
+    AdministrativePreserved mapping store middleMap middleStore → Dynamic.HeapMetadataExtend calleeHeap middle →
+    Dynamic.ValueHasType context calleeHeap (.closure function) (.function parameter sourceResult) →
+    Dynamic.HeapTypesExtend calleeHeap middle →
+    DataExpressionSequence.Values model middleMap middleWorld sourceTypes (compiler.codes.map (·.type)) arguments payloads →
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions middleMap middleWorld middle middleStore →
+    Dynamic.ValuesHaveTypes context middle arguments types → Dynamic.ValuesPack arguments packed →
+    TypeSystem.Ty.productMany types = parameter →
+    ∀ {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap},
+    (argumentsTrace : SourceExecutionSize.ExpressionsEvaluate (Program.ofChecked compiled.sourceProgram) argumentsSize context evidence
+      source environment calleeHeap ids arguments middle) →
+    (called : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) callSize context evidence
+      function.evidence middle (.closure function) arguments outcome after) →
+    CalledSuffix (context := context) (evidence := evidence) (environment := environment) suffix →
+    callSize ≤ budget →
+    ∃ result finalStore finalMap finalWorld,
+      CallableContract.decision prepared.site.gates .beforeApplication native.diagnostics.unknown dispatch.contract = none ∧
+      Evaluates [calleeNative, DataPatternValues.packValues payloads] middleStore
+        CallableIndexedLambdaCalls.applyPayload result finalStore ∧
+      FunctionCalls.ResultRepresents model finalMap finalWorld function.resultType resultCore faults outcome result ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends middleMap finalMap ∧ WorldExtends middleWorld finalWorld ∧
+      AdministrativePreserved middleMap middleStore finalMap finalStore ∧ Dynamic.HeapMetadataExtend middle after ∧
+      ∃ returned : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates argumentState returned
+
+include parent tree unique parentTyped wellFormed runtime covers environments locals agrees typed firstAdmission
+  calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata nativeTyped heaps
+  rawResult nativeResult dispatch accepted calleeTrace calleeEvaluation in
+/-- A real successful callee post feeds ordered admitted arguments, the exact
+parameter continuation and the original whole call. Only strict child IH remains. -/
+theorem preserves_selected_with_application
+    (_selected : CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata compiler.original dispatch.row)
+    (budget : Nat)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
+      bridge model context evidence source certificate faults size)
+    {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (suffix : SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids function
+      argumentsSize callSize outcome after)
+    (argumentsWithin : argumentsSize ≤ budget) (callWithin : callSize ≤ budget)
+    (applicationPreserves : ApplicationPreserves (registry := registry) (faults := faults) bridge functions compiler prepared (native := native)
+      (context := context) (evidence := evidence) (environment := environment) (scope := scope) (canonical := canonical) (calleeHeap := calleeHeap)
+      (mapping := mapping) (world := world) (store := store) (function := function)
+      (calleeNative := calleeNative) (sourceTypes := sourceTypes) (resultCore := resultCore) (dispatch := dispatch) budget suffix) :
+    ∃ sourceSize value finalStore finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize context evidence source
+        environment before id outcome after ∧
+      Evaluates actual firstStore (lowered.expression.rename ξ) value finalStore ∧
+      ResultAt (registry := registry) (faults := faults) (context := context) bridge functions compiler first outcome after value finalStore finalMap finalWorld := by
+  obtain ⟨parameter, sourceResult, rawTypes, calleeTyping, argumentsTyping, application⟩ :=
+    original_facts unique compiler.found compiler.originalForm parentTyped
+  obtain ⟨calleeTyped, calleeHeapTyped, calleeExtension⟩ :=
+    wellFormed.wholeLanguagePreservation.expression context evidence source environment before calleeHeap callee
+      (.closure function) (.function parameter sourceResult) runtime covers locals firstAdmission.heap calleeTyping calleeTrace.sound
+  have calleeAdmission : Admission bridge context calleeState :=
+    ⟨calleeHeapTyped, StableRows.after_administrative (bridge.pool first) (bridge.pool calleeState) firstAdmission.rows calleeFrame⟩
+  have count : rawTypes.length = metadata.argumentCount := by cases application with | intro count _ _ _ => exact count.symm
+  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
+    compiler.argumentCoercions parent.arity wellFormed runtime covers (locals.mono calleeMetadata) calleeHeapTyped
+    argumentsTyping count calleeTrace suffix
+  have stage := CallableIndexedOwnedSelectedCallStageAcceptance.before_arguments dispatch accepted native.diagnostics.unknown
+  have emitted := prepared.lowered_rename compiler ξ
+  rw [nativeResult] at emitted
+  have layout : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)) canonical (.unit :: calleeNative :: actual) :=
+    GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix agrees calleeNative) .unit
+  have actualTyped := RuntimeEnvironmentHasTypes.cons RuntimeValueHasType.unit
+    (RuntimeEnvironmentHasTypes.cons nativeTyped (typed.weaken calleeWorlds))
+  cases suffix with
+  | argumentFault failed =>
+    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+        frame, metadata, reached, related, _stable⟩ :=
+      CallableIndexedOwnedAdmittedExpressionSequence.preserves_fault_bounded bridge budget tree unique argumentsTyping children
+        (environments.extend calleeMaps calleeWorlds) heaps (locals.mono calleeMetadata) layout actualTyped
+        calleeState calleeAdmission failed argumentsWithin
+    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at evaluated
+    have whole := call_argument_fault (resultType := resultCore) dispatch.shape calleeEvaluation stage evaluated
+    rw [← emitted] at whole
+    exact ⟨sourceSize, _, finalStore, finalMap, finalWorld, original, whole,
+      parent_result functions compiler rawResult nativeResult (.fault matched), finalHeaps,
+      calleeMaps.trans maps, calleeWorlds.trans worlds, calleeFrame.trans frame, calleeMetadata.trans metadata,
+      reached, callerProtocol.trans calleeRelated related,
+      after_expression_sized first reached firstAdmission wellFormed runtime covers locals parentTyped original (calleeFrame.trans frame)⟩
+  | called argumentsTrace called =>
+    obtain ⟨payloads, middleStore, middleMap, middleWorld, argumentEvaluation, represented, middleHeaps,
+        maps, worlds, frame, metadata, argumentState, related, argumentAdmission⟩ :=
+      CallableIndexedOwnedAdmittedExpressionSequence.preserves_values_bounded bridge budget tree unique argumentsTyping children
+        (environments.extend calleeMaps calleeWorlds) heaps (locals.mono calleeMetadata) layout actualTyped
+        calleeState calleeAdmission argumentsTrace argumentsWithin
+    obtain ⟨packed, packing, rawTyped, _heapTyped, extension, _packedTyped⟩ :=
+      after_trace wellFormed runtime covers (locals.mono calleeMetadata) calleeHeapTyped argumentsTyping argumentsTrace
+    obtain ⟨result, finalStore, finalMap, finalWorld, arity, evaluated, resultRep, finalHeaps, lastMaps, lastWorlds,
+        lastFrame, lastMetadata, returned, lastRelated⟩ :=
+      applicationPreserves argumentState argumentAdmission maps worlds frame metadata calleeTyped extension
+        represented middleHeaps rawTyped packing (empty_bundle application compiler.argumentCoercions)
+        argumentsTrace called ⟨_, _, argumentsTrace, called, rfl⟩ callWithin
+    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentEvaluation
+    have whole := call_payload_success (resultType := resultCore) dispatch.shape calleeEvaluation stage
+      argumentEvaluation arity evaluated
+    rw [← emitted] at whole
+    exact ⟨sourceSize, result, finalStore, finalMap, finalWorld, original, whole,
+      parent_result functions compiler rawResult nativeResult resultRep, finalHeaps,
+      (calleeMaps.trans maps).trans lastMaps, (calleeWorlds.trans worlds).trans lastWorlds,
+      (calleeFrame.trans frame).trans lastFrame, (calleeMetadata.trans metadata).trans lastMetadata,
+      returned, callerProtocol.trans (callerProtocol.trans calleeRelated related) lastRelated,
+      after_expression_sized first returned firstAdmission wellFormed runtime covers locals parentTyped original
+        ((calleeFrame.trans frame).trans lastFrame)⟩
+
+end Selected
+end ForModel
+
 section Selected
 variable {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
@@ -299,12 +515,7 @@ private theorem parent_result {finalMap : LocationMap} {finalWorld : StoreTyping
     {outcome : Dynamic.ExpressionOutcome} {value : Value}
     (related : FunctionCalls.ResultRepresents model finalMap finalWorld function.resultType resultCore faults outcome value) :
     GenericExpressionMeaning.ResultRepresents model finalMap finalWorld compiler.original.type lowered.type faults outcome value := by
-  have loweredType : lowered.type = compiler.resultType :=
-    (congrArg (fun output => output.type) compiler.output).trans compiler.resultTypeEq.symm
-  rw [loweredType, nativeResult]
-  cases related with
-  | value payload => exact .value (.compatible rawResult payload)
-  | fault matched => exact .fault matched
+  exact ForModel.parent_result functions compiler rawResult nativeResult related
 
 include stages caller sidecarSource unique in
 private theorem actual_selected :
@@ -343,72 +554,29 @@ theorem preserves_selected (budget : Nat)
         environment before id outcome after ∧
       Evaluates actual firstStore (lowered.expression.rename ξ) value finalStore ∧
       ResultAt (registry := registry) (faults := faults) (context := context) bridge profile compiler first outcome after value finalStore finalMap finalWorld := by
-  obtain ⟨parameter, sourceResult, rawTypes, calleeTyping, argumentsTyping, application⟩ :=
-    original_facts unique compiler.found compiler.originalForm parentTyped
-  obtain ⟨calleeTyped, calleeHeapTyped, calleeExtension⟩ :=
-    wellFormed.wholeLanguagePreservation.expression context evidence source environment before calleeHeap callee
-      (.closure function) (.function parameter sourceResult) runtime covers locals firstAdmission.heap calleeTyping calleeTrace.sound
-  have calleeAdmission : Admission bridge context calleeState :=
-    ⟨calleeHeapTyped, StableRows.after_administrative (bridge.pool first) (bridge.pool calleeState) firstAdmission.rows calleeFrame⟩
-  have count : rawTypes.length = metadata.argumentCount := by cases application with | intro count _ _ _ => exact count.symm
-  obtain ⟨sourceSize, original⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm parent.requirements parent.coercions
-    compiler.argumentCoercions parent.arity wellFormed runtime covers (locals.mono calleeMetadata) calleeHeapTyped
-    argumentsTyping count calleeTrace suffix
-  have selected := actual_selected compiler prepared unique stages caller sidecarSource dispatch
-  have stage := CallableIndexedOwnedSelectedCallStageAcceptance.before_arguments dispatch accepted native.diagnostics.unknown
-  have arity := application_gate dispatch selected (actual_arity association binderCount) native.diagnostics.unknown
-  have emitted := prepared.lowered_rename compiler ξ
-  rw [nativeResult] at emitted
-  have layout : EnvironmentsAgree ((Renaming.insertion 0).comp ((Renaming.insertion 0).comp ξ)) canonical (.unit :: calleeNative :: actual) :=
-    GenericExpressionMeaning.agree_prefix (GenericExpressionMeaning.agree_prefix agrees calleeNative) .unit
-  have actualTyped := RuntimeEnvironmentHasTypes.cons RuntimeValueHasType.unit
-    (RuntimeEnvironmentHasTypes.cons (Association.native_typed association) (typed.weaken calleeWorlds))
-  cases suffix with
-  | argumentFault failed =>
-    obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
-        frame, metadata, reached, related, _stable⟩ :=
-      CallableIndexedOwnedAdmittedExpressionSequence.preserves_fault_bounded bridge budget tree unique argumentsTyping children
-        (environments.extend calleeMaps calleeWorlds) heaps (locals.mono calleeMetadata) layout actualTyped
-        calleeState calleeAdmission failed argumentsWithin
-    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at evaluated
-    have whole := call_argument_fault (resultType := resultCore) dispatch.shape calleeEvaluation stage evaluated
-    rw [← emitted] at whole
-    exact ⟨sourceSize, _, finalStore, finalMap, finalWorld, original, whole,
-      parent_result profile compiler rawResult nativeResult (.fault matched), finalHeaps,
-      calleeMaps.trans maps, calleeWorlds.trans worlds, calleeFrame.trans frame, calleeMetadata.trans metadata,
-      reached, callerProtocol.trans calleeRelated related,
-      after_expression_sized first reached firstAdmission wellFormed runtime covers locals parentTyped original (calleeFrame.trans frame)⟩
-  | called argumentsTrace called =>
-    obtain ⟨payloads, middleStore, middleMap, middleWorld, argumentEvaluation, represented, middleHeaps,
-        maps, worlds, frame, metadata, argumentState, related, argumentAdmission⟩ :=
-      CallableIndexedOwnedAdmittedExpressionSequence.preserves_values_bounded bridge budget tree unique argumentsTyping children
-        (environments.extend calleeMaps calleeWorlds) heaps (locals.mono calleeMetadata) layout actualTyped
-        calleeState calleeAdmission argumentsTrace argumentsWithin
-    have nativeCount : (compiler.codes.map (·.type)).length = bindings.length := by
-      simpa only [List.length_map] using compiler.ordered_children.1.symm.trans binderCount
-    have valuesCount : _ = bindings.length := represented.length.1.symm.trans nativeCount
-    have representedArguments := CallableIndexedOwnedStoredArgumentAlignment.arguments_of_bundles bindings represented
-      valuesCount sourceBundle nativeBundle
-    have future := association.extend maps worlds
-    obtain ⟨packed, packing, rawTyped, _heapTyped, extension, _packedTyped⟩ :=
-      after_trace wellFormed runtime covers (locals.mono calleeMetadata) calleeHeapTyped argumentsTyping argumentsTrace
-    have rawArity := arity_of_association future representedArguments
-    obtain ⟨result, finalStore, evaluated, finalMap, finalWorld, resultRep, finalHeaps, lastMaps, lastWorlds,
-        lastFrame, lastMetadata, _baseReached, _baseRelated, _stable, returned, _samePool, lastRelated⟩ :=
-      CallableIndexedOwnedAdmittedStoredClosureInvocation.preserves_at bridge functions wellFormed runtime future
-        argumentState argumentAdmission calleeTyped extension representedArguments middleHeaps rawTyped packing
-        (empty_bundle application compiler.argumentCoercions) rawArity budget below called callWithin
-    rw [GenericExpressionMeaning.rename_prefix, GenericExpressionMeaning.rename_prefix] at argumentEvaluation
-    have whole := call_payload_success (resultType := resultCore) dispatch.shape calleeEvaluation stage
-      argumentEvaluation arity evaluated
-    rw [← emitted] at whole
-    exact ⟨sourceSize, result, finalStore, finalMap, finalWorld, original, whole,
-      parent_result profile compiler rawResult nativeResult resultRep, finalHeaps,
-      (calleeMaps.trans maps).trans lastMaps, (calleeWorlds.trans worlds).trans lastWorlds,
-      (calleeFrame.trans frame).trans lastFrame, (calleeMetadata.trans metadata).trans lastMetadata,
-      returned, callerProtocol.trans (callerProtocol.trans calleeRelated related) lastRelated,
-      after_expression_sized first returned firstAdmission wellFormed runtime covers locals parentTyped original
-        ((calleeFrame.trans frame).trans lastFrame)⟩
+  apply ForModel.preserves_selected_with_application bridge functions compiler prepared parent tree unique parentTyped
+    wellFormed runtime covers environments locals agrees typed first firstAdmission calleeState calleeRelated
+    calleeMaps calleeWorlds calleeFrame calleeMetadata (Association.native_typed association) heaps rawResult nativeResult dispatch accepted calleeTrace calleeEvaluation
+    (actual_selected compiler prepared unique stages caller sidecarSource dispatch) budget children suffix argumentsWithin callWithin
+  intro middleMap middleWorld middle middleStore arguments payloads types parameter sourceResult packed
+    argumentState argumentAdmission maps worlds frame metadata calleeTyped extension representedValues
+    middleHeaps rawTyped packing bundle argumentsSize callSize outcome after argumentsTrace called _sameSuffix callWithin
+  have nativeCount : (compiler.codes.map (·.type)).length = bindings.length := by
+    simpa only [List.length_map] using compiler.ordered_children.1.symm.trans binderCount
+  have valuesCount : _ = bindings.length := representedValues.length.1.symm.trans nativeCount
+  have representedArguments := CallableIndexedOwnedStoredArgumentAlignment.arguments_of_bundles bindings representedValues
+    valuesCount sourceBundle nativeBundle
+  have future := association.extend maps worlds
+  have rawArity := arity_of_association future representedArguments
+  obtain ⟨result, finalStore, evaluated, finalMap, finalWorld, resultRep, finalHeaps, lastMaps, lastWorlds,
+      lastFrame, lastMetadata, _baseReached, _baseRelated, _stable, returned, _samePool, lastRelated⟩ :=
+    CallableIndexedOwnedAdmittedStoredClosureInvocation.preserves_at bridge functions wellFormed runtime future
+      argumentState argumentAdmission calleeTyped extension representedArguments middleHeaps rawTyped packing bundle
+      rawArity budget below called callWithin
+  exact ⟨result, finalStore, finalMap, finalWorld,
+    application_gate dispatch (actual_selected compiler prepared unique stages caller sidecarSource dispatch)
+      (actual_arity association binderCount) native.diagnostics.unknown,
+    evaluated, resultRep, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, returned, lastRelated⟩
 
 include parent tree unique parentTyped wellFormed runtime covers environments locals agrees typed firstAdmission
   calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata association heaps binderCount sourceBundle nativeBundle
