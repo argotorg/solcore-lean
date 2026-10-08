@@ -506,6 +506,10 @@ At `d35929c6`, projected fault receipts retain the actual key/getter or RHS/live
 
 Actual public projected-fault interpretation remains open: it must associate the reached terminal metadata with the precise prepared missing-default row, including normalized raw key/value checks and reserved token range. General stored-call parent expressions still need actual argument/stage/coercion and compiler binding receipts. Bundle type equality alone does not imply Source arity. Neither native type vectors nor an arbitrary fault relation can supply these facts.
 
+At `69e3f120`, actual Source call prefixes retain independent callee/argument typing and real heap extensions; actual codebook preparation exposes the selected generated request and count. Original stage acceptance remains an independent receipt. The missing-default producer retains authenticated emitted rows, and the original path-fault core exposes the actual terminal index and raw mapping fields. Verification passed 5278 normal jobs, 6329 strict declarations, 79 fresh declarations and 36 signatures. The original path-fault theorem retains its exact raw type and axioms against Root's independently saved actual original objects.
+
+At `eb7851c3`, genuine equal arity and independent Source/native bundle equalities derive the original binder argument representation. The indirect parent and payload application suffixes preserve the exact native grade, body, captures, argument and stores through finite inversion. Verification passed 5280 normal jobs, 6345 strict declarations, 21 fresh declarations and 11 signatures. All source reviews, policy, whitespace and 5013 other protected-file checks pass. Actual compiler pack provenance, whole-parent composition and coherent public diagnostic lookup remain incomplete; row membership and packed type equality do not replace those obligations.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
