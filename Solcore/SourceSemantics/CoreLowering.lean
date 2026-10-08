@@ -884,6 +884,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCa
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationCoverage
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingTerminalDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparedDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicCatalogClosedSources
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceMissingDiagnostics
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredSourceBundleReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectSiteSuccess
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
