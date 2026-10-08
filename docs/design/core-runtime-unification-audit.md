@@ -520,6 +520,13 @@ At `108f6af3`, the same original registration fold retains closed Source entries
 
 The public adapter must still produce its authentic selected catalog factory and full Source inventory membership from actual compilation. The terminal proof now closes for a real collected prepared assignment, while Source projection typing, actual extended raw metadata and the same generated path remain genuine inputs. Stored-call raw Source bundle/count/result production, full rejection/coercion/stage coverage and all-pass composition remain unfinished.
 
+
+At `0f829f4e`, actual public compilation supplies the selected catalog and complete Source inventory. Missing terminals and uninitialized projected roots retain their actual prepared paths and first table rows. Actual callable preparation supplies arity diagnostics before and after argument effects. Empty output coercions and genuine successful callee traces derive the raw Source result used by the ordinary/principal continuation adapters. The original assignment and Header static folds retain their selected preparation; admitted projected endpoints consume the actual reached diagnostic packet.
+
+Verification passed 5314 build jobs, 7186 strict declarations, 221 fresh module-attributed declarations and 29 signatures. All seven original Header raw types and axiom lists are exact against independently saved normal objects. The preceding assignment checkpoint independently checked all eight saved literal expressions and axiom lists; seven raw types are exact, with one hygienic matcher-name difference. Source/diff reviews, policy, whitespace and 5009 protected-file checks passed. Runtime and registered tests are unchanged since their actual executions at `3ff3daf4`.
+
+Preparation must still be tied structurally to the exact assignment in the emitted Tree. Equality of diagnostic predicates or emitted code does not recover the chosen head. Actual raw table observations also require a precise interpretation into the semantic fault relation, especially the reached uninitialized location. Existing uniform profile/Catalog fault requirements remain a separate consumer obligation. Stage rejection, nonempty coercions, public Source admission and all-pass composition remain incomplete.
+
 ### Remaining audit and proof obligations
 
 - Preserve full captures, original named/lambda Source provenance, caller/lexical frames, and the actual AuthorityPool under the same function-value and heap model.
