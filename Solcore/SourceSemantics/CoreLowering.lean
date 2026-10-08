@@ -901,6 +901,8 @@ import Solcore.SourceSemantics.CoreLowering.EmittedForHeaderPreparedExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicPlaceUninitializedDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticCoverage
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceProjectionDiagnosticPreparation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectResultSuccess
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredSourceResultReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
