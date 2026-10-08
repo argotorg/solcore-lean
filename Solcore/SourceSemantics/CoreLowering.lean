@@ -879,6 +879,7 @@ import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingDiagnosticAsso
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationRanges
 import Solcore.SourceSemantics.CoreLowering.CompatibleCatalogClosedSources
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceConcretePreparation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPackReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
