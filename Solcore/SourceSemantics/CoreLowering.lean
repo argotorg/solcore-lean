@@ -834,6 +834,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpre
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodMixedExpressionRuntimeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralOrdinaryLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedRankedOrdinarySupportReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedGeneralFunctionSelection
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
