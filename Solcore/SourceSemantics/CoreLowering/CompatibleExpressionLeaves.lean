@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadFaultPolicies
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.CompatibleMappingVirtualRoot
 import Solcore.SourceSemantics.CoreLowering.GenericExpressionMeaning
@@ -134,7 +135,7 @@ private theorem mapping_rename {value : Value} {literal : Expr} (quoted : Quoted
 /-- An actual accepted read and its static source binding construct both finite
 executions and the resulting heap/frame correspondence. Mapping initialization
 updates the existing mapped cell; it allocates no administrative cell. -/
-theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : TypedSource}
+theorem Certificate.evaluates_with_diagnostics {fuel : Nat} {context : ValuesContext} {source : TypedSource}
     {scope : Scope} {id : ExpressionId} {reason : Word} {code : Expr}
     (certificate : Certificate fuel context source scope id reason code)
     {ambient : AmbientDefinitions context.checked.catalog.definitions}
@@ -149,7 +150,7 @@ theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : T
     (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
     (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
     (agrees : EnvironmentsAgree ξ canonical actual)
-    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason) :
+    {faults : FunctionCalls.FaultRep} (uninitialized : UninitializedPolicy certificate sourceContext environment heap faults) :
     ∃ outcome after value finalStore,
       Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
       Evaluates actual store (code.rename ξ) value finalStore ∧
@@ -204,7 +205,8 @@ theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : T
     | ordinary notMapping =>
       refine ⟨.fault (.uninitializedLocation location), heap, .inLeft type (.word reason), store,
         sourceFault (form ▸ (.localUninitialized (owned := []) rfl lookup read rfl rfl ?_)), ?_,
-        .fault (uninitialized location), heaps, (fun _ _ _ => ⟨by assumption, rfl⟩), .refl _⟩
+        .fault (uninitialized location _ ⟨contains, form, declaredScope, occurrence, lookup, read,
+          cellType, rfl, rfl, by simpa only [cellType] using notMapping⟩), heaps, (fun _ _ _ => ⟨by assumption, rfl⟩), .refl _⟩
       · simpa only [cellType] using notMapping
       · rw [ordinary_rename]
         exact OptionalCell.read_failure reason (.var (agrees nativeLookup)) nativeRead
@@ -226,5 +228,32 @@ theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : T
         rw [quoted.weaken 0]
         exact quoted.evaluates _ _
       · exact nativeRead
+
+/-- The original uniform inclusion supplies the policy at its actual witness. -/
+theorem Certificate.evaluates {fuel : Nat} {context : ValuesContext} {source : TypedSource}
+    {scope : Scope} {id : ExpressionId} {reason : Word} {code : Expr}
+    (certificate : Certificate fuel context source scope id reason code)
+    {ambient : AmbientDefinitions context.checked.catalog.definitions}
+    (functions : FunctionModel context.checked.catalog ambient)
+    {registry : SourceCoreRawMetadata.Registry} (extension : SourceCoreRawMetadata.Extends context.registry registry)
+    (program : Program) (sourceContext : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
+    (binding : StaticBinding certificate sourceContext)
+    {mapping : LocationMap} {world : StoreTyping} {administrative : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {heap : Dynamic.Heap} {store : Store} {ξ : Renaming}
+    (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog context.checked.catalog) mapping world
+      administrative scope environment canonical ambient.definitions)
+    (heaps : CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world heap store)
+    (locals : Dynamic.EnvironmentAgrees heap sourceContext.locals environment)
+    (agrees : EnvironmentsAgree ξ canonical actual)
+    {faults : FunctionCalls.FaultRep} (uninitialized : ∀ location, faults (.uninitializedLocation location) reason) :
+    ∃ outcome after value finalStore,
+      Dynamic.ExpressionEvaluatesOutcome program sourceContext evidence source environment heap id outcome after ∧
+      Evaluates actual store (code.rename ξ) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel context.checked registry functions)
+        mapping world certificate.node.type certificate.type faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents context.checked registry functions mapping world after finalStore ∧
+      AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend heap after := by
+  exact certificate.evaluates_with_diagnostics functions extension program sourceContext evidence binding
+    environments heaps locals agrees (fun location _ _ => uninitialized location)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReads
