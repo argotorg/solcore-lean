@@ -807,6 +807,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedReadyNam
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedExtendedReadyMethodInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedFormationHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaFormationHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaSelectedCall
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
