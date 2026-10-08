@@ -982,6 +982,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaAssignmentReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedFlowBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPreparedBodyBounds
+import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
+import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualDiagnosticObservations
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
