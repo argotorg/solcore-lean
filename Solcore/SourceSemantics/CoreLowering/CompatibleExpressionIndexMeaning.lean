@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.IndexFaultPostContracts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndexTerminal
 
 /-! Whole finite index trees evaluate base, then key, then the actual generated
@@ -20,71 +21,80 @@ variable {fuel : Nat} {values : ValuesContext} {source : TypedSource} {context :
   (missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
     faults (.missingMappingDefault value) ((reasonAt id).add tag))
 
-include extension valid unique uninitialized missing in
-theorem preserves :
-    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+include unique in
+theorem preserves_with_post {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    (fragment : ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionMembers.Tree fuel values source context solved reasonAt) faults post)
+    (terminalProvider : IndexFaultPostContracts.TerminalProvider values source functions registry program context evidence
+      reasonAt SourceScalar faults post)
+    (joins : IndexFaultPostContracts.IndexJoins post values program context evidence source) :
+    ExpressionFailurePostContracts.TypedPreserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults post := by
   intro scope id lowered tree
   induction tree with
   | fragment child =>
-    exact TypedGenericExpressionMeaning.preserves_of_unrestricted
-      (CompatibleExpressionMembers.preserves functions extension program evidence valid unique uninitialized) child
+    exact fragment child
   | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree firstIH secondIH =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after
       environments heaps locals agrees actualTyped trace
     have same := Option.some.inj (header.metadata.found.symm.trans found)
     subst root
     rcases (index_inv header.metadata form unique trace).split with ⟨reason, rfl, failed⟩ | ⟨baseSource, middle, baseTrace, tail⟩
-    · obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+    · obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata, childPost⟩ :=
         firstIH header.baseMetadata.found environments heaps locals agrees actualTyped (.fault failed)
       cases represented with
       | fault matched =>
-        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps, maps, worlds, frame, metadata,
+          joins.base_outcome header keyFound form sourceType failed childPost⟩
         rw [index_rename comparison header.registered header.comparisonType]
         exact LanguageResult.bind_failure _ evaluated
-    · obtain ⟨value, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+    · obtain ⟨value, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         firstIH header.baseMetadata.found environments heaps locals agrees actualTyped (.value baseTrace)
       cases represented with
       | @value _ baseValue baseRep =>
         have keyEnvironment := RuntimeEnvironmentHasTypes.cons baseRep.runtime_hasType (actualTyped.weaken firstWorlds)
         rcases tail with ⟨reason, rfl, failed⟩ | ⟨keySource, keyTrace, terminal⟩
-        · obtain ⟨value, finalStore, finalMap, finalWorld, secondEval, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+        · obtain ⟨value, finalStore, finalMap, finalWorld, secondEval, represented, finalHeaps, maps, worlds, frame, metadata, childPost⟩ :=
             secondIH keyFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (agree_prefix agrees _) keyEnvironment (.fault failed)
           cases represented with
           | fault matched =>
             refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps,
-              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+              joins.key_outcome header keyFound form sourceType baseTrace failed childPost⟩
             rw [index_rename comparison header.registered header.comparisonType]
             rw [rename_prefix] at secondEval
             exact LanguageResult.bind_success _ firstEval (LanguageResult.bind_failure _ secondEval)
-        · obtain ⟨value, keyStore, keyMap, keyWorld, secondEval, represented, keyHeaps, keyMaps, keyWorlds, keyFrame, keyMetadata⟩ :=
+        · obtain ⟨value, keyStore, keyMap, keyWorld, secondEval, represented, keyHeaps, keyMaps, keyWorlds, keyFrame, keyMetadata, _keyPost⟩ :=
             secondIH keyFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
               (agree_prefix agrees _) keyEnvironment (.value keyTrace)
           cases represented with
           | @value _ keyValue keyRep =>
-            obtain ⟨actualOutcome, result, finalStore, finalWorld, terminal', related, lookup, finalHeaps, worlds, frame, uniqueResult⟩ :=
-              header.finish sourceType scalar (baseRep.extend (.refl _) keyMaps keyWorlds) keyRep
-                (actualTyped.weaken (firstWorlds.trans keyWorlds)) keyHeaps (reasonAt id) (missing id)
+            obtain ⟨actualOutcome, result, finalStore, finalWorld, terminal', related, lookup, finalHeaps, worlds, frame, uniqueResult, _terminalTrace, terminalPost⟩ :=
+              terminalProvider header sourceType scalar (baseRep.extend (.refl _) keyMaps keyWorlds) keyRep
+                (actualTyped.weaken (firstWorlds.trans keyWorlds)) keyHeaps keyFound form baseTrace keyTrace
             have same := uniqueResult outcome terminal
             subst actualOutcome
             refine ⟨result, finalStore, keyMap, finalWorld, ?_, related, finalHeaps,
               firstMaps.trans keyMaps, (firstWorlds.trans keyWorlds).trans worlds,
-              (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata⟩
+              (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata, terminalPost⟩
             rw [index_rename comparison header.registered header.comparisonType]
             rw [rename_prefix] at secondEval
             apply SourceCoreCompatibleDataExpressions.index_completed layout (reasonAt id) firstEval secondEval
             simpa only [Transport.expression_weaken] using lookup
 
-include extension valid uninitialized missing in
-theorem reflects :
-    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
-      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+theorem reflects_with_post {post : ExpressionFailurePostContracts.ExpressionFaultPost}
+    (fragment : ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (CompatibleExpressionMembers.Tree fuel values source context solved reasonAt) faults post)
+    (terminalProvider : IndexFaultPostContracts.TerminalProvider values source functions registry program context evidence
+      reasonAt SourceScalar faults post)
+    (joins : IndexFaultPostContracts.IndexJoins post values program context evidence source) :
+    ExpressionFailurePostContracts.TypedReflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults post := by
   intro scope id lowered tree
   induction tree with
   | fragment child =>
-    exact TypedGenericExpressionMeaning.reflects_of_unrestricted
-      (CompatibleExpressionMembers.reflects functions extension program evidence valid uninitialized) child
+    exact fragment child
   | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree firstIH secondIH =>
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore
       environments heaps locals agrees actualTyped evaluated
@@ -94,7 +104,7 @@ theorem reflects :
     have complete := evaluated
     cases evaluated with
     | caseLeft baseEvaluation branch =>
-      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+      obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, childPost⟩ :=
         firstIH header.baseMetadata.found environments heaps locals agrees actualTyped baseEvaluation
       cases represented with
       | fault matched =>
@@ -104,9 +114,10 @@ theorem reflects :
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete expected
         cases trace with
         | fault failed => exact ⟨_, after, finalMap, finalWorld, index_intro header.metadata form (.baseFailure failed),
-            .fault matched, finalHeaps, maps, worlds, frame, metadata⟩
+            .fault matched, finalHeaps, maps, worlds, frame, metadata,
+            joins.base_outcome header keyFound form sourceType failed childPost⟩
     | caseRight baseEvaluation branch =>
-      obtain ⟨outcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata⟩ :=
+      obtain ⟨outcome, middle, middleMap, middleWorld, trace, represented, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata, _firstPost⟩ :=
         firstIH header.baseMetadata.found environments heaps locals agrees actualTyped baseEvaluation
       cases represented with
       | @value baseSource baseValue baseRep =>
@@ -116,7 +127,7 @@ theorem reflects :
           cases branch with
           | caseLeft keyEvaluation ignored =>
             rw [← rename_prefix] at keyEvaluation
-            obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
+            obtain ⟨outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata, childPost⟩ :=
               secondIH keyFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (agree_prefix agrees _) keyEnvironment keyEvaluation
             cases represented with
@@ -128,25 +139,50 @@ theorem reflects :
               obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete expected
               cases trace with
               | fault failed => exact ⟨_, after, finalMap, finalWorld, index_intro header.metadata form (.keyFailure baseTrace failed),
-                  .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata⟩
+                  .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+                  joins.key_outcome header keyFound form sourceType baseTrace failed childPost⟩
           | caseRight keyEvaluation lookupEvaluation =>
             rw [← rename_prefix] at keyEvaluation
-            obtain ⟨outcome, after, keyMap, keyWorld, trace, represented, keyHeaps, keyMaps, keyWorlds, keyFrame, keyMetadata⟩ :=
+            obtain ⟨outcome, after, keyMap, keyWorld, trace, represented, keyHeaps, keyMaps, keyWorlds, keyFrame, keyMetadata, _keyPost⟩ :=
               secondIH keyFound (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
                 (agree_prefix agrees _) keyEnvironment keyEvaluation
             cases represented with
             | @value keySource keyValue keyRep =>
-              obtain ⟨outcome, result, endStore, finalWorld, terminal, related, lookup, finalHeaps, worlds, frame, uniqueResult⟩ :=
-                header.finish sourceType scalar (baseRep.extend (.refl _) keyMaps keyWorlds) keyRep
-                  (actualTyped.weaken (firstWorlds.trans keyWorlds)) keyHeaps (reasonAt id) (missing id)
-              rw [rename_prefix] at keyEvaluation
-              have expected := SourceCoreCompatibleDataExpressions.index_completed (comparison := comparison.expression) layout (reasonAt id) baseEvaluation keyEvaluation
-                (by simpa only [Transport.expression_weaken] using lookup)
-              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete expected
               cases trace with
               | value keyTrace =>
+                obtain ⟨outcome, result, endStore, finalWorld, terminal, related, lookup, finalHeaps, worlds, frame, uniqueResult, _terminalTrace, terminalPost⟩ :=
+                  terminalProvider header sourceType scalar (baseRep.extend (.refl _) keyMaps keyWorlds) keyRep
+                    (actualTyped.weaken (firstWorlds.trans keyWorlds)) keyHeaps keyFound form baseTrace keyTrace
+                rw [rename_prefix] at keyEvaluation
+                have expected := SourceCoreCompatibleDataExpressions.index_completed (comparison := comparison.expression) layout (reasonAt id) baseEvaluation keyEvaluation
+                  (by simpa only [Transport.expression_weaken] using lookup)
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete expected
                 exact ⟨outcome, after, keyMap, finalWorld, index_intro header.metadata form (terminal.trace baseTrace keyTrace),
-                  related, finalHeaps, firstMaps.trans keyMaps, (firstWorlds.trans keyWorlds).trans worlds,
-                  (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata⟩
+                    related, finalHeaps, firstMaps.trans keyMaps, (firstWorlds.trans keyWorlds).trans worlds,
+                    (firstFrame.trans keyFrame).trans frame, firstMetadata.trans keyMetadata, terminalPost⟩
+
+include extension valid unique uninitialized missing in
+theorem preserves :
+    TypedGenericExpressionMeaning.Preserves (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  exact ExpressionFailurePostContracts.TypedPreserves.forget
+    (preserves_with_post (functions := functions) (program := program) (evidence := evidence) (unique := unique)
+      (ExpressionFailurePostContracts.TypedPreserves.of_trivial
+        (TypedGenericExpressionMeaning.preserves_of_unrestricted
+        (CompatibleExpressionMembers.preserves functions extension program evidence valid unique uninitialized)))
+      (IndexFaultPostContracts.trivial_scalar_terminal functions registry program context evidence reasonAt missing)
+      (IndexFaultPostContracts.trivial_index_joins values program context evidence source))
+
+include extension valid uninitialized missing in
+theorem reflects :
+    TypedGenericExpressionMeaning.Reflects (CompatibleAmbientHeap.payloadModel values.checked registry functions)
+      program context evidence source (Tree fuel values source context solved reasonAt) faults := by
+  exact ExpressionFailurePostContracts.TypedReflects.forget
+    (reflects_with_post (functions := functions) (program := program) (evidence := evidence)
+      (ExpressionFailurePostContracts.TypedReflects.of_trivial
+        (TypedGenericExpressionMeaning.reflects_of_unrestricted
+        (CompatibleExpressionMembers.reflects functions extension program evidence valid uninitialized)))
+      (IndexFaultPostContracts.trivial_scalar_terminal functions registry program context evidence reasonAt missing)
+      (IndexFaultPostContracts.trivial_index_joins values program context evidence source))
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleExpressionIndices
