@@ -1,6 +1,6 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-07.
+Last updated: 2026-10-09.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
@@ -90,8 +90,12 @@ These internal proof modules connect the actual accepted compiler to a selected 
 | `CallableIndexedOwnedLiteralLambdaInvocationBounds` | Invocation and application preservation/reflection derive body continuations internally and retain actual marked parameters, the reached pool and saved caller restoration. |
 | `SourceCoreChosenOrdinaryAcceptedArgumentAdmission` | Actual numeric Source evaluations construct the physical pair, exclude argument faults and derive raw argument typing and admission at the same reached heap. |
 | `SourceCoreChosenOrdinaryAcceptedLiteralInvocation` | The accepted fixture derives its body context, Word facts and compiler receipts internally, then instantiates invocation and application bounds. |
+| `SourceCoreChosenOrdinaryAcceptedLiteralCallGuard` | Derives runtime parameter shape, Source stage acceptance, physical arity and the selected dispatch row's complete acceptance from genuine compiler and contract receipts. |
+| `SourceCoreChosenOrdinaryAcceptedParentCompilerReceipts` | Retains original parent acceptance, callee and argument compiler receipts, Prepared callsite and chosen root under the same policy, Header and body lowerer. |
+| `SourceCoreChosenOrdinaryAcceptedPairArgumentBounds` | Derives the pair argument tree from parent acceptance and closes preservation/reflection using actual literal and tuple producers, with admission and all rows. |
+| `SourceCoreChosenOrdinaryAcceptedLiteralStoredApplication` | Derives final Source heap admission from actual call allocation and return; reflects the original fourth bind into a real parent Source outcome, retaining genuine dispatch, captures and complete prefix witnesses. |
 
-The literal invocation derives its body ledger and runtime validity from the same selected Support. Genuine capture/global correspondence, argument typing, deep Source heap typing and the complete ordered record relation remain explicit where needed. Source and native grades are independent. The approved child is literal occurrence 3; the outer indirect parent at occurrence 5 remains in the Source. Connecting its actual argument compiler tree and complete dispatch to these invocation proofs, then closing the shared mixed body family, is ongoing.
+The literal invocation derives its body ledger and runtime validity from the same selected Support. Genuine capture/global correspondence, argument typing, deep Source heap typing and the complete ordered record relation remain explicit where needed. Source and native grades are independent. The approved child is literal occurrence 3; the outer indirect parent at occurrence 5 remains in the Source. The actual pair compiler tree and selected-row acceptance are connected. Deriving the actual sidecar/dispatch association and complete native prefix from whole parent completion, then closing the shared mixed body family, is ongoing.
 
 The old `SourceTypedRuntime` namespace remains in compatibility value, observation, and validation carriers. Its name does not imply that a runtime evaluator of Source expressions and statements remains.
 

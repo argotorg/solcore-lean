@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `e55949f5`: selected literal invocation and caller restoration, independent initialized callee admission and actual paired Source argument admission. The final dated section records its 5575-job build, 15194-declaration cumulative audit and remaining complete parent/mixed-family obligations. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `fdf51087`: original chosen parent receipts, closed paired argument semantics, actual selected call acceptance and stored application with successful result admission. The final dated section records its 5579-job build, 15311-declaration cumulative audit and remaining whole native prefix/mixed-family obligations. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1031,3 +1031,21 @@ At `e55949f5`, all registered Solcore modules and `Tests.Main` built successfull
 These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. Estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
 
 Next: connect the actual paired Core argument tree, stored-callee dispatch, sidecar and selected codebook to the new invocation proofs at parent occurrence 5. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: Accepted parent, paired arguments and stored application
+
+The accepted fixture now retains the actual indirect parent compiler receipt under the same chosen root, policy, body lowerer, read budget and Header. Its callee is occurrence 9, its physical argument list is the singleton occurrence 6, and the parent is occurrence 5. Header equality transports these original receipts without selecting another root.
+
+The actual parent acceptance derives the pair compiler tree and its two numeric children. Their original literal and tuple producers prove argument preservation and finite-completion reflection, including raw Source typing, deep heap admission and every ordered record row. No child execution law or whole-program well-formedness is supplied.
+
+The selected function's genuine stage and physical parameter count derive the actual dispatch row's acceptance. Application uses the existing selected literal invocation once, preserving captures, history, reference authority and the reached pool. Independent Source inversion of the real call allocation and singleton return derives final heap typing and successful result admission. The original physical caller restoration occurs once.
+
+Reflection of the original fourth bind retains its full SuccessPrefix, SuccessStep and PassedAt witnesses, then constructs the real parent Source outcome with an independent Source grade. The complete native callee and argument prefix still needs to be derived from whole parent completion. Actual sidecar, dispatch, stored-member and capture associations remain genuine inputs to this finite endpoint.
+
+Implementation commits: `782d7013` (selected-row acceptance), `4cbfb0e3` (original parent compiler receipt), `646de0f0` (closed paired argument semantics), and `fdf51087` (stored application, actual call outcome and test imports).
+
+At `fdf51087`, all registered Solcore modules and `Tests.Main` built successfully (**5579 jobs**). Strict checks verified **15311 cumulative declarations**, **119 declarations across four added modules**, and **35 signatures**. All 119 complete private literal types and axiom arrays match the normal build; only the three permitted standard axioms occur. The cumulative increase is **117**: the actual inventories also include two deferred `RecursiveNamedLoopContracts.ExecutesAt` equations already counted in the prior cumulative environment. Independent prior/current name censuses show no removals, and both complete original equation types and axiom arrays match literally.
+
+Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2250 pre-install Source/object pairs** and **4985 protected original files**. **2236 actual compiled project imports** match the Lean environment exactly. English, policy, registration and whitespace checks pass. No executable checker was added; full registered executions remain those at `3ff3daf4`.
+
+Next: derive the same chosen parent's actual sidecar, lambda origin, dispatch and selected codebook from its static receipts. Connect the original initialized stored read and closed pair argument tree to whole native parent completion. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
