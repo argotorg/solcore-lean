@@ -402,6 +402,67 @@ def NativeBodyAtWithPost (post : NamedInvocationFaultPostContracts.BodyFaultPost
         entry.environment entry.heap entry.actualBody entry.store (header.body.rename entry.embedding)
         header.output outcome after value finalMap finalWorld finalStore
 
+/-- Preserve the extra fact at the same completed body state. -/
+def SourceBodyAtWithExtra (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header))
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
+    (entry : BodyState (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    (reached : State headers keys ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩) (size : Nat) : Prop :=
+  ∀ {outcome after},
+    RecursiveNamedCallBounds.BodyTrace program size header.function header.context entry.environment entry.heap outcome after →
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      (∃ bodyState : State headers keys
+          ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+            finalMap, finalWorld, after, finalStore, entry.canonical⟩,
+        Relates reached bodyState ∧
+        extra entry reached outcome after value finalMap finalWorld finalStore bodyState) ∧
+      NamedInvocationFaultPostContracts.OutcomePost post program header.function header.context
+        entry.environment entry.heap entry.actualBody entry.store (header.body.rename entry.embedding)
+        header.output outcome after value finalMap finalWorld finalStore
+
+/-- Reflect the extra fact at the same completed body state. -/
+def NativeBodyAtWithExtra (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header))
+    {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
+    {initialMap : LocationMap} {initialWorld : StoreTyping} {administrative actualContext : Core.Context}
+    {actual : Environment} {ξ : Renaming} {frameLocation : Location} {current : NativeFrame} {ghost : GhostFrame}
+    (entry : BodyState (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers locations capturePrefix functions registry header arguments before initialStore initialMap initialWorld
+      administrative actualContext actual ξ frameLocation current ghost)
+    (reached : State headers keys ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+      entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩) (size : Nat) : Prop :=
+  ∀ {value finalStore}, EvaluationSize size entry.actualBody entry.store (header.body.rename entry.embedding) value finalStore →
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyTrace program sourceSize header.function header.context entry.environment entry.heap outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      (∃ bodyState : State headers keys
+          ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+            finalMap, finalWorld, after, finalStore, entry.canonical⟩,
+        Relates reached bodyState ∧
+        extra entry reached outcome after value finalMap finalWorld finalStore bodyState) ∧
+      NamedInvocationFaultPostContracts.OutcomePost post program header.function header.context
+        entry.environment entry.heap entry.actualBody entry.store (header.body.rename entry.embedding)
+        header.output outcome after value finalMap finalWorld finalStore
+
 variable (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
   {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
   (caller : State headers keys ⟨scope, mapping, world, heap, store, canonical⟩)
@@ -498,11 +559,60 @@ def NativeContinuationWithPost (post : NamedInvocationFaultPostContracts.BodyFau
     Relates caller reached → condition entry →
     Below budget (NativeBodyAtWithPost post (faults := faults) entry reached)
 
+/-- The strict actual Source child supplies its own post. -/
+def SourceContinuationWithExtra (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header)) (budget : Nat) : Prop :=
+  ∀ {origin index metadata administrative actualContext actual ξ frameLocation},
+    frameLocation = owner.key.frameLocation →
+    compiled.indexed.ancestry.graph.inputs.callable.table.idAt? (.named header.named.signature.key) = some origin →
+    Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table (.state index) (.named origin) (some metadata) →
+    header.code = withFrame (.var (compiled.indexed.base.globals.length + 1))
+      (SourceCoreCallableIndexedDispatch.literal compiled.indexed.ancestry.layout.frame (.state index)) header.parameterCode →
+  ∀ entry : BodyState (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    headers owner.key.locations owner.key.capturePrefix functions registry header arguments heap
+    (store.set frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index))) mapping world
+    administrative actualContext actual ξ frameLocation (.state index) (.named origin),
+    ContinuationAgreement actual
+      (store.set frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index)))
+      (header.parameterCode.rename ξ) entry.actualBody entry.store (header.body.rename entry.embedding) →
+  ∀ reached : State headers keys ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+    entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩,
+    Relates caller reached → condition entry →
+    Below budget (SourceBodyAtWithExtra post extra (faults := faults) entry reached)
+
+/-- The actual measured native child supplies its own post. -/
+def NativeContinuationWithExtra (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header)) (budget : Nat) : Prop :=
+  ∀ {origin index metadata administrative actualContext actual ξ frameLocation prefixSize bodyStore value finalStore},
+    frameLocation = owner.key.frameLocation →
+    compiled.indexed.ancestry.graph.inputs.callable.table.idAt? (.named header.named.signature.key) = some origin →
+    Carries compiled.indexed.ancestry.graph.inputs compiled.indexed.ancestry.graph.table (.state index) (.named origin) (some metadata) →
+    header.code = withFrame (.var (compiled.indexed.base.globals.length + 1))
+      (SourceCoreCallableIndexedDispatch.literal compiled.indexed.ancestry.layout.frame (.state index)) header.parameterCode →
+    EvaluationSize prefixSize actual
+      (store.set frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index)))
+      (header.parameterCode.rename ξ) value bodyStore → prefixSize < budget →
+    finalStore = bodyStore.set frameLocation
+      (encode compiled.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current) →
+  ∀ entry : BodyState (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    headers owner.key.locations owner.key.capturePrefix functions registry header arguments heap
+    (store.set frameLocation (encode compiled.indexed.ancestry.layout.frame (.state index))) mapping world
+    administrative actualContext actual ξ frameLocation (.state index) (.named origin),
+  ∀ reached : State headers keys ⟨header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)),
+    entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩,
+    Relates caller reached → condition entry →
+    Below budget (NativeBodyAtWithExtra post extra (faults := faults) entry reached)
+
+
 end Continuations
 
 /-- The original strictly smaller Source body child consumes the real parameter
 pool. Returning restores the saved caller in that body's actual reached pool. -/
-theorem invocation_preserves_bounded_at_with_post
+theorem invocation_preserves_bounded_at_with_extra
     {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     {header : CallableIndexedOwnedFunctionValues.Header compiled program}
@@ -528,7 +638,9 @@ theorem invocation_preserves_bounded_at_with_post
       mapping world header.bindings arguments payloads)
     (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world heap store)
     (post : NamedInvocationFaultPostContracts.BodyFaultPost)
-    (bodyMeaning : SourceContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header))
+    (bodyMeaning : SourceContinuationWithExtra (post := post) (extra := extra) (functions := functions) (registry := registry) (faults := faults)
       (header := header) (arguments := arguments) owner caller condition budget)
     {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
     (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence heap arguments outcome after)
@@ -543,8 +655,8 @@ theorem invocation_preserves_bounded_at_with_post
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) caller
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
-      NamedInvocationFaultPostContracts.ReturnedAt (header := header) (functions := functions)
-        (registry := registry) post size (none) owner caller arguments outcome after value finalMap finalWorld finalStore := by
+      NamedInvocationFaultPostContracts.ReturnedAtWithExtra (header := header) (functions := functions)
+        (registry := registry) post extra size (none) owner caller arguments outcome after value finalMap finalWorld finalStore := by
   let authority := (caller.rows owner.position).authority
   have physical : authority.frameLocation = owner.key.frameLocation := (caller.rows owner.position).frame_eq
   change authority.frameLocation = keys[owner.position.val].frameLocation at physical
@@ -610,7 +722,7 @@ theorem invocation_preserves_bounded_at_with_post
     bodyMeaning physical owned history emitted entry agreement parameterState
       (installedRelated.trans parameterRelated) (authorized physical owned history emitted entry)
       child (Nat.lt_of_lt_of_le smaller within) bodyTrace
-  obtain ⟨bodyState, bodyRelated⟩ := bodyTransition
+  obtain ⟨bodyState, bodyRelated, bodyExtra⟩ := bodyTransition
   have prefixEvaluation := agreement.wrap bodyEvaluation
   rw [rename_prefix] at prefixEvaluation
   have reference : (DataPatternValues.packValues payloads :: liveCapture.captured)[liveCapture.embedding.lift
@@ -640,7 +752,70 @@ theorem invocation_preserves_bounded_at_with_post
   refine ⟨origin, index, metadata, _, _, _, _, entry, parameterState, child, bodyStore, bodyState,
     owned, history, emitted, installedRelated.trans parameterRelated, bodyRelated, bodyTrace,
     smaller, bodyEvaluation, bodyPost, agreement, related, rfl, restoredCell,
-    restoredBodyRelated, restoredCallerRelated, restoredRecords⟩
+    restoredBodyRelated, restoredCallerRelated, restoredRecords, bodyExtra, restoredFrame⟩
+
+/-- Retain the legacy post-only interface through the same actual body witness. -/
+theorem invocation_preserves_bounded_at_with_post
+    {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {header : CallableIndexedOwnedFunctionValues.Header compiled program}
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : header.layouts = compiled.indexed.layouts)
+    (condition : BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations)
+      (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations)
+      (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation condition)
+    (budget : Nat)
+    {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
+    (caller : State headers keys ⟨scope, mapping, world, heap, store, canonical⟩)
+    (_member : header ∈ headers)
+    (capture : Capture (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers owner.key.locations owner.key.capturePrefix (caller.rows owner.position).authority.frameLocation header mapping world heap store)
+    {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+      mapping world header.bindings arguments payloads)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world heap store)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : SourceContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+      (header := header) (arguments := arguments) owner caller condition budget)
+    {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.BodyOutcome program size header.sourceBody header.function.evidence heap arguments outcome after)
+    (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (DataPatternValues.packValues payloads :: capture.captured) store
+        (header.code.rename capture.embedding.lift) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedInvocationFaultPostContracts.ReturnedAt (header := header) (functions := functions)
+        (registry := registry) post size (none) owner caller arguments outcome after value finalMap finalWorld finalStore := by
+  have strongMeaning : SourceContinuationWithExtra
+      (post := post) (extra := NamedInvocationFaultPostContracts.TrivialExtra)
+      (functions := functions) (registry := registry) (faults := faults) (header := header)
+      (arguments := arguments) owner caller condition budget := by
+    intro origin index metadata administrative actualContext actual ξ frameLocation
+      physical owned history emitted entry agreement reached related allowed child strict outcome after trace
+    obtain ⟨value, bodyStore, finalMap, finalWorld, evaluation, result, finalHeaps,
+      maps, worlds, frame, metadata, transition, bodyPost⟩ :=
+      bodyMeaning physical owned history emitted entry agreement reached related allowed child strict trace
+    obtain ⟨bodyState, bodyRelated⟩ := transition
+    exact ⟨value, bodyStore, finalMap, finalWorld, evaluation, result, finalHeaps,
+      maps, worlds, frame, metadata, ⟨bodyState, bodyRelated, trivial⟩, bodyPost⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluation, result, finalHeaps,
+    maps, worlds, frame, metadata, returned, receipt⟩ :=
+    invocation_preserves_bounded_at_with_extra (faults := faults) owner sameLayouts condition authorized budget caller
+      _member capture represented heaps post NamedInvocationFaultPostContracts.TrivialExtra strongMeaning trace within
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluation, result, finalHeaps,
+    maps, worlds, frame, metadata, returned, NamedInvocationFaultPostContracts.ReturnedAtWithExtra.forget receipt⟩
 
 theorem invocation_preserves_bounded_at
     {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
@@ -763,7 +938,7 @@ private theorem body_of_trace_sized {header : CallableIndexedOwnedFunctionValues
   | fault failed => exact .fault (.statements header.frame.roots extension allocation (header.frame.source ▸ failed))
   | escaped executed escape => exact .fault (.controlEscape header.frame.roots extension allocation (header.frame.source ▸ executed) escape)
 
-theorem invocation_reflects_bounded_at_with_post
+theorem invocation_reflects_bounded_at_with_extra
     {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     {header : CallableIndexedOwnedFunctionValues.Header compiled program}
@@ -789,7 +964,9 @@ theorem invocation_reflects_bounded_at_with_post
       mapping world header.bindings arguments payloads)
     (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world heap store)
     (post : NamedInvocationFaultPostContracts.BodyFaultPost)
-    (bodyMeaning : NativeContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+    (extra : NamedInvocationFaultPostContracts.BodyExtra (headers := headers) (keys := keys)
+      (functions := functions) (registry := registry) (header := header))
+    (bodyMeaning : NativeContinuationWithExtra (post := post) (extra := extra) (functions := functions) (registry := registry) (faults := faults)
       (header := header) (arguments := arguments) owner caller condition budget)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -804,8 +981,8 @@ theorem invocation_reflects_bounded_at_with_post
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
       ProtectedStateTransition.Transition (protocol headers keys) caller
         ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
-      NamedInvocationFaultPostContracts.ReturnedAt (header := header) (functions := functions)
-        (registry := registry) post sourceSize (some size) owner caller arguments outcome after value finalMap finalWorld finalStore := by
+      NamedInvocationFaultPostContracts.ReturnedAtWithExtra (header := header) (functions := functions)
+        (registry := registry) post extra sourceSize (some size) owner caller arguments outcome after value finalMap finalWorld finalStore := by
   let authority := (caller.rows owner.position).authority
   have physical : authority.frameLocation = owner.key.frameLocation := (caller.rows owner.position).frame_eq
   change authority.frameLocation = keys[owner.position.val].frameLocation at physical
@@ -886,7 +1063,7 @@ theorem invocation_reflects_bounded_at_with_post
       restored entry parameterState (installedRelated.trans parameterRelated)
       (authorized physical owned history emitted entry)
       child (Nat.lt_of_lt_of_le (Nat.lt_of_le_of_lt childLe prefixSmaller) within) bodyCompleted
-  obtain ⟨bodyState, bodyRelated⟩ := bodyTransition
+  obtain ⟨bodyState, bodyRelated, bodyExtra⟩ := bodyTransition
   have maps := entry.maps.trans bodyMaps
   have worlds := entry.worlds.trans bodyWorlds
   have frame := entry.frame.trans bodyFrame
@@ -905,9 +1082,74 @@ theorem invocation_reflects_bounded_at_with_post
       owned, history, emitted, installedRelated.trans parameterRelated, bodyRelated, trace,
       SourceExecutionSize.child_lt_stepSize (by simp), bodyCompleted.sound, bodyPost,
       ⟨prefixSize, child, prefixCompleted, bodyCompleted, childLe, prefixSmaller⟩, related, ?_, ?_,
-      restoredBodyRelated, restoredCallerRelated, restoredRecords⟩
+      restoredBodyRelated, restoredCallerRelated, restoredRecords, bodyExtra, ?_⟩
     · simp only [CallableIndexedOwnedBodyRestoration.finalIndex, ← physical, authority]
     · simpa only [CallableIndexedOwnedBodyRestoration.finalIndex, ← physical, authority] using restoredCell
+    · simpa only [CallableIndexedOwnedBodyRestoration.finalIndex, ← physical, authority] using restoredFrame
+
+/-- Retain the legacy post-only interface through the same actual body witness. -/
+theorem invocation_reflects_bounded_at_with_post
+    {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
+    {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
+    {header : CallableIndexedOwnedFunctionValues.Header compiled program}
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (sameLayouts : header.layouts = compiled.indexed.layouts)
+    (condition : BodyCondition (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations)
+      (capturePrefix := owner.key.capturePrefix) functions registry header)
+    (authorized : BodyAuthorizationAt (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers := headers) (locations := owner.key.locations)
+      (capturePrefix := owner.key.capturePrefix) functions registry header owner.key.frameLocation condition)
+    (budget : Nat)
+    {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
+    (caller : State headers keys ⟨scope, mapping, world, heap, store, canonical⟩)
+    (_member : header ∈ headers)
+    (capture : Capture (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      headers owner.key.locations owner.key.capturePrefix (caller.rows owner.position).authority.frameLocation header mapping world heap store)
+    {arguments : List Dynamic.Value} {payloads : List Value}
+    (represented : Arguments (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+      mapping world header.bindings arguments payloads)
+    (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions mapping world heap store)
+    (post : NamedInvocationFaultPostContracts.BodyFaultPost)
+    (bodyMeaning : NativeContinuationWithPost (post := post) (functions := functions) (registry := registry) (faults := faults)
+      (header := header) (arguments := arguments) owner caller condition budget)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
+      (header.code.rename capture.embedding.lift) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyOutcome program sourceSize header.sourceBody header.function.evidence heap arguments outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld header.function.resultType header.output faults outcome value ∧
+      CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+      ProtectedStateTransition.Transition (protocol headers keys) caller
+        ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
+      NamedInvocationFaultPostContracts.ReturnedAt (header := header) (functions := functions)
+        (registry := registry) post sourceSize (some size) owner caller arguments outcome after value finalMap finalWorld finalStore := by
+  have strongMeaning : NativeContinuationWithExtra
+      (post := post) (extra := NamedInvocationFaultPostContracts.TrivialExtra)
+      (functions := functions) (registry := registry) (faults := faults) (header := header)
+      (arguments := arguments) owner caller condition budget := by
+    intro origin index metadata administrative actualContext actual ξ frameLocation prefixSize bodyStore value finalStore
+      physical owned history emitted prefixCompleted prefixWithin restored entry reached related allowed child strict
+      bodyValue bodyFinalStore bodyCompleted
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps,
+      maps, worlds, frame, metadata, transition, bodyPost⟩ :=
+      bodyMeaning physical owned history emitted prefixCompleted prefixWithin restored entry reached related allowed child strict bodyCompleted
+    obtain ⟨bodyState, bodyRelated⟩ := transition
+    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps,
+      maps, worlds, frame, metadata, ⟨bodyState, bodyRelated, trivial⟩, bodyPost⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps,
+    maps, worlds, frame, metadata, returned, receipt⟩ :=
+    invocation_reflects_bounded_at_with_extra (faults := faults) owner sameLayouts condition authorized budget caller
+      _member capture represented heaps post NamedInvocationFaultPostContracts.TrivialExtra strongMeaning completed within
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result, finalHeaps,
+    maps, worlds, frame, metadata, returned, NamedInvocationFaultPostContracts.ReturnedAtWithExtra.forget receipt⟩
 
 theorem invocation_reflects_bounded_at
     {functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
