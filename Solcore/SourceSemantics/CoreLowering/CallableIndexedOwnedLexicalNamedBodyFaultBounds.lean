@@ -228,15 +228,59 @@ structure BodyInputs : Prop where
   extend : ∀ {context nextContext binder}, validity context →
     BinderExtends header.function.source.owner context binder nextContext → validity nextContext
 
+/-- The same literal static inputs without restricting the grammar profile. -/
+structure StaticBodyInputs : Prop where
+  syntaxTree : GenericLexicalStatements.Syntax header.function.source expressionSyntax header.context true
+    header.function.body header.function.resultType
+  tree : GenericLexicalStatements.Tree compiled.indexed.layouts header.owner header.active
+    compiled.indexed.ancestry.layout.frame header.globals header.onError (.initial compiled.compatible.checked)
+    header.function.source certificates header.context
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) true
+    header.function.body header.function.resultType header.output flow
+  accepted : SourceCoreLoops.lowerStatementsWithPolicy header.policy header.fuel header.function.source
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+    header.output header.reasonAt header.fellThrough header.escaped = .ok header.body
+  generated : SourceCoreLoops.lowerFlowStatementsWithPolicy header.policy header.fuel header.function.source
+    (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.function.body
+    header.output header.reasonAt true header.escaped = .ok flow
+  projection : compiled.compatible.checked.catalog.project header.function.resultType = .ok header.output
+  valid : validity header.context
+  contexts : ∀ context, validity context → StaticContext (compiled := compiled) (program := program)
+    (registry := registry) (faults := faults) (source := header.function.source) (certificates := certificates)
+    functions header.function.evidence context
+  extend : ∀ {context nextContext binder}, validity context →
+    BinderExtends header.function.source.owner context binder nextContext → validity nextContext
+
+/-- The original profile contributes no dynamic hypothesis to this finite receipt. -/
+theorem BodyInputs.static_inputs (inputs : BodyInputs (functions := functions) (header := header)
+    (registry := registry) (faults := faults) (certificates := certificates)
+    (expressionSyntax := expressionSyntax) (flow := flow) validity) :
+    StaticBodyInputs (functions := functions) (header := header) (registry := registry)
+      (faults := faults) (certificates := certificates) (expressionSyntax := expressionSyntax)
+      (flow := flow) validity := {
+  syntaxTree := inputs.syntaxTree,
+  tree := inputs.tree,
+  accepted := inputs.accepted,
+  generated := inputs.generated,
+  projection := inputs.projection,
+  valid := inputs.valid,
+  contexts := inputs.contexts,
+  extend := inputs.extend }
+
 variable (inputs : BodyInputs (functions := functions) (header := header) (registry := registry)
   (faults := faults) (certificates := certificates) (expressionSyntax := expressionSyntax) (flow := flow) validity)
 
 include inputs in
 private theorem BodyInputs.emitted : header.body = CompatibleStatements.finish header.output flow header.fellThrough header.escaped := by
-  have accepted := inputs.accepted
-  unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
-  rw [inputs.generated] at accepted
-  exact Except.ok.inj accepted.symm
+  exact with_static (staticInputs := BodyInputs.static_inputs functions validity inputs)
+where
+  with_static (staticInputs : StaticBodyInputs (functions := functions) (header := header)
+        (registry := registry) (faults := faults) (certificates := certificates)
+        (expressionSyntax := expressionSyntax) (flow := flow) validity) : header.body = CompatibleStatements.finish header.output flow header.fellThrough header.escaped := by
+    have accepted := staticInputs.accepted
+    unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
+    rw [staticInputs.generated] at accepted
+    exact Except.ok.inj accepted.symm
 
 include inputs in
 private theorem BodyInputs.transfers {environment : Dynamic.Environment} {before after : Dynamic.Heap}
@@ -244,11 +288,20 @@ private theorem BodyInputs.transfers {environment : Dynamic.Environment} {before
     (trace : RecursiveNamedLoopContracts.ExecutesAt sourceSize true program header.context header.function.evidence
       header.function.source environment before header.function.body finalContext control after) :
     ImperativeFunctionFinish.TransferFaults faults header.escaped control := by
-  cases trace with
-  | fault failed => constructor <;> intro next same <;> cases same
-  | control executed =>
-    cases GenericLexicalStatements.syntax_control_shape inputs.syntaxTree header.unique executed.sound <;>
-      constructor <;> intro next same <;> cases same
+  exact with_static (staticInputs := BodyInputs.static_inputs functions validity inputs) trace
+where
+  with_static (staticInputs : StaticBodyInputs (functions := functions) (header := header)
+        (registry := registry) (faults := faults) (certificates := certificates)
+        (expressionSyntax := expressionSyntax) (flow := flow) validity) {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {sourceSize : Nat} {finalContext : SourceSemantics.Context} {control : Dynamic.ControlOutcome}
+    (trace : RecursiveNamedLoopContracts.ExecutesAt sourceSize true program header.context header.function.evidence
+      header.function.source environment before header.function.body finalContext control after) :
+    ImperativeFunctionFinish.TransferFaults faults header.escaped control := by
+    cases trace with
+    | fault failed => constructor <;> intro next same <;> cases same
+    | control executed =>
+      cases GenericLexicalStatements.syntax_control_shape staticInputs.syntaxTree header.unique executed.sound <;>
+        constructor <;> intro next same <;> cases same
 
 variable {locations : CallableIndexedOwnedFunctionValues.Header compiled program → Location} {capturePrefix : Nat}
   {arguments : List Dynamic.Value} {before : Dynamic.Heap} {initialStore : Store}
@@ -279,45 +332,61 @@ at this actual parameter state. The fault post remains at the body store. -/
 theorem source_body_with_post (size : Nat) :
     SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
-  intro outcome after trace
-  let bodyBridge := poolBridge (headers := headers) (keys := keys)
-  let model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
-  let producer := CallableIndexedOwnedAllocationProducer.producer headers keys model
-  let condition := CallableIndexedOwnedAllocationProducer.StableOwner keys
-  have meaning := flow_preserves bodyBridge functions header.function.evidence
-    (administrativeTransport headers keys) extension faithful observations functionTypes header.unique wellFormed
-    (layouts := compiled.indexed.layouts) (owner := header.owner) (active := header.active)
-    (frame := compiled.indexed.ancestry.layout.frame) (globals := header.globals) (onError := header.onError)
-    (expressionSyntax := expressionSyntax) rfl header.registered condition producer
-    (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
-    (fun _ _ seed => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner model seed)
-    validity inputs.contexts inputs.extend size size (Nat.le_refl size) inputs.tree
-  have lifted := NamedLexicalFunctionFaultPostContracts.PreservesAtWith.of_lexical
-    (protocol := protocol headers keys) (readiness := readiness bodyBridge) (condition := condition)
-    (facts := GenericLexicalStatements.Syntax header.function.source expressionSyntax)
-    (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-    (functions := functions) (program := program) (evidence := header.function.evidence)
-    (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-    (meaning := meaning)
-  have matchTree := GenericImperativeMatch.Tree.body
-    (definitions := (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
-    (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-    inputs.syntaxTree inputs.tree
-  obtain ⟨value, bodyStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame,
-    metadata, _exit, finalTransition, retained⟩ :=
-    RecursiveNamedFunctionFinishBounds.WithReady.preserves_at_emitted_with_state_when_with_transfers_with_post
-      (functions := functions) (program := program) (tree := matchTree) (projection := inputs.projection) (unique := header.unique)
-      (FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
-      (protocol headers keys) (readiness bodyBridge) condition
-      (GenericLexicalStatements.Syntax header.function.source expressionSyntax) (BodyInputs.emitted functions validity inputs)
-      validity size lifted inputs.valid inputs.syntaxTree
-      entry.environments entry.heaps sourceReceipt.locals entry.lookups entry.actualTyped
-      (body_reference functions entry) entry.state.read (body_unmapped functions entry) reached stable
-      (show Admission bodyBridge header.context reached from ⟨sourceReceipt.heapTyped, rows⟩)
-      (BodyInputs.transfers functions validity inputs) trace
-  exact ⟨value, bodyStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame,
-    metadata, ProtectedStateTransition.FunctionFinish.Reached.forget finalTransition,
-    ReachedNamedLexicalBodyFaultPaths.outcome_post_of_finished inputs.syntaxTree header.unique retained evaluated⟩
+  exact with_static (extension := extension) (faithful := faithful) (observations := observations)
+    (functionTypes := functionTypes) (wellFormed := wellFormed) (sourceReceipt := sourceReceipt)
+    (rows := rows) (stable := stable) (staticInputs := BodyInputs.static_inputs functions validity inputs) size
+where
+  with_static (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
+      (faithful : DataEquality.IdentityFaithful identities)
+      (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
+      (functionTypes : FunctionRuntimeViews functions) (wellFormed : ProgramWellFormed program)
+      (sourceReceipt : SourceReceipt program header.function header.context entry.environment entry.heap)
+      (rows : StableRows reached)
+      (stable : CallableIndexedOwnedAllocationProducer.StableOwner keys frameLocation current)
+      (staticInputs : StaticBodyInputs (functions := functions) (header := header)
+        (registry := registry) (faults := faults) (certificates := certificates)
+        (expressionSyntax := expressionSyntax) (flow := flow) validity) (size : Nat) :
+    SourceBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
+      (faults := faults) entry reached size := by
+    intro outcome after trace
+    let bodyBridge := poolBridge (headers := headers) (keys := keys)
+    let model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+    let producer := CallableIndexedOwnedAllocationProducer.producer headers keys model
+    let condition := CallableIndexedOwnedAllocationProducer.StableOwner keys
+    have meaning := flow_preserves bodyBridge functions header.function.evidence
+      (administrativeTransport headers keys) extension faithful observations functionTypes header.unique wellFormed
+      (layouts := compiled.indexed.layouts) (owner := header.owner) (active := header.active)
+      (frame := compiled.indexed.ancestry.layout.frame) (globals := header.globals) (onError := header.onError)
+      (expressionSyntax := expressionSyntax) rfl header.registered condition producer
+      (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+      (fun _ _ seed => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner model seed)
+      validity staticInputs.contexts staticInputs.extend size size (Nat.le_refl size) staticInputs.tree
+    have lifted := NamedLexicalFunctionFaultPostContracts.PreservesAtWith.of_lexical
+      (protocol := protocol headers keys) (readiness := readiness bodyBridge) (condition := condition)
+      (facts := GenericLexicalStatements.Syntax header.function.source expressionSyntax)
+      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (functions := functions) (program := program) (evidence := header.function.evidence)
+      (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+      (meaning := meaning)
+    have matchTree := GenericImperativeMatch.Tree.body
+      (definitions := (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+      (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+      staticInputs.syntaxTree staticInputs.tree
+    obtain ⟨value, bodyStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame,
+      metadata, _exit, finalTransition, retained⟩ :=
+      RecursiveNamedFunctionFinishBounds.WithReady.preserves_at_emitted_with_state_when_with_transfers_with_post
+        (functions := functions) (program := program) (tree := matchTree) (projection := staticInputs.projection) (unique := header.unique)
+        (FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
+        (protocol headers keys) (readiness bodyBridge) condition
+        (GenericLexicalStatements.Syntax header.function.source expressionSyntax) (BodyInputs.emitted.with_static (functions := functions) (validity := validity) (staticInputs := staticInputs))
+        validity size lifted staticInputs.valid staticInputs.syntaxTree
+        entry.environments entry.heaps sourceReceipt.locals entry.lookups entry.actualTyped
+        (body_reference functions entry) entry.state.read (body_unmapped functions entry) reached stable
+        (show Admission bodyBridge header.context reached from ⟨sourceReceipt.heapTyped, rows⟩)
+        (BodyInputs.transfers.with_static (functions := functions) (validity := validity) (staticInputs := staticInputs)) trace
+    exact ⟨value, bodyStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame,
+      metadata, ProtectedStateTransition.FunctionFinish.Reached.forget finalTransition,
+      ReachedNamedLexicalBodyFaultPaths.outcome_post_of_finished staticInputs.syntaxTree header.unique retained evaluated⟩
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Native finish selects its genuine strict flow child. The Source grade is
@@ -325,55 +394,71 @@ constructed independently by the same shared producer at the reached state. -/
 theorem native_body_with_post (size : Nat) :
     NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
       (faults := faults) entry reached size := by
-  intro value bodyStore evaluated
-  let bodyBridge := poolBridge (headers := headers) (keys := keys)
-  let model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
-  let producer := CallableIndexedOwnedAllocationProducer.producer headers keys model
-  let condition := CallableIndexedOwnedAllocationProducer.StableOwner keys
-  have meaning : RecursiveNamedBoundedContracts.Below size (fun child =>
-      NamedLexicalFunctionFaultPostContracts.ReflectsAtWith
-        (post := FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
+  exact with_static (extension := extension) (faithful := faithful) (observations := observations)
+    (functionTypes := functionTypes) (wellFormed := wellFormed) (sourceReceipt := sourceReceipt)
+    (rows := rows) (stable := stable) (staticInputs := BodyInputs.static_inputs functions validity inputs) size
+where
+  with_static (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry)
+      (faithful : DataEquality.IdentityFaithful identities)
+      (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
+      (functionTypes : FunctionRuntimeViews functions) (wellFormed : ProgramWellFormed program)
+      (sourceReceipt : SourceReceipt program header.function header.context entry.environment entry.heap)
+      (rows : StableRows reached)
+      (stable : CallableIndexedOwnedAllocationProducer.StableOwner keys frameLocation current)
+      (staticInputs : StaticBodyInputs (functions := functions) (header := header)
+        (registry := registry) (faults := faults) (certificates := certificates)
+        (expressionSyntax := expressionSyntax) (flow := flow) validity) (size : Nat) :
+    NativeBodyAtWithPost (ReachedNamedLexicalBodyFaultPaths.model_bodyPost compiled.compatible.checked functions registry)
+      (faults := faults) entry reached size := by
+    intro value bodyStore evaluated
+    let bodyBridge := poolBridge (headers := headers) (keys := keys)
+    let model := CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+    let producer := CallableIndexedOwnedAllocationProducer.producer headers keys model
+    let condition := CallableIndexedOwnedAllocationProducer.StableOwner keys
+    have meaning : RecursiveNamedBoundedContracts.Below size (fun child =>
+        NamedLexicalFunctionFaultPostContracts.ReflectsAtWith
+          (post := FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
+          (protocol headers keys) (readiness bodyBridge) condition
+          (GenericLexicalStatements.Syntax header.function.source expressionSyntax)
+          (values := .initial compiled.compatible.checked) functions program header.function.evidence validity
+          (source := header.function.source) (context := header.context) (registry := registry) (faults := faults)
+          (frameLayout := compiled.indexed.ancestry.layout.frame) (globals := header.globals)
+          (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+          child (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) true
+          header.function.body header.function.resultType header.output flow) := by
+      intro child smaller
+      exact NamedLexicalFunctionFaultPostContracts.ReflectsAtWith.of_lexical
+        (protocol := protocol headers keys) (readiness := readiness bodyBridge) (condition := condition)
+        (facts := GenericLexicalStatements.Syntax header.function.source expressionSyntax)
+        (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (functions := functions) (program := program) (evidence := header.function.evidence)
+        (meaning := flow_reflects bodyBridge functions header.function.evidence
+          (administrativeTransport headers keys) extension faithful observations functionTypes header.unique wellFormed
+          (layouts := compiled.indexed.layouts) (owner := header.owner) (active := header.active)
+          (frame := compiled.indexed.ancestry.layout.frame) (globals := header.globals) (onError := header.onError)
+          (expressionSyntax := expressionSyntax) rfl header.registered condition producer
+          (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
+          (fun _ _ seed => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner model seed)
+          validity staticInputs.contexts staticInputs.extend size child (Nat.le_of_lt smaller) staticInputs.tree)
+    have matchTree := GenericImperativeMatch.Tree.body
+      (definitions := (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
+      (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
+      staticInputs.syntaxTree staticInputs.tree
+    obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame,
+      metadata, _exit, finalTransition, retained⟩ :=
+      RecursiveNamedFunctionFinishBounds.WithReady.reflects_at_emitted_with_state_when_with_transfers_with_post
+        (functions := functions) (program := program) (tree := matchTree) (projection := staticInputs.projection) (unique := header.unique)
+        (FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
         (protocol headers keys) (readiness bodyBridge) condition
-        (GenericLexicalStatements.Syntax header.function.source expressionSyntax)
-        (values := .initial compiled.compatible.checked) functions program header.function.evidence validity
-        (source := header.function.source) (context := header.context) (registry := registry) (faults := faults)
-        (frameLayout := compiled.indexed.ancestry.layout.frame) (globals := header.globals)
-        (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-        child (scope := header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) true
-        header.function.body header.function.resultType header.output flow) := by
-    intro child smaller
-    exact NamedLexicalFunctionFaultPostContracts.ReflectsAtWith.of_lexical
-      (protocol := protocol headers keys) (readiness := readiness bodyBridge) (condition := condition)
-      (facts := GenericLexicalStatements.Syntax header.function.source expressionSyntax)
-      (values := .initial compiled.compatible.checked) (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
-      (functions := functions) (program := program) (evidence := header.function.evidence)
-      (meaning := flow_reflects bodyBridge functions header.function.evidence
-        (administrativeTransport headers keys) extension faithful observations functionTypes header.unique wellFormed
-        (layouts := compiled.indexed.layouts) (owner := header.owner) (active := header.active)
-        (frame := compiled.indexed.ancestry.layout.frame) (globals := header.globals) (onError := header.onError)
-        (expressionSyntax := expressionSyntax) rfl header.registered condition producer
-        (CallableIndexedOwnedOrdinaryAllocation.bindings headers keys)
-        (fun _ _ seed => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner model seed)
-        validity inputs.contexts inputs.extend size child (Nat.le_of_lt smaller) inputs.tree)
-  have matchTree := GenericImperativeMatch.Tree.body
-    (definitions := (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
-    (administrative := SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)
-    inputs.syntaxTree inputs.tree
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame,
-    metadata, _exit, finalTransition, retained⟩ :=
-    RecursiveNamedFunctionFinishBounds.WithReady.reflects_at_emitted_with_state_when_with_transfers_with_post
-      (functions := functions) (program := program) (tree := matchTree) (projection := inputs.projection) (unique := header.unique)
-      (FlowPost (ReachedBuiltinExpressionFaultPaths.model_expressionPost compiled.compatible.checked functions registry))
-      (protocol headers keys) (readiness bodyBridge) condition
-      (GenericLexicalStatements.Syntax header.function.source expressionSyntax) (BodyInputs.emitted functions validity inputs)
-      validity size size (Nat.le_refl size) meaning inputs.valid inputs.syntaxTree
-      entry.environments entry.heaps sourceReceipt.locals entry.lookups entry.actualTyped
-      (body_reference functions entry) entry.state.read (body_unmapped functions entry) reached stable
-      (show Admission bodyBridge header.context reached from ⟨sourceReceipt.heapTyped, rows⟩)
-      (BodyInputs.transfers functions validity inputs) evaluated
-  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame,
-    metadata, ProtectedStateTransition.FunctionFinish.Reached.forget finalTransition,
-    ReachedNamedLexicalBodyFaultPaths.outcome_post_of_finished inputs.syntaxTree header.unique retained evaluated.sound⟩
+        (GenericLexicalStatements.Syntax header.function.source expressionSyntax) (BodyInputs.emitted.with_static (functions := functions) (validity := validity) (staticInputs := staticInputs))
+        validity size size (Nat.le_refl size) meaning staticInputs.valid staticInputs.syntaxTree
+        entry.environments entry.heaps sourceReceipt.locals entry.lookups entry.actualTyped
+        (body_reference functions entry) entry.state.read (body_unmapped functions entry) reached stable
+        (show Admission bodyBridge header.context reached from ⟨sourceReceipt.heapTyped, rows⟩)
+        (BodyInputs.transfers.with_static (functions := functions) (validity := validity) (staticInputs := staticInputs)) evaluated
+    exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame,
+      metadata, ProtectedStateTransition.FunctionFinish.Reached.forget finalTransition,
+      ReachedNamedLexicalBodyFaultPaths.outcome_post_of_finished staticInputs.syntaxTree header.unique retained evaluated.sound⟩
 
 include inputs sourceReceipt rows stable extension faithful observations functionTypes wellFormed in
 /-- Strict membership retains the same concrete Source body producer. -/
