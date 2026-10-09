@@ -1083,6 +1083,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryIn
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryInitializedReadAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralLambdaInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedInvocationAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredClosureAssociationReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualInitializedClosureReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
