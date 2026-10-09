@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `0a48ccf2`: the accepted body preservation and reflection proofs consume the actual named parameter Receipt, derive captures, readiness and admission internally, and populate the existing SourceBodyAt and NativeBodyAt interfaces at the same reached pool. Independent empty-parameter and singleton-hook ports supply genuine initial admission. The public bootstrap-to-Receipt association and shared mixed family remain unfinished. The final dated section records the 5599-job build and 15684-declaration cumulative audit. Earlier entries retain their historical scope.
+The latest implementation checkpoint is `783a716f`: the accepted fixture retains an actual public Recipe preparation and bootstrap completion, constructs its positive initialization authority, and produces the named parameter Receipt and ContinuationAgreement at that same completed store. Applying the existing body correspondence ports at this public receipt is next. Public Session association, stronger ReachedExit interfaces and the shared mixed family remain unfinished. The final dated section records the 5603-job build, 15836-declaration cumulative audit and independent attribution of one imported-namespace helper. Earlier entries retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1138,3 +1138,26 @@ The full returned pool, cumulative effects and successful raw PostAdmission are 
 The registered build passed 5599 jobs. Strict checks verified 15684 cumulative declarations, all 79 declarations of the four new modules and 32 signatures. Complete private/normal types and axiom arrays match literally; only the three permitted standard axioms occur. Authentic name censuses show 79 additions, no prior overlap and no removals. Normal Source/object guards and all 4985 protected-file checks pass. No executable fixture checker was added in this checkpoint.
 
 Next: retain the actual successful public Recipe preparation, bootstrap constructor fields and concrete store/capture association, then join the same singleton pool, hook and parameter producer to this Receipt. Public Session association, the shared mixed family and all-pass compiler correctness remain unfinished.
+
+### Accepted public bootstrap and actual parameter Receipt (2026-10-09)
+
+| Module | Proven connection |
+| --- | --- |
+| `RecursiveNamedCatalogPreparedInitializationReceipts` | `stored_capture` and `entry_with_constructor` retain the prescribed initialized capture and actual initialization authority, with frame zero, empty current/ghost ownership and no records. |
+| `SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt` | `prepare_public` retains one actual Recipe.prepare equation. `complete_bootstrap` retains one original runStateful completion; `completed_store` identifies its initialized store without rerunning either producer. |
+| `SourceCoreChosenOrdinaryAcceptedBootstrapHeaderEvidence` | The same authentic Header constructor retains runtime evidence, layout equality and empty Source captures. Native captures remain the actual installer data. |
+| `SourceCoreChosenOrdinaryAcceptedPublicParameterEntry` | Derives the singleton checker ledger, Complete and initial state at the actual completed store, then uses the original hook installation and parameter action once to return the same Receipt and ContinuationAgreement. |
+
+The unchanged accepted fixture has one named row. Its positive public bootstrap checker succeeds at fuel 10000 and observes a two-cell initialized store. The symbolic receipt retains the original Recipe acceptance and exact machine completion.
+
+The parameter entry derives native store typing, the empty Source heap relation, every initial stable row and the prescribed live capture from that same initialization constructor. Original named hook history and real frame installation feed `parameters_with_state` once. The returned parameter Receipt keeps the actual BodyState, reached pool, ordered records, Source admission and complete prefix/body ContinuationAgreement. The parameter proof uses the retained Recipe acceptance, machine completion and Header evidence; its function model and metadata registry remain parameters. It assumes no completed body law or ProgramWellFormed premise.
+
+At `783a716f`, all registered Solcore modules and `Tests.Main` built successfully (**5603 jobs**). Strict checks verified **15836 cumulative declarations**, all **152 declarations across four added modules**, and **45 signatures**. Every complete private literal type and axiom array matches the normal build; only the three permitted standard axioms occur. Authentic censuses show **152 additions**, no prior overlap and no removals. Generated helpers are attributed by actual Lean module index.
+
+The initial normal validation passed Source, type/axiom, signature and fixture checks, then failed because its cumulative census omitted `Solcore.SourceSemantics.CoreLowering.RecursiveNamedCatalogPreparedInitialization.environment.eq_1`. An independent probe of the same environment identifies its actual owner as `RecursiveNamedPublicBootstrapGlobals` and confirms complete literal type/axiom agreement. The corrected census includes that one genuine helper. The original failure is preserved; only the cumulative stage was rerun, and the original successful bootstrap execution remains the single new checker run.
+
+Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2278 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2267 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. Validation records: `/private/tmp/solcore-owned-functions-resume-20261007/accepted-public-parameter-entry-checks.json` and its actual command receipts.
+
+One positive bootstrap IO call is newly registered. Existing full registered executions remain those at `3ff3daf4`. The work estimates stay about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
+
+Next: compose the existing admitted body preservation/reflection and SourceBodyAt/NativeBodyAt interfaces at this actual public Receipt. Association with a returned public Session, stronger ReachedExit/LexicalResult witnesses, general mixed bodies, all-pass composition and the final public compiler theorem remain unfinished.
