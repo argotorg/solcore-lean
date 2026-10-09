@@ -387,7 +387,7 @@ A hidden match scrutinee is an actual old-source heap cell and must be exported.
 Preserving these differences does not require Core kernel extensions. The new registry/helpers use ordinary Word, product, sum, data, and function representations. Their connection to the public runtime and typing/meaning correspondence are validated separately.
 
 
-## 2026-10-08: Current status
+## 2026-10-09: Current status
 
 ### Execution and public boundary
 
@@ -398,6 +398,8 @@ The raw metadata, grouped tuples, stage/arity evaluation order, callable views/a
 The `SourceTypedRuntime` namespace remains for compatibility values, observations, and validation data. The namespace and tests named after old features do not demonstrate survival of a runtime evaluator. Existing comptime direct evaluation remains in preparation as agreed. Unifying that evaluator with Core and adding source contract/storage/external-call connections belong to the next phase.
 
 ### Latest proofs and validation scope
+
+The latest checkpoint is `3c2026ca`: mixed lexical named-call posts, literal body domains and an actual accepted lambda/indirect-parent fixture. The final dated section records its 5553-job build, 14618-declaration cumulative audit and remaining Source typing/public Header obligations. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -927,3 +929,21 @@ Each of the seven changed or new source files and every original-module diff rec
 Two parent metadata checks were corrected during verification: one omitted the audit's separate `COUNT` records; the other treated the two expected dependent rebuilds as unexpected changes. Final metadata checks pass. No proof changes or compiler reruns were required for these corrections.
 
 Next: populate the chosen factory and supported body domain from actual accepted compiler results, starting with the checked literal-return lambda and its same-Source indirect parent. Use these genuine receipts to close the shared measured family. Extend the concrete body producers for initialized declarations and broader imperative bodies. Initial and captured heap population, prior General and principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: Mixed lexical call posts and an accepted literal lambda fixture
+
+The latest implementation checkpoint is `3c2026ca`, following `7e66e744`, `adb7db57`, `712e95bb` and `8ef65a35`.
+
+The mixed lexical body producer now derives causal Source/native body posts from genuinely smaller expression children. Actual arguments construct the named parameter receipt, Source admission and stable rows. The outer named expression adapters consume these internally constructed body ports and the original ordered argument producer once. They retain the actual body store, independent execution grades, fault origin, restored caller pool and strict native completion bound. Static body typing, compiler receipts and the strict child induction remain genuine inputs.
+
+Literal lambda static facts are derived from an independent Source lambda typing judgment and the actual compiler/frame receipts. A literal-root receipt retains one original contextual selector, its authentic plan record and the fixed read budget of the prepared compiler. The literal body shell constructs parameter entry, return syntax and native body typing internally. Its local domain excludes indirect calls only at the approved literal occurrence; an indirect parent elsewhere in the same Source is allowed. Source typing, runtime/Covers, constructor/profile coverage and broader builtin static facts remain explicit inputs to this conditional construction.
+
+The new accepted fixture uses the actual parser, checker, worklist and public preparation for `accepted()`, whose local lambda returns `7` and whose indirect parent calls it with `(1, 2)`. It retains the untouched Source, original named slot, cached code, contextual compilation equations, numeric requirements and their valid evidence. The parent output is proved at the same selected initializer root using pointwise ordinary-branch equality. The proof keeps the original initializer budget 499, parent budget 498 and fixed read budget 500. It derives no equality between policies at different budgets.
+
+A computable finite graph receipt derives the original occurrence-graph invariants: unique occurrence IDs, owned nodes/roots and existence of roots/child edges. Together with the real numeric ledger and declaration-context fields, it supplies `SourceRuntimeValid` for the fixture. Genuine lambda typing and the association of that context with the actual public Header remain to be constructed. Chosen factory/support population, whole mixed-family closure and Source/Core execution equivalence for the fixture remain open.
+
+At `3c2026ca`, all registered Solcore modules and `Tests.Main` built successfully (**5553 jobs**). Strict verification checked **14618 cumulative declarations**, **691 declarations attributed to nine new or modified modules**, and **74 signatures**. All 691 private declaration blocks and all **three original declarations** retain their complete same-name literal types and axiom arrays. Only the three permitted standard axioms occur. The cumulative increase is 688 declarations. The newly registered fixture checker was executed successfully against the normal cache; it checks actual compiler and metadata receipts. The existing full registered test executions remain those at `3ff3daf4`.
+
+All nine complete Sources passed strict compilation with warnings treated as errors, and each received at least two full semantic reviews independent of its author. Normal installation copied Source files only. Independent guards confirmed the reviewed Source/object hashes, **2225 pre-install Source/object pairs**, and exact agreement between **2221 actual compiled project imports** and the Lean environment. Two unchanged-source consumers rebuilt their `.olean` files after the original body-post module changed; their Source and `.ilean` bytes remain exact, and actual build/import paths explain those rebuilds. Policy, English text, registration, whitespace and **4985 protected original-file checks** pass. The checkpoint changes one existing proof module, adds seven proof modules and one test module, and updates the proof umbrella and test import/runner.
+
+Next: construct independent lambda Source typing and actual public Header/context receipts for the accepted fixture, then populate its literal shell/domain and chosen factory from those genuine inputs. Feed those receipts into the sole measured mixed family. Initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
