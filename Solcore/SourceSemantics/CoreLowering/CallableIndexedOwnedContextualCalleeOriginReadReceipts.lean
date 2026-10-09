@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOr
 /-! Positive callee leaves and actual initialized ordinary reads retain their
 original raw Source type, native payload and reference. Compatible payload
 wrappers preserve a runtime view of the original positive function leaf.
-The closure branch retains its full Member; global and builtin branches retain
+The closure branch retains its full static member; global and builtin branches retain
 their original source-shaped receipts. No erased model is inverted. These pure
 receipts supply no selected compiler code, generalized-cell classification,
 callee execution or whole-call meaning. -/
@@ -12,7 +12,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCalleeOriginReadReceipts
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedFunctionValues (Header Key)
-open CallableIndexedOwnedContextualStoredClosureAssociationReceipts (Member)
+open CallableIndexedOwnedContextualTypedClosureReceipts (StaticMember)
 open CallableIndexedOwnedContextualCellOrigins
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -59,13 +59,13 @@ theorem callable_at
       cases callable
   | nil | cons | empty | entry | absent | present => trivial
 
-/-- Closure classification retains the exact Member already carried by the
+/-- Closure classification retains the exact static member already carried by the
 positive leaf, even when the original raw type has compatible wrappers. -/
 theorem CalleeAt.closure_member {function : Dynamic.Closure}
     (callee : CalleeAt (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
       (faults := faults) (mapping := mapping) (world := world) raw (.closure function) native type) :
     ∃ bindings parameter result,
-      Member headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
+      StaticMember headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
       type = CallableContract.functionType parameter result ∧
       SourceCoreRawMetadata.runtimeType raw =
         SourceCoreRawMetadata.runtimeType (FunctionValues.sourceType function) := by
@@ -144,7 +144,7 @@ theorem InitializedReadAt.payload_at_view
       occurrence source native type :=
   .compatible view read.payload
 
-/-- The initialized closure branch extracts its Member at this exact read,
+/-- The initialized closure branch extracts its static member at this exact read,
 without requiring raw = FunctionValues.sourceType function. -/
 theorem InitializedReadAt.closure_member
     {location : Dynamic.Location} {raw : TypeSystem.Ty} {function : Dynamic.Closure}
@@ -153,7 +153,7 @@ theorem InitializedReadAt.closure_member
       (registry := registry) (faults := faults) (mapping := mapping) (world := world)
       (heap := heap) (store := store) profile location raw (.closure function) target native type) :
     ∃ bindings parameter result,
-      Member headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
+      StaticMember headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
       type = CallableContract.functionType parameter result ∧
       SourceCoreRawMetadata.runtimeType raw =
         SourceCoreRawMetadata.runtimeType (FunctionValues.sourceType function) :=

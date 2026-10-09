@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualInitializedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatibleAmbientHeap
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
@@ -6,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSourceAdmission
 optional cells. The existing mutually recursive payload relation retains
 products, nominal constructor fields, ordered mapping entries and defaults.
 Actual allocation and writes update that relation at the same heap/store.
-Formation keeps its original receiving model; its positive Member is attached
+Formation keeps its original receiving model; its positive static member is attached
 forward at the actual returned value. This model supplies no reverse inclusion
 from the old general model and no administrative transport for mapped cells.
 The backend covers ordinary optional cells; generalized cells stay separate. -/
@@ -15,6 +16,7 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedFunctionValues (Header Key)
+open CallableIndexedOwnedContextualTypedClosureReceipts (StaticMember)
 open CallableIndexedOwnedContextualStoredClosureAssociationReceipts (Member)
 open CallableIndexedOwnedSourceAdmission
 universe u
@@ -24,7 +26,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
 
-/-- A closure leaf carries its exact positive member. Named and builtin leaves
+/-- A closure leaf carries its exact positive static member. Named and builtin leaves
 retain their existing source-shaped general receipts; neither branch admits an
 erased closure. The body registry is independent of outer payload metadata. -/
 inductive FunctionOrigins
@@ -35,7 +37,7 @@ inductive FunctionOrigins
     TypeSystem.Ty → Dynamic.Value → Value → Ty → Prop where
   | closure {function : Dynamic.Closure} {native : Value}
       {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
-      (member : Member headers keys bodyRegistry faults mapping world
+      (member : StaticMember headers keys bodyRegistry faults mapping world
         function native bindings parameter result) :
       FunctionOrigins headers keys bodyRegistry faults mapping world
         (FunctionValues.sourceType function) (.closure function) native
@@ -124,13 +126,23 @@ variable (profile : compiled.compatible.checked.catalog.callableContracts = true
 
 /-- Attach a newly formed member to that exact value, without changing the
 original formation action or its receiving model. -/
+theorem payload_static_member {function : Dynamic.Closure}
+    {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
+    (member : StaticMember headers keys bodyRegistry faults mapping world function native bindings parameter result) :
+    PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
+      (FunctionValues.sourceType function) (.closure function) native
+      (CallableContract.functionType parameter result) :=
+  .function (.closure member)
+
+/-- Legacy attachment preserves its original Member hypothesis and forwards
+that witness into the same static backend. -/
 theorem payload_member {function : Dynamic.Closure}
     {bindings : List CallableIndexedParameterCertificates.Binding} {parameter result : Ty}
     (member : Member headers keys bodyRegistry faults mapping world function native bindings parameter result) :
     PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
       (FunctionValues.sourceType function) (.closure function) native
       (CallableContract.functionType parameter result) :=
-  .function (.closure member)
+  payload_static_member profile member.to_static
 
 theorem PayloadOrigins.forget
     (origin : PayloadOrigins headers keys bodyRegistry registry faults profile mapping world
@@ -147,7 +159,7 @@ theorem PayloadOrigins.closure_member
       sourceType source native type) :
     ∀ function, source = .closure function →
       ∃ bindings parameter result,
-        Member headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
+        StaticMember headers keys bodyRegistry faults mapping world function native bindings parameter result ∧
         type = CallableContract.functionType parameter result := by
   induction origin using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True)
@@ -243,14 +255,14 @@ theorem CellOrigins.write_administrative
     CellOrigins headers keys bodyRegistry registry faults profile mapping world heap updated :=
   GenericHeap.HeapRepresents.write_administrative origins absent found typed written
 
-/-- An actual initialized closure read extracts its positive member, native
+/-- An actual initialized closure read extracts its positive static member, native
 read and reference from the jointly indexed heap relation. -/
 theorem CellOrigins.stored_at {location : Dynamic.Location} {function : Dynamic.Closure}
     (origins : CellOrigins headers keys bodyRegistry registry faults profile mapping world heap store)
     (read : Dynamic.Heap.Reads heap location
       ⟨FunctionValues.sourceType function, some (.closure function), none⟩) :
     ∃ native bindings parameter result,
-      CallableIndexedOwnedContextualInitializedClosureReceipts.StoredAt headers keys bodyRegistry faults
+      CallableIndexedOwnedContextualInitializedClosureReceipts.TypedStoredAt headers keys bodyRegistry faults
         mapping world heap store location function native bindings parameter result := by
   obtain ⟨target, value, payload, reference, nativeRead, represented⟩ := origins.read read
   cases represented with

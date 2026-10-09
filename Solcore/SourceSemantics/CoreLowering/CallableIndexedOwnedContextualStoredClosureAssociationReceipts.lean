@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualOrdinaryLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedContextualPrincipalLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredClosureAssociation
@@ -231,4 +232,16 @@ theorem principal_formation_member
       (CallableIndexedOwnedMethodLambdaFormationReceipts.reference_index captured code support) typed provenance escaped⟩
 
 end PrincipalFormation
+/-- Legacy members project forward to the diagnostic-free static witness.
+This does not reconstruct the original diagnostic from a typed member. -/
+theorem Member.to_static
+    (member : Member headers keys registry faults mapping world function native bindings parameterCore resultCore) :
+    CallableIndexedOwnedContextualTypedClosureReceipts.StaticMember
+      headers keys registry faults mapping world function native bindings parameterCore resultCore := by
+  cases member with
+  | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance _escaped =>
+    exact ⟨.ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance⟩
+  | principal owner captured code history support origin globals leading referenceIndex typed provenance _escaped =>
+    exact ⟨.principal owner captured code history support origin globals leading referenceIndex typed provenance⟩
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredClosureAssociationReceipts

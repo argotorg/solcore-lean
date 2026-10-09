@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredClosureAssociationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedIndirectHeads
@@ -543,4 +544,29 @@ theorem callee_post
       frame, metadata, initial, callerProtocol.refl initial, admittedPost⟩
 end Parent
 end Read
+/-- A diagnostic-free stored receipt keeps the same physical source/native
+cell witnesses and the contextual typed member. It does not recover a legacy
+diagnostic from an erased payload or from native type information. -/
+def TypedStoredAt
+    (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (store : Store)
+    (location : Dynamic.Location) (function : Dynamic.Closure) (native : Core.Value)
+    (bindings : List CallableIndexedParameterCertificates.Binding) (parameterCore resultCore : Ty) : Prop :=
+  CallableIndexedOwnedContextualTypedClosureReceipts.StaticMember
+    headers keys registry faults mapping world function native bindings parameterCore resultCore ∧
+  ∃ target, ReferenceRepresents mapping world location target (CallableContract.functionType parameterCore resultCore) ∧
+    Dynamic.Heap.Reads heap location ⟨FunctionValues.sourceType function, some (.closure function), none⟩ ∧
+    store.read? target = some (.inRight .unit native)
+
+/-- A genuine legacy member projects forward; its physical cell and read
+witnesses remain exactly those supplied by the original stored receipt. -/
+theorem StoredAt.to_static {heap : Dynamic.Heap} {store : Store} {location : Dynamic.Location}
+    (stored : StoredAt headers keys registry faults mapping world heap store
+      location function native bindings parameterCore resultCore) :
+    TypedStoredAt headers keys registry faults mapping world heap store
+      location function native bindings parameterCore resultCore :=
+  ⟨stored.1.to_static, stored.2⟩
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualInitializedClosureReceipts
