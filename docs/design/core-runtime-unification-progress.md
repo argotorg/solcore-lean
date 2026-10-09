@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation checkpoint is `c2ec5a7a`. Independent Source typing now covers the accepted outer let, local callee, pair argument, indirect call and return. Actual full-node inventory checks provide diagnostic and builtin static facts. The original selected compilation constructs the diagnostic issuer, and the accepted Source receipts populate the literal body shell's local fields.
+The latest implementation checkpoint is `024a3491`. Original accepted compiler receipts now derive native typing before lambda Site selection, genuine singleton catalog SourceTypes, the original diagnostic issuer and the selected literal factory. The initializer obtains its original compilation and root internally; actual catalog and inventory receipts construct the literal compiler domain.
 
-The registered build passed 5561 jobs. Strict checks cover 15036 cumulative declarations, 173 module-attributed declarations and 53 signatures, with complete literal private/normal type and axiom agreement. Two new fixture checkers passed; they check compiler/static receipts separately from runtime equivalence. Actual compiled imports match the Lean environment, and 4985 protected original files remain unchanged.
+The registered build passed 5566 jobs. Strict checks cover 15093 cumulative declarations, 57 module-attributed declarations and 34 signatures, with complete literal private/normal type and axiom agreement. No new executable checker was added. Actual compiled imports match the Lean environment, and 4985 protected original files remain unchanged.
 
-Native typing before Site selection, the genuine singleton catalog SourceTypes, automatic chosen factory/support population and connection to the mixed semantic family remain unfinished. The work estimates in the status table remain unchanged.
+The same recaptured Support's runtime meaning and connection to the complete measured mixed family remain unfinished. The work estimates in the status table remain unchanged.
 
 ### Implementation in progress
 
@@ -2804,3 +2804,21 @@ At `c2ec5a7a`, all registered Solcore modules and `Tests.Main` built successfull
 The two new finite checkers executed successfully against the normal cache. They check actual compiler/static fields and do not establish Source/Core execution equivalence. Full registered executions remain those at `3ff3daf4`.
 
 Next: derive native typing of the actual initializer before Site selection, construct singleton catalog order and SourceTypes from original specialization/signature receipts, and populate the chosen literal factory without an external body execution premise. Then feed this support into the sole measured mixed family. Initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: Native typing and automatic selection of the literal body factory
+
+The actual initializer now has Core typing before a lambda Site is selected. Its original accepted certificate supplies the real parameter compiler and literal body callback. The singleton parameter projection determines the packed native bundle; the unchanged native prefix supplies the frame cell, and the original expression hook supplies the callable descriptor. The proof uses no Produced, Site or completed body execution law as an input.
+
+Original worklist specialization and executable checker interface receipts now determine the singleton Header catalog's raw parameters and specialized result. They construct SourceTypes in the genuine receiving context using its signature equality. Lexical variables and residual mode remain unchanged. The finite Source inventory supplies builtin read/special callbacks and constructor/coercion facts at each actual child scope.
+
+The fixture now constructs the original diagnostic issuer, literal body inputs and shell internally. Its initializer selects one lambda Site, retaining the same Compilation, policy, body recipe, Source view and reason provider. The approved domain is fixed to literal occurrence 3 before collection. The chosen factory retains the actual collector inputs, certificate family and body entry. Its read budget is the original indexed budget 500; the initializer's lambda certificate uses compiler fuel 498. The independent static read index changes no generated code or execution budget.
+
+`chosen_initializer` obtains the original named compilation and initializer root internally. `globals_at` and `domain_at` construct the literal compiler domain from the actual catalog, inventory and Source inputs. The Source still contains the outer indirect call at occurrence 5. This checkpoint constructs the chosen static factory and domain; the same recaptured Support's runtime meaning and the complete measured mixed family remain unfinished.
+
+Implementation commits: `69b301b2` (original catalog SourceTypes), `bec71734` (native typing before Site selection), `22b4f9e0` (original issuer and body inputs), and `024a3491` (chosen initializer factory, literal domain and test imports).
+
+At `024a3491`, all registered Solcore modules and `Tests.Main` built successfully (**5566 jobs**). Strict checks verified **15093 cumulative declarations**, **57 declarations across five added modules**, and **34 signatures**. Every complete private literal type and axiom array matches the normal build; only the three permitted standard axioms occur. All five complete Sources passed strict compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2229 pre-install Source/object pairs** and **4985 protected original files**. **2219 actual compiled project imports** match the Lean environment exactly. English, policy, registration and whitespace checks pass.
+
+The five added modules are proof connections and add no executable checker. Existing full registered executions remain those at `3ff3daf4`; earlier finite fixture executions remain recorded at their original checkpoints. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts are not progress percentages.
+
+Next: derive each current-context domain and the local absence of indirect calls from the same chosen and recaptured Support, then prove the literal body meaning from its original expression and finish receipts. Retain the outer indirect parent and genuine capture, parameter and heap identities. The complete mixed family, initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
