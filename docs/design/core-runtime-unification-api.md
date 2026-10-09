@@ -77,7 +77,7 @@ An artifact with an empty root set accepts only an empty heap and rejects all ca
 
 ## Selected literal proof interfaces
 
-These internal proof modules connect the actual accepted compiler to a selected Word literal and singleton return body. They do not yet establish the final theorem for the complete public compiler.
+These internal proof modules connect the actual accepted compiler to a selected Word literal, singleton return body and invocation. They do not yet establish the final theorem for the complete public compiler.
 
 | Module | Available connection |
 | --- | --- |
@@ -86,8 +86,12 @@ These internal proof modules connect the actual accepted compiler to a selected 
 | `CallableIndexedOwnedLiteralLambdaBodyContinuations` | `support_flow_preserves` and `support_flow_reflects` derive the return child from actual coverage. `source_at_entry` / `native_at_entry` and `source_continuation` / `native_continuation` use genuine parameter admission and the original finish. |
 | `SourceCoreChosenOrdinaryAcceptedLiteralSupport` | The accepted fixture derives its current-context domain, local absence of indirect calls, recaptured factories and expression tree internally. |
 | `SourceCoreChosenOrdinaryAcceptedLiteralCompilerReceipts` | The same fixture derives Word facts and original compiler receipts, then exposes preservation and reflection at its selected Support. |
+| `CallableIndexedOwnedChosenOrdinaryInitializedReadAdmission` | `source_value_typed`, `post_admission` and `callee_post` derive admission and the callee value relation from the actual initialized Source cell and occurrence typing. |
+| `CallableIndexedOwnedLiteralLambdaInvocationBounds` | Invocation and application preservation/reflection derive body continuations internally and retain actual marked parameters, the reached pool and saved caller restoration. |
+| `SourceCoreChosenOrdinaryAcceptedArgumentAdmission` | Actual numeric Source evaluations construct the physical pair, exclude argument faults and derive raw argument typing and admission at the same reached heap. |
+| `SourceCoreChosenOrdinaryAcceptedLiteralInvocation` | The accepted fixture derives its body context, Word facts and compiler receipts internally, then instantiates invocation and application bounds. |
 
-These interfaces retain the actual body ledger, runtime validity, capture/global correspondence, argument typing, deep Source heap typing and complete ordered record relation as genuine inputs where needed. They preserve the same reached state and pool; Source and native grades are independent. The approved child is literal occurrence 3, while the outer indirect parent at occurrence 5 remains in the Source. Connecting complete call dispatch and the shared mixed body family is ongoing.
+The literal invocation derives its body ledger and runtime validity from the same selected Support. Genuine capture/global correspondence, argument typing, deep Source heap typing and the complete ordered record relation remain explicit where needed. Source and native grades are independent. The approved child is literal occurrence 3; the outer indirect parent at occurrence 5 remains in the Source. Connecting its actual argument compiler tree and complete dispatch to these invocation proofs, then closing the shared mixed body family, is ongoing.
 
 The old `SourceTypedRuntime` namespace remains in compatibility value, observation, and validation carriers. Its name does not imply that a runtime evaluator of Source expressions and statements remains.
 

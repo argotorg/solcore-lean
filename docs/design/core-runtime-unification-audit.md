@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest checkpoint is `c2ec5a7a`: independent outer-body Source typing, full finite node inventory, genuine selected diagnostic issuer and literal Source field population. The final dated section records its 5561-job build, 15036-declaration cumulative audit and remaining native typing/catalog/factory obligations. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `e55949f5`: selected literal invocation and caller restoration, independent initialized callee admission and actual paired Source argument admission. The final dated section records its 5575-job build, 15194-declaration cumulative audit and remaining complete parent/mixed-family obligations. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1013,3 +1013,21 @@ At `77f71db7`, all registered Solcore modules and `Tests.Main` built successfull
 These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. The estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
 
 Next: derive the remaining current body ledger, capture/global, argument and deep Source heap receipts from actual initialization and invocation. Connect these literal continuations through the real stored-callee parent and caller restoration. The complete mixed family, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and final compiler theorem remain unfinished.
+
+### 2026-10-09: Literal invocation and finite Source admission
+
+The selected literal Support now supplies its body ledger and runtime validity internally. Its original body continuation feeds the actual frame installation and marked parameter allocations. The body finishes once, and invocation restores the saved caller in the same reached pool. Application uses that invocation directly; reflection retains the original strict child bound and independent Source/native grades.
+
+Initialized callee admission now follows from the actual Source occurrence typing, initialized cell, environment correspondence and deep heap typing. The original read producer supplies the callee value relation at the same heap and complete ordered records. This finite connection does not require whole-program well-formedness or a broad runtime coverage premise.
+
+The actual numeric argument occurrences 7 and 8 evaluate in order to the physical pair at occurrence 6. Their selected evidence excludes missing-evidence, coercion and literal faults. The resulting pair has raw parameter typing in any receiving Source context. Its actual trace and administrative effects establish successful admission at the same reached heap and transfer every stable record row.
+
+The accepted fixture derives the literal parameters, result, body context, Word facts and original return receipts internally. Its invocation and application ports retain genuine dynamic captures, history, Source origin, captured globals, reference authority, Source heap typing, raw arguments and represented native arguments.
+
+Implementation commits: `ef031a04` (actual paired Source argument admission), `0353c372` (initialized callee admission), `a6fcef3f` (literal invocation, application and proof imports), and `e55949f5` (accepted fixture invocation and test imports).
+
+At `e55949f5`, all registered Solcore modules and `Tests.Main` built successfully (**5575 jobs**). Strict checks verified **15194 cumulative declarations**, **33 declarations across four added modules**, and **26 signatures**. All 33 complete private literal types and axiom arrays match the normal build; only the three permitted standard axioms occur. Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2245 pre-install Source/object pairs** and **4985 protected original files**. **2234 actual compiled project imports** match the Lean environment exactly. English, policy, registration and whitespace checks pass.
+
+These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. Estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
+
+Next: connect the actual paired Core argument tree, stored-callee dispatch, sidecar and selected codebook to the new invocation proofs at parent occurrence 5. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.

@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation checkpoint is `77f71db7`. The selected literal factory now derives its current-context domain, local absence of indirect calls and expression coverage internally. Original compiler receipts supply the singleton return body. Its Word literal and body continuations preserve execution semantics and reflect finite completion at the actual selected parameter entry.
+The latest implementation checkpoint is `e55949f5`. The selected literal body now connects to actual invocation, application and saved caller restoration. The same accepted fixture derives its body context and compiler receipts internally. Independent Source proofs establish initialized callee admission and successful paired argument admission.
 
-The registered build passed 5571 jobs. Strict checks cover 15161 cumulative declarations, 68 module-attributed declarations and 37 signatures, with complete literal private/normal type and axiom agreement. All 2235 pre-install Source/object pairs remain exact, and 2225 actual compiled project imports match the Lean environment. No new executable checker was added. All 4985 protected original files remain unchanged.
+The registered build passed 5575 jobs. Strict checks cover 15194 cumulative declarations, 33 module-attributed declarations and 26 signatures, with complete literal private/normal type and axiom agreement. All 2245 pre-install Source/object pairs remain exact, and 2234 actual compiled project imports match the Lean environment. No new executable checker was added. All 4985 protected original files remain unchanged.
 
-The selected literal body now has semantic continuations at the same recaptured Support. Its connection to complete call dispatch and the measured mixed family remains unfinished. The work estimates in the status table remain unchanged.
+The selected literal invocation retains the actual marked parameter entry, reached pool and caller restoration. The complete stored-callee parent still needs its actual argument compiler tree, dispatch and sidecar receipts connected. The shared mixed family and final compiler theorem remain unfinished. The work estimates in the status table remain unchanged.
 
 ### Implementation in progress
 
@@ -2838,3 +2838,21 @@ At `77f71db7`, all registered Solcore modules and `Tests.Main` built successfull
 These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. The estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
 
 Next: derive the remaining current body ledger, capture/global, argument and deep Source heap receipts from actual initialization and invocation. Connect these literal continuations through the real stored-callee parent and caller restoration. The complete mixed family, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and final compiler theorem remain unfinished.
+
+### 2026-10-09: Literal invocation and finite Source admission
+
+The selected literal Support now supplies its body ledger and runtime validity internally. Its original body continuation feeds the actual frame installation and marked parameter allocations. The body finishes once, and invocation restores the saved caller in the same reached pool. Application uses that invocation directly; reflection retains the original strict child bound and independent Source/native grades.
+
+Initialized callee admission now follows from the actual Source occurrence typing, initialized cell, environment correspondence and deep heap typing. The original read producer supplies the callee value relation at the same heap and complete ordered records. This finite connection does not require whole-program well-formedness or a broad runtime coverage premise.
+
+The actual numeric argument occurrences 7 and 8 evaluate in order to the physical pair at occurrence 6. Their selected evidence excludes missing-evidence, coercion and literal faults. The resulting pair has raw parameter typing in any receiving Source context. Its actual trace and administrative effects establish successful admission at the same reached heap and transfer every stable record row.
+
+The accepted fixture derives the literal parameters, result, body context, Word facts and original return receipts internally. Its invocation and application ports retain genuine dynamic captures, history, Source origin, captured globals, reference authority, Source heap typing, raw arguments and represented native arguments.
+
+Implementation commits: `ef031a04` (actual paired Source argument admission), `0353c372` (initialized callee admission), `a6fcef3f` (literal invocation, application and proof imports), and `e55949f5` (accepted fixture invocation and test imports).
+
+At `e55949f5`, all registered Solcore modules and `Tests.Main` built successfully (**5575 jobs**). Strict checks verified **15194 cumulative declarations**, **33 declarations across four added modules**, and **26 signatures**. All 33 complete private literal types and axiom arrays match the normal build; only the three permitted standard axioms occur. Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2245 pre-install Source/object pairs** and **4985 protected original files**. **2234 actual compiled project imports** match the Lean environment exactly. English, policy, registration and whitespace checks pass.
+
+These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. Estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
+
+Next: connect the actual paired Core argument tree, stored-callee dispatch, sidecar and selected codebook to the new invocation proofs at parent occurrence 5. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
