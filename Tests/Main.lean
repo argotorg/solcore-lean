@@ -1855,6 +1855,9 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedFixture
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBodyMetadata
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedTyping
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedHeader
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedOuterTyping
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedStaticInventory
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedLiteralInputs
 set_option autoImplicit false
 
 open Solcore
@@ -3038,6 +3041,8 @@ def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedBodyMetadata.run
   SourceCoreChosenOrdinaryAcceptedTyping.run
   SourceCoreChosenOrdinaryAcceptedHeader.run
+  SourceCoreChosenOrdinaryAcceptedOuterTyping.run
+  SourceCoreChosenOrdinaryAcceptedStaticInventory.run
   coreLocalFragmentPairBoundaryTests
   resolvedPairBoundaryTests
   resolvedLocalSemanticsTests
