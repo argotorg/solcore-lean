@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation checkpoint is `67a50253`. The accepted fixture now has independent Source typing for its literal lambda, finite Source metadata, and an association with the original selected public Header. The literal body shell preserves place diagnostics when compilation installs the callable root table.
+The latest implementation checkpoint is `c2ec5a7a`. Independent Source typing now covers the accepted outer let, local callee, pair argument, indirect call and return. Actual full-node inventory checks provide diagnostic and builtin static facts. The original selected compilation constructs the diagnostic issuer, and the accepted Source receipts populate the literal body shell's local fields.
 
-Three new fixture checkers passed in the normal cache. The registered build passed 5557 jobs; strict checks cover 14863 cumulative declarations, 245 unique module-attributed declarations and 59 signatures. All 246 private declaration occurrences match normal complete types and axiom arrays literally. One generated helper appears in two isolated private inventories and has one owner in the combined normal inventory. Actual compiled imports match the Lean environment, and 4985 protected original files remain unchanged.
+The registered build passed 5561 jobs. Strict checks cover 15036 cumulative declarations, 173 module-attributed declarations and 53 signatures, with complete literal private/normal type and axiom agreement. Two new fixture checkers passed; they check compiler/static receipts separately from runtime equivalence. Actual compiled imports match the Lean environment, and 4985 protected original files remain unchanged.
 
-Outer body Source typing, automatic chosen factory/support population and the connection to the mixed semantic family remain unfinished. The work estimates in the status table remain unchanged.
+Native typing before Site selection, the genuine singleton catalog SourceTypes, automatic chosen factory/support population and connection to the mixed semantic family remain unfinished. The work estimates in the status table remain unchanged.
 
 ### Implementation in progress
 
@@ -2788,3 +2788,19 @@ At `67a50253`, all registered Solcore modules and `Tests.Main` built successfull
 All four complete Sources passed strict compilation with warnings treated as errors and received at least two independent full semantic reviews. Installation copied Source files only. Guards confirmed **2221 unchanged pre-install Source/object pairs**, exact agreement between **2211 actual compiled project imports** and the Lean environment, regular Source/olean/ilean files, and **4985 protected original files**. English, policy, registration and whitespace checks pass. Three newly registered checkers ran successfully; they validate actual compiler and static receipts, and do not establish Source/Core execution equivalence. Full registered executions remain those at `3ff3daf4`.
 
 Next: construct independent typing of the outer let/indirect-call body, populate the literal shell/domain and chosen factory from these actual receipts, and connect them to the sole measured mixed family. Initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: Accepted outer body typing and literal Source input population
+
+Independent declarative typing now covers the actual outer let, its fresh local binder and paired requirement tables, both numeric argument literals, their physical pair, the indirect call and the return. The complete body and completion summary are transported to the original public Header using its actual inferred result and context. All node types, numeric evidence and Source rows remain unchanged.
+
+A finite check identifies every retained Source node through actual lookup receipts. It proves absence of unary assignments, value assignments, for-header assignments and constructors, and identifies the five numeric/local-reference/tuple rows in the builtin fragment. The original root's read and special callbacks retain their actual ordinary and generalized-local gates at each child scope and budget. The constructor law holds at the genuine residual context through form absence.
+
+The selected compilation's diagnostic row and original preparation now construct an IssuedSource with the actual assignment table and place providers. The same-Produced callback retains its diagnostics, code and Compilation identities. The accepted Header, lambda typing and body metadata supply the literal shell's remaining local Source fields. Genuine issuer and policy/view identity inputs are retained by that shell adapter; automatic population of the entire chosen factory is still incomplete.
+
+Implementation commits: `7124d2d6` (original diagnostic issuer), `6f6a199e` (outer Source typing), `494a8a8d` (full finite static inventory), and `c2ec5a7a` (literal Source inputs and test registration).
+
+At `c2ec5a7a`, all registered Solcore modules and `Tests.Main` built successfully (**5561 jobs**). Strict checks verified **15036 cumulative declarations**, **173 declarations across four added modules**, and **53 signatures**. All 173 private complete literal types and axiom arrays match the normal build; only the three permitted standard axioms occur. Every Source passed strict compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2225 pre-install Source/object pairs** and **4985 protected original files**; **2215 actual compiled project imports** match the Lean environment exactly. Registration, English, policy and whitespace checks pass.
+
+The two new finite checkers executed successfully against the normal cache. They check actual compiler/static fields and do not establish Source/Core execution equivalence. Full registered executions remain those at `3ff3daf4`.
+
+Next: derive native typing of the actual initializer before Site selection, construct singleton catalog order and SourceTypes from original specialization/signature receipts, and populate the chosen literal factory without an external body execution premise. Then feed this support into the sole measured mixed family. Initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
