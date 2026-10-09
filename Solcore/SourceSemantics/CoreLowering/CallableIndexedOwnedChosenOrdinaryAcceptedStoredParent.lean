@@ -263,6 +263,95 @@ def ModelRuntimeInputs.extend_receiving {futureMap : LocationMap} {futureWorld :
   interprets := genericInputs.interprets }
 
 
+/-- Genuine static inputs exclude indirect calls only at supported body expressions. -/
+structure ScopedModelRuntimeInputs
+    (receiving : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed)) where
+  domains : ∀ context, Validity i context → ∀ childScope,
+    DomainAt root expressionSyntax i.support.body.readFuel context i.function.evidence childScope headers
+  wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
+  sameLayouts : ∀ header, header ∈ headers → header.layouts = compiled.indexed.layouts
+  complete : RecursiveNamedCatalogNativeContexts.Complete (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers
+  globals : owning.globals = compiled.indexed.base.globals.length
+  slots : ∀ header, header ∈ headers → header.slot < compiled.indexed.base.globals.length
+  prefixZero : owner.key.capturePrefix = 0
+  noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+    (CallableIndexedNamedGeneration.source owning.named) (expressionSyntax (CallableIndexedNamedGeneration.source owning.named))
+  extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry registry
+  identities : Dynamic.Value → Word → Prop
+  faithful : DataEquality.IdentityFaithful identities
+  observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
+    receiving identities
+  uninitialized : ∀ id location, faults (.uninitializedLocation location) (rootReasonAt id)
+  missing : ∀ id key value tag, MetadataRep registry (.mapping key value) tag →
+    faults (.missingMappingDefault value) ((rootReasonAt id).add tag)
+  table : SourceCoreFaultSites.Table
+  rebuilt : i.support.issued.diagnostics.tableForRegistry registry extension = .ok table
+  operandIncluded : ∀ reason token, GenericAssignmentDiagnostics.OperandRep i.support.issued.assignments reason token → faults reason token
+  unaryIncluded : ∀ reason token, EmittedDiagnosticTokenPlan.UnaryRep i.support.issued.assignments reason token → faults reason token
+  interprets : ∀ context, Validity i context →
+    CallableIndexedOwnedContextualLambdaAssignmentReadiness.ReachedInterpretations
+      (context := context) (certificates := i.support.certificates i.support.body.readFuel i.function.source)
+      (administrative := i.captured.administrative)
+      (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory i.support.diagnosticPolicy i.function.source i.support.issued.invalidOperand)
+      (faults := faults) (registry := registry) i.support.issued
+      (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner owning)
+      receiving table
+
+/-- A whole-Source exclusion supplies the supported-expression restriction. -/
+def ModelRuntimeInputs.supported :
+    ScopedModelRuntimeInputs (headers := headers) (registry := registry) (faults := faults)
+      root expressionSyntax i owner receiving := {
+  domains := genericInputs.domains,
+  wellFormed := genericInputs.wellFormed,
+  sameLayouts := genericInputs.sameLayouts,
+  complete := genericInputs.complete,
+  globals := genericInputs.globals,
+  slots := genericInputs.slots,
+  prefixZero := genericInputs.prefixZero,
+  noIndirectOn := fun _allowed found => genericInputs.noIndirect found,
+  extension := genericInputs.extension,
+  identities := genericInputs.identities,
+  faithful := genericInputs.faithful,
+  observations := genericInputs.observations,
+  uninitialized := genericInputs.uninitialized,
+  missing := genericInputs.missing,
+  table := genericInputs.table,
+  rebuilt := genericInputs.rebuilt,
+  operandIncluded := genericInputs.operandIncluded,
+  unaryIncluded := genericInputs.unaryIncluded,
+  interprets := genericInputs.interprets }
+
+variable
+  (scopedInputs : ScopedModelRuntimeInputs (headers := headers) (registry := registry) (faults := faults)
+    root expressionSyntax i owner receiving)
+
+/-- Only map/world proof facets extend at the same literal static factory. -/
+def ScopedModelRuntimeInputs.extend_supported {futureMap : LocationMap} {futureWorld : StoreTyping}
+    (maps : LocationMap.Extends i.mapping futureMap) (worlds : WorldExtends i.world futureWorld) :
+    ScopedModelRuntimeInputs (headers := headers) (registry := registry) (faults := faults)
+      root expressionSyntax (extendIndex i maps worlds) owner receiving := {
+  domains := scopedInputs.domains,
+  wellFormed := scopedInputs.wellFormed,
+  sameLayouts := scopedInputs.sameLayouts,
+  complete := scopedInputs.complete,
+  globals := scopedInputs.globals,
+  slots := scopedInputs.slots,
+  prefixZero := scopedInputs.prefixZero,
+  noIndirectOn := scopedInputs.noIndirectOn,
+  extension := scopedInputs.extension,
+  identities := scopedInputs.identities,
+  faithful := scopedInputs.faithful,
+  observations := scopedInputs.observations,
+  uninitialized := scopedInputs.uninitialized,
+  missing := scopedInputs.missing,
+  table := scopedInputs.table,
+  rebuilt := scopedInputs.rebuilt,
+  operandIncluded := scopedInputs.operandIncluded,
+  unaryIncluded := scopedInputs.unaryIncluded,
+  interprets := scopedInputs.interprets }
+
+
 variable
   (genericPost : CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
     (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context) bridge
@@ -270,9 +359,10 @@ variable
 
 
 
-include calleeTrace parentTyped tree unique runtime covers locals admitted genericInputs in
+include calleeTrace parentTyped tree unique runtime covers locals admitted in
 /-- The independently typed Source row supplies this exact original parameter bundle. -/
-theorem ForModel.source_bundle_for_model :
+theorem ForModel.source_bundle_at_program
+    (wellFormedAt : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
     TypeSystem.Ty.productMany sourceTypes = TypeSystem.Ty.productMany (i.code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) := by
   have parameters := CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) i.code
   have sourceBinders : i.code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body) =
@@ -281,7 +371,15 @@ theorem ForModel.source_bundle_for_model :
       (congrArg (List.map (fun binding : TypedBinder => binding.scheme.body)) parameters).symm
   exact CallableIndexedOwnedStoredSourceBundleReceipts.source_bundle_of_trace
     unique compiler.found compiler.originalForm parentTyped tree compiler.argumentCoercions
-    genericInputs.wellFormed runtime covers locals admitted.heap calleeTrace sourceBinders
+    wellFormedAt runtime covers locals admitted.heap calleeTrace sourceBinders
+
+include calleeTrace parentTyped tree unique runtime covers locals admitted genericInputs in
+/-- The independently typed Source row supplies this exact original parameter bundle. -/
+theorem ForModel.source_bundle_for_model :
+    TypeSystem.Ty.productMany sourceTypes = TypeSystem.Ty.productMany (i.code.receipt.loweredParameters.map (fun binding => binding.1.scheme.body)) := by
+  exact ForModel.source_bundle_at_program (wellFormedAt := genericInputs.wellFormed) (i := i) (bridge := bridge) (compiler := compiler) (initial := initial)
+    (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
+    (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (tree := tree)
 
 
 include calleeTrace parentTyped tree unique runtime covers locals admitted inputs in
@@ -295,14 +393,21 @@ theorem source_bundle :
     (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
     (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (tree := tree)
 
+include calleeTrace parentTyped unique runtime covers locals admitted parent in
+/-- Empty original output coercions preserve the real Source result type. -/
+theorem ForModel.raw_result_at_program
+    (wellFormedAt : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) : SourceCoreRawMetadata.runtimeType compiler.original.type = SourceCoreRawMetadata.runtimeType i.function.resultType := by
+  exact congrArg SourceCoreRawMetadata.runtimeType
+    (CallableIndexedOwnedStoredSourceResultReceipts.source_result_of_trace
+      unique compiler.found compiler.originalForm parentTyped parent.coercions
+      wellFormedAt runtime covers locals admitted.heap calleeTrace)
+
 include calleeTrace parentTyped unique runtime covers locals admitted genericInputs parent in
 /-- Empty original output coercions preserve the real Source result type. -/
 theorem ForModel.raw_result_for_model : SourceCoreRawMetadata.runtimeType compiler.original.type = SourceCoreRawMetadata.runtimeType i.function.resultType :=
-  congrArg SourceCoreRawMetadata.runtimeType
-    (CallableIndexedOwnedStoredSourceResultReceipts.source_result_of_trace
-      unique compiler.found compiler.originalForm parentTyped parent.coercions
-      genericInputs.wellFormed runtime covers locals admitted.heap calleeTrace)
-
+  ForModel.raw_result_at_program (wellFormedAt := genericInputs.wellFormed) (i := i) (bridge := bridge) (compiler := compiler) (initial := initial)
+    (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
+    (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (parent := parent)
 
 
 include calleeTrace parentTyped unique runtime covers locals admitted inputs parent in
@@ -322,11 +427,11 @@ variable
   (owners : ((Program.ofChecked compiled.sourceProgram).functions.map (fun definition => definition.body.owner)).Nodup)
   (idsUnique : ∀ context, Validity i context → RequirementIdsUnique context)
 
-include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique runtime covers locals admitted
+include profile receiving members functionTypes member scopedInputs calleeTrace genericPost sameNative parentTyped tree unique runtime covers locals admitted
   actualFunctionType accepted owners idsUnique in
 /-- The parent core supplies its actual argument state. This finite leaf
 constructs raw arguments and the chosen continuation internally at that state. -/
-theorem ForModel.application_preserves_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.application_preserves_on (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
@@ -342,9 +447,8 @@ theorem ForModel.application_preserves_for_model (outer budget : Nat) (withinOut
       (root := root) (expressionSyntax := expressionSyntax) (i := i) (history := history)
       (owner := owner) (member := member) (bridge := bridge) (compiler := compiler) (initial := initial)
       (sameNative := sameNative) (actualFunctionType := actualFunctionType)
-  have rawBundle := ForModel.source_bundle_for_model (receiving := receiving) (genericInputs := genericInputs)
-      (root := root) (expressionSyntax := expressionSyntax) (i := i)
-      (owner := owner) (bridge := bridge) (compiler := compiler) (initial := initial)
+  have rawBundle := ForModel.source_bundle_at_program (wellFormedAt := scopedInputs.wellFormed)
+      (i := i) (bridge := bridge) (compiler := compiler) (initial := initial)
       (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
       (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (tree := tree)
   have parameters := CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) i.code
@@ -369,19 +473,47 @@ theorem ForModel.application_preserves_for_model (outer budget : Nat) (withinOut
     simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq i.support.body.extended] using raw.arguments
   obtain ⟨value, finalStore, finalMap, finalWorld, application, resultRep, finalHeaps,
     lastMaps, lastWorlds, lastFrame, lastMetadata, baseReached, baseRelated⟩ :=
-    CallableIndexedOwnedChosenOrdinaryLambdaInvocation.ForModel.application_preserves
-      («functions» := receiving) (members := members) (functionTypes := functionTypes)
-      (observationsGeneric := genericInputs.observations) (interpretsGeneric := genericInputs.interprets)
+    CallableIndexedOwnedChosenOrdinaryLambdaInvocation.ForModel.application_preserves_on
+      («functions» := receiving) (members := members) (noIndirectOn := scopedInputs.noIndirectOn) (functionTypes := functionTypes)
+      (observationsGeneric := scopedInputs.observations) (interpretsGeneric := scopedInputs.interprets)
       root expressionSyntax future history profile owner futureMember
-      genericInputs.domains genericInputs.wellFormed genericInputs.sameLayouts owners idsUnique genericInputs.complete genericInputs.globals genericInputs.slots
-      genericInputs.prefixZero genericInputs.noIndirect genericInputs.extension genericInputs.faithful genericInputs.uninitialized genericInputs.missing
-      genericInputs.rebuilt genericInputs.operandIncluded genericInputs.unaryIncluded
+      scopedInputs.domains scopedInputs.wellFormed scopedInputs.sameLayouts owners idsUnique scopedInputs.complete scopedInputs.globals scopedInputs.slots
+      scopedInputs.prefixZero scopedInputs.extension scopedInputs.faithful scopedInputs.uninitialized scopedInputs.missing
+      scopedInputs.rebuilt scopedInputs.operandIncluded scopedInputs.unaryIncluded
       (bridge.pool argumentState) raw.heaps actualRaw argumentAdmission.rows actualArguments argumentHeaps raw.captures
       outer budget withinOuter ih called callWithin
   obtain ⟨returned, _samePool, related⟩ := bridge.restore argumentState baseReached lastMaps lastWorlds lastFrame lastMetadata baseRelated
   refine ⟨value, finalStore, finalMap, finalWorld, accepted.beforeApplication, ?_, resultRep, finalHeaps,
     lastMaps, lastWorlds, lastFrame, lastMetadata, returned, related⟩
   simpa only [future, extendIndex, Captures.extend, sameNative] using application
+
+include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique runtime covers locals admitted
+  actualFunctionType accepted owners idsUnique in
+/-- The parent core supplies its actual argument state. This finite leaf
+constructs raw arguments and the chosen continuation internally at that state. -/
+theorem ForModel.application_preserves_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) receiving owner index))
+    {suffixArgumentsSize suffixCallSize : Nat} {suffixOutcome : Dynamic.ExpressionOutcome} {suffixAfter : Dynamic.Heap}
+    (suffix : SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids i.function
+      suffixArgumentsSize suffixCallSize suffixOutcome suffixAfter) :
+    CallableIndexedOwnedStoredIndirectCallBounds.ForModel.ApplicationPreserves (registry := registry) (faults := faults)
+      bridge receiving compiler prepared (native := native) (context := context) (evidence := evidence)
+      (environment := environment) (scope := scope) (canonical := canonical) (calleeHeap := calleeHeap)
+      (mapping := i.mapping) (world := i.world) (store := calleeStore) (function := i.function)
+      (calleeNative := calleeNative) (sourceTypes := sourceTypes) (resultCore := i.code.receipt.resultCore)
+      (dispatch := dispatch) budget suffix := by
+  exact ForModel.application_preserves_on (receiving := receiving)
+    (scopedInputs := ModelRuntimeInputs.supported root expressionSyntax i owner receiving genericInputs)
+    (genericPost := genericPost)
+    (members := members)
+    (functionTypes := functionTypes)
+    (root := root) (expressionSyntax := expressionSyntax) (i := i) (history := history)
+    (profile := profile) (owner := owner) (member := member) (bridge := bridge) (compiler := compiler)
+    (prepared := prepared) (initial := initial) (calleeTrace := calleeTrace) (sameNative := sameNative)
+    (parentTyped := parentTyped) (tree := tree) (unique := unique) (runtime := runtime)
+    (covers := covers) (locals := locals) (admitted := admitted) (actualFunctionType := actualFunctionType)
+    (dispatch := dispatch) (accepted := accepted) (owners := owners) (idsUnique := idsUnique) outer budget withinOuter ih suffix
 
 
 include member inputs calleeTrace post sameNative parentTyped tree unique runtime covers locals admitted
@@ -418,11 +550,11 @@ variable
   (agrees : EnvironmentsAgree ξ canonical actual)
   (typed : RuntimeEnvironmentHasTypes firstWorld actual actualContext compiled.indexed.layouts.definitions)
 
-include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
+include profile receiving members functionTypes member scopedInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
   actualFunctionType selected accepted owners idsUnique environments agrees typed in
 /-- Ordered arguments and the whole Source parent use the original core once;
 the chosen application leaf is constructed internally rather than supplied. -/
-theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.preserves_accepted_on (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
@@ -446,9 +578,8 @@ theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter 
   have nativeTyped : RuntimeValueHasType i.world calleeNative
       (CallableContract.functionType i.code.receipt.parameterCore i.code.receipt.resultCore) compiled.indexed.layouts.definitions := by
     rw [sameNative]; exact member.typed
-  have rawResult := ForModel.raw_result_for_model (receiving := receiving) (genericInputs := genericInputs)
-      (root := root) (expressionSyntax := expressionSyntax) (i := i)
-      (owner := owner) (bridge := bridge) (compiler := compiler) (initial := initial)
+  have rawResult := ForModel.raw_result_at_program (wellFormedAt := scopedInputs.wellFormed)
+      (i := i) (bridge := bridge) (compiler := compiler) (initial := initial)
       (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
       (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (parent := parent)
   have nativeFields := native_bundle.receiving_bundle (receiving := receiving) (genericPost := genericPost)
@@ -460,9 +591,9 @@ theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter 
       (environment := environment) (scope := scope) (canonical := canonical) (calleeHeap := calleeHeap)
       (mapping := i.mapping) (world := i.world) (store := calleeStore) (function := i.function)
       (calleeNative := calleeNative) (sourceTypes := sourceTypes) (resultCore := i.code.receipt.resultCore)
-      (dispatch := dispatch) budget suffix := ForModel.application_preserves_for_model
+      (dispatch := dispatch) budget suffix := ForModel.application_preserves_on
     (receiving := receiving) (members := members) (functionTypes := functionTypes)
-    (genericInputs := genericInputs) (genericPost := genericPost)
+    (scopedInputs := scopedInputs) (genericPost := genericPost)
     (root := root) (expressionSyntax := expressionSyntax) (i := i) (history := history)
     (profile := profile) (owner := owner) (member := member) (bridge := bridge) (compiler := compiler)
     (prepared := prepared) (initial := initial) (calleeTrace := calleeTrace) (sameNative := sameNative)
@@ -471,9 +602,42 @@ theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter 
     (dispatch := dispatch) (accepted := accepted) (owners := owners) (idsUnique := idsUnique)
     outer budget withinOuter ih suffix
   exact CallableIndexedOwnedStoredIndirectCallBounds.ForModel.preserves_selected_with_application
-    bridge receiving compiler prepared parent tree unique parentTyped genericInputs.wellFormed runtime covers environments locals agrees typed
+    bridge receiving compiler prepared parent tree unique parentTyped scopedInputs.wellFormed runtime covers environments locals agrees typed
     initial admitted calleeState calleeRelated calleeMaps calleeWorlds calleeFrame calleeMetadata nativeTyped calleeHeaps
     rawResult nativeFields.2 dispatch accepted.stage calleeTrace genericPost.1 selected budget children suffix argumentsWithin callWithin leaf
+
+include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
+  actualFunctionType selected accepted owners idsUnique environments agrees typed in
+/-- Ordered arguments and the whole Source parent use the original core once;
+the chosen application leaf is constructed internally rather than supplied. -/
+theorem ForModel.preserves_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) receiving owner index))
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
+      bridge (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry receiving) context evidence source certificate faults size)
+    {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (suffix : SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids i.function
+      argumentsSize callSize outcome after)
+    (argumentsWithin : argumentsSize ≤ budget) (callWithin : callSize ≤ budget) :
+    ∃ sourceSize value finalStore finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize context evidence source
+        environment before id outcome after ∧
+      Evaluates actual firstStore (lowered.expression.rename ξ) value finalStore ∧
+      CallableIndexedOwnedStoredFunctionModelReceipts.ParentResultAt (registry := registry) (faults := faults)
+        (context := context) bridge receiving compiler initial outcome after value finalStore finalMap finalWorld := by
+  exact ForModel.preserves_accepted_on (receiving := receiving)
+    (scopedInputs := ModelRuntimeInputs.supported root expressionSyntax i owner receiving genericInputs)
+    (genericPost := genericPost)
+    (members := members)
+    (functionTypes := functionTypes)
+    (root := root) (expressionSyntax := expressionSyntax) (i := i) (history := history)
+    (profile := profile) (owner := owner) (member := member) (bridge := bridge) (compiler := compiler)
+    (prepared := prepared) (initial := initial) (calleeTrace := calleeTrace) (sameNative := sameNative)
+    (parentTyped := parentTyped) (tree := tree) (unique := unique) (runtime := runtime)
+    (covers := covers) (locals := locals) (admitted := admitted) (actualFunctionType := actualFunctionType)
+    (dispatch := dispatch) (accepted := accepted) (owners := owners) (idsUnique := idsUnique) (parent := parent) (selected := selected)
+    (environments := environments) (agrees := agrees) (typed := typed)
+    outer budget withinOuter ih children suffix argumentsWithin callWithin
 
 
 include member inputs calleeTrace post sameNative parentTyped tree unique parent runtime covers locals admitted
@@ -543,11 +707,11 @@ def ForModel.ReflectedResultAt (budget : Nat) (value : Value) (finalStore : Stor
         bridge receiving compiler initial outcome after value finalStore finalMap finalWorld
 
 
-include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
+include profile receiving members functionTypes member scopedInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
   actualFunctionType accepted in
 /-- Reflection consumes the authentic whole fourth bind at its own argument
 store, then the same chosen application and finite caller-pool lift once. -/
-theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+theorem ForModel.reflects_accepted_on (outer budget : Nat) (withinOuter : budget ≤ outer)
     (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) receiving owner index))
     {value : Value} {finalStore : Store}
@@ -573,7 +737,7 @@ theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter :
       («functions» := receiving) (faults := faults) (genericPost := genericPost)
       root expressionSyntax bridge profile compiler prepared initial i history dispatch
       (chosen_at (faults := faults) root expressionSyntax i history owner member) calleeTrace sameNative parentTyped tree unique
-      genericInputs.wellFormed runtime covers locals admitted actualFunctionType budget original step passed
+      scopedInputs.wellFormed runtime covers locals admitted actualFunctionType budget original step passed
   refine ⟨original, step, passed, ?_⟩
   obtain ⟨nativeSize, argumentsSize, arguments, payloads, middle, argumentStore, middleMap, middleWorld,
     _argumentsNative, _argumentsStrict, argumentsTrace, represented, argumentHeaps, stepMaps, stepWorlds, _stepFrame, _stepMetadata,
@@ -601,13 +765,13 @@ theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter :
       have futureMember := extend_chosen root expressionSyntax i history owner member stepMaps stepWorlds
       obtain ⟨callSize, outcome, after, finalMap, finalWorld, called, resultRep, finalHeaps,
         lastMaps, lastWorlds, lastFrame, lastMetadata, baseReached, baseRelated⟩ :=
-        CallableIndexedOwnedChosenOrdinaryLambdaInvocation.ForModel.application_reflects
-          («functions» := receiving) (members := members) (functionTypes := functionTypes)
-          (observationsGeneric := genericInputs.observations) (interpretsGeneric := genericInputs.interprets)
+        CallableIndexedOwnedChosenOrdinaryLambdaInvocation.ForModel.application_reflects_on
+          («functions» := receiving) (members := members) (noIndirectOn := scopedInputs.noIndirectOn) (functionTypes := functionTypes)
+          (observationsGeneric := scopedInputs.observations) (interpretsGeneric := scopedInputs.interprets)
           root expressionSyntax future history profile owner futureMember
-          genericInputs.domains genericInputs.wellFormed genericInputs.sameLayouts genericInputs.complete genericInputs.globals genericInputs.slots
-          genericInputs.prefixZero genericInputs.noIndirect genericInputs.extension genericInputs.faithful genericInputs.uninitialized genericInputs.missing
-          genericInputs.rebuilt genericInputs.operandIncluded genericInputs.unaryIncluded
+          scopedInputs.domains scopedInputs.wellFormed scopedInputs.sameLayouts scopedInputs.complete scopedInputs.globals scopedInputs.slots
+          scopedInputs.prefixZero scopedInputs.extension scopedInputs.faithful scopedInputs.uninitialized scopedInputs.missing
+          scopedInputs.rebuilt scopedInputs.operandIncluded scopedInputs.unaryIncluded
           (bridge.pool argumentState) raw.heaps actualRaw stable actualArguments argumentHeaps raw.captures
           outer budget withinOuter ih payloadTrace (Nat.le_of_lt applicationStrict)
       obtain ⟨returned, _samePool, lastRelated⟩ := bridge.restore argumentState baseReached
@@ -618,15 +782,15 @@ theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter :
       obtain ⟨parameter, sourceResult, rawTypes, _calleeTyping, argumentsTyping, application,
         _calleeTyped, calleeHeapTyped, _calleeExtension, calleeLocals, _rawTyped, _argumentHeapTyped,
         _heapExtension, _argumentLocals, _fullExtension, _rawArity, packed, packing, _packedTyped, _raw⟩ :=
-        CallableIndexedOwnedStoredCallSourcePrefix.from_admission_with_arity bridge initial genericInputs.wellFormed runtime covers locals admitted
+        CallableIndexedOwnedStoredCallSourcePrefix.from_admission_with_arity bridge initial scopedInputs.wellFormed runtime covers locals admitted
           unique compiler.found compiler.originalForm parentTyped compiler.argumentCoercions arity
           calleeTrace argumentsTrace
       have count : rawTypes.length = metadata.argumentCount := by
         cases application with | intro count _ _ _ => exact count.symm
-      have argumentsCount := arguments_count_of_source_admission genericInputs.wellFormed runtime covers calleeLocals calleeHeapTyped
+      have argumentsCount := arguments_count_of_source_admission scopedInputs.wellFormed runtime covers calleeLocals calleeHeapTyped
         argumentsTyping count argumentsTrace
       obtain ⟨sourceSize, sourceParent⟩ := SourceSuffix.to_expression compiler.found compiler.originalForm
-        parent.requirements parent.coercions compiler.argumentCoercions parent.arity genericInputs.wellFormed runtime covers
+        parent.requirements parent.coercions compiler.argumentCoercions parent.arity scopedInputs.wellFormed runtime covers
         calleeLocals calleeHeapTyped argumentsTyping count calleeTrace (SourceSuffix.called argumentsTrace called)
       have coercions : Dynamic.CoercionPathExecutes (Program.ofChecked compiled.sourceProgram) context evidence
           middle metadata.argumentCoercions packed packed middle := by
@@ -641,9 +805,8 @@ theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter :
         | fault failed =>
           exact .applicationFault calleeTrace.sound (by simpa only [prepared.call] using accepted.stage)
             argumentsTrace.sound packing coercions packing parent.arity argumentsCount failed.sound
-      have rawResult := ForModel.raw_result_for_model (receiving := receiving) (genericInputs := genericInputs)
-          (root := root) (expressionSyntax := expressionSyntax) (i := i)
-          (owner := owner) (bridge := bridge) (compiler := compiler) (initial := initial)
+      have rawResult := ForModel.raw_result_at_program (wellFormedAt := scopedInputs.wellFormed)
+          (i := i) (bridge := bridge) (compiler := compiler) (initial := initial)
           (calleeTrace := calleeTrace) (parentTyped := parentTyped) (unique := unique)
           (runtime := runtime) (covers := covers) (locals := locals) (admitted := admitted) (parent := parent)
       have nativeFields := native_bundle.receiving_bundle (receiving := receiving) (genericPost := genericPost)
@@ -655,8 +818,45 @@ theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter :
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceParent, staged, parentRep, finalHeaps,
         maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadataExtended.trans lastMetadata,
         returned, callerProtocol.trans related lastRelated,
-        after_expression_sized initial returned admitted genericInputs.wellFormed runtime covers locals parentTyped sourceParent
+        after_expression_sized initial returned admitted scopedInputs.wellFormed runtime covers locals parentTyped sourceParent
           (frame.trans lastFrame)⟩
+
+include profile receiving members functionTypes member genericInputs calleeTrace genericPost sameNative parentTyped tree unique parent runtime covers locals admitted
+  actualFunctionType accepted in
+/-- Reflection consumes the authentic whole fourth bind at its own argument
+store, then the same chosen application and finite caller-pool lift once. -/
+theorem ForModel.reflects_accepted_for_model (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) receiving owner index))
+    {value : Value} {finalStore : Store}
+    (original : CallableIndexedOwnedStoredIndirectArgumentPrefix.ForModel.SuccessPrefix
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      bridge receiving compiler prepared initial budget value finalStore)
+    (step : CallableIndexedOwnedStoredFunctionModelReceipts.SuccessStep
+      (registry := registry) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      (calleeMap := i.mapping) (calleeWorld := i.world)
+      bridge receiving compiler prepared initial budget value finalStore)
+    (passed : CallableIndexedOwnedStoredIndirectApplicationPrefix.PassedAt (actual := actual)
+      compiler prepared dispatch budget value finalStore) :
+    ForModel.ReflectedResultAt (receiving := receiving) (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
+      (calleeHeap := calleeHeap) (calleeNative := calleeNative) (calleeStore := calleeStore)
+      i bridge compiler prepared initial dispatch budget value finalStore := by
+  exact ForModel.reflects_accepted_on (receiving := receiving)
+    (scopedInputs := ModelRuntimeInputs.supported root expressionSyntax i owner receiving genericInputs)
+    (genericPost := genericPost)
+    (members := members)
+    (functionTypes := functionTypes)
+    (root := root) (expressionSyntax := expressionSyntax) (i := i) (history := history)
+    (profile := profile) (owner := owner) (member := member) (bridge := bridge) (compiler := compiler)
+    (prepared := prepared) (initial := initial) (calleeTrace := calleeTrace) (sameNative := sameNative)
+    (parentTyped := parentTyped) (tree := tree) (unique := unique) (runtime := runtime)
+    (covers := covers) (locals := locals) (admitted := admitted) (actualFunctionType := actualFunctionType)
+    (dispatch := dispatch) (accepted := accepted) (parent := parent) outer budget withinOuter ih original step passed
 
 
 include member inputs calleeTrace post sameNative parentTyped tree unique parent runtime covers locals admitted

@@ -88,6 +88,35 @@ variable {function : Dynamic.Closure} {calleeHeap : Dynamic.Heap} {calleeSize : 
 
 /-- Only static route receipts, a genuine positive member and the actual Source
 suffix are supplied after the strict child has produced this literal post. -/
+def SourceAcceptedOn (outer budget : Nat) (calleeNative : Value) (_calleeStore : Store)
+    (calleeMap : LocationMap) (calleeWorld : StoreTyping) : Prop :=
+  ∀ (i : OrdinaryIndex compiled) (history : History i.code)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (_member : ChosenFor (headers := headers) root expressionSyntax owner i history),
+    function = i.function → calleeMap = i.mapping → calleeWorld = i.world →
+    calleeNative = value i.code i.captured.embedding history.native i.capturedActual →
+    CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ScopedModelRuntimeInputs
+      (headers := headers) (registry := registry) (faults := faults) root expressionSyntax i owner functions →
+    (∀ context, CallableIndexedOwnedChosenOrdinaryLambdaInvocation.Validity i context → RequirementIdsUnique context) →
+    ∀ (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids
+        (.closure i.function) calleeNative),
+    CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata
+      compiler.original dispatch.row →
+    CallableIndexedOwnedChosenOrdinarySelectedCallReceipts.AcceptedAt dispatch native.diagnostics.unknown →
+    (∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner index)) →
+    ∀ {argumentsSize callSize : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap},
+    SourceSuffix (Program.ofChecked compiled.sourceProgram) context evidence source environment calleeHeap ids i.function
+      argumentsSize callSize outcome after → argumentsSize ≤ budget → callSize ≤ budget →
+    ∃ sourceSize result finalStore finalMap finalWorld,
+      RecursiveNamedCallBounds.ExpressionOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+        context evidence source environment before id outcome after ∧
+      Evaluates actual store (lowered.expression.rename ξ) result finalStore ∧
+      CallableIndexedOwnedStoredFunctionModelReceipts.ParentResultAt (registry := registry) (faults := faults)
+        (context := context) bridge functions compiler initial outcome after result finalStore finalMap finalWorld
+
+/-- Only static route receipts, a genuine positive member and the actual Source
+suffix are supplied after the strict child has produced this literal post. -/
 def SourceAcceptedAt (outer budget : Nat) (calleeNative : Value) (_calleeStore : Store)
     (calleeMap : LocationMap) (calleeWorld : StoreTyping) : Prop :=
   ∀ (i : OrdinaryIndex compiled) (history : History i.code)
@@ -120,6 +149,56 @@ include certified found sourceTyped parentTyped runtime covers environments heap
 /-- Construct the callee post once from the actual strict child. Its complete
 selection keeps prior alternatives. The positive accepted continuation derives
 its own body and ordered argument producer through the existing parent core. -/
+theorem preserves_closure_parent_on (outer budget : Nat) (within : budget ≤ outer)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
+      bridge model context evidence source certificate faults size)
+    (trace : SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) calleeSize
+      context evidence source environment before callee (.closure function) calleeHeap)
+    (smaller : calleeSize < budget) :
+    ∃ calleeNative calleeStore calleeMap calleeWorld,
+      CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+        (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
+        bridge functions compiler initial (.closure function) calleeHeap calleeNative calleeStore calleeMap calleeWorld ∧
+      CallableIndexedOwnedChosenOrdinaryLambdaValues.Selected
+        (headers := headers) (keys := keys) (registry := registry) (faults := faults)
+        (mapping := calleeMap) (world := calleeWorld) (raw := calleeNode.type)
+        (function := function) (native := calleeNative) (type := compiler.calleeCode.type) root expressionSyntax ∧
+      SourceAcceptedOn (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+        (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar) (function := function) (calleeHeap := calleeHeap)
+        (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
+        (compiler := compiler) (prepared := prepared) (initial := initial) outer budget calleeNative calleeStore calleeMap calleeWorld := by
+  obtain ⟨calleeNative, calleeStore, calleeMap, calleeWorld, post, selection⟩ :=
+    CallableIndexedOwnedChosenOrdinaryCalleePosts.source_closure_at_callee
+      (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile) (compiler := compiler)
+      (certified := certified) (found := found) (sourceTyped := sourceTyped) (environments := environments)
+      (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (initial := initial) (admitted := admitted)
+      budget children trace smaller
+  refine ⟨calleeNative, calleeStore, calleeMap, calleeWorld, post, selection, ?_⟩
+  intro i history owner member sameFunction sameMap sameWorld sameNative inputs bodyIds dispatch selected accepted ih
+    argumentsSize callSize outcome after suffix argumentsWithin callWithin
+  cases sameFunction
+  cases sameMap
+  cases sameWorld
+  exact CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ForModel.preserves_accepted_on
+    (receiving := functions)
+    (members := CallableIndexedOwnedChosenOrdinaryLambdaExpressionHeads.members owning root expressionSyntax profile)
+    (functionTypes := CallableIndexedOwnedChosenOrdinaryLambdaValues.runtime_views
+      (root := root) (expressionSyntax := expressionSyntax) headers keys registry faults profile)
+    (scopedInputs := inputs) (genericPost := post) (root := root) (expressionSyntax := expressionSyntax)
+    (i := i) (history := history) (profile := profile) (owner := owner) (member := member)
+    (bridge := bridge) (compiler := compiler) (prepared := prepared) (initial := initial)
+    (calleeTrace := trace) (sameNative := sameNative) (parentTyped := parentTyped) (tree := tree)
+    (unique := unique) (parent := parent) (runtime := runtime) (covers := covers) (locals := locals)
+    (admitted := admitted) (actualFunctionType := actualFunctionType) (dispatch := dispatch)
+    (selected := selected) (accepted := accepted) (owners := owners) (idsUnique := bodyIds)
+    (environments := environments) (agrees := agrees) (typed := typed)
+    outer budget within ih children suffix argumentsWithin callWithin
+
+include certified found sourceTyped parentTyped runtime covers environments heaps locals agrees typed admitted
+  tree unique parent actualFunctionType owners in
+/-- Construct the callee post once from the actual strict child. Its complete
+selection keeps prior alternatives. The positive accepted continuation derives
+its own body and ordered argument producer through the existing parent core. -/
 theorem preserves_closure_parent (outer budget : Nat) (within : budget ≤ outer)
     (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt
       bridge model context evidence source certificate faults size)
@@ -138,32 +217,22 @@ theorem preserves_closure_parent (outer budget : Nat) (within : budget ≤ outer
         (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar) (function := function) (calleeHeap := calleeHeap)
         (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
         (compiler := compiler) (prepared := prepared) (initial := initial) outer budget calleeNative calleeStore calleeMap calleeWorld := by
-  obtain ⟨calleeNative, calleeStore, calleeMap, calleeWorld, post, selection⟩ :=
-    CallableIndexedOwnedChosenOrdinaryCalleePosts.source_closure_at_callee
-      (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile) (compiler := compiler)
-      (certified := certified) (found := found) (sourceTyped := sourceTyped) (environments := environments)
-      (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (initial := initial) (admitted := admitted)
-      budget children trace smaller
+  obtain ⟨calleeNative, calleeStore, calleeMap, calleeWorld, post, selection, resolve⟩ :=
+    preserves_closure_parent_on
+    (bridge := bridge) (profile := profile) (root := root) (expressionSyntax := expressionSyntax)
+    (compiler := compiler) (prepared := prepared) (certified := certified) (found := found)
+    (sourceTyped := sourceTyped) (parentTyped := parentTyped) (runtime := runtime) (covers := covers)
+    (environments := environments) (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed)
+    (initial := initial) (admitted := admitted) (tree := tree) (unique := unique) (parent := parent)
+    (actualFunctionType := actualFunctionType)
+    (owners := owners) outer budget within children trace smaller
   refine ⟨calleeNative, calleeStore, calleeMap, calleeWorld, post, selection, ?_⟩
   intro i history owner member sameFunction sameMap sameWorld sameNative inputs bodyIds dispatch selected accepted ih
     argumentsSize callSize outcome after suffix argumentsWithin callWithin
-  cases sameFunction
-  cases sameMap
-  cases sameWorld
-  exact CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ForModel.preserves_accepted_for_model
-    (receiving := functions)
-    (members := CallableIndexedOwnedChosenOrdinaryLambdaExpressionHeads.members owning root expressionSyntax profile)
-    (functionTypes := CallableIndexedOwnedChosenOrdinaryLambdaValues.runtime_views
-      (root := root) (expressionSyntax := expressionSyntax) headers keys registry faults profile)
-    (genericInputs := inputs) (genericPost := post) (root := root) (expressionSyntax := expressionSyntax)
-    (i := i) (history := history) (profile := profile) (owner := owner) (member := member)
-    (bridge := bridge) (compiler := compiler) (prepared := prepared) (initial := initial)
-    (calleeTrace := trace) (sameNative := sameNative) (parentTyped := parentTyped) (tree := tree)
-    (unique := unique) (parent := parent) (runtime := runtime) (covers := covers) (locals := locals)
-    (admitted := admitted) (actualFunctionType := actualFunctionType) (dispatch := dispatch)
-    (selected := selected) (accepted := accepted) (owners := owners) (idsUnique := bodyIds)
-    (environments := environments) (agrees := agrees) (typed := typed)
-    outer budget within ih children suffix argumentsWithin callWithin
+  exact resolve i history owner member sameFunction sameMap sameWorld sameNative
+    (CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ModelRuntimeInputs.supported
+      root expressionSyntax i owner functions inputs) bodyIds dispatch selected accepted ih
+    suffix argumentsWithin callWithin
 
 include prepared certified found sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed admitted in
 /-- A genuine strict callee fault closes the semantic parent before arguments.
@@ -225,6 +294,32 @@ def NativeChosenResult (i : OrdinaryIndex compiled)
 
 /-- This is a finite static resolver at the actual callee tuple. It receives no
 successful argument or application trace: the whole parent prefix derives both. -/
+def NativeAcceptedOn (function : Dynamic.Closure) (outer budget : Nat)
+    (calleeNative : Value) (calleeStore : Store) (calleeMap : LocationMap) (calleeWorld : StoreTyping)
+    (result : Value) (finalStore : Store) : Prop :=
+  ∀ (i : OrdinaryIndex compiled) (history : History i.code)
+    (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+    (_member : ChosenFor (headers := headers) root expressionSyntax owner i history),
+    function = i.function → calleeMap = i.mapping → calleeWorld = i.world →
+    calleeNative = value i.code i.captured.embedding history.native i.capturedActual →
+    CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ScopedModelRuntimeInputs
+      (headers := headers) (registry := registry) (faults := faults) root expressionSyntax i owner functions →
+    ∀ (dispatch : CallStageBoundary.Dispatch (CallableLedger.frame sidecar) prepared.site prepared.site.call ids
+        (.closure i.function) calleeNative),
+    CallableIndexedOwnedSelectedCallCodebookReceipts.Selected sidecar prepared.site callee ids metadata
+      compiler.original dispatch.row →
+    CallableIndexedOwnedChosenOrdinarySelectedCallReceipts.AcceptedAt dispatch native.diagnostics.unknown →
+    (∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner index)) →
+    NativeChosenResult (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (calleeNode := calleeNode) (environment := environment) (actual := actual) (ξ := ξ)
+      (sidecar := sidecar) (sourceTypes := sourceTypes) (calleeHeap := calleeHeap) (calleeStore := calleeStore)
+      (calleeNative := calleeNative) (calleeSize := calleeSize)
+      (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
+      (compiler := compiler) (prepared := prepared) (initial := initial) i dispatch budget result finalStore
+
+/-- This is a finite static resolver at the actual callee tuple. It receives no
+successful argument or application trace: the whole parent prefix derives both. -/
 def NativeAcceptedAt (function : Dynamic.Closure) (outer budget : Nat)
     (calleeNative : Value) (calleeStore : Store) (calleeMap : LocationMap) (calleeWorld : StoreTyping)
     (result : Value) (finalStore : Store) : Prop :=
@@ -248,6 +343,88 @@ def NativeAcceptedAt (function : Dynamic.Closure) (outer budget : Nat)
       (calleeNative := calleeNative) (calleeSize := calleeSize)
       (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
       (compiler := compiler) (prepared := prepared) (initial := initial) i dispatch budget result finalStore
+
+include certified found sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed admitted
+  caller sidecarSource tree unique parent actualFunctionType in
+/-- The original native parent prefix invokes the strict callee child once.
+Its actual value retains all alternatives; only a genuine positive receipt at
+that same tuple can enter the accepted body resolver. -/
+theorem reflects_parent_on (outer budget : Nat) (within : budget ≤ outer)
+    (children : ∀ size, size < budget → CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt
+      bridge model context evidence source certificate faults size)
+    {size : Nat} {result : Value} {finalStore : Store}
+    (completed : EvaluationSize size actual store (lowered.expression.rename ξ) result finalStore)
+    (bounded : size ≤ budget) :
+    SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar ∧
+    sidecar.source = source ∧
+    (CallableIndexedOwnedStoredIndirectNativePrefix.ForModel.FaultPrefix
+      (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+      (environment := environment) (actual := actual) (ξ := ξ) (sidecar := sidecar)
+      bridge functions compiler initial budget result finalStore ∨
+    ∃ nativeSize sourceSize sourceValue after carrier calleeStore finalMap finalWorld,
+      EvaluationSize nativeSize actual store (compiler.calleeCode.expression.rename ξ) (.inRight .word carrier) calleeStore ∧
+      nativeSize < budget ∧
+      SourceExecutionSize.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram) sourceSize context evidence
+        source environment before callee sourceValue after ∧
+      CallableIndexedOwnedStoredFunctionModelReceipts.ValuePost (registry := registry)
+        (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (context := context)
+        bridge functions compiler initial sourceValue after carrier calleeStore finalMap finalWorld ∧
+      CallableIndexedOwnedStoredIndirectNativePrefix.GatePrefix budget prepared.site native.diagnostics.unknown compiler.resultType
+        ((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ) actual calleeStore carrier result finalStore ∧
+      ∀ function, sourceValue = .closure function →
+        CallableIndexedOwnedChosenOrdinaryLambdaValues.Selected
+          (headers := headers) (keys := keys) (registry := registry) (faults := faults)
+          (mapping := finalMap) (world := finalWorld) (raw := calleeNode.type)
+          (function := function) (native := carrier) (type := compiler.calleeCode.type) root expressionSyntax ∧
+        NativeAcceptedOn (registry := registry) (faults := faults) (context := context) (evidence := evidence)
+          (calleeNode := calleeNode) (environment := environment) (actual := actual) (ξ := ξ)
+          (sidecar := sidecar) (sourceTypes := sourceTypes) (calleeHeap := after) (calleeSize := sourceSize)
+          (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
+          (compiler := compiler) (prepared := prepared) (initial := initial)
+          function outer budget carrier calleeStore finalMap finalWorld result finalStore) := by
+  obtain ⟨sameCaller, sameSource, producedPrefix⟩ :=
+    CallableIndexedOwnedStoredIndirectParentPrefix.ForModel.reflects_parent_with_effects
+      (bridge := bridge) (functionModel := functions) (compiler := compiler) (prepared := prepared)
+      (certified := certified) (found := found) (sourceTyped := sourceTyped) (parentTyped := parentTyped)
+      (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (environments := environments)
+      (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (initial := initial)
+      (admitted := admitted) (caller := caller) (sidecarSource := sidecarSource)
+      (tree := tree) (unique := unique) (parent := parent) budget children completed bounded
+  refine ⟨sameCaller, sameSource, ?_⟩
+  rcases producedPrefix with failed | succeeded
+  · exact Or.inl failed
+  · right
+    obtain ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
+      child, childStrict, trace, post, gate, resolve⟩ := succeeded
+    refine ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
+      child, childStrict, trace, post, gate, ?_⟩
+    intro function sameClosure
+    cases sameClosure
+    refine ⟨CallableIndexedOwnedChosenOrdinaryCalleePosts.selected_at_value_post
+      (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
+      (compiler := compiler) (initial := initial) post, ?_⟩
+    intro i history owner member sameFunction sameMap sameWorld sameNative inputs dispatch selected accepted ih
+    cases sameFunction
+    cases sameMap
+    cases sameWorld
+    rcases resolve i.function rfl dispatch selected with rejected | ⟨_stage, arguments⟩
+    · exact Or.inl rejected
+    · rcases arguments with failed | ⟨original, step, rejected | passed⟩
+      · exact Or.inr (Or.inl failed)
+      · exact Or.inr (Or.inr (Or.inl rejected))
+      · right; right; right
+        exact CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ForModel.reflects_accepted_on
+          (receiving := functions)
+          (members := CallableIndexedOwnedChosenOrdinaryLambdaExpressionHeads.members owning root expressionSyntax profile)
+          (functionTypes := CallableIndexedOwnedChosenOrdinaryLambdaValues.runtime_views
+            (root := root) (expressionSyntax := expressionSyntax) headers keys registry faults profile)
+          (scopedInputs := inputs) (genericPost := post) (root := root) (expressionSyntax := expressionSyntax)
+          (i := i) (history := history) (profile := profile) (owner := owner) (member := member)
+          (bridge := bridge) (compiler := compiler) (prepared := prepared) (initial := initial)
+          (calleeTrace := trace) (sameNative := sameNative) (parentTyped := parentTyped) (tree := tree)
+          (unique := unique) (parent := parent) (runtime := runtime) (covers := covers) (locals := locals)
+          (admitted := admitted) (actualFunctionType := actualFunctionType) (dispatch := dispatch)
+          (accepted := accepted) outer budget within ih original step passed
 
 include certified found sourceTyped parentTyped wellFormed runtime covers environments heaps locals agrees typed admitted
   caller sidecarSource tree unique parent actualFunctionType in
@@ -287,14 +464,15 @@ theorem reflects_parent (outer budget : Nat) (within : budget ≤ outer)
           (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
           (compiler := compiler) (prepared := prepared) (initial := initial)
           function outer budget carrier calleeStore finalMap finalWorld result finalStore) := by
-  obtain ⟨sameCaller, sameSource, producedPrefix⟩ :=
-    CallableIndexedOwnedStoredIndirectParentPrefix.ForModel.reflects_parent_with_effects
-      (bridge := bridge) (functionModel := functions) (compiler := compiler) (prepared := prepared)
-      (certified := certified) (found := found) (sourceTyped := sourceTyped) (parentTyped := parentTyped)
-      (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (environments := environments)
-      (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed) (initial := initial)
-      (admitted := admitted) (caller := caller) (sidecarSource := sidecarSource)
-      (tree := tree) (unique := unique) (parent := parent) budget children completed bounded
+  obtain ⟨sameCaller, sameSource, producedPrefix⟩ := reflects_parent_on
+    (bridge := bridge) (profile := profile) (root := root) (expressionSyntax := expressionSyntax)
+    (compiler := compiler) (prepared := prepared) (certified := certified) (found := found)
+    (sourceTyped := sourceTyped) (parentTyped := parentTyped) (runtime := runtime) (covers := covers)
+    (environments := environments) (heaps := heaps) (locals := locals) (agrees := agrees) (typed := typed)
+    (initial := initial) (admitted := admitted) (tree := tree) (unique := unique) (parent := parent)
+    (actualFunctionType := actualFunctionType)
+    (wellFormed := wellFormed) (caller := caller) (sidecarSource := sidecarSource)
+    outer budget within children completed bounded
   refine ⟨sameCaller, sameSource, ?_⟩
   rcases producedPrefix with failed | succeeded
   · exact Or.inl failed
@@ -304,32 +482,12 @@ theorem reflects_parent (outer budget : Nat) (within : budget ≤ outer)
     refine ⟨nativeSize, sourceSize, sourceValue, after, carrier, calleeStore, finalMap, finalWorld,
       child, childStrict, trace, post, gate, ?_⟩
     intro function sameClosure
-    cases sameClosure
-    refine ⟨CallableIndexedOwnedChosenOrdinaryCalleePosts.selected_at_value_post
-      (root := root) (expressionSyntax := expressionSyntax) (bridge := bridge) (profile := profile)
-      (compiler := compiler) (initial := initial) post, ?_⟩
-    intro i history owner member sameFunction sameMap sameWorld sameNative inputs dispatch selected accepted ih
-    cases sameFunction
-    cases sameMap
-    cases sameWorld
-    rcases resolve i.function rfl dispatch selected with rejected | ⟨_stage, arguments⟩
-    · exact Or.inl rejected
-    · rcases arguments with failed | ⟨original, step, rejected | passed⟩
-      · exact Or.inr (Or.inl failed)
-      · exact Or.inr (Or.inr (Or.inl rejected))
-      · right; right; right
-        exact CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ForModel.reflects_accepted_for_model
-          (receiving := functions)
-          (members := CallableIndexedOwnedChosenOrdinaryLambdaExpressionHeads.members owning root expressionSyntax profile)
-          (functionTypes := CallableIndexedOwnedChosenOrdinaryLambdaValues.runtime_views
-            (root := root) (expressionSyntax := expressionSyntax) headers keys registry faults profile)
-          (genericInputs := inputs) (genericPost := post) (root := root) (expressionSyntax := expressionSyntax)
-          (i := i) (history := history) (profile := profile) (owner := owner) (member := member)
-          (bridge := bridge) (compiler := compiler) (prepared := prepared) (initial := initial)
-          (calleeTrace := trace) (sameNative := sameNative) (parentTyped := parentTyped) (tree := tree)
-          (unique := unique) (parent := parent) (runtime := runtime) (covers := covers) (locals := locals)
-          (admitted := admitted) (actualFunctionType := actualFunctionType) (dispatch := dispatch)
-          (accepted := accepted) outer budget within ih original step passed
+    obtain ⟨selection, accepted⟩ := resolve function sameClosure
+    refine ⟨selection, ?_⟩
+    intro i history owner member sameFunction sameMap sameWorld sameNative inputs dispatch selected accepts ih
+    exact accepted i history owner member sameFunction sameMap sameWorld sameNative
+      (CallableIndexedOwnedChosenOrdinaryAcceptedStoredParent.ModelRuntimeInputs.supported
+        root expressionSyntax i owner functions inputs) dispatch selected accepts ih
 
 end Native
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryIndirectExpressionBounds

@@ -233,10 +233,12 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem preserves_flow_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     RecursiveNamedHeaderContracts.AtMost budget
@@ -259,11 +261,11 @@ theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
       context formationEvidence (receipt.formation.function environment).source
       ((receipt.formation.support environment).certificates (receipt.formation.support environment).body.readFuel
         (receipt.formation.function environment).source context) faults size
-    exact CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.ForModel.preserves_at_support
+    exact CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.ForModel.preserves_support_on
       (functions := functions) (members := members)
       (root := root) (expressionSyntax := expressionSyntax) (profile := profile) (owner := owner)
       (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (complete := complete)
-      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect)
+      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirectOn)
       (receipt := receipt) (chosen := chosen) (environment := environment) (domains := domains context valid) (valid := ledger)
       valid.2 extension faithful observationsGeneric functionTypesGeneric uninitialized missing outer budget size
       measured within ih (idsUnique context valid)
@@ -285,6 +287,19 @@ theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
     ((receipt.formation.support environment).body).unique wellFormed rebuilt operandIncluded unaryIncluded interpretsGeneric budget
     (CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters ((receipt.formation.support environment).body).frame ((receipt.formation.support environment).body).extended).1
     meaning ((receipt.formation.support environment).body).prepared
+
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
+/-- The same chosen Support supplies nested flow through the original prepared core. -/
+theorem preserves_flow (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
+    RecursiveNamedHeaderContracts.AtMost budget
+      (NestedFlowPreserves (functions := functions) receipt environment owner (headers := headers) (registry := registry) (faults := faults)) := by
+  exact preserves_flow_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric)
+    outer budget within ih
 end
 end ForModel
 
@@ -318,10 +333,12 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
 /-- The same chosen Support supplies nested flow through the original prepared core. -/
-theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
+theorem reflects_flow_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     Below budget
@@ -344,11 +361,11 @@ theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
       context formationEvidence (receipt.formation.function environment).source
       ((receipt.formation.support environment).certificates (receipt.formation.support environment).body.readFuel
         (receipt.formation.function environment).source context) faults size
-    exact CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.ForModel.reflects_at_support
+    exact CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.ForModel.reflects_support_on
       (functions := functions) (members := members)
       (root := root) (expressionSyntax := expressionSyntax) (profile := profile) (owner := owner)
       (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete)
-      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect)
+      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirectOn)
       (receipt := receipt) (chosen := chosen) (environment := environment) (domains := domains context valid) (valid := ledger)
       valid.2 extension faithful observationsGeneric functionTypesGeneric uninitialized missing outer budget size
       (Nat.le_of_lt measured) within ih
@@ -370,6 +387,19 @@ theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
     ((receipt.formation.support environment).body).unique wellFormed rebuilt operandIncluded unaryIncluded interpretsGeneric budget
     (CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters ((receipt.formation.support environment).body).frame ((receipt.formation.support environment).body).extended).1
     functionTypesGeneric meaning ((receipt.formation.support environment).body).prepared
+
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric in
+/-- The same chosen Support supplies nested flow through the original prepared core. -/
+theorem reflects_flow (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
+    Below budget
+      (NestedFlowReflects (functions := functions) receipt environment owner (headers := headers) (registry := registry) (faults := faults)) := by
+  exact reflects_flow_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric)
+    outer budget within ih
 end
 end ForModel
 
@@ -423,11 +453,13 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem source_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem source_at_entry_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i))
     (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
@@ -465,12 +497,44 @@ theorem source_at_entry (outer budget size : Nat) (strict : size < budget) (with
       (tree := (receipt.formation.support environment).body.tree) (projection := (receipt.formation.support environment).body.projection) (unique := (receipt.formation.support environment).body.unique)
       (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller) (readiness (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller)) (CallableIndexedOwnedAllocationProducer.StableOwner keys) (ProtectedStateImperativeTypedSourceSites.Facts (receipt.formation.function environment).source ((receipt.formation.support environment).expressionSyntax (receipt.formation.function environment).source))
       (receipt.formation.support environment).body.emitted (Validity receipt environment) size
-      (preserves_flow (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) outer size (Nat.le_trans (Nat.le_of_lt strict) within) ih size (Nat.le_refl size)) ⟨(receipt.formation.support environment).body.valid, source.runtime⟩
+      (preserves_flow_on (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := noIndirectOn) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) outer size (Nat.le_trans (Nat.le_of_lt strict) within) ih size (Nat.le_refl size)) ⟨(receipt.formation.support environment).body.valid, source.runtime⟩
       (body_facts receipt environment source)
       entry.entry.environments entry.entry.heaps entry.entry.locals entry.entry.lookups entry.entry.actualTyped
       entry.entry.reference entry.entry.read entry.entry.unmapped nested gate admitted source wellFormed trace
   exact ⟨packet, value, finalStore, finalMap, finalWorld, evaluated, represented, heaps,
     maps, worlds, frame, metadata, exit, post⟩
+
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  origin observed beforeTyped argumentsTyped stable in
+/-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
+theorem source_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i))
+    (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
+      (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt environment captured prefixContext) (receipt.formation.code environment) history (receipt.formation.support environment).body.toBody.toContext functions registry arguments nativeArguments before store owner.key.frameLocation
+      (first.rows owner.position).authority.current (first.rows owner.position).authority.ghost)
+    (added : Environment) (length : added.length = (receipt.formation.code environment).receipt.loweredParameters.length)
+    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (reached : State headers keys ⟨((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope), entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩)
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) size (receipt.formation.function environment) (receipt.formation.support environment).body.context
+      entry.entry.environment entry.entry.heap outcome after) :
+    ∃ packet value finalStore finalMap finalWorld,
+      Evaluates entry.entry.actualBody entry.entry.store ((receipt.formation.code environment).receipt.body.rename entry.entry.embedding) value finalStore ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld (receipt.formation.function environment).resultType (receipt.formation.code environment).receipt.resultCore faults outcome value ∧ CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.entry.mapping finalMap ∧ WorldExtends entry.entry.world finalWorld ∧
+      AdministrativePreserved entry.entry.mapping entry.entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.entry.heap after ∧
+      TypedMixedNamedBody.ReachedExit compiled.compatible.checked compiled.indexed.layouts.definitions finalMap finalWorld
+        (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) (Program.ofChecked compiled.sourceProgram) (receipt.formation.function environment) (receipt.formation.support environment).body.context ((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope)
+        entry.entry.environment entry.entry.heap after outcome ∧
+      ProtectedStateTransition.FunctionFinish.Reached (readiness (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller)) (receipt.formation.support environment).body.context outcome
+        ⟨reached, packet⟩ ⟨((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope), finalMap, finalWorld, after, finalStore, entry.entry.canonical⟩ := by
+  exact source_at_entry_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin) (observed := observed) (first := first) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped) (stable := stable)
+    outer budget size strict within ih entry added length spine reached trace
 end
 end ForModel
 
@@ -523,11 +587,13 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
-theorem native_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+theorem native_at_entry_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i))
     (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
@@ -563,12 +629,42 @@ theorem native_at_entry (outer budget size : Nat) (strict : size < budget) (with
       (tree := (receipt.formation.support environment).body.tree) (projection := (receipt.formation.support environment).body.projection) (unique := (receipt.formation.support environment).body.unique)
       (CallableIndexedOwnedNestedCanonicalState.protocol (headers := headers) owner caller) (readiness (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller)) (CallableIndexedOwnedAllocationProducer.StableOwner keys) (ProtectedStateImperativeTypedSourceSites.Facts (receipt.formation.function environment).source ((receipt.formation.support environment).expressionSyntax (receipt.formation.function environment).source))
       (receipt.formation.support environment).body.emitted (Validity receipt environment) budget size (Nat.le_of_lt strict)
-      (reflects_flow (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) outer budget within ih) ⟨(receipt.formation.support environment).body.valid, source.runtime⟩
+      (reflects_flow_on (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := noIndirectOn) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) outer budget within ih) ⟨(receipt.formation.support environment).body.valid, source.runtime⟩
       (body_facts receipt environment source)
       entry.environments entry.heaps entry.locals entry.lookups entry.actualTyped
       entry.reference entry.read entry.unmapped nested gate admitted source wellFormed completed
   exact ⟨packet, sourceSize, outcome, after, finalMap, finalWorld, trace, represented, heaps,
     maps, worlds, frame, metadata, exit, post⟩
+
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  origin observed beforeTyped argumentsTyped stable in
+/-- Typed finish returns the same actual nested pool with its Packet and readiness. -/
+theorem native_at_entry (outer budget size : Nat) (strict : size < budget) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i))
+    (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
+      (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt environment captured prefixContext) (receipt.formation.code environment) history (receipt.formation.support environment).body.toBody.toContext functions registry arguments before store owner.key.frameLocation
+      (first.rows owner.position).authority.current)
+    (reached : State headers keys ⟨((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope), entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩)
+    {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size entry.actual entry.store ((receipt.formation.code environment).receipt.body.rename entry.embedding) value finalStore) :
+    ∃ packet sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.BodyTrace (Program.ofChecked compiled.sourceProgram) sourceSize (receipt.formation.function environment) (receipt.formation.support environment).body.context
+        entry.environment entry.heap outcome after ∧
+      FunctionCalls.ResultRepresents (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        finalMap finalWorld (receipt.formation.function environment).resultType (receipt.formation.code environment).receipt.resultCore faults outcome value ∧ CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends entry.mapping finalMap ∧ WorldExtends entry.world finalWorld ∧
+      AdministrativePreserved entry.mapping entry.store finalMap finalStore ∧ Dynamic.HeapMetadataExtend entry.heap after ∧
+      TypedMixedNamedBody.ReachedExit compiled.compatible.checked compiled.indexed.layouts.definitions finalMap finalWorld
+        (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) (Program.ofChecked compiled.sourceProgram) (receipt.formation.function environment) (receipt.formation.support environment).body.context ((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope)
+        entry.environment entry.heap after outcome ∧
+      ProtectedStateTransition.FunctionFinish.Reached (readiness (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller)) (receipt.formation.support environment).body.context outcome
+        ⟨reached, packet⟩ ⟨((receipt.formation.code environment).receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ formationScope), finalMap, finalWorld, after, finalStore, entry.canonical⟩ := by
+  exact native_at_entry_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin) (observed := observed) (first := first) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped) (stable := stable)
+    outer budget size strict within ih entry reached completed
 end
 end ForModel
 
@@ -619,11 +715,13 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem source_continuation_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
@@ -631,10 +729,10 @@ theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
   intro entry added length spine reached size strict outcome after trace
   obtain ⟨packet, value, finalStore, finalMap, finalWorld, evaluated, represented, heaps,
       maps, worlds, frame, metadata, exit, post⟩ :=
-    source_at_entry (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
+    source_at_entry_on (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
       (environment := environment) (profile := profile) (owner := owner) (domains := domains)
       (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete)
-      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect)
+      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := noIndirectOn)
       (extension := extension) (faithful := faithful) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric)
       (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded)
       (unaryIncluded := unaryIncluded) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext)
@@ -644,6 +742,20 @@ theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
   obtain ⟨returned, related⟩ := post.forget
   exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps,
     maps, worlds, frame, metadata, exit, returned.val, (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller).related related⟩
+
+include functions members profile chosen domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  origin observed beforeTyped argumentsTyped stable in
+/-- The base continuation projects the same returned nested State and full pool. -/
+theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
+    CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
+      (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments) (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt environment captured prefixContext) (receipt.formation.code environment) history (receipt.formation.support environment).body.toBody.toContext functions owner first budget := by
+  exact source_continuation_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin) (observed := observed) (first := first) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped) (stable := stable)
+    outer budget within ih
 end
 end ForModel
 
@@ -678,11 +790,13 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (receipt.formation.support environment).diagnosticPolicy (receipt.formation.function environment).source (receipt.formation.support environment).issued.invalidOperand)
       (faults := faults) (registry := registry) (receipt.formation.support environment).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
-include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero
   extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   origin observed beforeTyped argumentsTyped stable in
 /-- The base continuation projects the same returned nested State and full pool. -/
-theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
+theorem native_continuation_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
     (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
       (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
     CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
@@ -690,10 +804,10 @@ theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
   intro entry reached size strict value finalStore completed
   obtain ⟨packet, sourceSize, outcome, after, finalMap, finalWorld, trace, represented, heaps,
       maps, worlds, frame, metadata, exit, post⟩ :=
-    native_at_entry (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
+    native_at_entry_on (functions := functions) (members := members) (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
       (environment := environment) (profile := profile) (owner := owner) (domains := domains)
       (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete)
-      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirect := noIndirect)
+      (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := noIndirectOn)
       (extension := extension) (faithful := faithful) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric)
       (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded)
       (unaryIncluded := unaryIncluded) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext)
@@ -703,6 +817,20 @@ theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
   obtain ⟨returned, related⟩ := post.forget
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, heaps,
     maps, worlds, frame, metadata, exit, returned.val, (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller).related related⟩
+
+include functions members profile chosen domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
+  extension faithful observationsGeneric functionTypesGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  origin observed beforeTyped argumentsTyped stable in
+/-- The base continuation projects the same returned nested State and full pool. -/
+theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ i, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults) functions owner i)) :
+    CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
+      (registry := registry) (faults := faults) (arguments := arguments) (CallableIndexedOwnedChosenOrdinaryFormedMembers.capture_at receipt environment captured prefixContext) (receipt.formation.code environment) history (receipt.formation.support environment).body.toBody.toContext functions owner first budget := by
+  exact native_continuation_on
+    (functions := functions) (members := members)
+    (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen) (environment := environment) (profile := profile) (owner := owner) (domains := domains) (wellFormed := wellFormed) (sameLayouts := sameLayouts) (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero) (noIndirectOn := fun _allowed found => noIndirect found) (extension := extension) (faithful := faithful) (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt) (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypesGeneric) (interpretsGeneric := interpretsGeneric) (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin) (observed := observed) (first := first) (beforeTyped := beforeTyped) (argumentsTyped := argumentsTyped) (stable := stable)
+    outer budget within ih
 end
 end ForModel
 

@@ -129,6 +129,37 @@ variable
       (factory := CallableIndexedOwnedContextualLambdaJointStaticReceipts.trackedFactory (i.support).diagnosticPolicy (i.function).source (i.support).issued.invalidOperand)
       (faults := faults) (registry := registry) (i.support).issued (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner caller) functions table)
 
+include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable in
+/-- The same positive factory internally supplies the genuine nested Source continuation. -/
+theorem source_continuation_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index)) :
+    CallableIndexedOwnedLambdaEntryBodyContracts.SourceContinuation
+      (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments)
+      i.captured i.code history i.support.body.toBody.toContext
+      functions owner first budget := by
+  obtain ⟨factory, origin, _prefixContext, observed, _referenceIndex, _typed⟩ := member
+  cases factory with
+  | formed receipt chosen environment captured prefixContext =>
+    exact CallableIndexedOwnedChosenNestedLambdaBodyContinuations.ForModel.source_continuation_on
+      (functions := functions) (members := members)
+      (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
+      (environment := environment) (profile := profile) (owner := owner) (domains := domains)
+      (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique)
+      (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero)
+      (noIndirectOn := noIndirectOn) (extension := extension) (faithful := faithful)
+      (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypes)
+      (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt)
+      (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (interpretsGeneric := interpretsGeneric)
+      (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin)
+      (observed := observed) (first := first) (beforeTyped := beforeTyped)
+      (argumentsTyped := argumentsTyped) (stable := stable) outer budget within ih
+
 include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable in
@@ -141,16 +172,38 @@ theorem source_continuation (outer budget : Nat) (within : budget ≤ outer)
       (registry := registry) (faults := faults) (arguments := arguments) (nativeArguments := nativeArguments)
       i.captured i.code history i.support.body.toBody.toContext
       functions owner first budget := by
+  exact source_continuation_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable outer budget within ih
+
+include functions members functionTypes profile member domains wellFormed sameLayouts complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable in
+/-- Reflection keeps the independent Source grade of the same literal nested continuation. -/
+theorem native_continuation_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (within : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index)) :
+    CallableIndexedOwnedLambdaEntryBodyContracts.NativeContinuation
+      (registry := registry) (faults := faults) (arguments := arguments)
+      i.captured i.code history i.support.body.toBody.toContext
+      functions owner first budget := by
   obtain ⟨factory, origin, _prefixContext, observed, _referenceIndex, _typed⟩ := member
   cases factory with
   | formed receipt chosen environment captured prefixContext =>
-    exact CallableIndexedOwnedChosenNestedLambdaBodyContinuations.ForModel.source_continuation
+    exact CallableIndexedOwnedChosenNestedLambdaBodyContinuations.ForModel.native_continuation_on
       (functions := functions) (members := members)
       (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
       (environment := environment) (profile := profile) (owner := owner) (domains := domains)
-      (wellFormed := wellFormed) (sameLayouts := sameLayouts) (owners := owners) (idsUnique := idsUnique)
+      (wellFormed := wellFormed) (sameLayouts := sameLayouts)
       (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero)
-      (noIndirect := noIndirect) (extension := extension) (faithful := faithful)
+      (noIndirectOn := noIndirectOn) (extension := extension) (faithful := faithful)
       (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypes)
       (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt)
       (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (interpretsGeneric := interpretsGeneric)
@@ -170,22 +223,13 @@ theorem native_continuation (outer budget : Nat) (within : budget ≤ outer)
       (registry := registry) (faults := faults) (arguments := arguments)
       i.captured i.code history i.support.body.toBody.toContext
       functions owner first budget := by
-  obtain ⟨factory, origin, _prefixContext, observed, _referenceIndex, _typed⟩ := member
-  cases factory with
-  | formed receipt chosen environment captured prefixContext =>
-    exact CallableIndexedOwnedChosenNestedLambdaBodyContinuations.ForModel.native_continuation
-      (functions := functions) (members := members)
-      (root := root) (expressionSyntax := expressionSyntax) (receipt := receipt) (chosen := chosen)
-      (environment := environment) (profile := profile) (owner := owner) (domains := domains)
-      (wellFormed := wellFormed) (sameLayouts := sameLayouts)
-      (complete := complete) (globals := globals) (slots := slots) (prefixZero := prefixZero)
-      (noIndirect := noIndirect) (extension := extension) (faithful := faithful)
-      (observationsGeneric := observationsGeneric) (functionTypesGeneric := functionTypes)
-      (uninitialized := uninitialized) (missing := missing) (rebuilt := rebuilt)
-      (operandIncluded := operandIncluded) (unaryIncluded := unaryIncluded) (interpretsGeneric := interpretsGeneric)
-      (captured := captured) (prefixContext := prefixContext) (history := history) (origin := origin)
-      (observed := observed) (first := first) (beforeTyped := beforeTyped)
-      (argumentsTyped := argumentsTyped) (stable := stable) outer budget within ih
+  exact native_continuation_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable outer budget within ih
 
 /-- The represented result and exact restored caller pool are the original tuple. -/
 def InvocationResultAt (outcome : Dynamic.ExpressionOutcome) (after : Dynamic.Heap)
@@ -205,6 +249,36 @@ variable
     i.mapping i.world before store)
   (locals : Dynamic.EnvironmentAgrees before i.function.context.locals i.function.captured)
 
+include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable represented heaps locals in
+/-- One internally built continuation feeds the original invocation and restoration once. -/
+theorem invocation_preserves_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index))
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
+      callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after)
+    (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (DataPatternValues.packValues nativeArguments :: encode compiled.indexed.ancestry.layout.frame history.native :: i.capturedActual)
+        store (i.code.body.rename i.captured.embedding.lift.lift) value finalStore ∧
+      InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
+  have continuation := source_continuation_on (noIndirectOn := noIndirectOn) (nativeArguments := nativeArguments) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member
+    domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero extension faithful
+    uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable
+    outer budget withinOuter ih
+  obtain ⟨currentMetadata, currentCarried⟩ := stable owner.position
+  exact CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_at_with_continuation
+    i.captured i.code history i.support.body.toBody.toContext
+    functions represented owner first heaps locals
+    (member.reference root expressionSyntax) currentCarried (CallableIndexedLambdaTemplatePermission.lambda_allowed i.code history)
+    budget continuation trace within
+
 include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
   beforeTyped argumentsTyped stable represented heaps locals in
@@ -222,16 +296,44 @@ theorem invocation_preserves (outer budget : Nat) (withinOuter : budget ≤ oute
       Evaluates (DataPatternValues.packValues nativeArguments :: encode compiled.indexed.ancestry.layout.frame history.native :: i.capturedActual)
         store (i.code.body.rename i.captured.embedding.lift.lift) value finalStore ∧
       InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
-  have continuation := source_continuation (nativeArguments := nativeArguments) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member
-    domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect extension faithful
+  exact invocation_preserves_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals outer budget withinOuter ih trace within
+
+include functions members functionTypes profile member domains wellFormed sameLayouts complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable represented heaps locals in
+/-- Native completion invokes the same continuation and restores the actual caller pool once. -/
+theorem invocation_reflects_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index))
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      (DataPatternValues.packValues nativeArguments :: encode compiled.indexed.ancestry.layout.frame history.native :: i.capturedActual)
+      store (i.code.body.rename i.captured.embedding.lift.lift) value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+        callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after ∧
+      InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
+  have continuation := native_continuation_on (noIndirectOn := noIndirectOn) (arguments := arguments) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member
+    domains wellFormed sameLayouts complete globals slots prefixZero extension faithful
     uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable
     outer budget withinOuter ih
   obtain ⟨currentMetadata, currentCarried⟩ := stable owner.position
-  exact CallableIndexedOwnedLambdaInvocationBounds.invocation_preserves_bounded_at_with_continuation
+  exact CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_at_with_continuation
     i.captured i.code history i.support.body.toBody.toContext
     functions represented owner first heaps locals
     (member.reference root expressionSyntax) currentCarried (CallableIndexedLambdaTemplatePermission.lambda_allowed i.code history)
-    budget continuation trace within
+    i.support.body.frame budget continuation completed within
 
 include functions members functionTypes profile member domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
@@ -251,16 +353,40 @@ theorem invocation_reflects (outer budget : Nat) (withinOuter : budget ≤ outer
       RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after ∧
       InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
-  have continuation := native_continuation (arguments := arguments) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member
-    domains wellFormed sameLayouts complete globals slots prefixZero noIndirect extension faithful
-    uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable
-    outer budget withinOuter ih
-  obtain ⟨currentMetadata, currentCarried⟩ := stable owner.position
-  exact CallableIndexedOwnedLambdaInvocationBounds.invocation_reflects_bounded_at_with_continuation
-    i.captured i.code history i.support.body.toBody.toContext
-    functions represented owner first heaps locals
-    (member.reference root expressionSyntax) currentCarried (CallableIndexedLambdaTemplatePermission.lambda_allowed i.code history)
-    i.support.body.frame budget continuation completed within
+  exact invocation_reflects_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals outer budget withinOuter ih completed within
+
+include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable represented heaps locals in
+/-- The genuine payload application edge retains that same invocation tuple. -/
+theorem application_preserves_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index))
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
+    (trace : RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) size
+      callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after)
+    (within : size ≤ budget) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates [CallableIndexedLambdaValues.value i.code i.captured.embedding history.native i.capturedActual,
+        DataPatternValues.packValues nativeArguments] store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result⟩ :=
+    invocation_preserves_on (noIndirectOn := noIndirectOn) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member domains wellFormed sameLayouts owners idsUnique
+      complete globals slots prefixZero extension faithful uninitialized missing rebuilt
+      operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals
+      outer budget withinOuter ih trace within
+  exact ⟨value, finalStore, finalMap, finalWorld,
+    .apply (.second (.first (.var rfl))) (.var rfl) evaluated, result⟩
 
 include functions members functionTypes profile member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
@@ -279,13 +405,39 @@ theorem application_preserves (outer budget : Nat) (withinOuter : budget ≤ out
       Evaluates [CallableIndexedLambdaValues.value i.code i.captured.embedding history.native i.capturedActual,
         DataPatternValues.packValues nativeArguments] store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, result⟩ :=
-    invocation_preserves (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member domains wellFormed sameLayouts owners idsUnique
-      complete globals slots prefixZero noIndirect extension faithful uninitialized missing rebuilt
-      operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals
-      outer budget withinOuter ih trace within
-  exact ⟨value, finalStore, finalMap, finalWorld,
-    .apply (.second (.first (.var rfl))) (.var rfl) evaluated, result⟩
+  exact application_preserves_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals outer budget withinOuter ih trace within
+
+include functions members functionTypes profile member domains wellFormed sameLayouts complete globals slots prefixZero
+  extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
+  beforeTyped argumentsTyped stable represented heaps locals in
+/-- The real application child keeps its strict native bound and independent Source grade. -/
+theorem application_reflects_on
+    (noIndirectOn : CallableIndexedOwnedPreparedMixedBodyRuntimeBounds.NoIndirectOn
+      (source caller.named) (expressionSyntax (source caller.named))) (outer budget : Nat) (withinOuter : budget ≤ outer)
+    (ih : ∀ index, Below outer (CallableIndexedOwnedPublicPreparedNamedFamilyClosure.Family
+      (headers := headers) (registry := registry) (faults := faults)
+      functions owner index))
+    {size : Nat} {callContext : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size
+      [CallableIndexedLambdaValues.value i.code i.captured.embedding history.native i.capturedActual,
+        DataPatternValues.packValues nativeArguments] store CallableIndexedLambdaCalls.applyPayload value finalStore)
+    (within : size ≤ budget) :
+    ∃ sourceSize outcome after finalMap finalWorld,
+      RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
+        callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after ∧
+      InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
+  obtain ⟨bodySize, smaller, applied⟩ := completed.apply_body (.second (.first (.var rfl))) (.var rfl)
+  exact invocation_reflects_on (noIndirectOn := noIndirectOn) (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member domains wellFormed sameLayouts
+    complete globals slots prefixZero extension faithful uninitialized missing rebuilt
+    operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals
+    outer budget withinOuter ih applied (Nat.le_trans (Nat.le_of_lt smaller) within)
 
 include functions members functionTypes profile member domains wellFormed sameLayouts complete globals slots prefixZero noIndirect
   extension faithful observationsGeneric uninitialized missing rebuilt operandIncluded unaryIncluded interpretsGeneric
@@ -305,12 +457,13 @@ theorem application_reflects (outer budget : Nat) (withinOuter : budget ≤ oute
       RecursiveNamedCallBounds.CallOutcome (Program.ofChecked compiled.sourceProgram) sourceSize
         callContext callerEvidence i.function.evidence before (.closure i.function) arguments outcome after ∧
       InvocationResultAt (registry := registry) (faults := faults) (functions := functions) i first outcome after value finalStore finalMap finalWorld := by
-  obtain ⟨bodySize, smaller, applied⟩ := completed.apply_body (.second (.first (.var rfl))) (.var rfl)
-  exact invocation_reflects (functions := functions) (members := members) (functionTypes := functionTypes) (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric) root expressionSyntax i history profile owner member domains wellFormed sameLayouts
-    complete globals slots prefixZero noIndirect extension faithful uninitialized missing rebuilt
-    operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals
-    outer budget withinOuter ih applied (Nat.le_trans (Nat.le_of_lt smaller) within)
-
+  exact application_reflects_on
+    (noIndirectOn := fun _allowed found => noIndirect found)
+    (functions := functions)
+    (members := members)
+    (functionTypes := functionTypes)
+    (observationsGeneric := observationsGeneric) (interpretsGeneric := interpretsGeneric)
+    root expressionSyntax i history profile owner member domains wellFormed sameLayouts complete globals slots prefixZero extension faithful uninitialized missing rebuilt operandIncluded unaryIncluded first beforeTyped argumentsTyped stable represented heaps locals outer budget withinOuter ih completed within
 end ForModel
 
 include member domains wellFormed sameLayouts owners idsUnique complete globals slots prefixZero noIndirect
