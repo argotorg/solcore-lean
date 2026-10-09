@@ -1891,6 +1891,10 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicParameterEntry
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicBodyCorrespondence
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicInvocation
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicSessionEntry
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicRootStart
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedOriginalProgramAdmission
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicResultObservation
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicProgramOutcome
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedLiteralInputs
 set_option autoImplicit false
 
@@ -3074,6 +3078,7 @@ def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
   SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt.run
   SourceCoreChosenOrdinaryAcceptedPublicSessionEntry.run
+  SourceCoreChosenOrdinaryAcceptedPublicProgramOutcome.run
   SourceCoreChosenOrdinaryAcceptedBodyMetadata.run
   SourceCoreChosenOrdinaryAcceptedTyping.run
   SourceCoreChosenOrdinaryAcceptedHeader.run

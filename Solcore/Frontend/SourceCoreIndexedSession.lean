@@ -961,12 +961,31 @@ private def suspend {artifact : Artifact} (checkpoint : Checkpoint artifact) (fu
     Core.well_typed_runStateful_preserves_checkpoint_type checkpoint.typed exhausted,
     checkpoint.extension.trans extension, checkpoint.registry.weaken extension, checkpoint.values, checkpoint.owner⟩
 
+/-- The same original resume action either completes at its actual native
+store and export generation, or retains its actual suspended state. -/
+def Checkpoint.ResumeAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (fuel boundaryFuel : Nat) (outcome : Outcome artifact) : Prop :=
+  (∃ (generation : ExportGeneration) (value : Core.Value) (store : Core.Store)
+      (finished : Core.runStateful fuel checkpoint.state = .done value store),
+    complete checkpoint generation fuel boundaryFuel value store finished = outcome) ∨
+  (∃ (state : Core.State) (exhausted : Core.runStateful fuel checkpoint.state = .outOfFuel state),
+    outcome = .outOfFuel (suspend checkpoint fuel state exhausted))
+
+/-- Retain a proof receipt from the original native match and mint once. -/
+def Checkpoint.resumeWithReceipt {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
+    (boundaryFuel : Nat := 1024) : IO {outcome : Outcome artifact // checkpoint.ResumeAt fuel boundaryFuel outcome} := do
+  match executed : Core.runStateful fuel checkpoint.state with
+  | .done value store =>
+      let generation ← SourceCorePublicValues.ExportGeneration.mint
+      pure ⟨complete checkpoint generation fuel boundaryFuel value store executed,
+        .inl ⟨generation, value, store, executed, rfl⟩⟩
+  | .outOfFuel state => pure ⟨.outOfFuel (suspend checkpoint fuel state executed),
+      .inr ⟨state, executed, rfl⟩⟩
+  | .fault _ _ => pure (False.elim (Core.well_typed_runStateful_never_faults checkpoint.typed executed))
+
 def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
     (boundaryFuel : Nat := 1024) : IO (Outcome artifact) := do
-  match executed : Core.runStateful fuel checkpoint.state with
-  | .done value store => pure (complete checkpoint (← SourceCorePublicValues.ExportGeneration.mint) fuel boundaryFuel value store executed)
-  | .outOfFuel state => pure (.outOfFuel (suspend checkpoint fuel state executed))
-  | .fault _ _ => pure (False.elim (Core.well_typed_runStateful_never_faults checkpoint.typed executed))
+  pure (← checkpoint.resumeWithReceipt fuel boundaryFuel).val
 
 def Session.run {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
     (fuel : Nat) (boundaryFuel : Nat := 1024) : IO (Except Error (Outcome artifact)) := do
@@ -2311,5 +2330,281 @@ theorem Session.NativeAt.heap_typed {artifact : Artifact} {session : Session art
   change Core.RuntimeStoreHasTypes world store artifact.recipe.program.layouts.definitions at typed
   rw [atRecipe] at typed
   exact typed
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Successful export retains the actual decoder slots and the original
+re-encoding, including the native payload equality checked by the producer. -/
+theorem exportValue_success_receipt {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected : TypeSystem.Ty} {core : Core.Value}
+    {exported : Exported (artifact := artifact) world authority fuel values expected core}
+    (accepted : exportValue authority generation fuel values slots expected core = .ok exported) :
+    decodeRaw authority generation values fuel slots expected core = .ok (exported.value, exported.slots) ∧
+    encodeRaw authority exported.slots fuel values.registry expected exported.value = .ok exported.encoded ∧
+    exported.encoded.value = core := by
+  unfold exportValue at accepted
+  obtain ⟨decoded, decodedEq, accepted⟩ := root_factory_bind_ok accepted
+  rcases decoded with ⟨value, returnedSlots⟩
+  dsimp only at accepted
+  split at accepted
+  · cases accepted
+  · rename_i encoded generated
+    split at accepted
+    · rename_i same
+      cases accepted
+      exact ⟨decodedEq, generated, same⟩
+    · cases accepted
+
+/-- An actual public successful completion retains its native done trace,
+true export slots, whole Source prefix and the same typed returned session. -/
+def Checkpoint.SucceededResultAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (fuel boundaryFuel : Nat) (generation : ExportGeneration) (native : Core.Value)
+    (store : Core.Store) (completion : Completion artifact) : Prop :=
+  checkpoint.NativeDone fuel native store ∧
+  ∃ (payload : Core.Value) (extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type))
+    (slots : Registry artifact (store.map Core.Value.type))
+    (encoded : SourceCoreCompatibleValues.Extended checkpoint.values.registry Core.Value),
+    Core.LanguageResult.decode? native = some (.succeeded payload) ∧
+    decodeRaw checkpoint.origin.authority generation checkpoint.values boundaryFuel
+      (checkpoint.registry.weaken extension) checkpoint.request.result payload = .ok (completion.value, slots) ∧
+    encodeRaw checkpoint.origin.authority slots boundaryFuel checkpoint.values.registry
+      checkpoint.request.result completion.value = .ok encoded ∧
+    encoded.value = payload ∧
+    completion.sourceType = checkpoint.request.result ∧ completion.boundaryFuel = boundaryFuel ∧
+    completion.session.store = store ∧ completion.session.world = store.map Core.Value.type ∧
+    completion.session.authority = checkpoint.origin.authority ∧
+    completion.session.sourcePrefix = checkpoint.origin.sourcePrefix ∧
+    completion.session.values = checkpoint.values ∧ HEq completion.session.owner checkpoint.owner ∧
+    HEq completion.session.registry slots ∧ completion.origin = checkpoint.origin ∧
+    completion.session.Authenticates boundaryFuel checkpoint.request.result completion.value
+
+/-- Invert success of the original pure completion, rather than assuming
+native completion suffices for the public export boundary. -/
+theorem Checkpoint.complete_succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {completion : Completion artifact}
+    (completed : checkpoint.NativeDone fuel native store)
+    (succeeded : complete checkpoint generation fuel boundaryFuel native store completed = .succeeded completion) :
+    checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion := by
+  have authenticated := completion.authenticated
+  unfold complete at succeeded
+  dsimp only at succeeded
+  split at succeeded
+  next decoded =>
+    obtain ⟨_world, _stored, typed⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed completed
+    obtain ⟨_outcome, found, _typed⟩ := Core.LanguageResult.decode?_runtime_typed typed
+    rw [decoded] at found
+    cases found
+  next outcome decoded =>
+    cases outcome with
+    | failed reason => cases succeeded
+    | succeeded payload =>
+      dsimp only at succeeded
+      split at succeeded
+      · cases succeeded
+      · rename_i exported exportedEq
+        have exportedReceipt := exportValue_success_receipt exportedEq
+        cases succeeded
+        refine ⟨completed, payload, ?_, exported.slots, exported.encoded, decoded,
+          exportedReceipt.1, exportedReceipt.2.1, exportedReceipt.2.2,
+          rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.rfl, HEq.rfl, rfl, ?_⟩
+        · obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+          obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+          simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+        · exact authenticated
+
+/-- A returned success receipt derives the original done/store observation
+and public export association without running the native machine again. -/
+theorem Checkpoint.ResumeAt.succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {completion : Completion artifact}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.succeeded completion)) :
+    ∃ generation native store,
+      checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion := by
+  rcases receipt with ⟨generation, native, store, completed, succeeded⟩ | ⟨state, exhausted, impossible⟩
+  · exact ⟨generation, native, store, checkpoint.complete_succeeded_receipt completed succeeded⟩
+  · cases impossible
+
+/-- Successful export's native world/store observation is proof-only. -/
+theorem Checkpoint.SucceededResultAt.native_at {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {completion : Completion artifact}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion) :
+    checkpoint.NativeDone fuel native store ∧ completion.session.NativeAt (store.map Core.Value.type) store := by
+  obtain ⟨completed, payload, extension, slots, encoded, decoded, decode, encode, recovered,
+    sourceType, boundary, stored, world, authority, sourcePrefixEq, values, owner, registry, origin, authenticated⟩ := receipt
+  exact ⟨completed, world, stored⟩
+
+
+/-- Proof-only observation of the original requested Source result type. -/
+def Checkpoint.ResultTypeAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (expected : TypeSystem.Ty) : Prop := checkpoint.request.result = expected
+
+/-- Proof-only observation of the original requested native payload type. -/
+def Checkpoint.PayloadTypeAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (expected : Core.Ty) : Prop := checkpoint.request.type = expected
+
+/-- The retained first-selected root and exact Recipe identify both original
+request types, without exposing the opaque request operationally. -/
+theorem Checkpoint.RootStart.request_types_at {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {boundaryFuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments boundaryFuel)
+    {recipe : Recipe} (atRecipe : artifact.RecipeAt recipe) {root : Root recipe.compiled}
+    (selected : recipe.roots.find? (fun candidate => decide (candidate.key = key)) = some root) :
+    checkpoint.ResultTypeAt root.result ∧ checkpoint.PayloadTypeAt root.type := by
+  change artifact.recipe = recipe at atRecipe
+  subst recipe
+  obtain ⟨actual, found, sameKey, length, encoded, accepted, origin, request, world,
+    initial, registry, values⟩ := receipt
+  have same : actual = root := by
+    rw [selected] at found
+    exact Option.some.inj found.symm
+  subst actual
+  change checkpoint.request.result = root.result ∧ checkpoint.request.type = root.type
+  rw [request]
+  exact ⟨rfl, rfl⟩
+
+theorem Checkpoint.RootStart.result_type_at {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {boundaryFuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments boundaryFuel)
+    {recipe : Recipe} (atRecipe : artifact.RecipeAt recipe) {root : Root recipe.compiled}
+    (selected : recipe.roots.find? (fun candidate => decide (candidate.key = key)) = some root) :
+    checkpoint.ResultTypeAt root.result := (receipt.request_types_at atRecipe selected).1
+
+theorem Checkpoint.RootStart.payload_type_at {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {boundaryFuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments boundaryFuel)
+    {recipe : Recipe} (atRecipe : artifact.RecipeAt recipe) {root : Root recipe.compiled}
+    (selected : recipe.roots.find? (fun candidate => decide (candidate.key = key)) = some root) :
+    checkpoint.PayloadTypeAt root.type := (receipt.request_types_at atRecipe selected).2
+
+/-- Returned public type alignment follows the same successful export. -/
+theorem Checkpoint.SucceededResultAt.source_type {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {completion : Completion artifact} {expected : TypeSystem.Ty}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion)
+    (requested : checkpoint.ResultTypeAt expected) : completion.sourceType = expected := by
+  obtain ⟨completed, payload, extension, slots, encoded, decoded, decode, encode, recovered,
+    sourceType, rest⟩ := receipt
+  exact sourceType.trans requested
+
+
+/-- Word export succeeds at a genuinely positive boundary budget. The
+original decoder and encoder retain exactly the supplied callable slots. -/
+theorem exportValue_word_success {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected : TypeSystem.Ty}
+    (positive : 0 < fuel) (wordResult : expected = .word) (value : Core.Word) :
+    ∃ exported : Exported (artifact := artifact) world authority fuel values expected (.word value),
+      exportValue authority generation fuel values slots expected (.word value) = .ok exported ∧
+      exported.value = .word value := by
+  subst expected
+  cases fuel with
+  | zero => omega
+  | succ rest =>
+    let exported : Exported (artifact := artifact) world authority (rest + 1) values .word (.word value) :=
+      ⟨.word value, slots, .pure values.registry (.word value), by
+        simp [encodeRaw, TypeSystem.Ty.word, SourceCoreRawMetadata.runtimeType], rfl⟩
+    refine ⟨exported, ?_, rfl⟩
+    simp [exportValue, decodeRaw, encodeRaw, TypeSystem.Ty.word,
+      SourceCoreRawMetadata.runtimeType, exported, pure, Except.pure,
+      SourceCoreCompatibleValues.Extended.pure, bind, Except.bind]
+
+/-- An actual native Word completion and actual requested Word type close
+this finite export branch; generic native completion is not enough. -/
+theorem Checkpoint.native_word_succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {value : Core.Word} {store : Core.Store}
+    (completed : checkpoint.NativeDone fuel (.inRight .word (.word value)) store)
+    (requested : checkpoint.ResultTypeAt .word) (positive : 0 < boundaryFuel) :
+    ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word (.word value)) store completed =
+        .succeeded completion ∧
+      checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word (.word value)) store completion ∧
+      completion.value = .word value := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word (.word value)) store at completed
+  have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+    obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+    obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+    simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+  let registry := checkpoint.registry.weaken extension
+  obtain ⟨exported, exportedEq, publicEq⟩ := exportValue_word_success
+    (authority := checkpoint.origin.authority) (generation := generation)
+    (values := checkpoint.values) (slots := registry) positive requested value
+  have actual : ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word (.word value)) store completed =
+        .succeeded completion ∧ completion.value = .word value := by
+    unfold complete
+    simp only [Core.LanguageResult.decode?]
+    rw [exportedEq]
+    exact ⟨_, rfl, publicEq⟩
+  obtain ⟨completion, succeeded, publicEq⟩ := actual
+  exact ⟨completion, succeeded, checkpoint.complete_succeeded_receipt completed succeeded, publicEq⟩
+
+
+/-- The successful branch carries both the actual native completion and its
+full public export receipt, with the original minted generation retained. -/
+theorem Checkpoint.ResumeAt.succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {completion : Completion artifact}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.succeeded completion)) :
+    ∃ generation native store, checkpoint.NativeDone fuel native store ∧
+      checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion := by
+  obtain ⟨generation, native, store, succeeded⟩ := receipt.succeeded_receipt
+  exact ⟨generation, native, store, succeeded.1, succeeded⟩
+
+/-- The original failed branch keeps its actual native reason and returned
+session; it does not claim an independent Source fault observation. -/
+theorem Checkpoint.ResumeAt.failed {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {reason : Core.Word} {returned : Session artifact}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.failed reason returned)) :
+    ∃ (_generation : ExportGeneration) (native : Core.Value) (store : Core.Store), checkpoint.NativeDone fuel native store ∧
+      checkpoint.FailedResultAt fuel native store reason returned := by
+  rcases receipt with ⟨generation, native, store, completed, failed⟩ | ⟨state, exhausted, impossible⟩
+  · exact ⟨generation, native, store, completed, checkpoint.complete_failed_receipt completed failed⟩
+  · cases impossible
+
+/-- A retained resume action whose same native execution returns a Word
+successfully exports that Word at the actual positive boundary budget. -/
+theorem Checkpoint.ResumeAt.word_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {value : Core.Word} {store : Core.Store}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (completed : checkpoint.NativeDone fuel (.inRight .word (.word value)) store)
+    (requested : checkpoint.ResultTypeAt .word) (positive : 0 < boundaryFuel) :
+    ∃ completion : Completion artifact, outcome = .succeeded completion ∧
+      completion.value = .word value := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word (.word value)) store at completed
+  rcases receipt with ⟨generation, native, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨completion, succeeded, exported, publicValue⟩ :=
+      checkpoint.native_word_succeeded_receipt completed requested positive (generation := generation)
+    exact ⟨completion, same.symm.trans succeeded, publicValue⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+/-- An actual successful Word completion keeps the original decoded public
+Word, without exposing or executing the private decoder again. -/
+theorem Checkpoint.SucceededResultAt.word_value {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {value : Core.Word} {store : Core.Store} {completion : Completion artifact}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation
+      (.inRight .word (.word value)) store completion)
+    (requested : checkpoint.ResultTypeAt .word) : completion.value = .word value := by
+  obtain ⟨completed, payload, extension, slots, encoded, decoded, decode, rest⟩ := receipt
+  simp only [Core.LanguageResult.decode?, Option.some.injEq, Core.LanguageResult.Outcome.succeeded.injEq] at decoded
+  cases decoded
+  change checkpoint.request.result = .word at requested
+  rw [requested] at decode
+  cases boundaryFuel with
+  | zero => simp [decodeRaw] at decode
+  | succ budget =>
+    simp [decodeRaw, TypeSystem.Ty.word, SourceCoreRawMetadata.runtimeType,
+      pure, Except.pure] at decode
+    exact decode.1.symm
 
 end Solcore.Frontend.SourceCoreIndexedSession
