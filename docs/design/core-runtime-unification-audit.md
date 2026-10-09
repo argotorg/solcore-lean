@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `b024dfd3`, following `5121afc3`: actual body compiler receipts, pure Source lambda admission, one stateful marked allocation with positive stored membership, and finite Source/native outer-body ports. The final dated section records its 5591-job build, 15541-declaration cumulative audit and remaining whole-body admission and mixed-family obligations. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `57485ac4`: authentic Header evidence, one formation and one initialized allocation at the actual admitted parent post, finite Source body construction, and whole-body preservation/reflection with returned admission. The final dated section records its 5595-job build, 15605-declaration cumulative audit and remaining public-interface, initial-population and mixed-family obligations. The public BodyState interface, initial/captured heap population and shared mixed family remain unfinished. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1104,3 +1104,27 @@ At `b024dfd3`, all registered Solcore modules and `Tests.Main` built successfull
 Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2266 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2255 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. No executable checker or IO runner was added; full registered executions remain those at `3ff3daf4`. Validation records: `/private/tmp/solcore-owned-functions-resume-20261007/accepted-outer-body-ports-checks.json` and its actual command receipts.
 
 Next: retain the actual Header constructor's empty evidence, compose formation, one marked allocation and the initialized parent at the same reached state, and align the parent child with whole native completion by reconstruction and determinism. Complete preservation and reflection of that body with admission, initial/captured heap population, the shared mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
+
+
+### Accepted whole outer-body preservation and reflection (2026-10-09)
+
+| Module | Proven connection |
+| --- | --- |
+| `SourceCoreChosenOrdinaryAcceptedHeaderEvidence` | The same original Header constructor retains `HeaderAt` and genuine empty evidence; no equation is inferred from emitted code. |
+| `SourceCoreChosenOrdinaryAcceptedInitializedEntry` | One original formation and one stateful initialized allocation retain the actual admitted parent entry, positive stored member and original formation history. |
+| `SourceCoreChosenOrdinaryAcceptedOuterSourceConstruction` | Actual initializer execution, Source allocation and parent outcome construct the original initialized-let/return body with independent Source grades. Raw admission transports to Γ0 at the same reached state. |
+| `SourceCoreChosenOrdinaryAcceptedOuterBodyPreservationBounds` | `preserves_body` and `reflects_body` compose the admitted parent internally and retain the full final body result, cumulative effects, actual restored caller and all rows. |
+
+Preservation inverts the original Source body, obtains its real allocation, and runs the initialized parent at the same reached state. Reflection constructs a genuine Source allocation independently of a Source execution premise, extracts the original strict native parent child, and reflects that child once. The resulting parent evaluation reconstructs whole native execution; determinism identifies both its final value and final store with the supplied whole completion. The finite Source constructors then build the independent body trace. Source and native grades remain independent.
+
+The returned result keeps the actual final heap/store, mapping and world extensions, administrative preservation, Source heap metadata, restored caller pool and every ordered row. Successful raw value and deep heap typing transport from the local binder context to the original Γ0. Lexical scope restoration preserves the same reached pool and records.
+
+Initial Source environment `[]`, actual captures and history, raw/native heap correspondence, native environment typing, frame/global references and reads, genuine allocator readiness and initial all-row admission remain explicit. These finite body ports contain no completed child/body law or whole-program well-formedness premise. The actual Header evidence equation remains explicit in the body ports and is available from the authentic Header constructor.
+
+At `57485ac4`, all registered Solcore modules and `Tests.Main` built successfully (**5595 jobs**). Strict checks verified **15605 cumulative declarations**, **64 declarations across four added modules**, and **18 signatures**. Every complete private literal type and axiom array matches the normal build; only the three permitted standard axioms occur. Authentic prior/current name censuses show **64 additions**, no prior overlap and no removals. Generated helpers are attributed by actual Lean module index; the four private inventories have no shared declaration names.
+
+Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2270 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2259 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. No executable checker or IO runner was added; full registered executions remain those at `3ff3daf4`. Validation records: `/private/tmp/solcore-owned-functions-resume-20261007/accepted-outer-body-preservation-bounds-checks.json` and its actual command receipts.
+
+The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
+
+Next: connect these finite body ports to the public BodyState interface and populate the genuine initial heap, captured environment, frame and complete rows. The shared mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, composition of all passes and the final compiler theorem remain unfinished.
