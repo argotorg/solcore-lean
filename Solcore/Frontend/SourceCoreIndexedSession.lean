@@ -273,7 +273,16 @@ structure Artifact where private mk ::
   private authority : ArtifactAuthority
   private recipe : Recipe
 
-def Recipe.open (recipe : Recipe) : IO Artifact := return ⟨← SourceCorePublicValues.ArtifactAuthority.mint, recipe⟩
+/-- Proof-only association with the very Recipe used by artifact creation. -/
+def Artifact.RecipeAt (artifact : Artifact) (recipe : Recipe) : Prop := artifact.recipe = recipe
+
+/-- The original authority mint runs once; the association proof is erased. -/
+def Recipe.openWithReceipt (recipe : Recipe) : IO { artifact : Artifact // artifact.RecipeAt recipe } := do
+  let authority ← SourceCorePublicValues.ArtifactAuthority.mint
+  let artifact : Artifact := ⟨authority, recipe⟩
+  pure ⟨artifact, rfl⟩
+
+def Recipe.open (recipe : Recipe) : IO Artifact := return (← recipe.openWithReceipt).val
 def Artifact.program (artifact : Artifact) := artifact.recipe.program
 
 def Artifact.keys (artifact : Artifact) : List Key := artifact.program.entries.map (·.key)
@@ -350,14 +359,64 @@ structure Bootstrap (artifact : Artifact) where private mk ::
   private typed : Core.StateHasType state (Core.LanguageResult.resultType .unit) artifact.program.layouts.definitions
   private sourcePrefix : InertPrefix artifact
 
+/-- The actual new checkpoint starts with the selected Recipe and prefix. -/
+def Bootstrap.InitialAt {artifact : Artifact} (checkpoint : Bootstrap artifact)
+    (recipe : Recipe) (sourceState : SourceTypedRuntime.RuntimeState) : Prop :=
+  artifact.RecipeAt recipe ∧ checkpoint.state = .initial recipe.bootstrap [] [] ∧
+    checkpoint.sourcePrefix.state = sourceState
+
+/-- Shared original construction; proof arguments do not change the IO action. -/
+private def Artifact.bootstrapReceiptCore (artifact : Artifact)
+    (initialTyped : Core.StateHasType ⟨.eval artifact.recipe.bootstrap [], [], []⟩
+      (Core.LanguageResult.resultType .unit) artifact.program.layouts.definitions)
+    (recipe : Recipe) (atRecipe : artifact.RecipeAt recipe) (sourcePrefix : InertPrefix artifact) :
+    IO { checkpoint : Bootstrap artifact // checkpoint.InitialAt recipe sourcePrefix.state } := do
+  let authority ← artifact.authority.newSession
+  let checkpoint : Bootstrap artifact := ⟨authority, .initial artifact.recipe.bootstrap [] [], initialTyped, sourcePrefix⟩
+  pure ⟨checkpoint, atRecipe, by
+    change Core.State.initial artifact.recipe.bootstrap [] [] = Core.State.initial recipe.bootstrap [] []
+    rw [atRecipe], rfl⟩
+
+/-- One original session-authority mint and one original initial state. -/
+def Artifact.bootstrapWithReceipt (artifact : Artifact) (recipe : Recipe)
+    (atRecipe : artifact.RecipeAt recipe) (sourcePrefix : InertPrefix artifact) :
+    IO { checkpoint : Bootstrap artifact // checkpoint.InitialAt recipe sourcePrefix.state } :=
+  artifact.bootstrapReceiptCore (.eval (.nil _) .nil artifact.recipe.bootstrapTyped .nil)
+    recipe atRecipe sourcePrefix
+
 def Artifact.bootstrap (artifact : Artifact) (sourcePrefix : InertPrefix artifact) : IO (Bootstrap artifact) :=
-  return ⟨← artifact.authority.newSession, .initial artifact.recipe.bootstrap [] [],
-    .eval (.nil _) .nil artifact.recipe.bootstrapTyped .nil, sourcePrefix⟩
+  return (← artifact.bootstrapReceiptCore (.eval (.nil _) .nil artifact.recipe.bootstrapTyped .nil)
+    artifact.recipe rfl sourcePrefix).val
 
 /-- Fresh source sessions need no legacy heap/carrier argument. The native
 frame and global slots are still installed by the resumable bootstrap. -/
 def Artifact.bootstrapFresh (artifact : Artifact) : IO (Bootstrap artifact) :=
   artifact.bootstrap ⟨{}, 1, rfl⟩
+
+/-- Fresh creation retains the same opaque checkpoint and empty Source prefix. -/
+def Artifact.bootstrapFreshWithReceipt (artifact : Artifact) (recipe : Recipe)
+    (atRecipe : artifact.RecipeAt recipe) :
+    IO { checkpoint : Bootstrap artifact // checkpoint.InitialAt recipe {} } :=
+  artifact.bootstrapWithReceipt recipe atRecipe ⟨{}, 1, rfl⟩
+
+/-- A proof observation of this checkpoint's original native machine. -/
+def Bootstrap.NativeDone {artifact : Artifact} (checkpoint : Bootstrap artifact)
+    (fuel : Nat) (value : Core.Value) (store : Core.Store) : Prop :=
+  Core.runStateful fuel checkpoint.state = .done value store
+
+/-- The actual native world and store, without an operational accessor. -/
+def Session.NativeAt {artifact : Artifact} (session : Session artifact)
+    (world : Core.StoreTyping) (store : Core.Store) : Prop :=
+  session.world = world ∧ session.store = store
+
+/-- Original successful finish keeps this exact authority, store and prefix. -/
+def Session.BootstrappedFrom {artifact : Artifact} (session : Session artifact)
+    (checkpoint : Bootstrap artifact) (store : Core.Store) : Prop :=
+  session.authority = checkpoint.authority ∧ session.world = store.map Core.Value.type ∧
+    session.store = store ∧ session.sourcePrefix = checkpoint.sourcePrefix ∧
+    session.registry = [] ∧
+    session.values = SourceCoreCompatibleValues.Context.initial artifact.recipe.compiled.compatible.checked
+
 
 inductive BootResult (artifact : Artifact) where
   | ready (session : Session artifact)
@@ -2154,5 +2213,103 @@ theorem Checkpoint.native_failed_result_receipt {artifact : Artifact}
       exact ⟨_, rfl⟩
   obtain ⟨returned, failed⟩ := actual
   exact ⟨returned, failed, complete_failed_receipt completed failed⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Initial creation rewrites the observed run to the SAME selected Recipe. -/
+theorem Bootstrap.InitialAt.native_done {artifact : Artifact} {checkpoint : Bootstrap artifact}
+    {recipe : Recipe} {sourceState : SourceTypedRuntime.RuntimeState}
+    (initial : checkpoint.InitialAt recipe sourceState) {fuel : Nat} {value : Core.Value} {store : Core.Store}
+    (completed : checkpoint.NativeDone fuel value store) :
+    Core.runStateful fuel (.initial recipe.bootstrap [] []) = .done value store := by
+  simpa only [Bootstrap.NativeDone, initial.2.1] using completed
+
+theorem Bootstrap.InitialAt.recipe_at {artifact : Artifact} {checkpoint : Bootstrap artifact}
+    {recipe : Recipe} {sourceState : SourceTypedRuntime.RuntimeState}
+    (initial : checkpoint.InitialAt recipe sourceState) : artifact.RecipeAt recipe := initial.1
+
+private theorem Bootstrap.finish_ready_receipt {artifact : Artifact} (checkpoint : Bootstrap artifact)
+    (fuel : Nat) (value : Core.Value) (store : Core.Store)
+    (finished : Core.runStateful fuel checkpoint.state = .done value store)
+    {session : Session artifact} (accepted : checkpoint.finish fuel value store finished = .ready session) :
+    value = .inRight .word .unit ∧ session.BootstrappedFrom checkpoint store := by
+  by_cases same : value = .inRight .word .unit
+  · subst value
+    dsimp only [Bootstrap.finish] at accepted
+    cases globals : checkGlobals artifact store with
+    | error error =>
+        simp only [globals] at accepted
+        cases accepted
+    | ok checkedGlobals =>
+        cases environment : validateEnvironment artifact.program.layouts.definitions
+            (store.map Core.Value.type) (environment artifact) with
+        | error error =>
+            simp only [globals, environment] at accepted
+            cases accepted
+        | ok validated =>
+            simp only [globals, environment] at accepted
+            cases accepted
+            exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · cases value <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+    case inRight annotation payload =>
+      cases annotation <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+      case word =>
+        cases payload <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+        case unit => exact (same rfl).elim
+
+/-- Only an actual ready result yields the original completion and session. -/
+theorem Bootstrap.resume_ready_receipt {artifact : Artifact} (checkpoint : Bootstrap artifact)
+    (fuel : Nat) {session : Session artifact} (accepted : checkpoint.resume fuel = .ready session) :
+    ∃ value store, checkpoint.NativeDone fuel value store ∧ value = .inRight .word .unit ∧
+      session.BootstrappedFrom checkpoint store := by
+  unfold Bootstrap.resume at accepted
+  split at accepted
+  · rename_i value store executed
+    obtain ⟨valueEq, booted⟩ := checkpoint.finish_ready_receipt fuel value store executed accepted
+    exact ⟨value, store, executed, valueEq, booted⟩
+  · cases accepted
+  · rename_i error state executed
+    exact (Core.well_typed_runStateful_never_faults checkpoint.typed executed).elim
+
+/-- Full native equality remains proof-only. -/
+theorem Session.BootstrappedFrom.native_at {artifact : Artifact} {session : Session artifact}
+    {checkpoint : Bootstrap artifact} {store : Core.Store} (booted : session.BootstrappedFrom checkpoint store) :
+    session.NativeAt (store.map Core.Value.type) store := ⟨booted.2.1, booted.2.2.1⟩
+
+/-- This is the actual metadata registry, distinct from physical handle slots. -/
+theorem Session.BootstrappedFrom.registry_at {artifact : Artifact} {session : Session artifact}
+    {checkpoint : Bootstrap artifact} {store : Core.Store} (booted : session.BootstrappedFrom checkpoint store)
+    {recipe : Recipe} {sourceState : SourceTypedRuntime.RuntimeState}
+    (initial : checkpoint.InitialAt recipe sourceState) :
+    session.RegistryAt recipe.compiled.compatible.checked.staticRegistry := by
+  unfold Session.RegistryAt
+  rw [booted.2.2.2.2.2]
+  change artifact.recipe.compiled.compatible.checked.staticRegistry = recipe.compiled.compatible.checked.staticRegistry
+  rw [initial.1]
+
+theorem Session.BootstrappedFrom.inert_prefix {artifact : Artifact} {session : Session artifact}
+    {checkpoint : Bootstrap artifact} {store : Core.Store} (booted : session.BootstrappedFrom checkpoint store)
+    {recipe : Recipe} {sourceState : SourceTypedRuntime.RuntimeState}
+    (initial : checkpoint.InitialAt recipe sourceState) : session.inertPrefix = sourceState := by
+  change session.sourcePrefix.state = sourceState
+  rw [booted.2.2.2.1]
+  exact initial.2.2
+
+theorem Session.BootstrappedFrom.function_count {artifact : Artifact} {session : Session artifact}
+    {checkpoint : Bootstrap artifact} {store : Core.Store} (booted : session.BootstrappedFrom checkpoint store) :
+    session.functionCount = 0 := by simp only [Session.functionCount, booted.2.2.2.2.1, List.length_nil]
+
+theorem Session.NativeAt.heap_typed {artifact : Artifact} {session : Session artifact}
+    {world : Core.StoreTyping} {store : Core.Store} (atNative : session.NativeAt world store)
+    {recipe : Recipe} (atRecipe : artifact.RecipeAt recipe) :
+    Core.RuntimeStoreHasTypes world store recipe.program.layouts.definitions := by
+  have typed := session.heap_typed
+  rw [atNative.1, atNative.2] at typed
+  change Core.RuntimeStoreHasTypes world store artifact.recipe.program.layouts.definitions at typed
+  rw [atRecipe] at typed
+  exact typed
 
 end Solcore.Frontend.SourceCoreIndexedSession
