@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `57485ac4`: authentic Header evidence, one formation and one initialized allocation at the actual admitted parent post, finite Source body construction, and whole-body preservation/reflection with returned admission. The final dated section records its 5595-job build, 15605-declaration cumulative audit and remaining public-interface, initial-population and mixed-family obligations. The public BodyState interface, initial/captured heap population and shared mixed family remain unfinished. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `0a48ccf2`: the accepted body preservation and reflection proofs consume the actual named parameter Receipt, derive captures, readiness and admission internally, and populate the existing SourceBodyAt and NativeBodyAt interfaces at the same reached pool. Independent empty-parameter and singleton-hook ports supply genuine initial admission. The public bootstrap-to-Receipt association and shared mixed family remain unfinished. The final dated section records the 5599-job build and 15684-declaration cumulative audit. Earlier entries retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1128,3 +1128,13 @@ Each complete Source passed compilation with warnings treated as errors and at l
 The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
 
 Next: connect these finite body ports to the public BodyState interface and populate the genuine initial heap, captured environment, frame and complete rows. The shared mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, composition of all passes and the final compiler theorem remain unfinished.
+
+### Accepted body correspondence at the actual parameter state (2026-10-09)
+
+At `0a48ccf2`, four additive modules connect the accepted whole-body proofs to the original named parameter Receipt. BodyStatePorts derives the actual empty Source entry, captures, global references, native typing, readiness and admission. InitialBodyAdmission derives deep heap typing and all rows from real empty-parameter allocation and singleton hook effects. HeaderRuntimeEvidence retains the actual global count and empty evidence. BodyStateCorrespondence supplies preservation, reflection and the existing SourceBodyAt/NativeBodyAt interfaces at the same reached state.
+
+The full returned pool, cumulative effects and successful raw PostAdmission are retained. No completed body law or ProgramWellFormed premise is added. Complete catalog and zero-prefix receipts remain genuine inputs. Stronger ReachedExit/LexicalResult witnesses are not asserted.
+
+The registered build passed 5599 jobs. Strict checks verified 15684 cumulative declarations, all 79 declarations of the four new modules and 32 signatures. Complete private/normal types and axiom arrays match literally; only the three permitted standard axioms occur. Authentic name censuses show 79 additions, no prior overlap and no removals. Normal Source/object guards and all 4985 protected-file checks pass. No executable fixture checker was added in this checkpoint.
+
+Next: retain the actual successful public Recipe preparation, bootstrap constructor fields and concrete store/capture association, then join the same singleton pool, hook and parameter producer to this Receipt. Public Session association, the shared mixed family and all-pass compiler correctness remain unfinished.
