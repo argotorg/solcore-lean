@@ -1087,6 +1087,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStored
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualInitializedClosureReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredMemberCallBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualPrincipalStoredCallReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredExpressionHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualStoredClosureWriteReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
