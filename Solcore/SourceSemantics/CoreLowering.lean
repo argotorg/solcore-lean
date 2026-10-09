@@ -1093,6 +1093,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOr
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOriginFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOriginAllocationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredIndirectCallForModelReflection
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCalleeOriginReadReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
