@@ -204,6 +204,57 @@ theorem projected {children childScope id lowered node}
     have emitted := congrArg SourceCoreBasic.LoweredExpr.type receipt.compiler.output
     simpa only [same, emitted] using receipt.parentMetadata.projected
 
+/-- A real Source occurrence is known to be non-indirect. -/
+def AbsentAt (source : TypedSource) (id : ExpressionId) : Prop :=
+  ∀ {node callee ids metadata}, source.lookupExpression? id = some node →
+    node.form ≠ .call callee ids (.indirect metadata)
+
+/-- The exact named receipt rules out only the indirect form at this id. -/
+theorem named_absent {children childScope id lowered}
+    (head : RecursiveNamedCallEvidenceHeads.Calls (some evidence) headers
+      (context compiled.indexed caller.named) (source caller.named) sourceContext children childScope id lowered) :
+    AbsentAt (source caller.named) id := by
+  intro node callee ids metadata found form
+  cases head with
+  | ordinary actual =>
+    cases actual with
+    | named _ metadata _ actualForm _ _ _ _ _ _ _ _ _ _ _ _ =>
+      have same := Option.some.inj (metadata.found.symm.trans found)
+      simp only [← same, actualForm] at form
+      cases form
+  | direct receipt _ _ =>
+    have same := Option.some.inj (receipt.found.symm.trans found)
+    simp only [← same, receipt.form] at form
+    cases form
+
+/-- Extra leaves retain the compiler's approved occurrence; named leaves
+retain their actual declaration form. The original head stays literal. -/
+def ScopedBodyCalls (children : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  fun childScope id lowered => BodyCalls root expressionSyntax factory headers children childScope id lowered ∧
+    (expressionSyntax (source caller.named) id ∨ AbsentAt (source caller.named) id)
+
+/-- The internal mode preserves the legacy certificate as its false case. -/
+def CallsFor (supported : Bool) (children : GenericExpressionMeaning.Certificate) : GenericExpressionMeaning.Certificate :=
+  if supported then ScopedBodyCalls root expressionSyntax factory headers children
+  else BodyCalls root expressionSyntax factory headers children
+
+theorem named_for (supported : Bool) {children childScope id lowered}
+    (head : RecursiveNamedCallEvidenceHeads.Calls (some evidence) headers
+      (context compiled.indexed caller.named) (source caller.named) sourceContext children childScope id lowered) :
+    CallsFor root expressionSyntax factory headers supported children childScope id lowered := by
+  cases supported
+  · exact .named head
+  · exact ⟨.named head, .inr (named_absent headers head)⟩
+
+theorem projected_for (supported : Bool) {children childScope id lowered node}
+    (head : CallsFor root expressionSyntax factory headers supported children childScope id lowered)
+    (found : (source caller.named).lookupExpression? id = some node) :
+    compiled.compatible.checked.catalog.project node.type = .ok lowered.type := by
+  cases supported
+  · exact projected root expressionSyntax factory headers head found
+  · obtain ⟨actual, _⟩ := head
+    exact projected root expressionSyntax factory headers actual found
+
 private theorem extra_cases {form : ExpressionForm} (extra : extraForm form) :
     (∃ parameters result statements, form = .lambda parameters result statements) ∨
       ∃ callee ids metadata, form = .call callee ids (.indirect metadata) := by
@@ -327,6 +378,29 @@ theorem extra_receipts
     exact ⟨receipt.compiler.entries, .prepared_indirect found form receipt (fun _ _ member => ⟨rfl, member⟩),
       by simpa only [form, extraChildren] using receipt.positions, receipt.generated⟩
 
+theorem extra_for (supported : Bool)
+    (domain : DomainAt root expressionSyntax readFuel sourceContext evidence scope headers)
+    (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) sourceContext (source caller.named))
+    (covers : evidence.Covers sourceContext)
+    (childFuel : Nat) (id : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr)
+    (allowed : expressionSyntax (source caller.named) id) (found : (source caller.named).lookupExpression? id = some node)
+    (extra : extraForm node.form) (typed : ExpressionHasType (source caller.named) sourceContext id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody
+      (childFuel + 1) (context compiled.indexed caller.named) (source caller.named) scope id rootReasonAt = .ok lowered) :
+    ∃ entries : List (ExpressionId × SourceCoreBasic.LoweredExpr),
+      CallsFor root expressionSyntax factory headers supported (CompatibleExpressionCalls.Entries scope entries) scope id lowered ∧
+      entries.map Prod.fst = extraChildren node.form ∧
+      ∀ child code, (child, code) ∈ entries → ∃ childNode,
+        (source caller.named).lookupExpression? child = some childNode ∧
+        ExpressionHasType (source caller.named) sourceContext child childNode.type ∧
+        SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody childFuel
+          (context compiled.indexed caller.named) (source caller.named) scope child rootReasonAt = .ok code := by
+  obtain ⟨entries, actual, positions, generated⟩ :=
+    extra_receipts root expressionSyntax factory headers domain runtime covers childFuel id node lowered allowed found extra typed accepted
+  cases supported
+  · exact ⟨entries, actual, positions, generated⟩
+  · exact ⟨entries, ⟨actual, .inl allowed⟩, positions, generated⟩
+
 /-- The full current ledger creates the indirect factory at this exact scope. -/
 theorem indirect_factory (domain : DomainAt root expressionSyntax readFuel sourceContext evidence scope headers)
     (valid : CompatibleRuntimeContextValidity.Valid (context compiled.indexed caller.named).solvedRequirements sourceContext evidence) :
@@ -341,12 +415,12 @@ theorem indirect_factory (domain : DomainAt root expressionSyntax readFuel sourc
 
 /-- Consume the actual AcceptedAt action once through the original compiler
 induction. No body or expression tree is supplied by DomainAt. -/
-theorem coverage (domain : DomainAt root expressionSyntax readFuel sourceContext evidence scope headers)
+theorem cover_for (supported : Bool) (domain : DomainAt root expressionSyntax readFuel sourceContext evidence scope headers)
     (valid : CompatibleRuntimeContextValidity.Valid (context compiled.indexed caller.named).solvedRequirements sourceContext evidence)
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) sourceContext (source caller.named))
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (receipt : AcceptedAt root expressionSyntax readFuel (source caller.named) sourceContext scope id lowered) :
-    RuntimeExpressionsFor (BodyCalls root expressionSyntax (indirect_factory root expressionSyntax headers domain valid) headers)
+    RuntimeExpressionsFor (CallsFor root expressionSyntax (indirect_factory root expressionSyntax headers domain valid) headers supported)
       readFuel (.initial compiled.compatible.checked) (source caller.named) sourceContext
       (context compiled.indexed caller.named).solvedRequirements rootReasonAt scope id lowered := by
   cases receipt with
@@ -354,13 +428,23 @@ theorem coverage (domain : DomainAt root expressionSyntax readFuel sourceContext
     let factory := indirect_factory root expressionSyntax headers domain valid
     exact tree_of_functions_at_runtime_with_children (headers := headers)
       (values := .initial compiled.compatible.checked) (compilation := context compiled.indexed caller.named)
-      (some evidence) (BodyCalls root expressionSyntax factory headers)
-      (include_named root expressionSyntax factory headers) (projected root expressionSyntax factory headers) extraForm extraChildren
+      (some evidence) (CallsFor root expressionSyntax factory headers supported)
+      (named_for root expressionSyntax factory headers supported) (projected_for root expressionSyntax factory headers supported) extraForm extraChildren
       domain.admission domain.coverage domain.sourceTypes domain.emptyEvidence domain.order
       runtime.graph.nodeOccurrencesUnique declarations signatures domain.constructorValid domain.fragmentValid domain.selectedValid
       (policy_for_all root expressionSyntax headers domain) compiled.indexed.ancestry.graph.inputs.callable [] root.callables
       domain.fragmentCoercions domain.coercions
-      (extra_receipts root expressionSyntax factory headers domain runtime valid.covers) allowed found typed accepted
+      (extra_for root expressionSyntax factory headers supported domain runtime valid.covers) allowed found typed accepted
+
+theorem coverage (domain : DomainAt root expressionSyntax readFuel sourceContext evidence scope headers)
+    (valid : CompatibleRuntimeContextValidity.Valid (context compiled.indexed caller.named).solvedRequirements sourceContext evidence)
+    (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) sourceContext (source caller.named))
+    {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : AcceptedAt root expressionSyntax readFuel (source caller.named) sourceContext scope id lowered) :
+    RuntimeExpressionsFor (BodyCalls root expressionSyntax (indirect_factory root expressionSyntax headers domain valid) headers)
+      readFuel (.initial compiled.compatible.checked) (source caller.named) sourceContext
+      (context compiled.indexed caller.named).solvedRequirements rootReasonAt scope id lowered :=
+  cover_for root expressionSyntax headers false domain valid runtime receipt
 
 end Coverage
 
@@ -395,6 +479,28 @@ theorem recaptured_factory (chosen : ChosenFactory root expressionSyntax receipt
 
 /-- Coverage consumes a real child certificate from the SAME recaptured
 Support, at its current lexical context and its own semantic readFuel. -/
+theorem support_cover_for (supported : Bool) (chosen : ChosenFactory root expressionSyntax receipt)
+    (environment : Dynamic.Environment)
+    {currentContext : SourceSemantics.Context} {childScope : SourceCoreLocalCell.Scope}
+    (headers : RecursiveNamedCatalog.Inventory compiled.indexed.ancestry (.initial compiled.compatible.checked)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions (Program.ofChecked compiled.sourceProgram))
+    (domain : DomainAt root expressionSyntax receipt.formation.body.readFuel currentContext evidence childScope headers)
+    (valid : CompatibleRuntimeContextValidity.Valid (context compiled.indexed caller.named).solvedRequirements currentContext evidence)
+    (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) currentContext (source caller.named))
+    {child : ExpressionId} {output : SourceCoreBasic.LoweredExpr}
+    (actual : (receipt.formation.support environment).certificates
+      (receipt.formation.support environment).body.readFuel (receipt.formation.function environment).source
+      currentContext childScope child output) :
+    RuntimeExpressionsFor
+      (CallsFor root expressionSyntax (indirect_factory root expressionSyntax headers domain valid) headers supported)
+      receipt.formation.body.readFuel (.initial compiled.compatible.checked) (source caller.named) currentContext
+      (context compiled.indexed caller.named).solvedRequirements rootReasonAt childScope child output := by
+  change receipt.formation.certificates receipt.formation.body.readFuel (source caller.named)
+    currentContext childScope child output at actual
+  have same := congrArg (fun family => family receipt.formation.body.readFuel (source caller.named)
+    currentContext childScope child output) (formation_factories root expressionSyntax receipt chosen).2
+  exact cover_for root expressionSyntax headers supported domain valid runtime (same.mp actual)
+
 theorem coverage_at_support (chosen : ChosenFactory root expressionSyntax receipt)
     (environment : Dynamic.Environment)
     {currentContext : SourceSemantics.Context} {childScope : SourceCoreLocalCell.Scope}
@@ -410,12 +516,8 @@ theorem coverage_at_support (chosen : ChosenFactory root expressionSyntax receip
     RuntimeExpressionsFor
       (BodyCalls root expressionSyntax (indirect_factory root expressionSyntax headers domain valid) headers)
       receipt.formation.body.readFuel (.initial compiled.compatible.checked) (source caller.named) currentContext
-      (context compiled.indexed caller.named).solvedRequirements rootReasonAt childScope child output := by
-  change receipt.formation.certificates receipt.formation.body.readFuel (source caller.named)
-    currentContext childScope child output at actual
-  have same := congrArg (fun family => family receipt.formation.body.readFuel (source caller.named)
-    currentContext childScope child output) (formation_factories root expressionSyntax receipt chosen).2
-  exact coverage root expressionSyntax headers domain valid runtime (same.mp actual)
+      (context compiled.indexed caller.named).solvedRequirements rootReasonAt childScope child output :=
+  support_cover_for root expressionSyntax receipt false chosen environment headers domain valid runtime actual
 
 end RetainedFactory
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedMixedBodySiteInputs
