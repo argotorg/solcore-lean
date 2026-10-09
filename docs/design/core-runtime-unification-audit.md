@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `3a99ac67`: preservation and reflection of the accepted whole indirect parent at its genuine initialized state, deriving callee, arguments, dispatch and native alignment internally. The final dated section records its 5587-job build, 15455-declaration cumulative audit and remaining initializer, outer-return and mixed-family obligations. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `b024dfd3`, following `5121afc3`: actual body compiler receipts, pure Source lambda admission, one stateful marked allocation with positive stored membership, and finite Source/native outer-body ports. The final dated section records its 5591-job build, 15541-declaration cumulative audit and remaining whole-body admission and mixed-family obligations. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1085,3 +1085,22 @@ At `3a99ac67`, all registered Solcore modules and `Tests.Main` built successfull
 Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2260 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2249 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. No executable checker was added; full registered executions remain those at `3ff3daf4`.
 
 Next: derive the actual initialized-let allocation and outer-return flow from original named-body acceptance, then connect real lambda formation and one marked allocation to the proved parent. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
+
+### Accepted initialized allocation and finite outer-body ports (2026-10-09)
+
+| Module | Proven connection |
+| --- | --- |
+| `SourceCoreChosenOrdinaryAcceptedOuterCompilerReceipts` | Original body acceptance supplies the initializer, marked Allocation/Annotated receipts and exact initialized-let/return flow and finish under the same selected root. |
+| `SourceCoreChosenOrdinaryAcceptedInitializerAdmission` | Actual lambda typing, frame coverage and captured-environment agreement derive the same receipt's raw closure typing, pure Source outcome and unchanged-state admission. |
+| `CallableIndexedOwnedChosenOrdinaryInitializedAllocationState` | One original stateful marked allocation retains every reached-state output and attaches positive `ChosenStoredAt` for the actual initialized cell in the receiving model. |
+| `SourceCoreChosenOrdinaryAcceptedOuterBodyBounds` | Actual native initializer, allocation and parent traces compose value/fault completion. Whole completion yields a genuine strict parent child; finite Source body inversion retains the initializer, allocation and parent outcome. |
+
+The allocator keeps actual environments, Source/native heaps, mappings, worlds, frame references and metadata, every ordered row, and reached-state admission. The finite native ports retain the literal final body store and fault token. Source inversion retains its own execution grades independently of native child grades. These are concrete composition ports; complete whole-body preservation and reflection with admission have not yet been assembled.
+
+Implementation commits: `5121afc3` (positive initialized allocation state) and `b024dfd3` (actual compiler receipts, initializer admission, finite outer-body ports and registrations).
+
+At `b024dfd3`, all registered Solcore modules and `Tests.Main` built successfully (**5591 jobs**). Strict checks verified **15541 cumulative declarations**, **87 declarations across four added modules**, and **42 signatures**. Every complete private literal type and axiom array matches the normal build; only the three permitted standard axioms occur. Authentic name censuses show **86 additions** and no removals. The one prior overlap, `Tests.SourceCoreChosenOrdinaryAcceptedParentCompilerReceipts.parentReason.eq_1`, has exact complete type/axiom agreement with an independent probe of the original imports. Generated helpers are attributed by actual Lean module index; the four private inventories have no shared declaration names.
+
+Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2266 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2255 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. No executable checker or IO runner was added; full registered executions remain those at `3ff3daf4`. Validation records: `/private/tmp/solcore-owned-functions-resume-20261007/accepted-outer-body-ports-checks.json` and its actual command receipts.
+
+Next: retain the actual Header constructor's empty evidence, compose formation, one marked allocation and the initialized parent at the same reached state, and align the parent child with whole native completion by reconstruction and determinism. Complete preservation and reflection of that body with admission, initial/captured heap population, the shared mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
