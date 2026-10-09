@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-09.
+Created: 2026-09-30. Updated: 2026-10-10.
 
 ## Current Implementation Status
 
@@ -10,12 +10,14 @@ Created: 2026-09-30. Updated: 2026-10-09.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest implementation commit | `46df219c`. The accepted fixture now connects admitted body correspondence and original named invocation to the same actual ready public Session. Erased construction receipts retain the original Recipe, artifact and fresh checkpoint; the actual ready equation supplies native completion without another bootstrap run. |
-| Latest verification of all registered modules | Verified on 2026-10-09 at `46df219c`: registered Solcore and Tests.Main build (5606 jobs), strict audit of 15944 cumulative declarations, all 1521 declarations of one changed and three added modules, and 49 signatures. Every current private/normal type and axiom array matches literally. The census adds 108 names, overlaps 1413 prior names and removes none; 1412 original declarations remain literal exact, with one explicitly approved generated-proof change. Source/object, import and protected-file guards pass. One new public Session runner returns ready at fuel 10000 with two native cells; two existing regression units pass separately. This is not a full registered-test execution. |
-| Working implementation | Connect actual public root start/call and native completion, Source program admission/staging, and authentic success/export receipts. Stronger invocation PostAdmission and ReachedExit interfaces, the measured mixed family, prior General/principal qualification, general dispatch, rejection/coercion routes and all-pass composition remain incomplete. |
+| Latest implementation commit | `7b0f562f`. The retained accepted fixture connects actual public root startup, independent original Source admission/staging, native completion and identical successful Word export. |
+| Latest verification of all registered modules | Verified on 2026-10-10 at `7b0f562f`: registered build (5610 jobs), 16181 cumulative declarations, all 1678 current declarations and 101 signatures. Private/normal types and axioms match literally. All 1440 prior/current overlapping declarations remain exact; one reviewed generated resume helper moves to a new name. Source/object, import and protected-file guards pass. The public runner returns Word 7; two existing Session regressions pass separately. The full registered suite was not executed. |
+| Working implementation | Retain stronger successful invocation PostAdmission and genuine lexical ReachedExit through body finish and caller restoration. Complete the measured mixed family, prior General/principal qualification, general dispatch, rejection/coercion routes and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
-Original public operational signatures and finish/resume branches are preserved. The Session-module compatibility audit reports 1412 exact original declarations and one explicitly approved generated-proof change. Its original 2750-byte native typing TYPE/AXIOMS block remains literally unchanged under the new genuine generated owner. All 1521 current private declarations match the normal audit exactly; this whole-module count includes the original Session declarations. The estimates remain about 70% for the second objective and about 85% overall.
+Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. Its compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 current private/normal declarations match literally. The estimates remain about 70% for the second objective and about 85% overall.
+
+For the retained accepted fixture, the same public Session root start and actual resume receipt now connect independent Source ProgramOutcome to native completion and the identical exported Word. Original checker typing and the actual stage analysis establish program admission internally. Reflection uses the successful public decoder equation; a Source Word result crosses the same boundary with sufficient native fuel and a positive export budget. The full low invocation result retains final heap correspondence, the restored owned pool and cumulative effects. Source and native budgets remain independent.
 
 Anyone resuming implementation should first read the current status and the handoff at the end of the [implementation record](core-runtime-unification-progress.md). Public API users should consult the [API migration record](core-runtime-unification-api.md); see the [T0 audit](core-runtime-unification-audit.md) for the initial compatibility and semantics investigation.
 
