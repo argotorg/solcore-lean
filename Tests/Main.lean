@@ -1852,6 +1852,9 @@ import Solcore.Test.SourceCoreClosedOwnedWhile
 import Solcore.Test.SourceCoreClosedOwnedFor
 import Solcore.Test.SourceCoreProjectedAssignmentHeader
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedFixture
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBodyMetadata
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedTyping
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedHeader
 set_option autoImplicit false
 
 open Solcore
@@ -3032,6 +3035,9 @@ private def coreRuntimeUnificationTests : IO Unit := do
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
+  SourceCoreChosenOrdinaryAcceptedBodyMetadata.run
+  SourceCoreChosenOrdinaryAcceptedTyping.run
+  SourceCoreChosenOrdinaryAcceptedHeader.run
   coreLocalFragmentPairBoundaryTests
   resolvedPairBoundaryTests
   resolvedLocalSemanticsTests
