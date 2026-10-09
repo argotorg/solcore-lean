@@ -1072,6 +1072,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFiniteSourceRunt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSingletonReturnCompilerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenWordLiteralExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralLambdaBodyContinuations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenOrdinaryInitializedReadAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralLambdaInvocationBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
