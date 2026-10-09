@@ -1069,6 +1069,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralPlaceDiag
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralIssuedSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMixedLexicalNamedExpressionHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedFiniteSourceRuntimeReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSingletonReturnCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedChosenWordLiteralExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralLambdaBodyContinuations
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
