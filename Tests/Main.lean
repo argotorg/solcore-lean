@@ -1900,6 +1900,7 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedOuterBodyLexicalExit
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBodyStateExitReceipts
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicBodyExitReceipts
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedLiteralInputs
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicInvocationExitAdmission
 set_option autoImplicit false
 
 open Solcore
