@@ -1885,6 +1885,9 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBodyStatePorts
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedInitialBodyAdmission
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedHeaderRuntimeEvidence
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBodyStateCorrespondence
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedBootstrapHeaderEvidence
+import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicParameterEntry
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedLiteralInputs
 set_option autoImplicit false
 
@@ -3066,6 +3069,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
+  SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt.run
   SourceCoreChosenOrdinaryAcceptedBodyMetadata.run
   SourceCoreChosenOrdinaryAcceptedTyping.run
   SourceCoreChosenOrdinaryAcceptedHeader.run
