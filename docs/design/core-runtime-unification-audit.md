@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest implementation checkpoint is `49f420e0`: actual chosen dispatch, initialized callee and paired argument receipts, native parameter alignment, and reflection of the whole native parent prefix. The final dated section records its 5583-job build, 15402-declaration cumulative audit and remaining whole parent composition/mixed-family obligations. Earlier entries below retain their historical scope.
+The latest implementation checkpoint is `3a99ac67`: preservation and reflection of the accepted whole indirect parent at its genuine initialized state, deriving callee, arguments, dispatch and native alignment internally. The final dated section records its 5587-job build, 15455-declaration cumulative audit and remaining initializer, outer-return and mixed-family obligations. Earlier entries below retain their historical scope.
 
 | Commit | Proved scope | What this unit alone does not complete |
 | --- | --- | --- |
@@ -1066,3 +1066,22 @@ At `49f420e0`, all registered Solcore modules and `Tests.Main` built successfull
 Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2256 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2233 actual project imports** match their compiled closure and Lean environment exactly. Independent stored Source snapshots also retain their original hashes. English, policy, registration and whitespace checks pass. No executable checker was added; full registered executions remain those at `3ff3daf4`.
 
 Next: compose these producers and the existing literal application theorem into preservation and reflection for the accepted whole parent, deriving the callee post, argument meanings, fault exclusion, dispatch and native bundle internally. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
+
+### Accepted whole parent preservation and reflection (2026-10-09)
+
+| Module | Proven connection |
+| --- | --- |
+| `CallableIndexedOwnedChosenOrdinaryCallDispatchSourceTransport` | Genuine Source equality transports the original compiler sidecar, lambda origin, dispatch and selected rows at the same chosen root. |
+| `SourceCoreChosenOrdinaryAcceptedParentArgumentOutcomes` | Independent sized Source traces fix the actual singleton pair values and heap and exclude argument faults. |
+| `SourceCoreChosenOrdinaryAcceptedParentPreservationBounds` | The whole Source parent derives its actual callee and pair producers, selected guards and native bundle internally, then uses the literal application proof once to construct Core evaluation and the full returned result. |
+| `SourceCoreChosenOrdinaryAcceptedParentReflectionBounds` | Whole Core parent completion yields the real successful prefix. One unpack of its successful step retains the same argument state and cumulative effects; the original application reflection runs once, and the independent Source parent is reconstructed. |
+
+Both directions retain the original compiler, receiving function model, positive chosen carrier, closure capture, history and physical caller restoration. Final value and heap relations, mapping/world extensions, administrative preservation, Source heap metadata and returned caller admission are composed at the same actual intermediate witnesses. Initial heap, environment, stored-cell authority, native typing and input admission remain genuine inputs. These proofs assume no completed child/body execution law or whole-program well-formedness.
+
+Implementation commits: `48f9dc42` (actual Source transport) and `3a99ac67` (whole parent preservation/reflection, argument outcomes and test imports).
+
+At `3a99ac67`, all registered Solcore modules and `Tests.Main` built successfully (**5587 jobs**). Strict checks verified **15455 cumulative declarations**, **53 declarations across four added modules**, and **20 signatures**. Every complete private literal type and axiom array matches the normal build; only the three permitted standard axioms occur. Authentic prior/current name censuses show **53 additions**, no prior overlap and no removals. Generated helpers are attributed by actual Lean module index.
+
+Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2260 pre-install Source/object pairs** and **4985 protected original files**. The four audited modules' **2249 actual project imports** match their compiled closure and Lean environment exactly. Original Source snapshots retain their hashes. English, policy, registration and whitespace checks pass. No executable checker was added; full registered executions remain those at `3ff3daf4`.
+
+Next: derive the actual initialized-let allocation and outer-return flow from original named-body acceptance, then connect real lambda formation and one marked allocation to the proved parent. Initial/captured heap population, the complete mixed family, prior General/principal qualification, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts do not measure progress.
