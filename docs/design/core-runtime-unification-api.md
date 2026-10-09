@@ -75,6 +75,20 @@ An artifact with an empty root set accepts only an empty heap and rejects all ca
 - Auditing public execution and internal evidence for the same artifact: [SourceCompilerFeatureSupport](../../Solcore/Test/SourceCompilerFeatureSupport.lean)
 - Definitional identity of the public facade and common API: [SourceCoreUnifiedImportBoundary](../../Solcore/Test/SourceCoreUnifiedImportBoundary.lean)
 
+## Selected literal proof interfaces
+
+These internal proof modules connect the actual accepted compiler to a selected Word literal and singleton return body. They do not yet establish the final theorem for the complete public compiler.
+
+| Module | Available connection |
+| --- | --- |
+| `CallableIndexedOwnedSingletonReturnCompilerReceipts` | `Receipt`, `of_return`, `functions_child` and `at_root` retain the original accepted child, emitted finish and actual compiler callback budget. |
+| `CallableIndexedOwnedChosenWordLiteralExpressionBounds` | `WordNodeFacts` and `certificate_at_support` connect actual numeric evidence to the same selected Support. `preserves_at_support` and `reflects_at_support` prove admitted literal execution semantics. |
+| `CallableIndexedOwnedLiteralLambdaBodyContinuations` | `support_flow_preserves` and `support_flow_reflects` derive the return child from actual coverage. `source_at_entry` / `native_at_entry` and `source_continuation` / `native_continuation` use genuine parameter admission and the original finish. |
+| `SourceCoreChosenOrdinaryAcceptedLiteralSupport` | The accepted fixture derives its current-context domain, local absence of indirect calls, recaptured factories and expression tree internally. |
+| `SourceCoreChosenOrdinaryAcceptedLiteralCompilerReceipts` | The same fixture derives Word facts and original compiler receipts, then exposes preservation and reflection at its selected Support. |
+
+These interfaces retain the actual body ledger, runtime validity, capture/global correspondence, argument typing, deep Source heap typing and complete ordered record relation as genuine inputs where needed. They preserve the same reached state and pool; Source and native grades are independent. The approved child is literal occurrence 3, while the outer indirect parent at occurrence 5 remains in the Source. Connecting complete call dispatch and the shared mixed body family is ongoing.
+
 The old `SourceTypedRuntime` namespace remains in compatibility value, observation, and validation carriers. Its name does not imply that a runtime evaluator of Source expressions and statements remains.
 
 Moving the comptime evaluator to Core and adding source contract/storage/external-call connections are the agreed next phase. Meaning preservation for comptime transformations actually performed by the current compiler is part of the second goal.

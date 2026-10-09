@@ -32,11 +32,11 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest committed verification point
 
-The latest implementation checkpoint is `024a3491`. Original accepted compiler receipts now derive native typing before lambda Site selection, genuine singleton catalog SourceTypes, the original diagnostic issuer and the selected literal factory. The initializer obtains its original compilation and root internally; actual catalog and inventory receipts construct the literal compiler domain.
+The latest implementation checkpoint is `77f71db7`. The selected literal factory now derives its current-context domain, local absence of indirect calls and expression coverage internally. Original compiler receipts supply the singleton return body. Its Word literal and body continuations preserve execution semantics and reflect finite completion at the actual selected parameter entry.
 
-The registered build passed 5566 jobs. Strict checks cover 15093 cumulative declarations, 57 module-attributed declarations and 34 signatures, with complete literal private/normal type and axiom agreement. No new executable checker was added. Actual compiled imports match the Lean environment, and 4985 protected original files remain unchanged.
+The registered build passed 5571 jobs. Strict checks cover 15161 cumulative declarations, 68 module-attributed declarations and 37 signatures, with complete literal private/normal type and axiom agreement. All 2235 pre-install Source/object pairs remain exact, and 2225 actual compiled project imports match the Lean environment. No new executable checker was added. All 4985 protected original files remain unchanged.
 
-The same recaptured Support's runtime meaning and connection to the complete measured mixed family remain unfinished. The work estimates in the status table remain unchanged.
+The selected literal body now has semantic continuations at the same recaptured Support. Its connection to complete call dispatch and the measured mixed family remains unfinished. The work estimates in the status table remain unchanged.
 
 ### Implementation in progress
 
@@ -2822,3 +2822,19 @@ At `024a3491`, all registered Solcore modules and `Tests.Main` built successfull
 The five added modules are proof connections and add no executable checker. Existing full registered executions remain those at `3ff3daf4`; earlier finite fixture executions remain recorded at their original checkpoints. The work estimates remain about 70% for the second goal and about 85% overall; declaration counts are not progress percentages.
 
 Next: derive each current-context domain and the local absence of indirect calls from the same chosen and recaptured Support, then prove the literal body meaning from its original expression and finish receipts. Retain the outer indirect parent and genuine capture, parameter and heap identities. The complete mixed family, initial/captured heap population, prior General/principal qualification, complete dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and the final compiler theorem remain unfinished.
+
+### 2026-10-09: Selected literal return semantics
+
+Original singleton return receipts now retain the compiler's actual child, emitted finish and callback budget. The literal factory derives its current-context domain and expression coverage from the same selected Support. Its approved domain remains literal occurrence 3; the unchanged outer Source contains the indirect parent at occurrence 5. The indexed read budget 500, initializer compiler fuel 498 and independent Source/native execution grades remain separate.
+
+The actual Word node and its selected numeric evidence prove admitted expression preservation and finite-completion reflection. Both use the existing literal producer and retain the same initial heap, store, mapping, world and complete ordered record vector. No whole-program well-formedness or finished body semantics is assumed.
+
+The body proof derives the certified child and return flow from the actual expression tree and Source syntax. Genuine parameter admission supplies the reached entry, Source receipt and all rows. The original finish transfers the return once; Source control establishes that break and continue cannot escape this body. Source/native continuations retain the same reached pool and returned value. Fixture helpers obtain the original body inputs, compiler receipt and Word facts internally.
+
+Implementation commits: `ca7b7b57` (original singleton return compiler receipts), `d620422d` (admitted Word literal semantics), `b4dbc7db` (selected literal domain and coverage), `8a170eac` (literal body continuations and proof imports), and `77f71db7` (accepted compiler receipt connections and test imports).
+
+At `77f71db7`, all registered Solcore modules and `Tests.Main` built successfully (**5571 jobs**). Strict checks verified **15161 cumulative declarations**, **68 declarations across five added modules**, and **37 signatures**. All 68 complete private literal types and axiom arrays match the normal build; only the three permitted standard axioms occur. Each complete Source passed compilation with warnings treated as errors and at least two independent full semantic reviews. Source-only installation preserved **2235 pre-install Source/object pairs** and **4985 protected original files**. **2225 actual compiled project imports** match the Lean environment exactly. English, policy, registration and whitespace checks pass.
+
+These proof modules add no executable checker. Full registered executions remain those at `3ff3daf4`; earlier finite fixture executions retain their original checkpoints. The estimates remain about 70% for the second goal and about 85% overall. Declaration counts do not measure progress.
+
+Next: derive the remaining current body ledger, capture/global, argument and deep Source heap receipts from actual initialization and invocation. Connect these literal continuations through the real stored-callee parent and caller restoration. The complete mixed family, general dispatch, rejection/coercion/staging routes, public Source admission, all-pass composition and final compiler theorem remain unfinished.
