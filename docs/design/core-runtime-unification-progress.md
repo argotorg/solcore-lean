@@ -32,6 +32,10 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed proof scope
 
+`staged-finite-reads-and-named-body-composition` is normally verified in `6d4fcbd8` and `ed30cd3b`: eleven proof Sources, 120 owned declarations and 36 selected interfaces. The cumulative census is 20041, with 120 additions and no overlap or removals. The finite read/product fold and named body construct child meaning internally. Exact closure factories and generic named invocation/application keep authentic selected scopes and reached posts; finite invocation specialization, outer global joins, shared numeric induction and full grammar remain open.
+
+### Preceding finite expression and named call proof scope
+
 `staged-finite-expressions-and-named-call-parents` is normally verified in `5a5bdeff` and `ef75b2c3`: eleven proof Sources, 191 owned declarations and 50 selected interfaces. The cumulative census is 19921, with 191 additions and no overlap or removals. Finite literal/group/pair folds construct their meanings internally, and whole indirect dispatch and terminal named invocation reflection retain actual state and caller posts. Original named/global argument and arity joins, named preservation, shared numeric induction and complete compiler coverage remain open.
 
 ### Preceding staged call parent proof scope
@@ -56,9 +60,13 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed normal verification point
 
+Finite reads and named body composition pass normal verification in `6d4fcbd8` and `ed30cd3b`. Build 5827 passes, all eleven strict Source logs are empty, all 120 complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 36-interface API logs are byte-identical. The cumulative census grows from 19921 to 20041: 120 additions, no overlaps and no removals. The fifteen original normal validation receipts are closed with exit code zero. The latest dated entry records the exact selected scope and remaining semantic work.
+
+### Preceding normal verification point (historical)
+
 Staged call parent dispatch bounds pass normal verification at `910e3e1d`. Normal verification passed build 5805, seven empty strict Source checks, literal private/normal TYPE/AXIOMS agreement for 117 declarations and byte-identical complete logs for 19 interfaces. The cumulative census grew from 19614 to 19730: 116 additions, one literally unchanged generated-helper overlap and no removals. The eleven original normal receipts are closed with exit code zero. See the final dated entry for the exact semantic boundaries and remaining work.
 
-The latest committed and normally verified code commit is `910e3e1d`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The staged call parent unit was committed and normally verified at `910e3e1d`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -3660,3 +3668,42 @@ The five named-call proofs retain the positive payload, original Header, selecte
 The shared numeric expression/function-body induction still has to provide strict hypotheses for the actual executed children; Source and native grades remain independent. Joining the original raw global argument list to the Header, connecting the independent named physical-arity receipt, composing the outer indirect parent and proving named invocation preservation remain open. General bodies, the full expression/statement grammar and authentic compiler occurrence and receiving-diagnostic coverage are unfinished. Specialization, evidence and comptime composition, general failures/export errors and the final public theorem across all passes remain open.
 
 The separate real-cell read proof and finite compiler-factory proof remain reviewed work in the private proof area, outside these eleven registration targets. The first objective remains 100%; the second stays about 70%, and the equally weighted overall estimate stays about 85%. These estimates describe completed work, not declaration counts or remaining time.
+
+## 2026-10-11: Finite reads and named body composition; normally verified in two code commits
+
+`staged-finite-reads-and-named-body-composition` is committed and normally verified in two logical code groups. The finite read/body commit `6d4fcbd855b387845dba4ca511ea66d6dde0c020` contains six proof Sources, 64 module-owned declarations and fourteen selected interfaces. The closure/named commit `ed30cd3be8a2f9b11e5ff21387a19f8fcfdbde99` contains five Sources, 56 declarations and twenty-two interfaces. Together they add eleven Sources with 120 complete owned declarations and 36 selected interfaces. Each Source retains its isolated author pass and two genuine nonauthor Source reviews.
+
+All eleven native and eleven normal strict Source logs are empty. Complete private/normal TYPE/AXIOMS blocks agree literally for all 120 declarations. The complete 36-interface API logs are byte-identical: 108225 bytes, SHA-256 `79a0c159998685d6e97f3c1c1302f389d6ffcba81df469023faf1e62582b2e2c`. The independent selected BEFORE contains 2274 modules and the compiled native environment 2285.
+
+The cumulative census grows from 19921 to 20041: 120 additions, no prior overlaps and no removals. Build 5827 passes. The complete normal snapshot grows from 5749 to 5760 rows, with eleven new regular Source/olean/ilean triples. Only the existing `CoreLowering` object pair changes. The dependency cone and actual rebuild set each contain thirteen modules; all 4985 protected artifacts remain unchanged.
+
+The selected tooling has independent Root and Entry reviews; the inherited snapshot-copy change retains its genuine Entry and Formal reviews. Both code commits and all fifteen original normal validation receipts are closed with exit code zero. The complete checks have SHA-256 `ce9c5751d088be73b668e9f76a8f64ce7f2c126d873dc8ae03102f7ccf498ed6`. Metadata finalization reuses the original fifteen closed normal validation receipts without repeating their kernel checks.
+
+Preservation constructs native execution from a Source derivation; reflection constructs an independently graded Source derivation from native completion. Neither direction equates the two grades.
+
+The finite fold now includes real-cell reads alongside literals, transparent grouping and ordered pairs. It builds the accepted compiler tree and literal-site certificate once, then constructs each child's meaning internally. A read uses its genuine lowered-read receipt and raw Source typing; generalized local reads remain outside this branch. The represented result, lazy mapping writes, full returned pool and reached caller post are retained. Preservation uses the independent Source trace grade. Reflection uses structural descent through a transparent group at the same native grade, and strict native descent only at actual evaluated bind children.
+
+Named read diagnostics come from the actual prepared Header, diagnostic receipt and receiving issuer. The uninitialized-read interpretation is indexed by the certified read occurrence, including its binder, span and reason token; decoding does not manufacture a Source fault. The Header and accepted terminal receipt supply the real child typing and finite compiler tree. The finite named body producer calls this fold directly in both directions, removing its external child-expression meaning and arbitrary certificate callback. It keeps the actual parameter entry and selected body scope, and carries the returned heap, store, map, world, relation and PostAdmission.
+
+The closure factories retain an exact accepted body child and its authentic static support. Their application consumers still require meaning for the actual selected child. Named invocation preservation constructs the real parameter allocation, uses the selected terminal body, and restores the caller at the returned pool. Named argument rows retain the original selected node and metadata, the Source argument types and the independent physical-count receipt. The literal named carrier supports both application directions at those exact endpoints. These generic invocation/application proofs still consume strict child hypotheses; they do not yet instantiate the new finite body producer.
+
+| Concrete proof route | Constructed result | Remaining boundary |
+| --- | --- | --- |
+| Accepted finite read/product tree | Read, literal, group and pair preservation/reflection with internally constructed child meanings and the exact reached post. | Raw typing, accepted lowering, ledger/runtime/coverage and supported finite syntax. |
+| Finite named terminal body | Actual Header child and receiving read diagnostics feed body preservation/reflection without an external expression law. | Genuine prepared Header, diagnostic receipt, receiving issuer and per-selected-scope static/runtime facts. |
+| Exact closure child factory | Retains the accepted requested child and its static support at the actual body scope. | Its application consumer still needs the selected child semantic hypothesis. |
+| Named invocation and application | Actual parameter allocation, original selected argument rows, literal carrier and saved-caller restoration. | Connect the finite body producer to these generic child hypotheses and then to the outer global parent. |
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected scope / interfaces | Eleven Sources / 36 interfaces; all eleven have two genuine nonauthor Source reviews. |
+| Logical code groups | Finite read/body: six Sources / 64 declarations / 14 interfaces; closure/named: five Sources / 56 declarations / 22 interfaces. |
+| Complete literal audit | 120 owned declarations; exact private/normal TYPE/AXIOMS and complete API bytes. |
+| Native and normal strict Source checks | Eleven empty logs in each phase. |
+| Independent selected BEFORE / compiled native environment | 2274 / 2285 modules. |
+| Cumulative census | 19921 → 20041 (+120); no overlaps or removals. |
+| Registered build / normal module snapshot | 5827 jobs passed / 5749 → 5760 rows; eleven regular new Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 13 / 13. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / fifteen CLOSED0 receipts. |
+
+The next finite named invocation/application proof will retain the substantive parameter-entry and restoration proofs and replace their body call with the finite named body producer. It must preserve the actual Source-selected child in preservation and the authenticated Header/descriptor scope in reflection, with real ledger, runtime, coverage, ordinary-metadata and finite-syntax premises. The shared numeric expression/function-body family, outer named/global joins, full compiler and Source grammar, general bodies and complete receiving-diagnostic coverage remain open. Specialization, evidence and comptime composition, general failure/export-error correspondence and the public theorem across all passes are unfinished. Estimates remain 100% for runtime unification, about 70% for the second objective and about 85% overall.
