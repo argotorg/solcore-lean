@@ -357,3 +357,22 @@ These interfaces retain the same compiler occurrence, issuer and reached caller.
 | `PreparedPositiveCalleeBoundaryReceipts` | `function_origin`, `payload_origin`, `boundary_at_payload` |
 
 The argument factories discharge concrete packet and arity obligations at accepted call branches. The eligible body ports still require the numeric expression/body induction. Reached stage rejection remains an independent Source staging outcome before argument evaluation; a boundary receipt does not establish complete recursive staging coverage.
+
+## Accepted indirect parent and eligible function interfaces (`22a68060`)
+
+Accepted-call proofs construct the builtin or user argument packet at the actual argument post, then invoke the original application and restore the saved caller. The following modules are registered through `CoreLowering`.
+
+| Module suffix | Main interfaces |
+| --- | --- |
+| `PreparedOriginGlobalsCarriers` | `carrier`, `forget_slots` |
+| `PreparedPairedCatalogNamedProfileFamilies` | `profiles` at the actual body entry with both native typings |
+| `PreparedHeaderRootPolicyReceipts` | `header_action`, `at_successor`, `at_accepted` |
+| `PreparedAcceptedBuiltinArgumentPackets` | `builtin_member`, `at_arguments`, `packets` |
+| `PreparedAcceptedBuiltinIndirectParentBounds` | `preserves`, `reflects` |
+| `PreparedAcceptedUserIndirectParentBounds` | `UserCallee`, closure/global constructors, `user_packets`, `preserves`, `reflects` |
+| `PreparedIndirectCalleeReflection` | `reflects_value`, `reflects_fault` |
+| `PreparedPairedOriginNamedCallBounds` | `preserves_calls`, `reflects_calls` |
+| `PreparedEligiblePairedExpressionFamilies` | Pointwise and budgeted `ExpressionPreserves` / `ExpressionReflects`, `preserves_at_prefix`, `reflects_at_prefix` |
+| `PreparedEligibleSelectedLambdaRecipes` | `RawLambda`, ordinary/principal `CompilerInputs`, `Recipes`, `preserves_at`, `reflects_at` |
+
+Builtin application closes through the original primitive proof. User application retains strict closure or named body hypotheses. The eligible expression interfaces describe the needed induction hypotheses; they do not close the numeric expression/body induction. Actual first- and second-stage acceptance remain explicit. A rejected first-stage guard retains its separate Source staging judgment before arguments. Second-stage rejection occurs after argument evaluation and remains a separate pending branch. Complete scoped rejection and compiler occurrence coverage remain unfinished.
