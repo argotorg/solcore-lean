@@ -1862,3 +1862,25 @@ The finite closure body proof retains a fixed accepted BodyWith with both compil
 Metadata finalization reuses the original thirteen closed validation receipts without repeating their kernel checks.
 
 The shared numeric expression/function-body family and general callee/argument recursion remain open. The finite named and closure application proofs do not yet instantiate every generic whole-call child hypothesis. Constructing the fixed finite closure support from every actual compiler path still needs genuine reachable certificate transport. Wider expression/statement grammar, general bodies, complete receiving-diagnostic coverage, specialization/evidence/comptime composition and the final public theorem across all passes are unfinished. Runtime unification remains 100%; the second objective remains about 70%, with an equally weighted overall estimate of about 85%. These are estimates of completed work, not declaration counts or remaining time.
+
+## 2026-10-11: Finite closure dispatch and arbitrary tuple proof boundaries
+
+`staged-finite-call-dispatch-and-tuple-folds` is normally verified in three code commits: `fb42f8c2` adds the finite closure parent, static transport and terminal packet (three modules, thirteen interfaces); `280557de` adds the arbitrary tuple fold and compiler issuer (two modules, six interfaces); `a48286e4` connects the whole-call and user dispatch branches (six modules, eight interfaces). The eleven modules expose 27 selected interfaces and 156 owned declarations. Each Source has two genuine nonauthor Source reviews.
+
+All eleven fresh private and normal strict Source checks closed with empty output. Complete TYPE/AXIOMS and API audits passed, and the private and normal API logs are byte-identical (142486 bytes). The native import closure grew from 2319 to 2330 modules. The registered build completed 5847 jobs; normal Source/BOTH rows grew from 5769 to 5780. The only changed existing object was `CoreLowering`; all eleven new modules have regular objects, all thirteen modules in the reverse dependency cone were rebuilt, and 4985 protected artifacts stayed unchanged. The cumulative census grew from 20218 to 20374, with 156 additions, no overlap and no removals. Metadata finalization reuses the original fifteen closed validation receipts without repeating their kernel checks.
+
+| Boundary | Retained authority and limit |
+| --- | --- |
+| Finite closure body and packet | Same Association, accepted tree and parameter context; actual selected Source scope and certified read diagnostics remain inputs. No external child meaning is assumed. |
+| Compiler-view transport | Genuine reachability, LocalView and Avoids; raw expression typing remains independent of metadata transport. |
+| Arbitrary tuples | Actual ordered compiler vector and intermediate caller states; Source grades remain independent of native grades, with structural same-grade reflection for erased singleton packing. |
+| Whole-call dispatch | Actual callee/argument/application suffix and receiving table; strict caller child hypotheses remain until the recursive static caller fold is implemented. |
+
+| Validation item | Current state |
+| --- | --- |
+| Proof selection | Eleven integrated modules, 156 owned declarations and 27 selected interfaces. |
+| Native checks and literal audit | Eleven empty strict checks; complete TYPE/AXIOMS and byte-identical private/normal API logs; import closure 2319 → 2330. |
+| Normal validation and build | Fifteen closed validation receipts; 5847 build jobs; normal Source/BOTH rows 5769 → 5780; thirteen affected modules rebuilt; 4985 protected artifacts unchanged. |
+| Census and code commits | 20218 → 20374 (+156, no overlap or removals); `fb42f8c2`, `280557de`, `a48286e4`. |
+
+The next substantive cut is a recursive static caller certificate whose read/literal/group/tuple/call fold constructs those child hypotheses internally. The current tuple issuer admits groups only inside its older leaf grammar, not groups around a new arbitrary tuple or call. Finite closure transport and terminal bodies still use the narrower read/literal/group/binary-pair grammar. Authentic compiler policy, raw typing, selected Header or Association, registry/receiving diagnostics, runtime ledger and coverage remain inputs. Shared numeric expression/application/body induction, general recursive bodies, broader expression and statement grammar, and the final public all-pass theorem remain unfinished. Runtime unification stays 100%; the second objective stays about 70%, and the equally weighted overall estimate stays about 85%.
