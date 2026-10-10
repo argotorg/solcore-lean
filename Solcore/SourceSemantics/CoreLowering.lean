@@ -1301,7 +1301,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteClosureBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteClosureParentBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteClosureStaticTransport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTupleTreeBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteClosureTerminalPackets
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTupleCompilerReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
