@@ -1748,3 +1748,47 @@ The whole indirect parent reflection and preservation dispatch proofs, and termi
 | Code commit | `910e3e1d9f18c1fde867b7d56ef3321b5a0dd943`; seven proof Sources and registration. |
 
 The shared numeric expression/function-body induction, general named application, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public theorem across all passes are unfinished. Finite literal, group and product-tree proofs remain a separate reviewed W unit. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
+
+
+## 2026-10-11: Finite staged expressions and named call parents; normally verified in two code commits
+
+`staged-finite-expressions-and-named-call-parents` is committed and normally verified in two logical code groups. The finite expression commit `5a5bdeffec4008cb4d6e972224b90b8a2df048db` contains four proof Sources, 102 module-owned declarations and 32 selected interfaces. The whole-call and named-call commit `ef75b2c3b86a2e2bc140ea274ae9ff55d86c99d2` contains seven Sources, 89 declarations and 18 interfaces. Together they add eleven Sources with 191 complete owned declarations and 50 selected interfaces. Each Source retains its isolated author pass and two genuine nonauthor Source reviews.
+
+All eleven native strict logs and all eleven normal strict logs are empty. Complete private/normal TYPE/AXIOMS blocks agree literally for all 191 declarations. The complete 50-interface API logs are byte-identical: 112327 bytes, SHA-256 `df758c72f09c97d7e7f17fee86fd94d67595c6adf117e6103b2bd158aa7f4058`. The independent selected BEFORE contains 2240 modules and the compiled native environment 2251.
+
+The cumulative census grows from 19730 to 19921: 191 additions, no prior overlaps and no removals. Build 5816 passes. The complete normal snapshot grows from 5738 to 5749 rows, with eleven new regular Source/olean/ilean triples. Only the existing `CoreLowering` object pair changes. The dependency cone and actual rebuild set each contain thirteen modules; all 4985 protected artifacts remain unchanged.
+
+The original package tooling has independent Root and Entry reviews. The separate snapshot-copy successor was authored by Root and independently reviewed by Entry and Formal. Both code commits closed with exit code zero at actual receipt `0cb4aa`; normal validation records fifteen original CLOSED0 receipts. Its complete checks have SHA-256 `d48582c7b3291b9093a30b010b37f4805312f1b812e93c272b08ec96ed21d8cc`. Metadata finalization reuses the original fifteen closed validation receipts without repeating their kernel checks.
+
+| Proof boundary | Retained authority | Unfinished obligation |
+| --- | --- | --- |
+| Finite expression extraction | Same accepted compiler Tree, LiteralSites, Source lookup/type identities and exact emitted children. | Every compiler alternative and the general numeric E/F family. |
+| Transparent grouping | Structural child receipt; reflection uses the same native grade. | No blanket strict-native-grade descent is assumed for transparent heads. |
+| Ordered pairs | Actual left/right native bind children and intermediate caller state. | Independent Source/native grades and real strict child hypotheses at evaluated binds. |
+| Whole indirect calls | Actual scoped gates, receiving fault rows and exact caller post for completed branches. | The retained global prefix still needs its independent named argument/arity/application join. |
+| Terminal named invocation | Same Header, dictionary, parameter receipt, selected body scope and restored returned pool. | General named bodies, invocation preservation and outer parent composition. |
+
+The finite expression fold constructs preservation and reflection for literals, transparent grouping and ordered two-element products from the actual compiler Tree and LiteralSites receipts. It retains original Source typing, the represented result, both staged and semantic failure interpretations, and the reached heap, store and caller post. Preservation descends on the independent Source trace grade. Reflection descends structurally through a transparent group at the same native evaluation grade; only children of actual evaluated pair binds require a strictly smaller native grade. The finite fold constructs its child meanings internally.
+
+The whole indirect parent dispatch composes real callee, first-gate, ordered argument and physical-arity failure branches with accepted builtin and supported terminal closure application. Completed cases keep the exact restored caller PostAdmission at the returned pool. The named/global alternative retains the literal application prefix and reached Admission for an independent named consumer. First-gate stage failure and after-arguments semantic arity failure retain their distinct Source rules, tags and scopes.
+
+The five named-call proofs retain the positive payload, original Header, selected record, Source scope, dictionary and actual parameter/body state. Supported terminal body preservation and reflection use the genuine compiled child with a separate strict child hypothesis. Invocation reflection constructs the parameter receipt, reflects the supported body once, and restores the saved caller in the actual returned pool. Its complete caller post refers to that same execution.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope / interfaces | Eleven Sources / 50 interfaces; all eleven have two genuine nonauthor Source reviews. |
+| Logical code groups | Finite expressions: four Sources / 102 declarations / 32 interfaces; whole and named calls: seven Sources / 89 declarations / 18 interfaces. |
+| Complete owned declarations / literal audit | 191; complete private/normal TYPE/AXIOMS agreement and byte-identical complete API logs. |
+| Native and normal strict Source checks | Eleven empty logs in each phase. |
+| Independent selected BEFORE / compiled native environment | 2240 / 2251 modules. |
+| Cumulative census | 19730 → 19921 (+191); no overlaps or removals. |
+| Registered build | 5816 jobs passed. |
+| Complete normal module snapshot | 5738 → 5749 rows; eleven new regular Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 13 / 13. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / fifteen CLOSED0 receipts. |
+| Finite-expression code commit | `5a5bdeffec4008cb4d6e972224b90b8a2df048db`; four Sources and their registration. |
+| Whole-and-named-call code commit | `ef75b2c3b86a2e2bc140ea274ae9ff55d86c99d2`; seven Sources and their registration. |
+
+The shared numeric expression/function-body induction still has to provide strict hypotheses for the actual executed children; Source and native grades remain independent. Joining the original raw global argument list to the Header, connecting the independent named physical-arity receipt, composing the outer indirect parent and proving named invocation preservation remain open. General bodies, the full expression/statement grammar and authentic compiler occurrence and receiving-diagnostic coverage are unfinished. Specialization, evidence and comptime composition, general failures/export errors and the final public theorem across all passes remain open.
+
+The separate real-cell read proof and finite compiler-factory proof remain reviewed work in the private proof area, outside these eleven registration targets. The first objective remains 100%; the second stays about 70%, and the equally weighted overall estimate stays about 85%. These estimates describe completed work, not declaration counts or remaining time.
