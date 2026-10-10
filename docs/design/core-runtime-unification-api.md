@@ -208,6 +208,8 @@ Reached read and index diagnostics are integrated at `ef85a057`. The proof uses 
 
 Direct prepared closure origins and ordinary/principal formation are integrated at `6dbfa243`. The actual Code, History, Support, Source origin, captures and positive cells remain together in the returned state. The stage-scope receipts recover the original owner and source scope from authentic sidecars. Receiving and body registries remain independent. Normal verification passes build 5677, four empty strict logs, 139 declarations and 47 API checks with complete literal private/normal agreement; the cumulative census is 17675. Invocation adapters and the shared expression/body family still need normal integration and complete compiler occurrence factories.
 
+Selected named Header provenance and physical arity are integrated at `ee27dc50`. The Header factory uses the actual selected diagnostic issuer and retains its original Source and resolved dictionary. Authentic compiler selection supplies selected ordinary dictionary emptiness, Source typing and validity, and the full physical binder count. Normal verification passes build 5681, four empty strict logs, 27 declarations and 15 API checks with literal private/normal agreement; the cumulative census is 17702. Finite inventory construction and the strict expression/body induction remain in progress.
+
 The shared expression/body family remains incomplete. Static factories must construct the same retained body's compiler Tree at every genuine occurrence context, scope and read budget. Source typing alone does not justify globally empty evidence or coercions, or exclude generalized local cells. Actual compiler alternatives require their own coverage. Ordinary execution also needs authentic guard acceptance at each reached indirect call; separate staged judgments preserve guard rejection before arguments. The final recursive staging proof must cover the remaining Source forms.
 
 Next: close one receiving-model expression/body family across closure, named/global, builtin and method calls, with positive cells and genuine physical arity, Source stage gates and public diagnostic inclusion. Then compose the actual specialization, evidence and comptime transformations through the public compilation and input boundary. Generalized/scheme cells, compound assignment, general failure/export-error correspondence and the final all-pass theorem remain incomplete. The first objective remains 100%; the second stays about 70%, and the equally weighted overall estimate stays about 85%. These are estimates of completed work, not declaration counts or remaining time.
@@ -288,3 +290,14 @@ These interfaces keep actual reached read/index witnesses and the selected recei
 | `CallableIndexedOwnedPreparedDirectStageScopeReceipts` | `sidecar_owner`, `code_scope`, `scope_at` and `original_scope` |
 
 These interfaces retain the actual prepared source, captures and returned state. They recover the original stage scope without assuming its guard result. Body and receiving registries are independent. Normal verification passes build 5677, four empty strict logs, 139 declarations and 47 API checks with complete literal private/normal agreement; the cumulative census is 17675. The strict mixed expression/body family, full compiler alternatives and the final public theorem remain unfinished.
+
+## Selected named static proof interfaces (`ee27dc50`)
+
+| Module | Main interfaces |
+| --- | --- |
+| `CallableIndexedOwnedSelectedNamedHeaderReceipts` | `diagnostic_typed`, `reissued`, `reissued_view`, `reason_at`, `canonical_at_prepared`, `retained_at_prepared` |
+| `CallableIndexedOwnedPreparedOrdinaryNamedEvidenceReceipts` | `selected_evidence_empty`, `SourceReceiptCover`, `SourceReceiptCover.selected_empty` |
+| `CallableIndexedOwnedPreparedNamedSourceFactoryFacts` | `source_types`, `selected_validity` |
+| `CallableIndexedOwnedNamedPhysicalArityReceipts` | `bound_parameters`, `dispatch_parameter_count`, `named_parameter_count`, `before_application` |
+
+These factories retain the same actual selected row, diagnostic issuer, complete ordered Source metadata and resolved dictionary. Ordinary selected dictionary emptiness and physical arity follow from authentic receipts. Arity does not establish acceptance of the separate staging guard. The finite Source receipt cover remains an input; constructing that inventory, closing the shared expression/body induction and covering all public compiler branches remain unfinished.
