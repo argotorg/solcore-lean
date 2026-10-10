@@ -1293,6 +1293,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedParentBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectTerminalCallBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureCanonicalChildFactories
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
