@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-10.
+Created: 2026-09-30. Updated: 2026-10-11.
 
 ## Current Implementation Status
 
@@ -10,10 +10,11 @@ Created: 2026-09-30. Updated: 2026-10-10.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `d9f2a0c4`. Staged indirect call grades, scoped boundaries, reached admission and ordered arguments are integrated. |
-| Latest completed normal verification | Build 5762; ten empty strict Source checks; 234 declarations and 71 APIs with literal private/normal TYPE/AXIOMS and complete API agreement; cumulative 19250 (+234, no overlap or removals). |
+| Latest normally verified implementation commit | `1507404b`. Receiving call diagnostics, supported terminal bodies, builtin application and whole indirect argument prefixes are integrated. |
+| Latest completed normal verification | Build 5774; twelve empty strict Source checks; 184 declarations and 66 APIs with literal private/normal TYPE/AXIOMS and complete API agreement; cumulative 19434 (+184, no overlap or removals). |
 | Working implementation | Accepted builtin and user calls construct their argument packets and restore the actual caller. Paired named and positive lambda interfaces retain compiler authority. The numeric expression/body induction and complete compiler alternatives remain unfinished. |
-| Latest proof scope | `staged-indirect-call-runtime-bounds` retains exact semantic/stage failures, actual reached caller state and independent Source/Core grades. Numeric E/F, complete compiler coverage and the final theorem remain open. |
+| Latest proof scope | `staged-call-diagnostics-terminal-bodies` retains actual receiving-table call diagnostics, supported terminal body meaning and whole indirect argument prefixes, with exact reached state and independent Source/Core grades. Numeric E/F, complete compiler coverage and the final theorem remain open. |
+| Latest completed proof package | `staged-call-diagnostics-terminal-bodies`: twelve Sources and 66 selected interfaces for receiving call diagnostics, supported terminal bodies, builtin application and whole argument prefixes, normally verified at `1507404b`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. The `7b0f562f` compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 declarations audited at that checkpoint match literally between private and normal builds. The estimates remain about 70% for the second objective and about 85% overall.
@@ -30,7 +31,7 @@ The public root adapter derives its strong invocation pair from the same actual 
 
 The program adapter joins that same result to genuine ProgramOutcome and successful positive Word export through the original start/resume receipts. The successful Word boundary requires its genuine positive validation budget. These ports cover the finite accepted fixture; general failures, export errors, mixed bodies and the final all-pass theorem remain incomplete. No bootstrap, parameter entry or public action is replayed.
 
-The latest committed and normally verified code commit is `d9f2a0c4`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `1507404b`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -93,6 +94,22 @@ Reading order:
 - Develop proofs: Sections 6 and 7
 - Choose a task to resume: The implementation status above and Sections 8, 9, and 12
 - Assess completion: Sections 10 and 11
+
+## Staged call diagnostics and terminal bodies (2026-10-11; `1507404b`)
+
+The normally verified `staged-call-diagnostics-terminal-bodies` package adds twelve proof Sources and twelve CoreLowering imports at `1507404b`, with 184 owned declarations and 66 selected interfaces. Its preceding baseline was code `d9f2a0c4`, documentation `1a84839a6a2ae4013c191b3988a92f129e0bc68c` and cumulative census 19250. Author checks and two independent nonauthor Source reviews per Source are preserved. This proof package retains the existing Core syntax, runtime and public execution definitions.
+
+Receiving diagnostic adapters use the same accepted preparation, original codebook row and actual receiving `IssuedAt` to transport the literal call token into the completion table. Original and substituted call metadata remain distinct. First-gate rejection retains the actual invocation, failing Source scope, guard frame and callee post as `Failure.stage`, including an arity error raised by that guard. Physical arity rejection at the second gate is `Failure.semantic` after evaluated arguments, with the actual argument state and effects. The public decoded semantic view adds concrete arity counts to the existing assignment view.
+
+Terminal proofs cover accepted `returnSome` or singleton expression-tail bodies. The compiler receipt supplies the actual child action, predecessor fuel, result type and emitted footer. The same SourceView recovers the original terminal occurrence. Strict child preservation/reflection proves the literal emitted `code.rename`, retaining the original BodyResult, independent Source/Core grades, exact failure tags and reached caller relation. Successful values carry Source admission; stage failures retain stable rows at the reached state. The body meaning follows from the concrete compiler and child receipts.
+
+The builtin application producer uses represented ordered scalar arguments and the original primitive proof. The whole indirect argument-prefix reflection starts from the actual native parent, constructs raw callee and argument typing from the original Source rows, resolves the first gate and uses the concrete ordered-argument fold. It retains stage rejection at the callee post, argument failures at the reached argument post, or the actual remaining application suffix after values.
+
+Complete application/body dispatch, recursive statement bodies, the numeric E/F induction and authentic static factories for every compiler alternative remain open. The supported recursive Source profile still needs its remaining grammar. Specialization, evidence and comptime composition, general failure/export-error correspondence and the final public all-pass theorem are unfinished. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
+
+Normal verification passed one registered build with 5774 jobs, twelve empty strict Source checks, and literal private/normal TYPE/AXIOMS agreement for all 184 complete owned declarations and complete API agreement for 66 selected interfaces, using only the standard three axioms. The cumulative census grew from 19250 to 19434 (+184), with no overlap or removals. The normal pre-install snapshot contained 5695 module rows; the current snapshot contains 5707. The independent BEFORE environment measured 2195 project modules and the compiled environment measured 2207. The existing CoreLowering object changed for registration; all fourteen modules in the reverse dependency cone were rebuilt, and all 4985 protected artifacts passed. All sixteen original normal receipts closed with exit code 0.
+
+The independent BEFORE capture closed at `95d226` (`5e30b5`, session 27207); private full/API audit at `e7c58a` (`c4bffc`, session 59109); packet freeze at `ffc386` (`36c4ae`, session 8576); registered build at `335796` (`dc06e6`, session 62711); and normal validation at `8d3298` (`b29544`, session 57723). Code commit `1507404b20264fc300b656e9971205f3ecbf90a8` closed at `07591c`. The saved `staged-call-diagnostics-terminal-bodies-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `f3558384cf298fe7fd4d535eaafe4cd535435adef662b8e24db3b3cf80e013ba`. The checkpoint uses the original sixteen closed validation receipts; metadata finalization does not repeat their kernel runs.
 
 ## Staged indirect call proof package (2026-10-10; `d9f2a0c4`)
 
