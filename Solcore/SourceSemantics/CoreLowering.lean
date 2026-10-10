@@ -1140,6 +1140,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeDi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectFormationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectStageScopeReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedNamedHeaderReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryNamedEvidenceReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSourceFactoryFacts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalArityReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
