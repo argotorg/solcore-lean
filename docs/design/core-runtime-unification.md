@@ -10,9 +10,9 @@ Created: 2026-09-30. Updated: 2026-10-10.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `ee27dc50`. Selected named Headers retain their actual diagnostic issuer, Source dictionary, typing and physical binder count. |
-| Latest completed normal verification | Build 5681; four empty strict logs; full 27 / API 15 with literal private/normal TYPE/AXIOMS and API agreement; cumulative 17702 (+27, no overlaps or removals). |
-| Working implementation | Native child collectors, reached diagnostics, direct prepared closure formation and selected named static receipts pass normal checks. Finite inventory production and the shared expression/body induction are next. Complete compiler alternatives remain unfinished. |
+| Latest normally verified implementation commit | `ae3d5594`. Finite named inventories, compiler body profiles and actual bootstrap ownership are integrated. |
+| Latest completed normal verification | Build 5695; fourteen empty strict logs; full 344 / API 102 with literal private/normal TYPE/AXIOMS and API agreement; cumulative 18046 (+344, no overlaps or removals). |
+| Working implementation | Native child collectors, reached diagnostics, prepared closure formation, finite named inventory/profile construction and bootstrap ownership pass normal checks. A common function-value model and the shared expression/body induction are next. Complete compiler alternatives remain unfinished. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. The `7b0f562f` compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 declarations audited at that checkpoint match literally between private and normal builds. The estimates remain about 70% for the second objective and about 85% overall.
@@ -29,7 +29,7 @@ The public root adapter derives its strong invocation pair from the same actual 
 
 The program adapter joins that same result to genuine ProgramOutcome and successful positive Word export through the original start/resume receipts. The successful Word boundary requires its genuine positive validation budget. These ports cover the finite accepted fixture; general failures, export errors, mixed bodies and the final all-pass theorem remain incomplete. No bootstrap, parameter entry or public action is replayed.
 
-The latest committed and normally verified code commit is `6dbfa243`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `ae3d5594`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -71,7 +71,7 @@ Reached read and index diagnostics are integrated at `ef85a057`. The proof uses 
 
 Direct prepared closure origins and ordinary/principal formation are integrated at `6dbfa243`. The actual Code, History, Support, Source origin, captures and positive cells remain together in the returned state. The stage-scope receipts recover the original owner and source scope from authentic sidecars. Receiving and body registries remain independent. Normal verification passes build 5677, four empty strict logs, 139 declarations and 47 API checks with complete literal private/normal agreement; the cumulative census is 17675. Invocation adapters and the shared expression/body family still need normal integration and complete compiler occurrence factories.
 
-Selected named Header provenance and physical arity are integrated at `ee27dc50`. The Header factory uses the actual selected diagnostic issuer and retains its original Source and resolved dictionary. Authentic compiler selection supplies selected ordinary dictionary emptiness, Source typing and validity, and the full physical binder count. Normal verification passes build 5681, four empty strict logs, 27 declarations and 15 API checks with literal private/normal agreement; the cumulative census is 17702. Finite inventory construction and the strict expression/body induction remain in progress.
+Prepared named inventories and bootstrap call correspondence are integrated at `ae3d5594`. The finite inventory retains actual selected Headers, diagnostic issuers and full Source dictionaries. Compiler extraction constructs each body profile at its actual parameter-entry state. Bootstrap ownership retains the original initialization key through complete key embeddings. Normal verification passes build 5695, fourteen empty strict logs, 344 declarations and 102 API checks with literal private/normal agreement; the cumulative census is 18046. The common function-value model and strict expression/body induction remain in progress.
 
 The shared expression/body family remains incomplete. Static factories must construct the same retained body's compiler Tree at every genuine occurrence context, scope and read budget. Source typing alone does not justify globally empty evidence or coercions, or exclude generalized local cells. Actual compiler alternatives require their own coverage. Ordinary execution also needs authentic guard acceptance at each reached indirect call; separate staged judgments preserve guard rejection before arguments. The final recursive staging proof must cover the remaining Source forms.
 
@@ -590,6 +590,7 @@ InputsRelated(ρ₀, sourceInputs, sourceHeap, coreInputs, coreStore)
 ```
 
 Successful `compile` includes plan validation, compilation, and successful Core checking.
+Compilation success does not itself establish `EntryValid`. Public specialization can accept an unused type substitution containing a nominal type absent from the Source program. Entry validity checks the full substitution range, including unused replacements. Such an input is outside this theorem until its independent entry validity is established.
 Do not make the main theorem trivial by requiring callers to supply proof fields that assume meaning preservation itself.
 
 **A. Preservation of Successful Execution**

@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest committed and normally verified code commit is `e0edb2ec`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `ae3d5594`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -1543,3 +1543,17 @@ Each Source had two genuine nonauthor reviews. The independent BEFORE capture me
 Validation: `selected-named-static-authority-receipts-checks.json` (SHA-256 `d0945377acf47c2fc5cc1abc459faa308ce5d680721b4ba05c6498c742617b47`) and `selected-named-static-authority-receipts-root-normal-summary.json`, both local verification records in `/private/tmp/solcore-owned-functions-resume-20261007`.
 
 The finite Header inventory and raw per-occurrence compiler factories are still being constructed. Closure/named/global/builtin recursion, recursive staged rejection, full evidence/coercion/generalized-local alternatives, specialization/comptime composition, general failure/export-error correspondence and the final public theorem remain open. Estimates stay at 100% for the first objective, about 70% for the second and about 85% overall.
+
+## 2026-10-10: Prepared named inventories and bootstrap correspondence (`ae3d5594`)
+
+Fourteen proof modules connect actual selected named definitions to compiler body profiles and initialization authority. A finite inventory keeps each selected Header, diagnostic issuer, Source view, complete substitution and resolved dictionary. Body profiles come from the coupled compiler collector at the actual parameter-entry state. Typed continuations preserve the original caller pool, ordered arguments, dictionary and independent Source/native grades.
+
+Bootstrap receipts use the actual prepared initialization and retain its complete ownership key through key embeddings. The finite inventory supplies cache, global-size and empty-local facts. Reached range receipts transport the complete substitution range, including unused replacements, from genuine valid instantiation. They do not infer Source entry validity from public compiler acceptance.
+
+Normal verification passes one registered build with 5695 jobs, fourteen empty strict Source logs, all 344 module-owned declarations and 102 API checks. Complete private/normal literal TYPE/AXIOMS and API logs agree, using only the standard three axioms. The cumulative census grows from 17702 to 18046, with no overlaps or removals. The 5614-row pre-install snapshot, actual 2241-module environment, one existing umbrella object delta, sixteen-module dependency cone/rebuild and all 4985 protected artifacts pass.
+
+Each Source had two genuine nonauthor reviews. Authentic BEFORE captured 2227 modules before any private proof Source existed. Source copies compiled on their first Root attempts; author objects were not installed. Eighteen successful normal receipts are retained. A metadata-only verifier attempt failed because Root omitted the prior census count from its bindings; the immutable corrected bindings use the actual count 17702. No successful Source check was replayed.
+
+Validation: `prepared-catalog-named-profile-bootstrap-checkpoint-checks.json` (SHA-256 `53001c0f2cc55657926a05cc0d23121ddedd78b56e7a0d3c056385f9bd33c9be`) and `prepared-catalog-named-profile-bootstrap-checkpoint-root-normal-summary.json`, local verification records in `/private/tmp/solcore-owned-functions-resume-20261007`.
+
+The common function/cell model must retain positive bootstrap and selected compiler provenance through formation, reads and state extension. Actual reached-input coverage, receiving diagnostic interpretation, remaining compiler alternatives, strict expression/body induction and all-pass public correctness remain unfinished. Work estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
