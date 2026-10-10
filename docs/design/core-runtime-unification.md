@@ -10,11 +10,11 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `6844f7b0`. Retained callee/argument prefixes, builtin whole parents and terminal closure entry/body/application producers are integrated. |
-| Latest completed normal verification | Build 5798; twelve empty strict Source checks; 74 declarations and 26 APIs with literal private/normal TYPE/AXIOMS and complete API agreement; cumulative 19614 (+74, no overlap or removals). |
-| Working implementation | Retained callee typing and ordered arguments support builtin whole-parent preservation/reflection. Actual parameter admission and terminal child proofs construct the covered closure body/application and caller post. Shared numeric induction and complete compiler alternatives remain unfinished. |
-| Latest proof scope | `staged-parent-and-terminal-lambda-producers` joins retained callee/argument transport, builtin parents and concrete terminal closure entry/body/application. Shared numeric induction, general user/named dispatch, complete compiler coverage and the final theorem remain open. |
-| Latest completed proof package | `staged-parent-and-terminal-lambda-producers`: twelve Sources, 74 owned declarations and 26 selected interfaces, normally verified at `6844f7b0`. |
+| Latest normally verified implementation commit | `910e3e1d`. Contextual terminal closure parents, builtin preservation dispatch and actual Source call prefixes are integrated. |
+| Latest completed normal verification | Build 5805; seven empty strict Source checks; 117 declarations and 19 APIs with literal private/normal TYPE/AXIOMS and byte-exact API agreement; cumulative 19730 (+116, one unchanged prior overlap, no removals). |
+| Working implementation | Actual closure argument rows and terminal body/application proofs construct preservation and reflection with the restored caller post. Source prefix dispatch covers real callee, first-gate and argument failures; builtin/user dispatch retains the named/global branch. Shared numeric induction and complete compiler alternatives remain unfinished. |
+| Latest proof scope | `staged-call-parent-dispatch-bounds` connects concrete terminal closure parents, receiving physical-arity faults, builtin preservation dispatch and actual Source call prefixes. Named/global completion, shared numeric induction, complete compiler coverage and the final theorem remain open. |
+| Latest completed proof package | `staged-call-parent-dispatch-bounds`: seven Sources, 117 owned declarations and 19 selected interfaces, normally verified at `910e3e1d`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. The `7b0f562f` compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 declarations audited at that checkpoint match literally between private and normal builds. The estimates remain about 70% for the second objective and about 85% overall.
@@ -1164,3 +1164,36 @@ The shared numeric induction for expressions and function bodies, general user a
 | Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 14 / 14. |
 | Protected artifacts / original normal receipts | All 4985 unchanged / sixteen CLOSED0 receipts. |
 | Code commit | `6844f7b0f788069d858f42a29343c7c5900829ba`; twelve Sources and registration. |
+
+## Staged call parent dispatch bounds (2026-10-11; normally verified at `910e3e1d`)
+
+`staged-call-parent-dispatch-bounds` is committed and normally verified at `910e3e1d`. Its seven proof Sources have 117 complete module-owned declarations and 19 selected interfaces. Every native and normal strict Source log is empty. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 19-interface API logs are byte-identical. Each Source has its preserved isolated author pass and two genuine nonauthor Source reviews; the tooling has independent Root and Entry reviews.
+
+The cumulative census is 19730 from 19614: 116 additions, one prior overlap and no removals. The overlapping generated helper, `ContextualCellOrigins.functions.congr_simp`, is literally unchanged. Build 5805 passes. The selected dependency BEFORE contains 2228 modules and the compiled native environment 2235; the complete normal snapshot changes from 5731 to 5738 rows. Seven new Source/olean/ilean triples are installed. Only the existing `CoreLowering` object pair changes, within the nine-module dependency cone and nine actual rebuilds. All 4985 protected artifacts remain unchanged.
+
+The eleven original normal validation receipts are closed with exit code zero. Normal validation closed at `ce446f`; code commit `910e3e1d9f18c1fde867b7d56ef3321b5a0dd943` closed at `83f21b`. The saved `staged-call-parent-dispatch-bounds-checks.json` has SHA-256 `9360372c1f3e5abb9ab873e023f542f20bcfd58b301b46851ee5d9e7a108df4c`. Metadata finalization reuses the original eleven closed validation receipts without repeating their kernel checks.
+
+The Source prefix dispatch constructs the real callee, first-gate and ordered argument failure parents, or retains the successful application prefix. Builtin preservation dispatch consumes the actual callee and ordered values once: an accepted physical count uses the original primitive parent, while a mismatch produces the authentic receiving semantic arity fault at the argument post. The user branch retains the same application prefix.
+
+For closures, the successful argument producer derives original Source arity and contextual binder rows at the actual callee and argument heaps. Terminal application preservation and reflection use the genuine Code, support and selected body scope, consume their strict body child once, and restore the saved caller at the actual returned pool. Closure/global dispatch handles a closure's physical mismatch at the same reached argument state. It retains the global prefix for its independent named arity and application consumer.
+
+Completed parent results keep the reached heap, store, map, world, relation and caller PostAdmission. A successful retained application prefix keeps reached Admission while its whole application remains open. First-gate stage failure and second-gate semantic arity failure retain different Source constructors, tags and scopes. Physical arity comes from the actual Source bindings and codebook row.
+
+The strict child hypotheses describe the actual executed child: preservation uses a smaller Source trace grade, and reflection uses a smaller native evaluation grade. The shared numeric induction must still construct these hypotheses. Source and native grades are independent, and static compiler receipts retain authority rather than a completed execution law.
+
+The whole indirect parent reflection and preservation dispatch proofs, and terminal named invocation reflection, have saved author passes and genuine peer reviews in W. They are outside the seven registration targets, and their normal integration remains open. The whole parent proofs retain the actual named/global application prefix for further composition. Named invocation constructs the real parameter receipt, reflects the supported terminal body at its selected scope, and restores the caller; joining original raw global arguments, named physical arity, the outer indirect parent and the preservation direction remain separate obligations.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope / interfaces | Seven Sources / 19 interfaces; all seven have genuine Source2. |
+| Complete owned declarations / literal audit | 117; complete private/normal TYPE/AXIOMS blocks agree literally and complete API logs are byte-identical. |
+| Native and normal strict Source checks | Seven empty logs in each phase. |
+| Selected dependency BEFORE / compiled native environment | 2228 / 2235 modules. |
+| Cumulative census | 19614 → 19730 (+116); one literally unchanged generated-helper overlap; no removals. |
+| Registered build | 5805 jobs passed. |
+| Complete normal module snapshot | 5731 → 5738 rows; seven new regular Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 9 / 9. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / eleven CLOSED0 receipts. |
+| Code commit | `910e3e1d9f18c1fde867b7d56ef3321b5a0dd943`; seven proof Sources and registration. |
+
+The shared numeric expression/function-body induction, general named application, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public theorem across all passes are unfinished. Finite literal, group and product-tree proofs remain a separate reviewed W unit. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.

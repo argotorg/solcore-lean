@@ -1711,3 +1711,40 @@ Semantic and stage failures retain distinct tags, scopes and actual receiving in
 | Code commit | `6844f7b0f788069d858f42a29343c7c5900829ba`; twelve Sources and registration. |
 
 The shared numeric induction for expressions and function bodies, general user and named application dispatch, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public all-pass theorem are unfinished. Finite proofs for literals and grouping, the separate closure argument-typing producer and the whole builtin preservation dispatcher are outside this checkpoint. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
+
+## 2026-10-11: Staged call parent dispatch audit; normally verified at `910e3e1d`
+
+`staged-call-parent-dispatch-bounds` is committed and normally verified at `910e3e1d`. Its seven proof Sources have 117 complete module-owned declarations and 19 selected interfaces. Every native and normal strict Source log is empty. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 19-interface API logs are byte-identical. Each Source has its preserved isolated author pass and two genuine nonauthor Source reviews; the tooling has independent Root and Entry reviews.
+
+The cumulative census is 19730 from 19614: 116 additions, one prior overlap and no removals. The overlapping generated helper, `ContextualCellOrigins.functions.congr_simp`, is literally unchanged. Build 5805 passes. The selected dependency BEFORE contains 2228 modules and the compiled native environment 2235; the complete normal snapshot changes from 5731 to 5738 rows. Seven new Source/olean/ilean triples are installed. Only the existing `CoreLowering` object pair changes, within the nine-module dependency cone and nine actual rebuilds. All 4985 protected artifacts remain unchanged.
+
+The eleven original normal validation receipts are closed with exit code zero. Normal validation closed at `ce446f`; code commit `910e3e1d9f18c1fde867b7d56ef3321b5a0dd943` closed at `83f21b`. The saved `staged-call-parent-dispatch-bounds-checks.json` has SHA-256 `9360372c1f3e5abb9ab873e023f542f20bcfd58b301b46851ee5d9e7a108df4c`. Metadata finalization reuses the original eleven closed validation receipts without repeating their kernel checks.
+
+| Proof boundary | Retained authority and result | Unfinished obligation |
+| --- | --- | --- |
+| Closure arguments | Actual positive callee, original raw argument typing, physical Source bindings and represented contextual rows. | Compiler occurrence/typing factories and the shared child induction. |
+| Terminal application | Genuine Code/support and actual selected scope, independent Source/native grades, body result and exact saved-caller restoration. | Supported terminal selection and smaller executed expression/body hypotheses; general bodies remain open. |
+| Builtin/user classification | Actual codebook row and physical count; original primitive parent or unchanged user application prefix with reached Admission. | General named/global application assembly. |
+| Source prefix failure | Actual scoped first-gate rejection or semantic failure at its reached callee/argument post. | Authentic receiver authority and exact original SourceView/CallView; no whole-source equality is inferred. |
+| Receiving arity rejection | Actual second-gate mismatch, selected receiving row and same argument state, heap/store and caller PostAdmission. | Shared numeric caller family and complete supported occurrence coverage. |
+
+The strict child hypotheses describe the actual executed child: preservation uses a smaller Source trace grade, and reflection uses a smaller native evaluation grade. The shared numeric induction must still construct these hypotheses. Source and native grades are independent, and static compiler receipts retain authority rather than a completed execution law.
+
+No packed native type establishes physical arity, and no erased token establishes an arbitrary Source scope. First-guard stage rejection and after-arguments semantic arity failure retain their distinct tags and Source rules. The selected change is seven proof Sources and seven registration imports; no runtime/Core or public operational definition is changed by this proof package.
+
+The whole indirect parent reflection and preservation dispatch proofs, and terminal named invocation reflection, have saved author passes and genuine peer reviews in W. They are outside the seven registration targets, and their normal integration remains open. The whole parent proofs retain the actual named/global application prefix for further composition. Named invocation constructs the real parameter receipt, reflects the supported terminal body at its selected scope, and restores the caller; joining original raw global arguments, named physical arity, the outer indirect parent and the preservation direction remain separate obligations.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope / interfaces | Seven Sources / 19 interfaces; all seven have genuine Source2. |
+| Complete owned declarations / literal audit | 117; complete private/normal TYPE/AXIOMS blocks agree literally and complete API logs are byte-identical. |
+| Native and normal strict Source checks | Seven empty logs in each phase. |
+| Selected dependency BEFORE / compiled native environment | 2228 / 2235 modules. |
+| Cumulative census | 19614 → 19730 (+116); one literally unchanged generated-helper overlap; no removals. |
+| Registered build | 5805 jobs passed. |
+| Complete normal module snapshot | 5731 → 5738 rows; seven new regular Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 9 / 9. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / eleven CLOSED0 receipts. |
+| Code commit | `910e3e1d9f18c1fde867b7d56ef3321b5a0dd943`; seven proof Sources and registration. |
+
+The shared numeric expression/function-body induction, general named application, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public theorem across all passes are unfinished. Finite literal, group and product-tree proofs remain a separate reviewed W unit. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
