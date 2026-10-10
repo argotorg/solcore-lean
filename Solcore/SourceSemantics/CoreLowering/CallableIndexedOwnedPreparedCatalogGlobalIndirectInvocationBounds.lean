@@ -19,7 +19,7 @@ open RecursiveNamedCatalogInvocationBounds (Below)
 open CallableIndexedOwnedPreparedCatalogNamedBodyContinuations (Profile ProfilesFor FlowPreserves FlowReflects)
 
 section Invocation
-variable {compiled : SourceCoreUnifiedCompilation.Compiled} 
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -255,7 +255,7 @@ theorem application_reflects_at {rawD : SourceTypedRuntime.RuntimeEvidenceEnviro
 end Invocation
 
 section SourceAdmission
-variable {compiled : SourceCoreUnifiedCompilation.Compiled} 
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
   {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {source : Dynamic.GlobalFunction}
 
