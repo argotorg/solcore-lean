@@ -32,6 +32,10 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed proof scope
 
+`staged-parent-and-terminal-lambda-producers` is normally verified at `6844f7b0`: twelve proof Sources, 74 owned declarations and 26 selected interfaces. The cumulative census is 19614. Builtin parents and covered terminal closure entry/body/application are connected; shared numeric induction, general user/named dispatch and complete compiler coverage remain open.
+
+### Preceding staged call dispatch and terminal closure proof scope
+
 `staged-call-dispatch-and-terminal-closures` is normally verified at `6c165e33`: twelve proof Sources, 106 owned declarations and 42 selected interfaces. The cumulative census is 19540. Whole accepted call dispatch, numeric E/F induction and complete compiler coverage remain open.
 
 ### Preceding staged call diagnostics and terminal body proof scope
@@ -44,9 +48,9 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed normal verification point
 
-Staged call dispatch and terminal closures pass normal verification at `6c165e33`. Normal verification passed build 5786, twelve empty strict Source checks, and literal private/normal agreement for 106 declarations and 42 APIs. The cumulative census grew from 19434 to 19540, with no overlap or removals. See the final dated entry for the exact semantic boundaries and remaining work.
+Staged parent and terminal lambda producers pass normal verification at `6844f7b0`. Normal verification passed build 5798, twelve empty strict Source checks, and literal private/normal agreement for 74 declarations and 26 APIs. The cumulative census grew from 19540 to 19614, with no overlap or removals. See the final dated entry for the exact semantic boundaries and remaining work.
 
-The latest committed and normally verified code commit is `6c165e33`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `6844f7b0`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -3532,3 +3536,40 @@ The application suffix preserves the literal accepted second gate and exposes th
 Retained-callee argument prefixes (258), builtin whole-parent reflection/preservation (134/154), terminal body typing (96), metadata-body bounds (131), parameter-admission and concrete body-join drafts, and retained-callee fault/builtin dispatch drafts (127/216) are outside this twelve-Source checkpoint.
 
 The numeric staged expression/argument/application/body induction, authentic static factories for complete compiler alternatives, general call/body dispatch and remaining recursive Source grammar remain unfinished. Specialization, evidence and comptime composition, general failure/export-error correspondence and the final public all-pass theorem are open. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall; declaration counts do not measure semantic completion.
+
+## 2026-10-11: Staged parent and terminal lambda producers at `6844f7b0`
+
+`staged-parent-and-terminal-lambda-producers` is committed and normally verified at `6844f7b0`. The twelve proof Sources contribute 74 complete module-owned declarations and 26 selected interfaces. All twelve strict Source logs are empty, and complete private/normal TYPE/AXIOMS blocks and API logs agree literally. The cumulative census grows from 19540 to 19614: 74 additions, no overlaps and no removals. Each Source has its preserved isolated author pass and two genuine nonauthor Source reviews.
+
+The registered build passes 5798 jobs. The independent selected dependency BEFORE contains 2218 modules; the compiled native environment contains 2230. The complete normal module snapshot changes from 5719 to 5731 rows. Twelve new regular Source/olean/ilean triples are installed. The only changed existing object pair is `CoreLowering`, within the fourteen-module dependency cone and fourteen actual rebuilds. All 4985 protected artifacts remain unchanged. Sixteen original normal validation receipts are closed with exit code zero. The checkpoint will use those original sixteen receipts; metadata finalization does not repeat their kernel runs.
+
+Normal validation closed at `cc2cfe`; code commit `6844f7b0f788069d858f42a29343c7c5900829ba` closed at `5cea3d`. The saved `staged-parent-and-terminal-lambda-producers-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `bf9f5a5635e9876005265366485f4f31bad0d297b3478785aa453b778561c456`. The selected BEFORE environment of 2218 modules is separate from the complete pre-install snapshot of 5719 module rows.
+
+The strict child hypotheses are induction assumptions for the actual executed child: its Source trace grade is smaller for preservation, or its native evaluation grade is smaller for reflection. The shared numeric induction must still construct these hypotheses; the static compiler receipts do not contain a completed execution law.
+
+| Proof route | Concrete result | Remaining input or composition |
+| --- | --- | --- |
+| Retained callee and arguments | Whole-parent reflection retains the actual callee post and typing, reached argument state, fault tags or application suffix. | Induction hypotheses for smaller child traces, with genuine scoped compiler/tree receipts. |
+| Builtin parent | Literal physical count and ordered scalar representations feed the original primitive; preservation/reflection construct the parent and caller post. | A common numeric child family and complete caller occurrence factories. |
+| Fault/builtin dispatch | The retained prefix yields the actual fault, accepted builtin result, physical arity rejection or user application prefix. | Whole user/named application dispatch; a preservation-dispatch counterpart remains outside this unit. |
+| Successful values prefix | Actual callee preservation and the original ordered fold produce represented values at the reached argument state. | Strict expression preservation for the evaluated children. |
+| Raw argument typing | Successful Source traces produce ordered raw typing and heap extension at the final argument heap. | Real original typing, runtime validity and selected closure facts. |
+| Parameter admission | Actual allocation, frames and preserved administrative rows construct deep entry admission. | Authentic capture/history, raw arguments and initial caller/heap facts. |
+| Terminal body/application | Original typing and metadata identify the used child; actual Code/registry derive scope; strict child expression hypotheses construct body/application meaning and caller restoration. | The supported terminal receipt and child certificate, strict child expression hypotheses and general body grammar. |
+
+Values retain Source admission at the reached state. Faults retain stable rows, their exact semantic or stage tag, scope and the same reached caller relation. First-gate rejection precedes arguments; physical arity failure follows evaluated arguments. No token decoder supplies arbitrary Source scope or complete body meaning.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope / interfaces | Twelve Sources / 26 public interfaces. |
+| Complete owned declarations / literal audit | 74; complete private/normal TYPE/AXIOMS and API logs agree literally. |
+| Independent selected BEFORE / compiled native environment | 2218 / 2230 modules. |
+| Native and normal strict Source checks | Twelve empty logs in each phase. |
+| Cumulative census | 19540 → 19614 (+74); no overlaps or removals. |
+| Registered build | 5798 jobs passed. |
+| Complete normal module snapshot | 5719 → 5731 rows; twelve new regular Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 14 / 14. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / sixteen CLOSED0 receipts. |
+| Code commit | `6844f7b0f788069d858f42a29343c7c5900829ba`; twelve Sources and registration. |
+
+The shared numeric induction for expressions and function bodies, general user and named application dispatch, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public all-pass theorem are unfinished. Finite proofs for literals and grouping, the separate closure argument-typing producer and the whole builtin preservation dispatcher are outside this checkpoint. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.

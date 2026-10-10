@@ -455,3 +455,34 @@ The fault relation retains the actual receiving table and same result model/map/
 Retained-callee argument prefixes (258), builtin whole-parent reflection/preservation (134/154), terminal body typing (96), metadata-body bounds (131), parameter-admission and concrete body-join drafts, and retained-callee fault/builtin dispatch drafts (127/216) are outside this twelve-Source checkpoint.
 
 The numeric staged expression/argument/application/body induction, authentic static factories for complete compiler alternatives, general call/body dispatch and remaining recursive Source grammar remain unfinished. Specialization, evidence and comptime composition, general failure/export-error correspondence and the final public all-pass theorem are open. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall; declaration counts do not measure semantic completion.
+
+## Staged parent and terminal lambda interfaces (2026-10-11; normally verified at `6844f7b0`)
+
+`staged-parent-and-terminal-lambda-producers` is committed and normally verified at `6844f7b0`. The twelve proof Sources contribute 74 complete module-owned declarations and 26 selected interfaces. All twelve strict Source logs are empty, and complete private/normal TYPE/AXIOMS blocks and API logs agree literally. The cumulative census grows from 19540 to 19614: 74 additions, no overlaps and no removals. Each Source has its preserved isolated author pass and two genuine nonauthor Source reviews.
+
+The registered build passes 5798 jobs. The independent selected dependency BEFORE contains 2218 modules; the compiled native environment contains 2230. The complete normal module snapshot changes from 5719 to 5731 rows. Twelve new regular Source/olean/ilean triples are installed. The only changed existing object pair is `CoreLowering`, within the fourteen-module dependency cone and fourteen actual rebuilds. All 4985 protected artifacts remain unchanged. Sixteen original normal validation receipts are closed with exit code zero. The checkpoint will use those original sixteen receipts; metadata finalization does not repeat their kernel runs.
+
+Normal validation closed at `cc2cfe`; code commit `6844f7b0f788069d858f42a29343c7c5900829ba` closed at `5cea3d`. The saved `staged-parent-and-terminal-lambda-producers-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `bf9f5a5635e9876005265366485f4f31bad0d297b3478785aa453b778561c456`. The selected BEFORE environment of 2218 modules is separate from the complete pre-install snapshot of 5719 module rows.
+
+The strict child hypotheses are induction assumptions for the actual executed child: its Source trace grade is smaller for preservation, or its native evaluation grade is smaller for reflection. The shared numeric induction must still construct these hypotheses; the static compiler receipts do not contain a completed execution law.
+
+Module suffixes below are under `Solcore.SourceSemantics.CoreLowering.CallableIndexedOwned`. All 26 selected interfaces match the complete native and normal API logs. The 74 complete module-owned declarations also have literal private/normal TYPE/AXIOMS agreement.
+
+| Module suffix | Selected interfaces | Semantic boundary |
+| --- | --- | --- |
+| `PreparedStagedIndirectRetainedCalleeArgumentPrefix` | `ApplicationPrefix`, `ApplicationPrefix.to_original`, `reflects_arguments` | Retains callee PostAdmission and raw typing through the actual argument fold; projects to the original application prefix. |
+| `PreparedStagedBuiltinParentBounds` | `reflects_suffix` | Accepted builtin suffix constructs the original whole Source parent and full reached caller post. |
+| `PreparedStagedBuiltinParentPreservation` | `preserves_parent` | The actual primitive and original binds construct the whole native builtin parent and caller post. |
+| `PreparedStagedTerminalBodyTyping` | `child_typed`, `at_parameters` | Original body typing selects the genuine terminal child and declared result at parameter entry. |
+| `PreparedStagedTerminalMetadataBodyBounds` | `source_head`, `preserves_body`, `reflects_body` | Actual metadata identifies the Source head; terminal body preservation/reflection retain the real used child and full post. |
+| `PreparedLambdaParameterAdmission` | `install_rows`, `after_parameters`, `at_parameters` | Real parameter allocation and row histories construct entry admission without a supplied support law. |
+| `PreparedStagedIndirectRetainedCalleeFaultDispatch` | `reflects_fault_or_application` | Whole-parent reflection returns the exact fault post or application prefix with retained callee typing. |
+| `PreparedStagedIndirectBuiltinApplicationDispatch` | `UserApplicationPrefix`, `UserApplicationPrefix.to_retained`, `ParentResult`, `reflects_builtin_or_user` | Reflection constructs the accepted builtin result or arity fault, preserving the real user application prefix. |
+| `PreparedStagedIndirectValuesPrefix` | `ValuesPrefix`, `preserves_values` | Strict callee P and the concrete ordered fold retain represented values at the actual argument post. |
+| `PreparedStagedSuccessfulArgumentTyping` | `values_at`, `closure_at` | Successful Source arguments produce raw ordered typing, heap extension and the actual closure frame. |
+| `PreparedStagedTerminalLambdaBodyBounds` | `source_body_at`, `native_body_at` | Code/registry derive child scope and parameter entry facts internally before strict terminal body preservation/reflection. |
+| `PreparedStagedTerminalLambdaApplicationBounds` | `application_preserves`, `application_reflects` | Constructs the terminal body port at actual entry, then uses original closure application and caller restore once. |
+
+The dependent caller post, callee typing, ordered argument heap and restored pool refer to the same actual execution. Builtin application has no function-body child. Terminal closure application still uses a strict expression hypothesis for its genuine compiled child. Physical gates retain their actual codebook count and rejected tag; Source and native grades are independent.
+
+The shared numeric induction for expressions and function bodies, general user and named application dispatch, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public all-pass theorem are unfinished. Finite proofs for literals and grouping, the separate closure argument-typing producer and the whole builtin preservation dispatcher are outside this checkpoint. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.

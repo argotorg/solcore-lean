@@ -1675,3 +1675,39 @@ Normal validation closed at `0799ac`; code commit `6c165e334b61a044e480e96ea9da7
 Retained-callee argument prefixes (258), builtin whole-parent reflection/preservation (134/154), terminal body typing (96), metadata-body bounds (131), parameter-admission and concrete body-join drafts, and retained-callee fault/builtin dispatch drafts (127/216) are outside this twelve-Source checkpoint.
 
 The numeric staged expression/argument/application/body induction, authentic static factories for complete compiler alternatives, general call/body dispatch and remaining recursive Source grammar remain unfinished. Specialization, evidence and comptime composition, general failure/export-error correspondence and the final public all-pass theorem are open. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall; declaration counts do not measure semantic completion.
+
+## 2026-10-11: Staged parent and terminal lambda producer audit at `6844f7b0`
+
+`staged-parent-and-terminal-lambda-producers` is committed and normally verified at `6844f7b0`. The twelve proof Sources contribute 74 complete module-owned declarations and 26 selected interfaces. All twelve strict Source logs are empty, and complete private/normal TYPE/AXIOMS blocks and API logs agree literally. The cumulative census grows from 19540 to 19614: 74 additions, no overlaps and no removals. Each Source has its preserved isolated author pass and two genuine nonauthor Source reviews.
+
+The registered build passes 5798 jobs. The independent selected dependency BEFORE contains 2218 modules; the compiled native environment contains 2230. The complete normal module snapshot changes from 5719 to 5731 rows. Twelve new regular Source/olean/ilean triples are installed. The only changed existing object pair is `CoreLowering`, within the fourteen-module dependency cone and fourteen actual rebuilds. All 4985 protected artifacts remain unchanged. Sixteen original normal validation receipts are closed with exit code zero. The checkpoint will use those original sixteen receipts; metadata finalization does not repeat their kernel runs.
+
+Normal validation closed at `cc2cfe`; code commit `6844f7b0f788069d858f42a29343c7c5900829ba` closed at `5cea3d`. The saved `staged-parent-and-terminal-lambda-producers-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `bf9f5a5635e9876005265366485f4f31bad0d297b3478785aa453b778561c456`. The selected BEFORE environment of 2218 modules is separate from the complete pre-install snapshot of 5719 module rows.
+
+The strict child hypotheses are induction assumptions for the actual executed child: its Source trace grade is smaller for preservation, or its native evaluation grade is smaller for reflection. The shared numeric induction must still construct these hypotheses; the static compiler receipts do not contain a completed execution law.
+
+| Boundary | Retained authority and constructive proof | Remaining obligation |
+| --- | --- | --- |
+| Callee/argument transport | Actual callee PostAdmission and raw typing survive the original strict ordered fold at the reached state. | Construct the common smaller-child induction hypotheses for all supported occurrences. |
+| Builtin signature and parent | Actual BuiltinAt and physical count identify ordered scalar rows; the original primitive, suffix and binds construct preservation/reflection. | Complete numeric/compiler coverage and user/named dispatch. |
+| Dispatch classification | Actual scoped row selects faults, builtin application, arity rejection or the retained user prefix without rerunning children. | The user payload/body branch and an integrated preservation dispatcher. |
+| Parameter state | Authentic allocation and frames update the real row histories and construct Source entry admission. | Genuine captures, Code/history, caller rows and raw typed arguments. |
+| Terminal Source and scope | Original body typing/metadata recover the used child; Code/registry derive its Source scope. | The actual supported terminal compiler receipt and child certificate. |
+| Body/application result | Strict expression preservation/reflection feeds the real terminal footer and saved-caller restoration; full reached posts are retained. | Construct the shared numeric expression/body induction; cover nonterminal bodies and general callable alternatives. |
+
+Semantic and stage failures retain distinct tags, scopes and actual receiving interpretations. No packed native type establishes physical arity, no token establishes arbitrary scope, and no completed body or application meaning is a static premise. The scope is twelve proof Sources and twelve registration imports; runtime/Core and public execution definitions are outside this proof change.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope / interfaces | Twelve Sources / 26 public interfaces. |
+| Complete owned declarations / literal audit | 74; complete private/normal TYPE/AXIOMS and API logs agree literally. |
+| Independent selected BEFORE / compiled native environment | 2218 / 2230 modules. |
+| Native and normal strict Source checks | Twelve empty logs in each phase. |
+| Cumulative census | 19540 → 19614 (+74); no overlaps or removals. |
+| Registered build | 5798 jobs passed. |
+| Complete normal module snapshot | 5719 → 5731 rows; twelve new regular Source/BOTH triples. |
+| Existing object delta / dependency cone / actual rebuilds | Only `CoreLowering` / 14 / 14. |
+| Protected artifacts / original normal receipts | All 4985 unchanged / sixteen CLOSED0 receipts. |
+| Code commit | `6844f7b0f788069d858f42a29343c7c5900829ba`; twelve Sources and registration. |
+
+The shared numeric induction for expressions and function bodies, general user and named application dispatch, full statement grammar and authentic compiler occurrence coverage remain open. Specialization, evidence and comptime composition, general failures/export errors and the final public all-pass theorem are unfinished. Finite proofs for literals and grouping, the separate closure argument-typing producer and the whole builtin preservation dispatcher are outside this checkpoint. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
