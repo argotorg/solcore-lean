@@ -30,7 +30,11 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest completed proof scope
+### Latest normally verified proof scope
+
+`staged-finite-call-bodies-and-global-joins` is normally verified in `c37620a6`, `b568df64` and `ef72f57e`: nine proof Sources, 177 owned declarations and 37 selected interfaces. The cumulative census is 20218, with 177 additions and no overlap or removals. Finite named invocation and global dispatch and finite closure applications construct supported body meaning internally. Generic whole-call joins retain authentic strict child hypotheses; shared numeric induction, whole-call finite specialization and full grammar remain open.
+
+### Preceding finite read and named body proof scope
 
 `staged-finite-reads-and-named-body-composition` is normally verified in `6d4fcbd8` and `ed30cd3b`: eleven proof Sources, 120 owned declarations and 36 selected interfaces. The cumulative census is 20041, with 120 additions and no overlap or removals. The finite read/product fold and named body construct child meaning internally. Exact closure factories and generic named invocation/application keep authentic selected scopes and reached posts; finite invocation specialization, outer global joins, shared numeric induction and full grammar remain open.
 
@@ -59,6 +63,10 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 `staged-indirect-call-runtime-bounds` is normally verified at `d9f2a0c4`: ten proof Sources, 234 owned declarations and 71 selected APIs. It retains actual reached state and exact staged outcomes. The numeric expression/body induction and complete compiler coverage remain open.
 
 ### Latest completed normal verification point
+
+Finite call bodies and global joins pass normal verification in `c37620a6`, `b568df64` and `ef72f57e`. Build 5836 passes, all nine strict Source logs are empty, all 177 complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 37-interface API logs are byte-identical. The cumulative census grows from 20041 to 20218: 177 additions, no overlaps and no removals. The thirteen original normal validation receipts are closed with exit code zero. The selected environment grows from 2312 to 2321 modules, and the normal snapshot from 5760 to 5769 rows. The latest dated entry records the exact selected scope and remaining semantic work.
+
+### Preceding finite read and named body normal verification point (historical)
 
 Finite reads and named body composition pass normal verification in `6d4fcbd8` and `ed30cd3b`. Build 5827 passes, all eleven strict Source logs are empty, all 120 complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 36-interface API logs are byte-identical. The cumulative census grows from 19921 to 20041: 120 additions, no overlaps and no removals. The fifteen original normal validation receipts are closed with exit code zero. The latest dated entry records the exact selected scope and remaining semantic work.
 
@@ -3707,3 +3715,33 @@ The closure factories retain an exact accepted body child and its authentic stat
 | Protected artifacts / original normal receipts | All 4985 unchanged / fifteen CLOSED0 receipts. |
 
 The next finite named invocation/application proof will retain the substantive parameter-entry and restoration proofs and replace their body call with the finite named body producer. It must preserve the actual Source-selected child in preservation and the authenticated Header/descriptor scope in reflection, with real ledger, runtime, coverage, ordinary-metadata and finite-syntax premises. The shared numeric expression/function-body family, outer named/global joins, full compiler and Source grammar, general bodies and complete receiving-diagnostic coverage remain open. Specialization, evidence and comptime composition, general failure/export-error correspondence and the public theorem across all passes are unfinished. Estimates remain 100% for runtime unification, about 70% for the second objective and about 85% overall.
+
+## 2026-10-11: Finite call bodies and global joins; normal verification complete
+
+The selected `staged-finite-call-bodies-and-global-joins` work contains nine proof Sources and 37 selected interfaces. The three generic parent/global joins expose seven interfaces; the two static closure-child producers expose twelve; the four finite call/body proofs expose eighteen. Each selected Source has an isolated author pass and two genuine nonauthor Source reviews. Normal verification passes for all nine Sources, 177 module-owned declarations and 37 selected interfaces. The generic joins contribute 68 declarations, the static closure-child producers 27, and the finite call/body proofs 82. The three code commits are `c37620a6`, `b568df64` and `ef72f57e`.
+
+Preservation constructs native execution from an actual Source derivation. Reflection reconstructs a Source derivation from native completion with an independent Source grade. Both retain the actual reached heap, store, map, world, relation and returned pool. Completed application and parent results retain full caller PostAdmission, including the original tag and scope of nested stage failures.
+
+Finite named invocation and application now call the finite named body producer directly at the actual parameter entry. Preservation retains every actual Source-selected body scope; reflection retains the authenticated Header/descriptor-selected scope. The proof runs the original parameter installation and body prefix once, uses the finite read/literal/group/pair body once, and restores the saved caller at the actual returned pool. It no longer takes an external child-expression meaning hypothesis or arbitrary certificate callback.
+
+The finite named parent derives typed Source arguments and represented native parameters from the authentic ordered rows and independent physical-count receipt. Its accepted suffix uses that same finite application once. The finite global dispatcher recovers the real Header, dictionary, capture and Source frame from the positive named payload. It either runs the finite parent at the selected equal count or proves the actual Source semantic arity failure with the exact receiving diagnostic at the reached argument post. First-gate `Failure.stage` and second-gate semantic arity failure remain separate.
+
+The finite closure body proof retains a fixed accepted BodyWith with both compiler-view and original-Source trees. Authentic frame typing and the selected Source scope provide the raw child type; the exact original child certificate feeds the finite evaluator. Its application proofs construct read/literal/group/pair child meaning internally and retain the restored caller post. Genuine finite-family compiler transport, terminal/read policy, certified read-fault interpretation, registry extension and runtime premises remain explicit.
+
+The generic named parent/global joins and whole terminal indirect-call proof connect actual callee and ordered-argument prefixes to the original payload application and native suffix. They keep transient effects and the complete restored caller post. These generic ports still require authentic terminal factories and strict child induction hypotheses: those hypotheses assert child execution only below the enclosing numeric budget.
+
+The static closure-child producers retain the exact accepted child in both original and compiler Sources, then restrict a requested child certificate to that literal occurrence. They do not infer raw typing from a metadata view or turn an arbitrary static certificate family into finite semantics.
+
+| Validation item | Completed result |
+| --- | --- |
+| Selected proof scope | Nine Sources / 37 interfaces, with isolated author passes and two genuine nonauthor Source reviews each. |
+| Native and normal strict checks; full literal TYPE/AXIOMS/API audits | All nine strict Source logs are empty. All 177 complete module-owned TYPE/AXIOMS blocks agree literally; the 37-interface API logs are byte-identical (195517 bytes, SHA-256 `a601df8af4153992798319bc93f9f0d4870323bf5cebf5f4a30114070d61d9ec`). |
+| Independent selected BEFORE and compiled environment | 2312 modules before the selection; 2321 in the actual compiled environment. |
+| Registered build and normal snapshot | Build 5836 passes; the full normal snapshot grows from 5760 to 5769 rows. All thirteen original normal validation receipts close with exit code zero. |
+| Cumulative additions, overlaps, removals and current census | 20041 → 20218: 177 additions, no prior overlap and no removals. |
+| Existing object changes, dependency cone, rebuilds and protected artifacts | Only the existing `CoreLowering` object changes. The reverse dependency cone and actual rebuild each contain eleven modules; all 4985 protected artifacts remain unchanged. |
+| Code commits | Generic named joins: `c37620a6` (three Sources / seven interfaces / 68 declarations); static closure children: `b568df64` (two / twelve / 27); finite call bodies: `ef72f57e` (four / eighteen / 82). |
+
+Metadata finalization reuses the original thirteen closed validation receipts without repeating their kernel checks.
+
+The shared numeric expression/function-body family and general callee/argument recursion remain open. The finite named and closure application proofs do not yet instantiate every generic whole-call child hypothesis. Constructing the fixed finite closure support from every actual compiler path still needs genuine reachable certificate transport. Wider expression/statement grammar, general bodies, complete receiving-diagnostic coverage, specialization/evidence/comptime composition and the final public theorem across all passes are unfinished. Runtime unification remains 100%; the second objective remains about 70%, with an equally weighted overall estimate of about 85%. These are estimates of completed work, not declaration counts or remaining time.
