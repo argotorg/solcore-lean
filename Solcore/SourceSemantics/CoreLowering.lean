@@ -1127,6 +1127,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAs
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeForHeaderCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeImperativeCollectors
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeSitePolicies
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
