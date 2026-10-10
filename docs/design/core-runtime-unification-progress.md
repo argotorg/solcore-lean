@@ -20,7 +20,7 @@ In the progress response to the user on 2026-10-04, the second objective was est
 
 In the progress response to the user on 2026-10-05, the second objective was estimated at about 70% by amount of work. This reflects semantic preservation and completion reflection for integer functions with staging, preservation of reference authority in the catalog, derivation of lambda permissions from actual compiler receipts, and connection of additional child expressions to the sole compiler induction. The first objective remains 100%, and the overall estimate with equal weighting is about 85%. The final main theorem connecting general functions, lambda, indirect calls, method, and all passes is incomplete; the percentages do not estimate remaining time.
 
-## Current status (2026-10-10)
+## Current status (2026-10-11)
 
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
@@ -32,6 +32,10 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed proof scope
 
+`staged-call-dispatch-and-terminal-closures` is normally verified at `6c165e33`: twelve proof Sources, 106 owned declarations and 42 selected interfaces. The cumulative census is 19540. Whole accepted call dispatch, numeric E/F induction and complete compiler coverage remain open.
+
+### Preceding staged call diagnostics and terminal body proof scope
+
 `staged-call-diagnostics-terminal-bodies` is normally verified at `1507404b`: twelve proof Sources, 184 owned declarations and 66 selected interfaces. The cumulative census is 19434. Whole application/body dispatch, numeric E/F induction and complete compiler coverage remain open.
 
 ### Preceding staged indirect call proof scope
@@ -40,9 +44,9 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 ### Latest completed normal verification point
 
-Staged call diagnostics and terminal bodies pass normal verification at `1507404b`. Normal verification passed build 5774, twelve empty strict Source checks, and literal private/normal agreement for 184 declarations and 66 APIs. The cumulative census grew from 19250 to 19434, with no overlap or removals. See the final dated entry for the exact semantic boundaries and remaining work.
+Staged call dispatch and terminal closures pass normal verification at `6c165e33`. Normal verification passed build 5786, twelve empty strict Source checks, and literal private/normal agreement for 106 declarations and 42 APIs. The cumulative census grew from 19434 to 19540, with no overlap or removals. See the final dated entry for the exact semantic boundaries and remaining work.
 
-The latest committed and normally verified code commit is `1507404b`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `6c165e33`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -3498,3 +3502,33 @@ This proof package retains existing Core AST/runtime and public operational defi
 Normal verification passed one registered build with 5774 jobs, twelve empty strict Source checks, and literal private/normal TYPE/AXIOMS agreement for all 184 complete owned declarations and complete API agreement for 66 selected interfaces, using only the standard three axioms. The cumulative census grew from 19250 to 19434 (+184), with no overlap or removals. The normal pre-install snapshot contained 5695 module rows; the current snapshot contains 5707. The independent BEFORE environment measured 2195 project modules and the compiled environment measured 2207. The existing CoreLowering object changed for registration; all fourteen modules in the reverse dependency cone were rebuilt, and all 4985 protected artifacts passed. All sixteen original normal receipts closed with exit code 0.
 
 The independent BEFORE capture closed at `95d226` (`5e30b5`, session 27207); private full/API audit at `e7c58a` (`c4bffc`, session 59109); packet freeze at `ffc386` (`36c4ae`, session 8576); registered build at `335796` (`dc06e6`, session 62711); and normal validation at `8d3298` (`b29544`, session 57723). Code commit `1507404b20264fc300b656e9971205f3ecbf90a8` closed at `07591c`. The saved `staged-call-diagnostics-terminal-bodies-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `f3558384cf298fe7fd4d535eaafe4cd535435adef662b8e24db3b3cf80e013ba`. The checkpoint uses the original sixteen closed validation receipts; metadata finalization does not repeat their kernel runs.
+
+## 2026-10-11: Staged call dispatch and terminal closures at `6c165e33`
+
+`staged-call-dispatch-and-terminal-closures` is committed and normally verified at `6c165e33`. The twelve proof Sources contribute 106 complete module-owned declarations and 42 selected interfaces. All twelve strict Source logs are empty, and complete private/normal TYPE/AXIOMS blocks and API logs agree literally. The cumulative census grows from 19434 to 19540: 106 additions, no overlaps and no removals.
+
+The registered build passes 5786 jobs. The independent selected dependency BEFORE contains 2250 modules; the compiled native environment contains 2262. The complete normal module snapshot changes from 5707 to 5719 rows. Twelve new regular Source/olean/ilean triples are installed. The only changed existing object pair is `CoreLowering`, within the fourteen-module dependency cone and fourteen actual rebuilds. All 4985 protected artifacts remain unchanged. Sixteen original normal validation receipts are closed with exit code zero. The checkpoint uses these original sixteen closed receipts; metadata finalization does not repeat their kernel runs.
+
+Normal validation closed at `0799ac`; code commit `6c165e334b61a044e480e96ea9da7d414894817c` closed at `215010`. The saved `staged-call-dispatch-and-terminal-closures-checks.json` in `/private/tmp/solcore-owned-functions-resume-20261007` has SHA-256 `dc631c0c098aee0e8a9fec163b3141d0142c3cb429aa78878f272d15a57c1ee3`. The corrected summary distinguishes the selected BEFORE environment of 2250 modules from the complete pre-install snapshot of 5707 module rows.
+
+The selected scope joins the receiving-table fault relation to concrete first-gate rejection, second-gate arity classification, argument-fault bounds and native parent fault dispatch. First-gate rejection remains Failure.stage before arguments. Second-gate count mismatch remains Failure.semantic after arguments. Each fault carries its literal receiving token and the actual reached caller relation, heap/store and PostAdmission.
+
+The application suffix preserves the literal accepted second gate and exposes the strict payload application. Builtin row production authenticates physical count before recovering exact Source/native signatures and ordered scalar representations. Terminal compiler receipts and whole Source-body inversion supply the used terminal child. Closure invocation/application uses the strict body result at its real parameter entry and restores the actual saved caller, retaining success admission and both fault tags.
+
+| Validation item | Actual result |
+| --- | --- |
+| Selected proof scope | Twelve Sources; final closure post Source has 337 lines. |
+| Complete owned declarations / selected interfaces | 106 / 42; literal private/normal TYPE/AXIOMS and complete API agreement. |
+| Independent selected BEFORE / compiled native environment | 2250 / 2262 modules. |
+| Native and normal strict Source checks | Twelve empty logs in each phase. |
+| Cumulative census | 19434 → 19540 (+106); no overlaps or removals. |
+| Registered build | 5786 jobs passed. |
+| Complete normal module snapshot | 5707 → 5719 rows; twelve new regular Source/BOTH triples. |
+| Existing object deltas / dependency cone / actual rebuilds | Only `CoreLowering` / 14 / 14. |
+| Protected artifacts | All 4985 unchanged. |
+| Original normal validation receipts | Sixteen closed with exit code zero. |
+| Code commit | `6c165e334b61a044e480e96ea9da7d414894817c`; twelve Sources and registration. |
+
+Retained-callee argument prefixes (258), builtin whole-parent reflection/preservation (134/154), terminal body typing (96), metadata-body bounds (131), parameter-admission and concrete body-join drafts, and retained-callee fault/builtin dispatch drafts (127/216) are outside this twelve-Source checkpoint.
+
+The numeric staged expression/argument/application/body induction, authentic static factories for complete compiler alternatives, general call/body dispatch and remaining recursive Source grammar remain unfinished. Specialization, evidence and comptime composition, general failure/export-error correspondence and the final public all-pass theorem are open. Estimates remain 100% for the first objective, about 70% for the second and about 85% overall; declaration counts do not measure semantic completion.
