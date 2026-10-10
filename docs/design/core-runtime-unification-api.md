@@ -170,7 +170,7 @@ These internal proof modules connect the actual accepted compiler to a selected 
 
 The literal invocation derives its body ledger and runtime validity from the same selected Support. Source and native grades remain independent. The approved body child is literal occurrence 3; the outer indirect parent at occurrence 5 remains in the Source. Whole parent preservation and reflection now derive the callee post, pair arguments, fault exclusion, dispatch and native argument bundle internally. Both retain the actual returned caller and cumulative heap, mapping, world and administrative effects. Genuine initial heap, stored-cell authority, captures, history, environment correspondence, native typing and input admission remain explicit in the parent ports. The accepted outer body now forms its initializer and allocates its local cell once, then runs the proved parent at that actual admitted post. Reflection reconstructs whole native execution and uses determinism to align its final value and store. The returned result retains cumulative effects, the actual restored pool, every ordered row and successful raw value/deep heap typing at Γ0. The BodyState adapter derives these inputs from the same actual named parameter Receipt and runs each whole-body port once. Its returned result retains the same actual pool and successful raw PostAdmission. The existing low SourceBodyAt and NativeBodyAt interfaces remain available. The new BodyStateExitReceipts companion also populates PreparedNamedParameterReceipts.PreservesAt/ReflectsAt with genuine ReachedExit, successful PostAdmission and the same returned state.
 
-The latest committed and normally verified code commit is `0338a276`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `e0edb2ec`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -234,3 +234,19 @@ These interfaces retain static proof authority for the existing public execution
 | `CallableIndexedOwnedPreparedCanonicalFlowBounds` | `Origin`, its protocol/bridge/transport/bindings/producer/acquire ports, `preserves_flow`, `reflects_flow` |
 
 Protocol-specific finish, ordinary/principal parameter packets, qualified formation and canonical flow are integrated. The shared expression/body family still needs actual compiler occurrence typing, canonical capture and selected method-prefix alignment, reached diagnostic interpretations, and a concrete common induction over expressions and function bodies. The canonical flow producer requires genuine diagnostic table readiness and both reached error interpretations; registry extension alone supplies neither. Named and indirect dispatch, mixed bodies and the final public theorem across specialization, evidence and comptime remain unfinished.
+
+## Native compiler occurrence proof interfaces (`e0edb2ec`)
+
+| Module | Main interface |
+| --- | --- |
+| `CallableIndexedOwnedPreparedCanonicalCaptureReceipts` | Prefix/capture agreement and ordinary/principal captured parameter packets and admission |
+| `CallableIndexedOwnedPreparedPrincipalRootPrefixTyping` | `body_native_at_prefix` |
+| `CallableIndexedOwnedPreparedLambdaOccurrenceNativeTyping` | Snapshot result normalization and `certificate_native` |
+| `CallableIndexedOwnedPreparedNativeLexicalCollectors` | `tree_of_typed_flow_with_residual` |
+| `CallableIndexedOwnedPreparedNativeMatchCollectors` | Native expression/body extraction and `finite_typed_of_lower` |
+| `CallableIndexedOwnedPreparedNativeAssignmentChildren` | Raw typing, packed children, present RHS and ordered key extraction |
+| `CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors` | `Head.of_lower_with_raw_occurrences` |
+| `CallableIndexedOwnedPreparedNativeForHeaderCollectors` | `extraction_of_lowerForItems_with_coupled` |
+| `CallableIndexedOwnedPreparedNativeImperativeCollectors` | `extraction_of_typed_position_with_catalog_coupled` |
+
+These interfaces derive local child typing from the same emitted Core expression. Authentic Source facts and the actual compiler Site remain independent inputs. The shared expression/body induction and full public compiler theorem remain incomplete. Normal verification passes build 5664, nine empty strict logs, 134 declarations and 28 API checks, with literal private/normal TYPE/AXIOMS and API agreement; the cumulative census is 17361.
