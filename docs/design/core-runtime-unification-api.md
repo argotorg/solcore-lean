@@ -170,7 +170,7 @@ These internal proof modules connect the actual accepted compiler to a selected 
 
 The literal invocation derives its body ledger and runtime validity from the same selected Support. Source and native grades remain independent. The approved body child is literal occurrence 3; the outer indirect parent at occurrence 5 remains in the Source. Whole parent preservation and reflection now derive the callee post, pair arguments, fault exclusion, dispatch and native argument bundle internally. Both retain the actual returned caller and cumulative heap, mapping, world and administrative effects. Genuine initial heap, stored-cell authority, captures, history, environment correspondence, native typing and input admission remain explicit in the parent ports. The accepted outer body now forms its initializer and allocates its local cell once, then runs the proved parent at that actual admitted post. Reflection reconstructs whole native execution and uses determinism to align its final value and store. The returned result retains cumulative effects, the actual restored pool, every ordered row and successful raw value/deep heap typing at Γ0. The BodyState adapter derives these inputs from the same actual named parameter Receipt and runs each whole-body port once. Its returned result retains the same actual pool and successful raw PostAdmission. The existing low SourceBodyAt and NativeBodyAt interfaces remain available. The new BodyStateExitReceipts companion also populates PreparedNamedParameterReceipts.PreservesAt/ReflectsAt with genuine ReachedExit, successful PostAdmission and the same returned state.
 
-The latest committed and normally verified code commit is `ae3d5594`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `922ac60f`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -208,7 +208,7 @@ Reached read and index diagnostics are integrated at `ef85a057`. The proof uses 
 
 Direct prepared closure origins and ordinary/principal formation are integrated at `6dbfa243`. The actual Code, History, Support, Source origin, captures and positive cells remain together in the returned state. The stage-scope receipts recover the original owner and source scope from authentic sidecars. Receiving and body registries remain independent. Normal verification passes build 5677, four empty strict logs, 139 declarations and 47 API checks with complete literal private/normal agreement; the cumulative census is 17675. Invocation adapters and the shared expression/body family still need normal integration and complete compiler occurrence factories.
 
-Prepared named inventories and bootstrap call correspondence are integrated at `ae3d5594`. The finite inventory retains actual selected Headers, diagnostic issuers and full Source dictionaries. Compiler extraction constructs each body profile at its actual parameter-entry state. Bootstrap ownership retains the original initialization key through complete key embeddings. Normal verification passes build 5695, fourteen empty strict logs, 344 declarations and 102 API checks with literal private/normal agreement; the cumulative census is 18046. The common function-value model and strict expression/body induction remain in progress.
+The shared function proof model and native compiler foundations are integrated at `922ac60f`. Positive closure and named origins retain the actual bootstrap owner, compiler association, capture and full Source dictionary. Formation, selected occurrence collectors, typed named calls and the closure/global/builtin dispatcher use those retained receipts. Normal verification passes build 5722, 27 empty strict logs, 568 declarations and 165 API checks with literal private/normal agreement; the cumulative census is 18614. The shared expression/body induction and its concrete argument and diagnostic producers remain incomplete.
 
 The shared expression/body family remains incomplete. Static factories must construct the same retained body's compiler Tree at every genuine occurrence context, scope and read budget. Source typing alone does not justify globally empty evidence or coercions, or exclude generalized local cells. Actual compiler alternatives require their own coverage. Ordinary execution also needs authentic guard acceptance at each reached indirect call; separate staged judgments preserve guard rejection before arguments. The final recursive staging proof must cover the remaining Source forms.
 
@@ -318,3 +318,22 @@ These factories retain the same actual selected row, diagnostic issuer, complete
 | `CallableIndexedOwnedReachedNamedRangeReceipts` | `range_of_valid_match`, `range_of_selected`, `range_at_catalog`, `catalog_range_of_selected` |
 
 Direct and nested typed named-body adapters retain the same actual parameter-entry protocol. A bootstrap owner is produced from initialization and transported forward through a complete key embedding. An arbitrary existing named capture cannot be upgraded to that provenance. Profiles, genuine child typing, receiving diagnostics and the common graded expression/body induction must still be supplied by their actual compiler producers.
+
+## Shared positive function and native call proof interfaces (`922ac60f`)
+
+The following modules are registered through `CoreLowering`. Their interfaces retain the actual owner, compiler association, Source dictionary and occurrence context.
+
+| Module suffix | Main interfaces |
+| --- | --- |
+| `PreparedPositiveFunctionOrigins` | `Owner`, `OwnerCover`, `ClosureAssociation`, `NamedAssociation`, `PayloadOrigins`, `CellOrigins`, `closure_member`, `global_member`, `bootstrap_owner_cover` |
+| `PreparedFunctionModelFormationBounds` | Ordinary and principal `preserves_at` / `reflects_at` |
+| `PreparedSelectedNativeFamilyQualification` | `facet`, `ordinary_family`, `principal_family`, `ordinary_prepared`, `principal_prepared` |
+| `PreparedNativeTaggedLambdaCompilerReceipts` | `of_certificate_with_shell_property` |
+| `PreparedReachedNativeExpressionTreeBounds` | `RuntimeTree`, `preserves_at`, `reflects_at` |
+| `PreparedCatalogTypedNamedCallBounds` | `preserves_at`, `reflects_at`, `CallerEvidence`, `preserves_calls`, `reflects_calls` |
+| `PreparedCatalogIndirectInvocationDispatcher` | `Receipt`, `preserves`, `reflects` |
+| `PreparedCatalogIndirectArgumentReceipts` | `closure`, `named` |
+| `PreparedCatalogIndirectApplicationBounds` | `ArgumentPackets`, `preserves`, `reflects` |
+| `PreparedNamedProfileFamilies` | `profiles`, `source_continuation`, `native_continuation` |
+
+These are conditional proof interfaces. A concrete packet producer must establish accepted physical argument count, retained Source typing and the selected callee association at the actual argument post. The shared expression/body induction must then supply the strict body continuations. These interfaces do not yet constitute the final theorem for all compiler passes.

@@ -399,7 +399,7 @@ The `SourceTypedRuntime` namespace remains for compatibility values, observation
 
 ### Latest proofs and validation scope
 
-The latest committed and normally verified code commit is `ae3d5594`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The latest committed and normally verified code commit is `922ac60f`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -1557,3 +1557,13 @@ Each Source had two genuine nonauthor reviews. Authentic BEFORE captured 2227 mo
 Validation: `prepared-catalog-named-profile-bootstrap-checkpoint-checks.json` (SHA-256 `53001c0f2cc55657926a05cc0d23121ddedd78b56e7a0d3c056385f9bd33c9be`) and `prepared-catalog-named-profile-bootstrap-checkpoint-root-normal-summary.json`, local verification records in `/private/tmp/solcore-owned-functions-resume-20261007`.
 
 The common function/cell model must retain positive bootstrap and selected compiler provenance through formation, reads and state extension. Actual reached-input coverage, receiving diagnostic interpretation, remaining compiler alternatives, strict expression/body induction and all-pass public correctness remain unfinished. Work estimates remain 100% for the first objective, about 70% for the second and about 85% overall.
+
+### Shared function model and native compiler foundations at `922ac60f` (2026-10-10)
+
+The code unit adds 27 proof Sources and their `CoreLowering` imports. Positive origins retain actual bootstrap ownership, compiler associations, captures and full Source dictionaries. Native occurrence collectors and typed closure/global/builtin dispatch use those retained receipts. This unit changes proof infrastructure; public runtime signatures and behavior remain as previously verified.
+
+Genuine Source peer reviews and independent tool reviews preceded native integration. The private environment uses explicit Source and both object aliases with no normal-library fallback. Normal validation checks all 568 declarations and 165 APIs against the private results with literal TYPE/AXIOMS and complete API agreement. Only the standard three axioms occur. The cumulative census is 18614 from 18046, with no overlaps or removals. All 27 strict logs are empty. Build 5722, the actual 2306-module environment, the 29-module dependency cone/rebuild and 4985 protected artifacts pass.
+
+The original successful tool receipts are retained: native BEFORE `7daa60` / session 93654 / closure `30f834`; private full/API `08c07c` / session 92107 / closure `27c479`; registered build `e06174` / session 71932 / closure `ea453c`; normal validation `fe28a7` / session 49243 / closure `0da14f`. The normal checks artifact SHA256 is `15be61fa750a7148625eda13a72a6916a94c4c2d74c5ac0f3f0983a662cc404d`. Commit finalization reuses these successful receipts without rerunning Lean.
+
+Concrete accepted argument producers, eligible ordinary/principal expression roots and the strict shared body induction remain incomplete. Actual body compilation at an administrative prefix and fixed-prefix lambda compilation require independent compiler receipts. Neither packed argument typing nor erased representation supplies physical arity or original Source authority.
