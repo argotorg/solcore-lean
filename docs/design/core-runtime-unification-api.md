@@ -651,3 +651,34 @@ All eleven fresh private and normal strict Source checks closed with empty outpu
 The arbitrary tuple fold supports nested finite tuples of any arity, including repeated child identifiers, in their original order. It internally constructs the read/literal/group/pair leaves and evaluates each next child at the actual intermediate caller state. Preservation uses the actual Source grades, including the legacy two-element pair rules. Reflection uses structural child descent when a singleton's native packer erases the tuple wrapper and keeps the same grade. The compiler issuer extracts this certificate from the actual accepted action and ordered child vector, with original raw typing and static policy inputs; no leaf execution law is supplied.
 
 The next substantive cut is a recursive static caller certificate whose read/literal/group/tuple/call fold constructs those child hypotheses internally. The current tuple issuer admits groups only inside its older leaf grammar, not groups around a new arbitrary tuple or call. Finite closure transport and terminal bodies still use the narrower read/literal/group/binary-pair grammar. Authentic compiler policy, raw typing, selected Header or Association, registry/receiving diagnostics, runtime ledger and coverage remain inputs. Shared numeric expression/application/body induction, general recursive bodies, broader expression and statement grammar, and the final public all-pass theorem remain unfinished. Runtime unification stays 100%; the second objective stays about 70%, and the equally weighted overall estimate stays about 85%.
+
+## Recursive caller certificates and compiler composition (2026-10-11)
+
+The selected `staged-recursive-callers-and-static-receipts` unit is normally verified in `e8607d82` and `abe72325`: six proof Sources, 198 owned declarations and 37 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews.
+
+All six native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (89589 bytes, SHA-256 `05cacd2519262ad3ad8a8762e6110fde41596f12f27aa90b3638ffdfdfe4eafb`). The selected native environment grows from 2324 to 2330 modules. Build 5853 passes; the normal Source/BOTH snapshot grows from 5780 to 5786 rows. The cumulative census grows from 20374 to 20572: 198 additions, no overlap and no removals. All 8 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original ten closed validation receipts without repeating their kernel checks.
+
+| Module suffix under `Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStaged` | Selected interfaces | Role |
+| --- | --- | --- |
+| `RecursiveCallerSourceReceipts` | 4 | Derives original call-node alignment, raw child typing and actual callable preparation. |
+| `TupleHeadBounds` | 2 | Assembles ordered tuple preservation/reflection from the structural child hypotheses at the actual intermediate states. |
+| `FiniteCallHeadBounds` | 4 | Retains the authentic call port and joins one finite whole-call result to expression preservation/reflection. |
+| `RecursiveCallerCertificates` | 21 | Defines supported syntax, policy, recursive certificates and reachable call receipts, then issues the root from an accepted compiler action. |
+| `RecursiveCallerBounds` | 4 | Builds caller child preservation/reflection internally by structural induction. |
+| `RecursiveCallerCompilerBounds` | 2 | Connects the actual accepted compiler action and generated root to the preservation/reflection fold. |
+
+The Source receipt APIs are `original_read_metadata`, `source_parent`, `original_child_types` and `prepared`. Tuple heads expose `tuple_preserves` and `tuple_reflects`; call heads expose `Point`, `Port`, `preserves` and `reflects`.
+
+The certificate module exposes `Syntax`, `PolicyFor`, `Certificate`, `Calls` and `of_functions`, together with their sixteen selected constructors or fields. The fold exposes `Point`, `CallsReady`, `preserves` and `reflects`. The compiler wrapper exposes `preserves_compiled` and `reflects_compiled`; both construct the root certificate from the actual accepted compiler action.
+
+The compiler issuer starts from the actual accepted lowering action and original Source typing. It recovers the original indirect-call node, raw callee type and ordered argument types before building the child certificate. The certificate retains groups, tuples and indirect calls recursively, including groups around new tuple or call nodes. Argument entries keep their original order and repeated identifiers.
+
+Structural induction on that certificate proves both preservation and reflection at every actual reached state. Child execution hypotheses are constructed internally. Group reflection and erased singleton tuple packing can use the same native grade; induction follows the child certificate rather than assuming a smaller execution grade. An indirect call uses the actual callee entry and ordered argument tree, then the existing finite whole-call proof once. Results retain the reached heap, store, map and world, exact staged fault scope, returned pool, caller relation and PostAdmission. Source and native grades remain independent.
+
+The compiler-facing wrapper constructs its root certificate internally. Its `CallsReady` premise refers only to call receipts reachable from that exact generated root. Actual preparation, Source view, sidecar, guard frame, selected Header or Association, receiver, registry extension, diagnostic interpretation, ledger and coverage remain static or runtime premises. Called bodies still use the existing finite read/literal/group/binary-pair family. No public child execution or arbitrary body meaning callback is supplied.
+
+General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+The static Source/compiler receipt group (`e8607d82`) contains two Sources, 125 declarations and 25 selected interfaces. The semantic head/fold/compiler composition group (`abe72325`) contains four Sources, 73 declarations and twelve interfaces. Interface and declaration counts do not measure proof completion.

@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest normally verified proof scope
+### Latest normally verified recursive caller proof scope
+
+The selected `staged-recursive-callers-and-static-receipts` unit is normally verified in `e8607d82` and `abe72325`: six proof Sources, 198 owned declarations and 37 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews.
+
+All six native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (89589 bytes, SHA-256 `05cacd2519262ad3ad8a8762e6110fde41596f12f27aa90b3638ffdfdfe4eafb`). The selected native environment grows from 2324 to 2330 modules. Build 5853 passes; the normal Source/BOTH snapshot grows from 5780 to 5786 rows. The cumulative census grows from 20374 to 20572: 198 additions, no overlap and no removals. All 8 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original ten closed validation receipts without repeating their kernel checks.
+
+Caller child meaning is constructed internally; general recursive called bodies, shared numeric induction and full compiler coverage remain open.
+
+### Preceding finite call and tuple proof scope
 
 `staged-finite-call-dispatch-and-tuple-folds` is normally verified in `fb42f8c2`, `280557de` and `a48286e4`: eleven proof Sources, 156 owned declarations and 27 selected interfaces. The cumulative census is 20374 (+156, no overlap or removals). Build 5847 and all fifteen normal validation receipts passed. Finite closure bodies and arbitrary tuple children construct their supported meanings internally; the whole-call ports retain strict caller child hypotheses. A recursive static caller fold, shared numeric induction for general bodies and full grammar remain open.
 
@@ -66,9 +76,9 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 `staged-indirect-call-runtime-bounds` is normally verified at `d9f2a0c4`: ten proof Sources, 234 owned declarations and 71 selected APIs. It retains actual reached state and exact staged outcomes. The numeric expression/body induction and complete compiler coverage remain open.
 
-### Latest completed normal verification point
+### Preceding finite call bodies and global joins verification point (historical)
 
-Finite call bodies and global joins pass normal verification in `c37620a6`, `b568df64` and `ef72f57e`. Build 5836 passes, all nine strict Source logs are empty, all 177 complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 37-interface API logs are byte-identical. The cumulative census grows from 20041 to 20218: 177 additions, no overlaps and no removals. The thirteen original normal validation receipts are closed with exit code zero. The selected environment grows from 2312 to 2321 modules, and the normal snapshot from 5760 to 5769 rows. The latest dated entry records the exact selected scope and remaining semantic work.
+Finite call bodies and global joins pass normal verification in `c37620a6`, `b568df64` and `ef72f57e`. Build 5836 passes, all nine strict Source logs are empty, all 177 complete private/normal TYPE/AXIOMS blocks agree literally, and the complete 37-interface API logs are byte-identical. The cumulative census grows from 20041 to 20218: 177 additions, no overlaps and no removals. The thirteen original normal validation receipts are closed with exit code zero. The selected environment grows from 2312 to 2321 modules, and the normal snapshot from 5760 to 5769 rows. The corresponding dated entry records that checkpoint's selected scope and remaining semantic work.
 
 ### Preceding finite read and named body normal verification point (historical)
 
@@ -3763,3 +3773,30 @@ The arbitrary tuple fold supports nested finite tuples of any arity, including r
 The finite closure user dispatch handles the physical-count mismatch at the real argument post or applies the retained finite closure at equal count. The whole-call preservation and reflection ports keep callee and ordered-argument effects, exact receiving faults and full restored caller PostAdmission; their global prefix feeds the existing finite named route. The final join combines those branches. Caller callee/argument induction hypotheses still remain explicit: these assert meaning only below the enclosing measured budget. Source and native grades remain independent, and first-gate `Failure.stage` keeps its original failing scope separately from semantic arity failures.
 
 The next substantive cut is a recursive static caller certificate whose read/literal/group/tuple/call fold constructs those child hypotheses internally. The current tuple issuer admits groups only inside its older leaf grammar, not groups around a new arbitrary tuple or call. Finite closure transport and terminal bodies still use the narrower read/literal/group/binary-pair grammar. Authentic compiler policy, raw typing, selected Header or Association, registry/receiving diagnostics, runtime ledger and coverage remain inputs. Shared numeric expression/application/body induction, general recursive bodies, broader expression and statement grammar, and the final public all-pass theorem remain unfinished. Runtime unification stays 100%; the second objective stays about 70%, and the equally weighted overall estimate stays about 85%.
+
+## 2026-10-11: Recursive caller certificates and compiler composition; normal verification complete
+
+The selected `staged-recursive-callers-and-static-receipts` unit is normally verified in `e8607d82` and `abe72325`: six proof Sources, 198 owned declarations and 37 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews.
+
+All six native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (89589 bytes, SHA-256 `05cacd2519262ad3ad8a8762e6110fde41596f12f27aa90b3638ffdfdfe4eafb`). The selected native environment grows from 2324 to 2330 modules. Build 5853 passes; the normal Source/BOTH snapshot grows from 5780 to 5786 rows. The cumulative census grows from 20374 to 20572: 198 additions, no overlap and no removals. All 8 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original ten closed validation receipts without repeating their kernel checks.
+
+| Module suffix under `Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStaged` | Selected interfaces | Role |
+| --- | --- | --- |
+| `RecursiveCallerSourceReceipts` | 4 | Derives original call-node alignment, raw child typing and actual callable preparation. |
+| `TupleHeadBounds` | 2 | Assembles ordered tuple preservation/reflection from the structural child hypotheses at the actual intermediate states. |
+| `FiniteCallHeadBounds` | 4 | Retains the authentic call port and joins one finite whole-call result to expression preservation/reflection. |
+| `RecursiveCallerCertificates` | 21 | Defines supported syntax, policy, recursive certificates and reachable call receipts, then issues the root from an accepted compiler action. |
+| `RecursiveCallerBounds` | 4 | Builds caller child preservation/reflection internally by structural induction. |
+| `RecursiveCallerCompilerBounds` | 2 | Connects the actual accepted compiler action and generated root to the preservation/reflection fold. |
+
+The compiler issuer starts from the actual accepted lowering action and original Source typing. It recovers the original indirect-call node, raw callee type and ordered argument types before building the child certificate. The certificate retains groups, tuples and indirect calls recursively, including groups around new tuple or call nodes. Argument entries keep their original order and repeated identifiers.
+
+Structural induction on that certificate proves both preservation and reflection at every actual reached state. Child execution hypotheses are constructed internally. Group reflection and erased singleton tuple packing can use the same native grade; induction follows the child certificate rather than assuming a smaller execution grade. An indirect call uses the actual callee entry and ordered argument tree, then the existing finite whole-call proof once. Results retain the reached heap, store, map and world, exact staged fault scope, returned pool, caller relation and PostAdmission. Source and native grades remain independent.
+
+The compiler-facing wrapper constructs its root certificate internally. Its `CallsReady` premise refers only to call receipts reachable from that exact generated root. Actual preparation, Source view, sidecar, guard frame, selected Header or Association, receiver, registry extension, diagnostic interpretation, ledger and coverage remain static or runtime premises. Called bodies still use the existing finite read/literal/group/binary-pair family. No public child execution or arbitrary body meaning callback is supplied.
+
+General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+The static Source/compiler receipt group (`e8607d82`) contains two Sources, 125 declarations and 25 selected interfaces. The semantic head/fold/compiler composition group (`abe72325`) contains four Sources, 73 declarations and twelve interfaces. Interface and declaration counts do not measure proof completion.

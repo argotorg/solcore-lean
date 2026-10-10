@@ -10,11 +10,11 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `fb42f8c2`, `280557de` and `a48286e4`. Finite closure transport and applications, arbitrary tuple folds and whole-call dispatch are integrated. |
-| Latest completed normal verification | Build 5847; eleven empty strict Source checks; 156 declarations and 27 APIs with literal private/normal TYPE/AXIOMS and byte-exact API agreement; cumulative 20374 (+156, no overlaps or removals). |
-| Working implementation | Finite named and closure bodies construct their supported meaning internally. Arbitrary tuple folds retain ordered reached states. Whole-call dispatch retains strict caller callee/argument hypotheses; the recursive caller fold, general bodies and full compiler coverage remain unfinished. |
-| Latest proof scope | Normally verified finite closure transport/application, arbitrary tuples and whole-call dispatch; actual compiler, typing, diagnostics, registry and coverage premises remain explicit. |
-| Latest normally verified proof package | `staged-finite-call-dispatch-and-tuple-folds`: eleven Sources, 156 owned declarations and 27 selected interfaces, normally verified in three code commits. |
+| Latest normally verified implementation commits | `e8607d82` and `abe72325`. Compiler-issued recursive caller certificates and structural preservation/reflection are integrated. |
+| Latest completed normal verification | Build 5853; six empty strict Source checks; 198 declarations and 37 APIs with literal private/normal TYPE/AXIOMS and byte-exact API agreement; cumulative 20572 (+198, no overlaps or removals). |
+| Working implementation | The recursive caller certificate, structural fold and actual compiler wrapper are normally verified. Caller child meaning is built internally. General recursive called bodies and full compiler coverage remain unfinished. |
+| Latest proof scope | Actual compiler-issued caller trees with recursive groups, ordered tuples and indirect calls; structural child meaning is built internally, with finite called bodies and authentic static/runtime authority retained. |
+| Latest normally verified proof package | `staged-recursive-callers-and-static-receipts`: six Sources, 198 owned declarations and 37 selected interfaces, normally verified in two code commits. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. The `7b0f562f` compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 declarations audited at that checkpoint match literally between private and normal builds. The estimates remain about 70% for the second objective and about 85% overall.
@@ -31,7 +31,7 @@ The public root adapter derives its strong invocation pair from the same actual 
 
 The program adapter joins that same result to genuine ProgramOutcome and successful positive Word export through the original start/resume receipts. The successful Word boundary requires its genuine positive validation budget. These ports cover the finite accepted fixture; general failures, export errors, mixed bodies and the final all-pass theorem remain incomplete. No bootstrap, parameter entry or public action is replayed.
 
-The latest committed and normally verified code commit is `6844f7b0`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
+The historical staged parent and terminal lambda checkpoint was committed and normally verified at `6844f7b0`. The typed contextual receipt unit was introduced at `df034b25`, and the positive-cell backend migrated at `350e4336`. `CallableIndexedOwnedContextualTypedClosureReceipts` retains actual ordinary and method-principal lambda formation through a typed `Association` and a propositional `StaticMember`.
 
 The receipt keeps the original Code, owner, ordered history, captures, parameter bindings, static body and independent Source syntax. Its forward representation and selection ports preserve that authority. Finite application preservation and reflection consume real argument typing, initial stable rows and strict typed `FlowBelow` for the same retained Code. Each uses the original parameter/body invocation and saved caller restoration once, retaining the actual returned pool and independent Source/native grades. The typed finish derives exclusion of escaping break/continue from the Source body receipt; it requires no unconditional escaped-control diagnostic at internal Word zero.
 
@@ -1314,3 +1314,28 @@ The finite closure user dispatch handles the physical-count mismatch at the real
 | Census and code commits | 20218 → 20374 (+156, no overlap or removals); `fb42f8c2`, `280557de`, `a48286e4`. |
 
 The next substantive cut is a recursive static caller certificate whose read/literal/group/tuple/call fold constructs those child hypotheses internally. The current tuple issuer admits groups only inside its older leaf grammar, not groups around a new arbitrary tuple or call. Finite closure transport and terminal bodies still use the narrower read/literal/group/binary-pair grammar. Authentic compiler policy, raw typing, selected Header or Association, registry/receiving diagnostics, runtime ledger and coverage remain inputs. Shared numeric expression/application/body induction, general recursive bodies, broader expression and statement grammar, and the final public all-pass theorem remain unfinished. Runtime unification stays 100%; the second objective stays about 70%, and the equally weighted overall estimate stays about 85%.
+
+## Recursive caller certificates and compiler composition (2026-10-11)
+
+The selected `staged-recursive-callers-and-static-receipts` unit is normally verified in `e8607d82` and `abe72325`: six proof Sources, 198 owned declarations and 37 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews.
+
+All six native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (89589 bytes, SHA-256 `05cacd2519262ad3ad8a8762e6110fde41596f12f27aa90b3638ffdfdfe4eafb`). The selected native environment grows from 2324 to 2330 modules. Build 5853 passes; the normal Source/BOTH snapshot grows from 5780 to 5786 rows. The cumulative census grows from 20374 to 20572: 198 additions, no overlap and no removals. All 8 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original ten closed validation receipts without repeating their kernel checks.
+
+| Module suffix under `Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStaged` | Selected interfaces | Role |
+| --- | --- | --- |
+| `RecursiveCallerSourceReceipts` | 4 | Derives original call-node alignment, raw child typing and actual callable preparation. |
+| `TupleHeadBounds` | 2 | Assembles ordered tuple preservation/reflection from the structural child hypotheses at the actual intermediate states. |
+| `FiniteCallHeadBounds` | 4 | Retains the authentic call port and joins one finite whole-call result to expression preservation/reflection. |
+| `RecursiveCallerCertificates` | 21 | Defines supported syntax, policy, recursive certificates and reachable call receipts, then issues the root from an accepted compiler action. |
+| `RecursiveCallerBounds` | 4 | Builds caller child preservation/reflection internally by structural induction. |
+| `RecursiveCallerCompilerBounds` | 2 | Connects the actual accepted compiler action and generated root to the preservation/reflection fold. |
+
+The compiler issuer starts from the actual accepted lowering action and original Source typing. It recovers the original indirect-call node, raw callee type and ordered argument types before building the child certificate. The certificate retains groups, tuples and indirect calls recursively, including groups around new tuple or call nodes. Argument entries keep their original order and repeated identifiers.
+
+Structural induction on that certificate proves both preservation and reflection at every actual reached state. Child execution hypotheses are constructed internally. Group reflection and erased singleton tuple packing can use the same native grade; induction follows the child certificate rather than assuming a smaller execution grade. An indirect call uses the actual callee entry and ordered argument tree, then the existing finite whole-call proof once. Results retain the reached heap, store, map and world, exact staged fault scope, returned pool, caller relation and PostAdmission. Source and native grades remain independent.
+
+The compiler-facing wrapper constructs its root certificate internally. Its `CallsReady` premise refers only to call receipts reachable from that exact generated root. Actual preparation, Source view, sidecar, guard frame, selected Header or Association, receiver, registry extension, diagnostic interpretation, ledger and coverage remain static or runtime premises. Called bodies still use the existing finite read/literal/group/binary-pair family. No public child execution or arbitrary body meaning callback is supplied.
+
+General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.

@@ -1884,3 +1884,39 @@ All eleven fresh private and normal strict Source checks closed with empty outpu
 | Census and code commits | 20218 → 20374 (+156, no overlap or removals); `fb42f8c2`, `280557de`, `a48286e4`. |
 
 The next substantive cut is a recursive static caller certificate whose read/literal/group/tuple/call fold constructs those child hypotheses internally. The current tuple issuer admits groups only inside its older leaf grammar, not groups around a new arbitrary tuple or call. Finite closure transport and terminal bodies still use the narrower read/literal/group/binary-pair grammar. Authentic compiler policy, raw typing, selected Header or Association, registry/receiving diagnostics, runtime ledger and coverage remain inputs. Shared numeric expression/application/body induction, general recursive bodies, broader expression and statement grammar, and the final public all-pass theorem remain unfinished. Runtime unification stays 100%; the second objective stays about 70%, and the equally weighted overall estimate stays about 85%.
+
+## 2026-10-11: Recursive caller static receipts and structural proof boundaries; normal verification complete
+
+The selected `staged-recursive-callers-and-static-receipts` unit is normally verified in `e8607d82` and `abe72325`: six proof Sources, 198 owned declarations and 37 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews.
+
+All six native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (89589 bytes, SHA-256 `05cacd2519262ad3ad8a8762e6110fde41596f12f27aa90b3638ffdfdfe4eafb`). The selected native environment grows from 2324 to 2330 modules. Build 5853 passes; the normal Source/BOTH snapshot grows from 5780 to 5786 rows. The cumulative census grows from 20374 to 20572: 198 additions, no overlap and no removals. All 8 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original ten closed validation receipts without repeating their kernel checks.
+
+
+| Boundary | Evidence retained by the proof |
+| --- | --- |
+| Original call metadata and raw types | Compatible Source read, actual original indirect-call node, original callee typing and ordered argument types, before constructing the child tree. |
+| Static recursive certificate | Actual compiler entries, callee head membership, ordered argument vector and recursive certificates for each literal entry, including duplicates. |
+| Structural child laws | Preservation/reflection quantified over grades and reached states; same-grade group and singleton reflection descend through the actual certificate. |
+| Call authority | `CallsReady` for actual reachable receipts of the exact issued root; actual prepared/Source/sidecar/guard/caller ports remain required. |
+| Called bodies | Genuine finite named/Association body packets with their exact context, read diagnostics, registry authority and coverage; general recursive body meaning is still open. |
+
+The compiler issuer starts from the actual accepted lowering action and original Source typing. It recovers the original indirect-call node, raw callee type and ordered argument types before building the child certificate. The certificate retains groups, tuples and indirect calls recursively, including groups around new tuple or call nodes. Argument entries keep their original order and repeated identifiers.
+
+Structural induction on that certificate proves both preservation and reflection at every actual reached state. Child execution hypotheses are constructed internally. Group reflection and erased singleton tuple packing can use the same native grade; induction follows the child certificate rather than assuming a smaller execution grade. An indirect call uses the actual callee entry and ordered argument tree, then the existing finite whole-call proof once. Results retain the reached heap, store, map and world, exact staged fault scope, returned pool, caller relation and PostAdmission. Source and native grades remain independent.
+
+The compiler-facing wrapper constructs its root certificate internally. Its `CallsReady` premise refers only to call receipts reachable from that exact generated root. Actual preparation, Source view, sidecar, guard frame, selected Header or Association, receiver, registry extension, diagnostic interpretation, ledger and coverage remain static or runtime premises. Called bodies still use the existing finite read/literal/group/binary-pair family. No public child execution or arbitrary body meaning callback is supplied.
+
+General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+| Validation item | State |
+| --- | --- |
+| Selected proof scope | Six integrated Sources, 198 owned declarations and 37 selected interfaces. |
+| Native and normal verification | Six empty strict checks in each phase; complete literal private/normal TYPE/AXIOMS and byte-exact API agreement; selected native environment 2324 → 2330. |
+| Build and cumulative census | 5853 jobs; 5780 → 5786 normal rows; 20374 → 20572 (+198, no overlap or removals). |
+| Code commits | `e8607d82` and `abe72325`. |
+
+The saved lexical closure records the registered CoreLowering umbrella and these six new targets. Its import relation is separate from the native environment and declaration ownership measured during normal validation.
+
+The static Source/compiler receipt group (`e8607d82`) contains two Sources, 125 declarations and 25 selected interfaces. The semantic head/fold/compiler composition group (`abe72325`) contains four Sources, 73 declarations and twelve interfaces. Interface and declaration counts do not measure proof completion.
