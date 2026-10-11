@@ -10,19 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `333c5d61`, following static support `448ad204`. Mixed closure body/application proofs retain terminal and discard packets; repository policy remains clear. |
-| Latest completed normal verification | Build 5889; eight empty strict Source checks and ten modules rebuilt; 150 declarations and 28 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1182 → 1332; registered tests and repository policy pass. |
-| Working implementation | Mixed terminal/discard closure packets now feed body application and saved caller restoration. The common recursive caller/body composition, complete formation factories, wider grammar and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | Same-Code terminal/discard packets, authentic ordinary/principal Association contexts, body/application correspondence and exact saved caller restoration. |
-| Latest normally verified proof package | `mixed-body-static-and-application-bounds`: eight Sources, 150 owned declarations and 28 selected interfaces, verified in `448ad204` and `333c5d61`. |
+| Latest normally verified implementation commits | `a6cb5ab2`, `2f22789d`. Mixed closure dispatch and recursive caller/body proofs are integrated. |
+| Latest completed normal verification | Build 5895; six empty strict Source checks and eight modules rebuilt; 70 declarations and 12 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1332 → 1402; registered tests and repository policy pass. |
+| Working implementation | Structural caller induction and numeric body induction construct meaning for terminal/discard closure bodies and terminal named bodies. Complete formation factories, wider grammar and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | Indirect dispatch, recursive groups and ordered tuples preserve actual caller restoration; called bodies consume strictly smaller grades while native groups and singleton tuples use structural induction. |
+| Latest normally verified proof package | `mixed-callers-and-recursive-body-bounds`: six Sources, 70 owned declarations and 12 selected interfaces, verified in `a6cb5ab2` and `2f22789d`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 
 ### Verified compiler factories and discard bodies
 
+The recursive caller/body composition is verified in `a6cb5ab2` and `2f22789d`. Its six Sources construct the supported body semantics internally from static packets and genuine call authority. All 46 preceding scoped modules retain their literal declarations; build 5895, registered tests and the repository policy checker pass. Packet coverage for actual formations and the wider grammar remain open.
+
 Eight mixed body/application Sources are normally verified and committed in `448ad204` and `333c5d61`: 150 owned declarations and 28 interfaces with complete literal private/normal TYPE/AXIOMS and API agreement. Build 5889, registered tests and the repository policy checker pass with zero findings. The exact scope grows from 1182 to 1332 without removals; all 38 preceding scoped modules retain their declarations. The normal Source/BOTH snapshot grows from 5814 to 5822 and the ten-module dependency cone is rebuilt.
 
-The same ordinary or principal Association retains a terminal or discard packet at its actual parameter context. Discard flow, body application and caller restoration preserve the reached state, exact returned pool, failures and independent Source/native grades. Compiler/static authority stays explicit. The common recursive caller/body composition, complete packet factories for actual formations, wider grammar and the public all-pass theorem remain incomplete.
+The same ordinary or principal Association retains a terminal or discard packet at its actual parameter context. Discard flow, body application and caller restoration preserve the reached state, exact returned pool, failures and independent Source/native grades. Compiler/static authority stays explicit. The subsequent recursive composition is verified above; complete packet factories for actual formations, wider grammar and the public all-pass theorem remain incomplete.
 
 The three compiler-root/support/caller Sources were integrated in `d5d5e123` and `02006e66`: 219 owned declarations and 36 interfaces, with complete private/normal literal agreement. Their authentic accepted compiler actions produce original Source roots and static support; the caller proof constructs supported selected body meaning internally. Constructive replacements in `db1ab3d2` preserve all 25 public interface types and private/normal agreement for 175 declarations. The scoped census changes from 595 to 597 through two generated proof additions.
 

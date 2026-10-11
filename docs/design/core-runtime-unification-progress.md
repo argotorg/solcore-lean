@@ -30,11 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified mixed bodies and applications
+### Latest verified mixed caller and body recursion
+
+The six Sources in `a6cb5ab2` and `2f22789d` connect mixed closure bodies to indirect dispatch and close caller/body recursion. Structural induction handles groups, ordered tuples and calls; numeric induction supplies each called body's strictly smaller Root. The final body endpoints construct their execution laws internally from static packet/support and named-body authority. Named bodies are still terminal; closure bodies are terminal or discard followed by a terminal return.
+
+All six private and normal strict checks have empty logs. Complete TYPE/AXIOMS blocks agree for 70 owned declarations, and all 12 selected interfaces agree. The scope grows from 1332 to 1402 with no removals; all 46 preceding scoped modules remain exact. Build 5895, registered tests and the repository policy checker pass. The normal Source/BOTH snapshot grows from 5822 to 5828, and all eight affected modules are rebuilt. Complete formation factories, wider grammar and the public all-pass theorem remain open; the estimates above are unchanged.
+
+### Preceding verified mixed bodies and applications
 
 Eight mixed body/application Sources are normally verified and committed in `448ad204` and `333c5d61`: 150 owned declarations and 28 interfaces with complete literal private/normal TYPE/AXIOMS and API agreement. Build 5889, registered tests and the repository policy checker pass with zero findings. The exact scope grows from 1182 to 1332 without removals; all 38 preceding scoped modules retain their declarations. The normal Source/BOTH snapshot grows from 5814 to 5822 and the ten-module dependency cone is rebuilt. Existing user work is preserved.
 
-The same ordinary or principal Association retains a terminal or discard packet at its actual parameter context. Discard flow, body application and caller restoration preserve the reached state, exact returned pool, failures and independent Source/native grades. Compiler/static authority stays explicit. The common recursive caller/body composition, complete packet factories for actual formations, wider grammar and the public all-pass theorem remain incomplete.
+The same ordinary or principal Association retains a terminal or discard packet at its actual parameter context. Discard flow, body application and caller restoration preserve the reached state, exact returned pool, failures and independent Source/native grades. Compiler/static authority stays explicit. Its recursive caller/body composition is verified above; complete packet factories for actual formations, wider grammar and the public all-pass theorem remain incomplete.
 
 ### Preceding verified compiler factories and static witnesses
 
