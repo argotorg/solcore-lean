@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified retained-recipe factories and original typing
+### Latest verified contextual compiler policy retention
+
+The three modules in `806e809c` retain the actual contextual compiler policy together with the body recipe, named compilation and generated Code. The receipt records initializer overrides, evidence, local reads and the original fuel choices. Generation and producer projections preserve this same witness.
+
+All 753 affected modules pass private strict compilation and rebuild normally. The three selected normal strict checks have empty logs. The selected modules own 133 declarations and expose eleven new interfaces. All 16679 preceding scoped declarations retain their complete types and axiom lists; 48 declarations are added and none are removed. All 16727 complete private/normal declaration blocks and the API logs agree. Build 5911, registered tests and repository policy pass. The normal source/object inventory grows from 5843 to 5844, and all 38 Tests.Main declaration blocks remain exact.
+
+The wider baseline includes existing dependencies; its growth from the preceding 8862-declaration scope does not measure new semantic coverage. Policy profiles, formation coverage, original typing, supported grammar and exact call readiness still need to be composed. The final public all-pass theorem remains incomplete.
+
+The estimates above are unchanged.
+
+### Preceding verified retained-recipe factories and original typing
 
 The four Sources in `96a60f2f` construct discard and sequence packets from the retained production recipe of the actual Code. Both ordinary and principal Associations retain their named compilation and body context. Original closure typing supplies parameter declarations and per-scope typing conditions.
 

@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `96a60f2f`. Retained compiler recipes construct body packets; original typing supplies parameter and scope authority. |
-| Latest completed normal verification | Build 5910; four empty strict Source checks and six affected modules rebuilt; 139 new declarations and 32 APIs agree between private and normal checks. All 8723 preceding scoped declarations remain exact; registered tests and repository policy pass. |
-| Working implementation | Retained compiler recipes supply discard and sequence packets for ordinary and principal Associations. Complete formation coverage and the public all-pass theorem remain incomplete. |
-| Latest proof scope | Original frames supply parameter declarations and per-scope typing conditions. Compiler policy, wider grammar and exact call readiness remain obligations. |
-| Latest normally verified proof package | `staged-retained-recipe-factories-and-original-authority`: four Sources, 139 new declarations and 32 selected interfaces, verified in `96a60f2f`. |
+| Latest normally verified implementation commit | `806e809c`. Generation retains the actual contextual compiler policy with the same body recipe and Code. |
+| Latest completed normal verification | Build 5911; three empty strict Source checks and 753 affected modules rebuilt; 133 selected declarations and eleven new interfaces agree between private and normal checks. All 16679 preceding scoped declarations remain exact; registered tests and repository policy pass. |
+| Working implementation | Body recipes and contextual compiler policies are retained at the same generation site. Complete formation coverage and the public all-pass theorem remain incomplete. |
+| Latest proof scope | Generation retains its actual policy callbacks and fuel choices. Global metadata profiles, wider grammar and exact call readiness remain obligations. |
+| Latest normally verified proof package | `contextual-lambda-full-policy-provenance`: three modules, 133 owned declarations and eleven new interfaces, verified in `806e809c`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified contextual compiler policy retention
+
+The three modules in `806e809c` retain the actual contextual compiler policy together with the body recipe, named compilation and generated Code. The receipt records initializer overrides, evidence, local reads and the original fuel choices. Generation and producer projections preserve this same witness.
+
+All 753 affected modules pass private strict compilation and rebuild normally. The three selected normal strict checks have empty logs. The selected modules own 133 declarations and expose eleven new interfaces. All 16679 preceding scoped declarations retain their complete types and axiom lists; 48 declarations are added and none are removed. All 16727 complete private/normal declaration blocks and the API logs agree. Build 5911, registered tests and repository policy pass. The normal source/object inventory grows from 5843 to 5844, and all 38 Tests.Main declaration blocks remain exact.
+
+The wider baseline includes existing dependencies; its growth from the preceding 8862-declaration scope does not measure new semantic coverage. Policy profiles, formation coverage, original typing, supported grammar and exact call readiness still need to be composed. The final public all-pass theorem remains incomplete.
 
 ### Verified retained-recipe factories and original typing
 

@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The factories from retained recipes and source typing lemmas are committed in `96a60f2f`: four Sources expose 32 checked interfaces with literal private/normal agreement for 139 new declarations. All 8723 preceding scoped declarations remain exact. The preceding sequence body/application changes are in `a0778ccc` (27 interfaces, 169 owned declarations).
+Contextual compiler policy retention is committed in `806e809c`: three modules expose eleven new interfaces, with literal private/normal agreement for 133 owned declarations. All 16679 preceding scoped declarations remain exact. The earlier retained-recipe factories and source typing lemmas are in `96a60f2f` (32 interfaces, 139 new declarations); sequence body/application changes are in `a0778ccc` (27 interfaces, 169 owned declarations).
 
 - `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
 - `SelectedBodyCompilerCallbacks`, `SelectedNamedCompilerRecipes` and the selected closure/named factories retain the same contextual compiler site, actual body, callback, chosen packet and raw parameter authority. They derive support for those genuine occurrences; an arbitrary earlier Association or unrelated compiler site is not upgraded.
@@ -20,6 +20,14 @@ The factories from retained recipes and source typing lemmas are committed in `9
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Contextual compiler policy retention
+
+`CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe` records the actual read and special-expression callbacks for one generated Code. `Retained` keeps that policy with its named compilation and body recipe inside a proposition. The special callback keeps the original initializer, evidence and local-read choices and the `min budget code.fuel` bound; compatible reads keep the prepared compilation's fuel.
+
+`CallableIndexedLambdaGeneration.contextual_certificate_with_policy_recipe` and `of_contextual_with_policy_recipe` construct this witness at the actual generation site. The producer's `ProducedWithPolicy` retains the same Produced value and Site. Existing projections retain their interface types.
+
+Verified in `806e809c`: 753 affected modules, three empty normal strict checks, build 5911, registered tests and repository policy pass. Global metadata profiles and complete formation/call coverage remain separate obligations.
 
 ## Retained-recipe factories and original typing
 
