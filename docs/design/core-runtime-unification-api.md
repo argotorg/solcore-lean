@@ -682,3 +682,38 @@ The compiler-facing wrapper constructs its root certificate internally. Its `Cal
 General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
 
 The static Source/compiler receipt group (`e8607d82`) contains two Sources, 125 declarations and 25 selected interfaces. The semantic head/fold/compiler composition group (`abe72325`) contains four Sources, 73 declarations and twelve interfaces. Interface and declaration counts do not measure proof completion.
+
+## Selected caller and recursive terminal body interfaces (2026-10-11; normal verification complete)
+
+The selected `staged-selected-callers-and-recursive-body-bounds` unit is normally verified in `7db7dd2c`, `dda78f9c`, `31549a17`: sixteen proof Sources, 376 owned declarations and 53 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews, excluding contributing repair authors.
+
+All sixteen native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (215570 bytes, SHA-256 `40020d9c5a18129f8d398856d30533f3fbbb94a7d853a9d9bc783fc51eb820e9`). The selected native environment grows from 2317 to 2333 modules. Build 5869 passes; the normal Source/BOTH snapshot grows from 5786 to 5802 rows. The cumulative census grows from 20572 to 20948: 376 additions, no overlap and no removals. All 18 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original twenty closed validation receipts without repeating their kernel checks.
+
+| Module suffix under `CallableIndexedOwnedPreparedStaged` | Selected interfaces | Role |
+| --- | --- | --- |
+| `SelectedTerminalCertificates` | 4 | Narrows the certificate to the actual chosen terminal child. |
+| `SelectedTerminalClosureParentBounds` | 1 | Reflects the selected closure application and original parent. |
+| `SelectedTerminalClosureParentPreservation` | 1 | Preserves the selected closure application and original parent. |
+| `SelectedTerminalNamedGlobalDispatch` | 2 | Connects the actual selected named Header and global application. |
+| `SelectedTerminalClosureUserDispatch` | 1 | Reflects user arity and accepted selected closure dispatch. |
+| `SelectedTerminalClosureUserPreservationDispatch` | 1 | Preserves user arity and accepted selected closure dispatch. |
+| `SelectedIndirectTerminalReflectionDispatch` | 1 | Reflects actual callee and ordered argument prefixes. |
+| `SelectedIndirectTerminalPreservationDispatch` | 1 | Preserves actual callee and ordered argument prefixes. |
+| `SelectedIndirectTerminalCallBounds` | 2 | Joins selected closure and named whole-call branches. |
+| `SelectedGeneralCallHeadBounds` | 4 | Connects one authentic whole-call result to expression meaning. |
+| `SelectedRecursiveCallerBounds` | 4 | Builds caller child meaning by structural certificate induction. |
+| `SelectedBodyStaticSupport` | 9 | Retains original Root/RootAt and named/Association static authority. |
+| `SelectedRecursiveBodyBounds` | 10 | Constructs selected terminal body meaning by numeric induction. |
+| `SelectedCallerFromRecursiveBodies` | 2 | Uses the constructed body family in the caller fold. |
+| `SelectedBodyCompilerSupport` | 2 | Issues original Source roots from actual accepted compiler actions. |
+| `RecursiveBodyViewTransport` | 8 | Transports accepted compiler-view lowering to the original Source. |
+
+The call chain selects one authentic terminal packet for the actual named Header or contextual closure Association. Its certificate is narrowed to that packet's original expression, scope and lowered child. Closure and named dispatch retain the real argument order, physical arity, staged rejection and selected scope. The accepted application keeps its actual returned pool and restores the saved caller, including caller relation and PostAdmission.
+
+The selected caller fold constructs callee and argument preservation/reflection internally from the actual recursive certificate. Group reflection and erased singleton tuple packing may keep the same native grade; their induction follows the child certificate. Ordered argument entries retain repeated identifiers and use the actual intermediate state. Numeric strong induction then constructs meaning for supported selected terminal bodies at strictly smaller semantic budgets. The caller-from-bodies adapter consumes that constructed body family. These endpoints require no external child execution or body meaning callback. Source and native grades remain independent.
+
+Static body support retains the original Source root, raw context, actual Header or Association body context and every genuinely selected child scope. The compiler support issues a certificate from the actual accepted original action and indexes call readiness by that exact proof. The compiler-view transport proves accepted lowering on the original Source from paired policies, reached unedited metadata and the real compiler action. Compiler callbacks, reason functions, original typing/declarations, receiver, registry extension, diagnostics, runtime ledger and coverage remain explicit authority inputs.
+
+This closes the supported selected terminal body/caller recursion. Constructing these authentic roots and authority packets for every compiler path remains unfinished. Wider expression and statement grammar, unrestricted function bodies, complete receiving-diagnostic coverage, specialization/evidence/comptime composition and the final public theorem across all passes are still open. Runtime unification remains 100%; meaning preservation remains about 70%, with an equally weighted overall estimate of about 85%. These estimates describe completed work, not interface counts or remaining time.

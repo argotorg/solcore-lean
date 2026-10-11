@@ -1920,3 +1920,30 @@ General recursive called bodies, the shared numeric expression/application/body 
 The saved lexical closure records the registered CoreLowering umbrella and these six new targets. Its import relation is separate from the native environment and declaration ownership measured during normal validation.
 
 The static Source/compiler receipt group (`e8607d82`) contains two Sources, 125 declarations and 25 selected interfaces. The semantic head/fold/compiler composition group (`abe72325`) contains four Sources, 73 declarations and twelve interfaces. Interface and declaration counts do not measure proof completion.
+
+## 2026-10-11: Selected terminal body recursion and original Source authority; normal verification complete
+
+The selected `staged-selected-callers-and-recursive-body-bounds` unit is normally verified in `7db7dd2c`, `dda78f9c`, `31549a17`: sixteen proof Sources, 376 owned declarations and 53 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews, excluding contributing repair authors.
+
+All sixteen native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (215570 bytes, SHA-256 `40020d9c5a18129f8d398856d30533f3fbbb94a7d853a9d9bc783fc51eb820e9`). The selected native environment grows from 2317 to 2333 modules. Build 5869 passes; the normal Source/BOTH snapshot grows from 5786 to 5802 rows. The cumulative census grows from 20572 to 20948: 376 additions, no overlap and no removals. All 18 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original twenty closed validation receipts without repeating their kernel checks.
+
+| Boundary | Retained evidence |
+| --- | --- |
+| Terminal selection | One actual Header/Association packet and its original child, scope and lowering. |
+| Call behavior | Ordered callee/argument traces, physical arity, exact nested staged fault identity, returned pool and restored caller post. |
+| Structural caller induction | The actual issued recursive certificate; duplicate entries and same-grade group/singleton branches. |
+| Numeric body induction | Genuine selected original RootAt and strict smaller semantic budgets; body child laws constructed internally. |
+| Original Source authority | Raw typing and context, real accepted compiler action, paired-policy view transport and actual selected scope. |
+| Validation | Sixteen native and normal strict checks, complete literal audits and twenty closed normal validation receipts. |
+
+The saved lexical closure has 2780 canonical Source rows from the registered umbrella and sixteen targets. That import relation is separate from the native environment and physical module-owned declarations, measured independently during integration.
+
+The call chain selects one authentic terminal packet for the actual named Header or contextual closure Association. Its certificate is narrowed to that packet's original expression, scope and lowered child. Closure and named dispatch retain the real argument order, physical arity, staged rejection and selected scope. The accepted application keeps its actual returned pool and restores the saved caller, including caller relation and PostAdmission.
+
+The selected caller fold constructs callee and argument preservation/reflection internally from the actual recursive certificate. Group reflection and erased singleton tuple packing may keep the same native grade; their induction follows the child certificate. Ordered argument entries retain repeated identifiers and use the actual intermediate state. Numeric strong induction then constructs meaning for supported selected terminal bodies at strictly smaller semantic budgets. The caller-from-bodies adapter consumes that constructed body family. These endpoints require no external child execution or body meaning callback. Source and native grades remain independent.
+
+Static body support retains the original Source root, raw context, actual Header or Association body context and every genuinely selected child scope. The compiler support issues a certificate from the actual accepted original action and indexes call readiness by that exact proof. The compiler-view transport proves accepted lowering on the original Source from paired policies, reached unedited metadata and the real compiler action. Compiler callbacks, reason functions, original typing/declarations, receiver, registry extension, diagnostics, runtime ledger and coverage remain explicit authority inputs.
+
+This closes the supported selected terminal body/caller recursion. Constructing these authentic roots and authority packets for every compiler path remains unfinished. Wider expression and statement grammar, unrestricted function bodies, complete receiving-diagnostic coverage, specialization/evidence/comptime composition and the final public theorem across all passes are still open. Runtime unification remains 100%; meaning preservation remains about 70%, with an equally weighted overall estimate of about 85%. These estimates describe completed work, not interface counts or remaining time.

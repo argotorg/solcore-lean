@@ -10,11 +10,11 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `e8607d82` and `abe72325`. Compiler-issued recursive caller certificates and structural preservation/reflection are integrated. |
-| Latest completed normal verification | Build 5853; six empty strict Source checks; 198 declarations and 37 APIs with literal private/normal TYPE/AXIOMS and byte-exact API agreement; cumulative 20572 (+198, no overlaps or removals). |
-| Working implementation | The recursive caller certificate, structural fold and actual compiler wrapper are normally verified. Caller child meaning is built internally. General recursive called bodies and full compiler coverage remain unfinished. |
-| Latest proof scope | Actual compiler-issued caller trees with recursive groups, ordered tuples and indirect calls; structural child meaning is built internally, with finite called bodies and authentic static/runtime authority retained. |
-| Latest normally verified proof package | `staged-recursive-callers-and-static-receipts`: six Sources, 198 owned declarations and 37 selected interfaces, normally verified in two code commits. |
+| Latest normally verified implementation commits | `7db7dd2c`, `dda78f9c`, `31549a17`. Selected terminal caller/body recursion and original Source transport are integrated. |
+| Latest completed normal verification | Build 5869; sixteen empty strict Source checks; 376 declarations and 53 APIs with literal private/normal TYPE/AXIOMS and byte-exact API agreement; cumulative 20948 (+376, no overlaps or removals). |
+| Working implementation | Structural caller induction and numeric induction construct supported selected terminal body meaning internally. Authentic compiler/static coverage and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | Actual selected terminal packets and original body roots; recursive groups, ordered tuples and indirect calls with internally constructed child/body meaning, exact returned state and staged fault identity. |
+| Latest normally verified proof package | `staged-selected-callers-and-recursive-body-bounds`: sixteen Sources, 376 owned declarations and 53 selected interfaces, normally verified in three code commits. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 Original public operational signatures and finish branches remain exact. The completion receipt shares the original resume/mint action. The `7b0f562f` compatibility audit retains 1440 original same-name literal types and axiom arrays and one explicitly reviewed generated resume-helper migration with two binder-label differences. All 1678 declarations audited at that checkpoint match literally between private and normal builds. The estimates remain about 70% for the second objective and about 85% overall.
@@ -1339,3 +1339,27 @@ Structural induction on that certificate proves both preservation and reflection
 The compiler-facing wrapper constructs its root certificate internally. Its `CallsReady` premise refers only to call receipts reachable from that exact generated root. Actual preparation, Source view, sidecar, guard frame, selected Header or Association, receiver, registry extension, diagnostic interpretation, ledger and coverage remain static or runtime premises. Called bodies still use the existing finite read/literal/group/binary-pair family. No public child execution or arbitrary body meaning callback is supplied.
 
 General recursive called bodies, the shared numeric expression/application/body family, other expression and statement forms, and specialization/evidence/comptime composition remain unfinished. The final public theorem across all compiler passes is incomplete. Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+## Selected callers and recursive terminal body proofs (2026-10-11; normal verification complete)
+
+The selected `staged-selected-callers-and-recursive-body-bounds` unit is normally verified in `7db7dd2c`, `dda78f9c`, `31549a17`: sixteen proof Sources, 376 owned declarations and 53 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews, excluding contributing repair authors.
+
+All sixteen native and normal strict Source checks have empty logs. Complete private/normal TYPE/AXIOMS blocks agree literally, and the complete API logs are byte-identical (215570 bytes, SHA-256 `40020d9c5a18129f8d398856d30533f3fbbb94a7d853a9d9bc783fc51eb820e9`). The selected native environment grows from 2317 to 2333 modules. Build 5869 passes; the normal Source/BOTH snapshot grows from 5786 to 5802 rows. The cumulative census grows from 20572 to 20948: 376 additions, no overlap and no removals. All 18 modules in the affected dependency cone are rebuilt and all 4985 protected artifacts remain unchanged.
+
+Metadata finalization reuses the original twenty closed validation receipts without repeating their kernel checks.
+
+The call chain selects one authentic terminal packet for the actual named Header or contextual closure Association. Its certificate is narrowed to that packet's original expression, scope and lowered child. Closure and named dispatch retain the real argument order, physical arity, staged rejection and selected scope. The accepted application keeps its actual returned pool and restores the saved caller, including caller relation and PostAdmission.
+
+The selected caller fold constructs callee and argument preservation/reflection internally from the actual recursive certificate. Group reflection and erased singleton tuple packing may keep the same native grade; their induction follows the child certificate. Ordered argument entries retain repeated identifiers and use the actual intermediate state. Numeric strong induction then constructs meaning for supported selected terminal bodies at strictly smaller semantic budgets. The caller-from-bodies adapter consumes that constructed body family. These endpoints require no external child execution or body meaning callback. Source and native grades remain independent.
+
+Static body support retains the original Source root, raw context, actual Header or Association body context and every genuinely selected child scope. The compiler support issues a certificate from the actual accepted original action and indexes call readiness by that exact proof. The compiler-view transport proves accepted lowering on the original Source from paired policies, reached unedited metadata and the real compiler action. Compiler callbacks, reason functions, original typing/declarations, receiver, registry extension, diagnostics, runtime ledger and coverage remain explicit authority inputs.
+
+| Logical code group | Proof Sources | Selected interfaces |
+| --- | --- | --- |
+| Selected terminal dispatch | 9 | 14 |
+| Caller and original Source authority | 5 | 27 |
+| Numeric body induction and caller composition | 2 | 12 |
+
+The three dependency-ordered code groups are committed at `7db7dd2c` (9 Sources / 14 interfaces); `dda78f9c` (5 Sources / 27 interfaces); `31549a17` (2 Sources / 12 interfaces).
+
+This closes the supported selected terminal body/caller recursion. Constructing these authentic roots and authority packets for every compiler path remains unfinished. Wider expression and statement grammar, unrestricted function bodies, complete receiving-diagnostic coverage, specialization/evidence/comptime composition and the final public theorem across all passes are still open. Runtime unification remains 100%; meaning preservation remains about 70%, with an equally weighted overall estimate of about 85%. These estimates describe completed work, not interface counts or remaining time.
