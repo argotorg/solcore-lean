@@ -10,17 +10,19 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `37b62b0b`, `5d708d56`. Ordered discard sequences and propositional closure support coverage are integrated. |
-| Latest completed normal verification | Build 5900; three empty strict Source checks and five modules rebuilt; 155 declarations and 13 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1465 → 1620; registered tests and repository policy pass. |
-| Working implementation | Accepted compilation supplies ordered discard receipts and the flow proof composes the actual reached states. Original full-body typing and application joins, arbitrary/principal Association coverage and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | Arbitrary finite discard prefixes retain evaluation order and early failures. The caller wrapper accepts static packet/support existence using theorem-local choice; actual coverage remains an obligation. |
-| Latest normally verified proof package | `staged-discard-sequence-and-prop-coverage`: three Sources, 155 owned declarations and 13 selected interfaces, verified in `37b62b0b` and `5d708d56`. |
+| Latest normally verified implementation commit | `de3c71e5`. Original body typing and compiler support for ordered discard sequences are integrated. |
+| Latest completed normal verification | Build 5902; two empty strict Source checks and four modules rebuilt; 47 declarations and 13 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1620 → 1667; registered tests and repository policy pass. |
+| Working implementation | Original full-body typing now supplies each accepted sequence child's raw type and its final declared result. Application joins, arbitrary/principal Association coverage and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | The actual sequence receipt supplies each child compiler action and fuel. Original typing and constructive view transport issue its certificate; call readiness remains indexed by that exact certificate. |
+| Latest normally verified proof package | `staged-discard-sequence-typing-and-compiler-support`: two Sources, 47 owned declarations and 13 selected interfaces, verified in `de3c71e5`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 
 ### Verified compiler factories and discard bodies
 
-Ordered discard sequences and propositional support coverage are verified in `37b62b0b` and `5d708d56`. The sequence receipt retains every accepted child action and its predecessor fuel. The flow proof uses structural tail recursion and strict child hypotheses, preserving actual intermediate states and early faults. The coverage wrapper keeps a chosen dependent packet/support pair local to each theorem. Build 5900, registered tests and repository policy pass; full body typing and application joins for longer sequences remain open.
+Original body typing and compiler support for ordered discard sequences are verified in `de3c71e5`. The original closure frame and parameter extension supply each used expression's stored node and raw type. Full body typing fixes the terminal result to the function's declared type. Each actual compiler action issues its own certificate; static call readiness refers to that same proof. Build 5902, registered tests and repository policy pass. Application joins for longer sequences and complete formation coverage remain open.
+
+Ordered discard sequences and propositional support coverage are verified in `37b62b0b` and `5d708d56`. The sequence receipt retains every accepted child action and its predecessor fuel. The flow proof uses structural tail recursion and strict child hypotheses, preserving actual intermediate states and early faults. The coverage wrapper keeps a chosen dependent packet/support pair local to each theorem. Build 5900, registered tests and repository policy pass; the original body typing connection is verified above, while application joins for longer sequences remain open.
 
 The compiler connection and ordinary closure factory are verified in `c2d799e7` and `46a03ca1`. Accepted expression compilation now supplies the mixed recursive caller certificate, while the same produced closure supplies its accepted body action and static packet. Both execution directions retain original raw typing and genuine call readiness. All 52 preceding scoped modules retain their literal declarations; build 5897, registered tests and the repository policy checker pass. Coverage of arbitrary and principal Associations and longer statement sequences remains open.
 

@@ -30,11 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified discard sequences and static coverage
+### Latest verified sequence typing and compiler support
+
+The two Sources in `de3c71e5` derive each actual discard-sequence child's original stored node and raw type from full body typing, the closure frame and parameter extension. The terminal's raw result is proved equal to the function's declared result. Native type projection is not used to establish Source typing.
+
+The compiler support retains the same accepted sequence receipt, each child's real fuel, paired policies and full metadata. Constructive action transport issues the original certificate. Call readiness refers to that exact proof; child roots and the resulting typed sequence tree are packaged inside propositions. These interfaces require genuine static compiler authority, without assuming the desired body execution law.
+
+Both private and normal strict checks have empty logs. Complete TYPE/AXIOMS blocks agree for 47 owned declarations, and all 13 selected interfaces agree. The scope grows from 1620 to 1667 with no removals; all 57 preceding scoped modules remain exact. Build 5902, registered tests and the repository policy checker pass. The normal Source/BOTH snapshot grows from 5833 to 5835, and all four affected modules are rebuilt. Application joins for longer sequences, production coverage and the public all-pass theorem remain incomplete. The estimates above are unchanged.
+
+### Preceding verified discard sequences and static coverage
 
 The three Sources in `37b62b0b` and `5d708d56` extract ordered compiler receipts for any finite discard prefix followed by a supported terminal statement and prove preservation and reflection of that flow. Structural tail induction retains the actual intermediate state, temporary binder and fault prefix. Each expression uses the strict Root induction hypothesis; original raw typing remains explicit.
 
-The caller wrapper accepts propositional existence of a packet and matching support for every actual Association. A theorem-local choice supplies the existing recursive caller proof. It adds no exported computational selector; body shape and static coverage still require proof. The whole function-body typing and application joins for arbitrary sequences remain open.
+The caller wrapper accepts propositional existence of a packet and matching support for every actual Association. A theorem-local choice supplies the existing recursive caller proof. It adds no exported computational selector; body shape and static coverage still require proof. Original function-body typing is connected in the latest unit above; application joins for arbitrary sequences remain open.
 
 All three private and normal strict checks have empty logs. Complete TYPE/AXIOMS blocks agree for 155 owned declarations, and all 13 selected interfaces agree. The scope grows from 1465 to 1620 with no removals; all 54 preceding scoped modules remain exact. Build 5900, registered tests and the repository policy checker pass. The normal Source/BOTH snapshot grows from 5830 to 5833, and all five affected modules are rebuilt. The public all-pass theorem remains incomplete and the estimates above are unchanged.
 
