@@ -1386,6 +1386,9 @@ import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalSpecializationO
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalSpecializationRanges
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationIdentity
 import Solcore.Frontend.CorrelatedTypedSourceInstances
+import Solcore.SourceSemantics.SourceAnnotationSummaryUniqueness
+import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationStageCoherence
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryScopeCallsReady
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
