@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `552dfdfd`. Supported recursive discard sequences preserve and reflect their exact ordinary exits and stage rejections. |
-| Latest completed normal verification | Build 5920; one empty strict Source check and 3 affected modules rebuilt; 19 selected declarations and four APIs agree between private and normal checks. All 16993 preceding scoped declarations remain exact; registered tests and repository policy pass. |
-| Working implementation | Both directions of the recursive discard-sequence body proof now expose exact exit receipts. Complete formation coverage and the public all-pass theorem remain incomplete. |
-| Latest proof scope | Supported discard sequences retain lexical exits and exact stage rejections. Other selected stage frames, global metadata, broader grammar and complete compiler coverage remain obligations. |
-| Latest normally verified proof package | `staged-discard-sequence-body-exits`: one module, 19 selected declarations and four interfaces, verified in `552dfdfd`. |
+| Latest normally verified implementation commit | `74b762a7`. Actual preparation retains specialization provenance; correlated source instances and ordinary catalog identity have checked foundations. |
+| Latest completed normal verification | Build 5928; all 2505 affected modules rebuilt and nine selected strict checks empty; 758 selected declarations and 21 APIs agree privately and normally. All 17652 baseline declarations remain exact. |
+| Working implementation | Preparation origins, accepted concrete replacements and correlated source instances are verified. Selected call authority and the public all-pass theorem are still being connected. |
+| Latest proof scope | Actual specialization receipts, ordinary original identity and complete correlated source recovery. General method identity, compiler coverage and full staged execution composition remain obligations. |
+| Latest normally verified proof package | `source-specialization-and-staged-coherence`: nine selected modules, 118 new declaration names and 21 interfaces, verified in `74b762a7`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified specialization and source-instance foundations
+
+The nine-module foundation in `74b762a7` connects successful executable-plan preparation to the actual specialization receipts for every retained row. Accepted canonical replacements are concrete and contain no flexible variables. Equal local instances of one original source recover its complete rigid instances, including ordered nodes, binders and qualified metadata. Genuine ordinary catalog origins identify the same original checked function. A separate congruence theorem transports successful stage analyses when their actual inputs agree.
+
+All 2505 affected modules pass private strict compilation and rebuild normally. The nine selected strict logs are empty. Their 758 owned declarations and 21 selected interfaces agree between private and normal checks. Of those declarations, 640 already belonged to the existing specialization checker; 118 names are new. The expanded baseline includes that checker's existing declarations, and the scoped census grows from 17652 to 17770, with every old type and axiom list exact and no removals. Build 5928, registered tests and repository policy pass. The normal source/object inventory grows from 5853 to 5861.
+
+Concreteness does not establish nominal catalog membership or arity validity. These foundations do not yet derive every selected stage frame or the public all-pass semantics theorem. General method identity, complete formation coverage and broader grammar remain open. Core instructions and runtime behavior are unchanged.
 
 ### Verified recursive discard-sequence exits
 

@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified recursive discard-sequence exits
+### Latest verified specialization and source-instance foundations
+
+The nine-module foundation in `74b762a7` connects successful executable-plan preparation to the actual specialization receipts for every retained row. Accepted canonical replacements are concrete and contain no flexible variables. Equal local instances of one original source recover its complete rigid instances, including ordered nodes, binders and qualified metadata. Genuine ordinary catalog origins identify the same original checked function. A separate congruence theorem transports successful stage analyses when their actual inputs agree.
+
+All 2505 affected modules pass private strict compilation and rebuild normally. The nine selected strict logs are empty. Their 758 owned declarations and 21 selected interfaces agree between private and normal checks. Of those declarations, 640 already belonged to the existing specialization checker; 118 names are new. The expanded baseline includes that checker's existing declarations, and the scoped census grows from 17652 to 17770, with every old type and axiom list exact and no removals. Build 5928, registered tests and repository policy pass. The normal source/object inventory grows from 5853 to 5861.
+
+Concreteness does not establish nominal catalog membership or arity validity. These foundations do not yet derive every selected stage frame or the public all-pass semantics theorem. General method identity, complete formation coverage and broader grammar remain open. Core instructions and runtime behavior are unchanged.
+
+The estimates above are unchanged.
+
+### Preceding verified recursive discard-sequence exits
 
 The module in `552dfdfd` connects both preservation and reflection for supported recursive discard sequences to their exact exits. Ordinary returned values and semantic faults carry the reached lexical exit. Stage rejection retains its original scope, call, reason, context and prefix heap. The strict child laws are constructed inside the proof.
 

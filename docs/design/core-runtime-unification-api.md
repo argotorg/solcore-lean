@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Specialization and source-instance foundations are committed in `74b762a7`: nine selected modules, 118 new declaration names and 21 interfaces. All 17652 expanded baseline declarations remain exact.
+
 Recursive discard-sequence exits are committed in `552dfdfd`: one module, 19 selected declarations and four public interfaces. All 16993 preceding scoped declarations remain exact.
 
 Canonical call readiness and ordinary body exits are committed in `3059a7f5`: three modules, 19 new declarations and nine interfaces. All 16974 preceding scoped declarations remain exact.
@@ -26,6 +28,16 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Specialization and source-instance foundations
+
+`SourceSpecializationAcceptance` exposes concreteness and absence of flexible variables for actual accepted canonical replacements. `CorrelatedParameterInstances` and `CorrelatedTypedSourceInstances` recover rigid instances from equal local instances of the same original type or complete source. These statements preserve ordered metadata and do not assume general substitution injectivity.
+
+`CallablePreparedSpecializationOrigins` and `CallablePreparedFinalSpecializationOrigins` follow the actual requests, worklist, method, operator and coercion preparation paths. The final preparation endpoints construct specialization receipts internally. `CallablePreparedFinalSpecializationRanges` obtains concrete replacement properties from those receipts.
+
+`CallableOrdinarySpecializationIdentity` uses genuine ordinary catalog membership and declaration uniqueness to identify a shared original checked function. `SourceStageAnalysisCongruence` compares successful analyses from equal declaration, source and effective return inputs; correspondence of those inputs must still be established.
+
+Verified in `74b762a7`: build 5928, all affected modules, strict checks, complete scoped declaration comparisons, registered tests and repository policy pass. These interfaces do not infer nominal type formation from concreteness or complete the public semantics theorem.
 
 ## Recursive discard-sequence exits
 
