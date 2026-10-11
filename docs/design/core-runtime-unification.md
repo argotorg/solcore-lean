@@ -10,15 +10,17 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `a6cb5ab2`, `2f22789d`. Mixed closure dispatch and recursive caller/body proofs are integrated. |
-| Latest completed normal verification | Build 5895; six empty strict Source checks and eight modules rebuilt; 70 declarations and 12 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1332 → 1402; registered tests and repository policy pass. |
-| Working implementation | Structural caller induction and numeric body induction construct meaning for terminal/discard closure bodies and terminal named bodies. Complete formation factories, wider grammar and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | Indirect dispatch, recursive groups and ordered tuples preserve actual caller restoration; called bodies consume strictly smaller grades while native groups and singleton tuples use structural induction. |
-| Latest normally verified proof package | `mixed-callers-and-recursive-body-bounds`: six Sources, 70 owned declarations and 12 selected interfaces, verified in `a6cb5ab2` and `2f22789d`. |
+| Latest normally verified implementation commits | `c2d799e7`, `46a03ca1`. Accepted caller compilation and the ordinary closure support factory are integrated. |
+| Latest completed normal verification | Build 5897; two empty strict Source checks and four modules rebuilt; 63 declarations and 12 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1402 → 1465; registered tests and repository policy pass. |
+| Working implementation | Accepted expression compilation supplies the mixed recursive caller proof. The ordinary closure factory derives support from its actual body action. Arbitrary/principal Association coverage, wider grammar and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | The compiler wrapper issues its original Source certificate. The closure factory retains the same generated body, parameter context and both child roots; actual policy, typing and call readiness remain explicit. |
+| Latest normally verified proof package | `mixed-recursive-compiler-and-closure-factories`: two Sources, 63 owned declarations and 12 selected interfaces, verified in `c2d799e7` and `46a03ca1`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 
 ### Verified compiler factories and discard bodies
+
+The compiler connection and ordinary closure factory are verified in `c2d799e7` and `46a03ca1`. Accepted expression compilation now supplies the mixed recursive caller certificate, while the same produced closure supplies its accepted body action and static packet. Both execution directions retain original raw typing and genuine call readiness. All 52 preceding scoped modules retain their literal declarations; build 5897, registered tests and the repository policy checker pass. Coverage of arbitrary and principal Associations and longer statement sequences remains open.
 
 The recursive caller/body composition is verified in `a6cb5ab2` and `2f22789d`. Its six Sources construct the supported body semantics internally from static packets and genuine call authority. All 46 preceding scoped modules retain their literal declarations; build 5895, registered tests and the repository policy checker pass. Packet coverage for actual formations and the wider grammar remain open.
 

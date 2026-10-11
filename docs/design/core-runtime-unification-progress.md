@@ -30,7 +30,13 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified mixed caller and body recursion
+### Latest verified compiler connection and closure factory
+
+The two Sources in `c2d799e7` and `46a03ca1` connect accepted expression compilation to the mixed recursive caller proof and construct discard-body support for the same ordinary closure produced by the compiler. The wrapper issues its original Source certificate internally. The factory retains the actual body action, parameter context, child roots and call readiness; it does not require a completed execution law.
+
+Both private and normal strict checks have empty logs. Complete TYPE/AXIOMS blocks agree for 63 owned declarations, and all 12 selected interfaces agree. The scope grows from 1402 to 1465 with no removals; all 52 preceding scoped modules remain exact. Build 5897, registered tests and the repository policy checker pass. The normal Source/BOTH snapshot grows from 5828 to 5830, and all four affected modules are rebuilt. Arbitrary and principal Association coverage, longer statement sequences and the public all-pass theorem remain open. The estimates above are unchanged.
+
+### Preceding verified mixed caller and body recursion
 
 The six Sources in `a6cb5ab2` and `2f22789d` connect mixed closure bodies to indirect dispatch and close caller/body recursion. Structural induction handles groups, ordered tuples and calls; numeric induction supplies each called body's strictly smaller Root. The final body endpoints construct their execution laws internally from static packet/support and named-body authority. Named bodies are still terminal; closure bodies are terminal or discard followed by a terminal return.
 
