@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified sequence bodies and applications
+### Latest verified retained-recipe factories and original typing
+
+The four Sources in `96a60f2f` construct discard and sequence packets from the retained production recipe of the actual Code. Both ordinary and principal Associations retain their named compilation and body context. Original closure typing supplies parameter declarations and per-scope typing conditions.
+
+All four private and normal strict checks pass with empty logs. Their 139 new declarations and 32 interfaces agree literally; all 8723 preceding scoped declarations retain their complete types and axiom lists. The scope grows to 8862 without removals. Build 5910 rebuilds all six affected modules, and registered tests and repository policy pass with zero findings. The normal Source/BOTH snapshot grows from 5839 to 5843. Unrelated user work is preserved.
+
+Compiler policy, captured declarations, supported grammar and readiness at the exact issued calls remain genuine static obligations. Complete production coverage and the public all-pass theorem remain unfinished.
+
+The estimates above are unchanged.
+
+### Preceding verified sequence bodies and applications
 
 The five Sources in `a0778ccc` connect ordered discard sequences to closure bodies and lambda applications for both ordinary and principal Associations. Each packet keeps the accepted compiler receipt, original frame and real parameter context. Support supplies original child Roots at every actual Source-selected scope. Preservation and reflection retain raw result typing, reached states, failures and the exact caller post.
 

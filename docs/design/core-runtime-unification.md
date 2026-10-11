@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `a0778ccc`. Ordered discard sequences connect to ordinary and principal lambda application proofs. |
-| Latest completed normal verification | Build 5906; five empty strict Source checks and 24 affected modules rebuilt; 169 owned declarations and 27 APIs; all 8723 scoped TYPE/AXIOMS blocks and API logs agree between private and normal checks; registered tests and repository policy pass. |
-| Working implementation | Retained recipes identify the actual body lowerer. Ordered discard sequences now compose with lambda application and caller restoration; complete formation coverage and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | Sequence packets retain the original frame and every used child Root at the actual parameter context. Body/application proofs preserve state, faults and caller restoration. Compiler coverage and static call authority remain obligations. |
-| Latest normally verified proof package | `discard-sequence-packets-and-applications`: five Sources, 169 owned declarations and 27 selected interfaces, verified in `a0778ccc`. |
+| Latest normally verified implementation commit | `96a60f2f`. Retained compiler recipes construct body packets; original typing supplies parameter and scope authority. |
+| Latest completed normal verification | Build 5910; four empty strict Source checks and six affected modules rebuilt; 139 new declarations and 32 APIs agree between private and normal checks. All 8723 preceding scoped declarations remain exact; registered tests and repository policy pass. |
+| Working implementation | Retained compiler recipes supply discard and sequence packets for ordinary and principal Associations. Complete formation coverage and the public all-pass theorem remain incomplete. |
+| Latest proof scope | Original frames supply parameter declarations and per-scope typing conditions. Compiler policy, wider grammar and exact call readiness remain obligations. |
+| Latest normally verified proof package | `staged-retained-recipe-factories-and-original-authority`: four Sources, 139 new declarations and 32 selected interfaces, verified in `96a60f2f`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified retained-recipe factories and original typing
+
+The four Sources in `96a60f2f` construct discard and sequence packets from the retained production recipe of the actual Code. Both ordinary and principal Associations retain their named compilation and body context. Original closure typing supplies parameter declarations and per-scope typing conditions.
+
+All four private and normal strict checks pass with empty logs. Their 139 new declarations and 32 interfaces agree literally; all 8723 preceding scoped declarations retain their complete types and axiom lists. The scope grows to 8862 without removals. Build 5910 rebuilds all six affected modules, and registered tests and repository policy pass with zero findings. The normal Source/BOTH snapshot grows from 5839 to 5843. Unrelated user work is preserved.
+
+Compiler policy, captured declarations, supported grammar and readiness at the exact issued calls remain genuine static obligations. Complete production coverage and the public all-pass theorem remain unfinished.
 
 ### Verified sequence bodies and lambda applications
 
