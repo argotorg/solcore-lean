@@ -14,7 +14,7 @@ open CallableIndexedOwnedFunctionValues (Header Key NamedSourceAt NamedInstalled
 open CallableIndexedOwnedFunctionEntries (OwnedPool)
 open CallableIndexedOwnedPreparedContextualQualification (Facet)
 open CallableIndexedOwnedPreparedPositiveFunctionOrigins (Owner NamedAssociation functions)
-open CallableIndexedOwnedPreparedBootstrapGlobalCallRecipes (Recipe)
+open CallableIndexedOwnedPreparedBootstrapGlobalCallRecipes (Seed Recipe)
 universe u
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -26,7 +26,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {mapping : LocationMap} {world : StoreTyping}
   (origin : Owner (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (profile := profile))
   {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
-  (recipe : Recipe (CallableIndexedLambdaValues.model compiled.indexed profile) origin header mapping world)
+  {seed : Seed (CallableIndexedLambdaValues.model compiled.indexed profile) origin header}
+  (recipe : Recipe (CallableIndexedLambdaValues.model compiled.indexed profile) origin header seed mapping world)
   {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {source : Dynamic.GlobalFunction}
   (sourceAt : NamedSourceAt header rawD source)
   {identity : Word}
@@ -48,7 +49,7 @@ theorem installed : NamedInstalledCode recipe.capture := by
 
 /-- Construct the positive association from the real recipe and complete
 carrier fields; no older function relation is inverted. -/
-noncomputable def association :
+def association :
     NamedAssociation headers keys bodyRegistry profile mapping world
       header.named.specialized.function.type source (recipe.carrier identity descriptor.id)
       (CallableContract.functionType header.named.signature.parameterType header.named.signature.resultType) :=
@@ -133,7 +134,7 @@ include sourceAt bridge initial admitted runtime extension argumentsTyped packin
 /-- Ordered argument admission uses the same positive model and bootstrap
 owner. The recipe's actual capture is passed to the original named producer. -/
 theorem at_arguments
-    (currentRecipe : Recipe (CallableIndexedLambdaValues.model compiled.indexed profile) origin header
+    (currentRecipe : Recipe (CallableIndexedLambdaValues.model compiled.indexed profile) origin header seed
       index.mapping index.world)
     (sameLayouts : header.layouts = compiled.indexed.layouts)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))

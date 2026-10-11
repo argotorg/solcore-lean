@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedBootstrapReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogIndirectArgumentReceipts
 
-/-! A positive global recipe chooses its owner and capture from the actual
-bootstrap. Only that same capture is extended to the actual argument post.
+/-! A positive global recipe retains one capture from the actual bootstrap as
+an explicit seed. Every reached recipe extends that same seed capture.
 No broad global value representation is inverted into bootstrap provenance. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstrapGlobalCallRecipes
@@ -20,10 +20,26 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (functions : FunctionModel compiled.compatible.checked.catalog
     (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
 
-/-- The stored capture is the output of the real bootstrap capture producer.
-Its extension changes only type/map admission, preserving carrier fields. -/
+/-- One bootstrap capture and its installed code remain a literal witness.
+Every reached Recipe is indexed by this same seed, preserving carrier identity. -/
+structure Seed (origin : NamedOwner (headers := headers) keys functions registry)
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram)) where
+  member : header ∈ headers
+  initialCapture : NamedCapture headers origin.owner.key header [] origin.world
+  installed : NamedInstalledCode initialCapture
+
+/-- The real bootstrap producer supplies one seed inside a proposition.
+No Type-valued choice is made by a public definition. -/
+theorem Seed.of_bootstrap (origin : NamedOwner (headers := headers) keys functions registry)
+    {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (member : header ∈ headers) : Nonempty (Seed functions origin header) := by
+  obtain ⟨capture, installed⟩ := origin.named_capture member
+  exact ⟨⟨member, capture, installed⟩⟩
+
+/-- Map/world growth retains the same bootstrap seed and full capture. -/
 structure Recipe (origin : NamedOwner (headers := headers) keys functions registry)
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (seed : Seed functions origin header)
     (mapping : LocationMap) (world : StoreTyping) where
   member : header ∈ headers
   maps : LocationMap.Extends [] mapping
@@ -34,37 +50,57 @@ variable {functions : FunctionModel compiled.compatible.checked.catalog
     (CallableIndexedAmbient.ambientDefinitions compiled.indexed)}
   {origin : NamedOwner (headers := headers) keys functions registry}
   {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+  {seed : Seed functions origin header}
   {mapping : LocationMap} {world : StoreTyping}
 
-/-- The capture is chosen from the original bootstrap producer; it is not a
-field supplied by a caller or recovered from an arbitrary global carrier. -/
-noncomputable def initialCapture (recipe : Recipe functions origin header mapping world) :
-    NamedCapture headers origin.owner.key header [] origin.world :=
-  Classical.choose (origin.named_capture recipe.member)
+/-- This is the retained original bootstrap witness, independent of reached map/world. -/
+def initialCapture (_recipe : Recipe functions origin header seed mapping world) :
+    NamedCapture headers origin.owner.key header [] origin.world := seed.initialCapture
 
-theorem installed (recipe : Recipe functions origin header mapping world) :
-    NamedInstalledCode recipe.initialCapture :=
-  Classical.choose_spec (origin.named_capture recipe.member)
+theorem installed (recipe : Recipe functions origin header seed mapping world) :
+    NamedInstalledCode recipe.initialCapture := seed.installed
 
-noncomputable def capture (recipe : Recipe functions origin header mapping world) :
+def capture (recipe : Recipe functions origin header seed mapping world) :
     NamedCapture headers origin.owner.key header mapping world :=
   recipe.initialCapture.extend recipe.maps recipe.worlds
 
-noncomputable def carrier (recipe : Recipe functions origin header mapping world)
+def carrier (recipe : Recipe functions origin header seed mapping world)
     (identity descriptor : Word) : Value :=
   CallableIndexedOwnedPreparedCatalogGlobalIndirectInvocationBounds.carrier
     origin.owner recipe.capture identity descriptor
 
+/-- Reached growth changes only admission fields and preserves the literal seed. -/
+theorem extend (recipe : Recipe functions origin header seed mapping world)
+    {futureMap : LocationMap} {futureWorld : StoreTyping}
+    (maps : LocationMap.Extends mapping futureMap) (worlds : WorldExtends world futureWorld) :
+    Recipe functions origin header seed futureMap futureWorld :=
+  ⟨recipe.member, recipe.maps.trans maps, recipe.worlds.trans worlds⟩
+
+theorem carrier_extend (recipe : Recipe functions origin header seed mapping world)
+    {futureMap : LocationMap} {futureWorld : StoreTyping}
+    (maps : LocationMap.Extends mapping futureMap) (worlds : WorldExtends world futureWorld)
+    (identity descriptor : Word) :
+    (recipe.extend maps worlds).carrier identity descriptor = recipe.carrier identity descriptor := rfl
+
 end Recipe
 
-/-- The only positive recipe producer obtains its capture from bootstrap
-once. The caller supplies actual map/world growth at the reached packet. -/
+/-- A reached recipe keeps this exact seed; no fresh capture is selected. -/
+theorem of_seed (origin : NamedOwner (headers := headers) keys functions registry)
+    {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (seed : Seed functions origin header) {mapping : LocationMap} {world : StoreTyping}
+    (maps : LocationMap.Extends [] mapping) (worlds : WorldExtends origin.world world) :
+    Recipe functions origin header seed mapping world :=
+  ⟨seed.member, maps, worlds⟩
+
+/-- The actual bootstrap producer is invoked once inside Prop. The returned
+seed is retained as the common index for all later map/world extensions. -/
 theorem of_bootstrap (origin : NamedOwner (headers := headers) keys functions registry)
     {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
     (member : header ∈ headers) {mapping : LocationMap} {world : StoreTyping}
     (maps : LocationMap.Extends [] mapping) (worlds : WorldExtends origin.world world) :
-    Nonempty (Recipe functions origin header mapping world) := by
-  exact ⟨⟨member, maps, worlds⟩⟩
+    ∃ seed : Seed functions origin header, Nonempty (Recipe functions origin header seed mapping world) := by
+  obtain ⟨seed⟩ := Seed.of_bootstrap functions origin member
+  exact ⟨seed, ⟨of_seed functions origin seed maps worlds⟩⟩
 
 variable {qualification : Facet compiled}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -91,7 +127,8 @@ theorem at_arguments
     (origin : NamedOwner (headers := headers) keys functions registry)
     {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
     (member : header ∈ headers)
-    (recipe : Recipe functions origin header index.mapping index.world)
+    {seed : Seed functions origin header}
+    (recipe : Recipe functions origin header seed index.mapping index.world)
     {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {function : Dynamic.GlobalFunction}
     (sourceAt : NamedSourceAt header rawD function)
     (identity descriptor : Word) (sameLayouts : header.layouts = compiled.indexed.layouts)

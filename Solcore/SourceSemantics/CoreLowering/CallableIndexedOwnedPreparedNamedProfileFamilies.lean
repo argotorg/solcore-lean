@@ -38,12 +38,14 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {input : Input compi
     (certificates := certificates) (expressionSyntax := expressionSyntax)
     (header := packet.header) (administrative := administrative))
 
+include accepted nativeMember complete wellFormed children in
 /-- Construct the same rich profile from the real parameter entry. The zero
 capture prefix is proved by the retained bootstrap token and key embedding. -/
-noncomputable def profiles :
-    CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.ProfilesFor
+theorem profiles :
+    Nonempty (CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.ProfilesFor
       (headers := headers) (registry := registry) (certificates := certificates) (expressionSyntax := expressionSyntax)
-      functions origin.owner (header := packet.header) := by
+      functions origin.owner (header := packet.header)) := by
+  refine ⟨?_⟩
   intro arguments before initialStore mapping world administrative actualContext actual ξ frameLocation current ghost entry
   have captureZero := origin.capture_zero
   rw [captureZero] at entry
@@ -75,11 +77,12 @@ theorem source_continuation (budget : Nat)
       (header := packet.header) (arguments := arguments) origin.owner caller
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (headers := headers) (keys := keys)
         (locations := origin.owner.key.locations) (capturePrefix := origin.owner.key.capturePrefix)
-        functions registry packet.header) budget :=
-  CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.source_continuation
+        functions registry packet.header) budget := by
+  obtain ⟨issuedProfiles⟩ := profiles packet accepted nativeMember functions origin complete wellFormed children
+  exact CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.source_continuation
     functions origin.owner origin.capture_zero (origin.globals member) caller
     beforeTyped argumentsTyped stable wellFormed
-    (profiles packet accepted nativeMember functions origin complete wellFormed children)
+    issuedProfiles
     (children []).syntaxTree budget below
 
 include accepted nativeMember complete wellFormed children member beforeTyped argumentsTyped stable in
@@ -96,11 +99,12 @@ theorem native_continuation (budget : Nat)
       (header := packet.header) (arguments := arguments) origin.owner caller
       (CallableIndexedOwnedInvocationBounds.stableOwnerCondition (headers := headers) (keys := keys)
         (locations := origin.owner.key.locations) (capturePrefix := origin.owner.key.capturePrefix)
-        functions registry packet.header) budget :=
-  CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.native_continuation
+        functions registry packet.header) budget := by
+  obtain ⟨issuedProfiles⟩ := profiles packet accepted nativeMember functions origin complete wellFormed children
+  exact CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.native_continuation
     functions origin.owner origin.capture_zero (origin.globals member) caller
     beforeTyped argumentsTyped stable wellFormed
-    (profiles packet accepted nativeMember functions origin complete wellFormed children)
+    issuedProfiles
     (children []).syntaxTree budget below
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedProfileFamilies

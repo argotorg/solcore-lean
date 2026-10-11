@@ -36,12 +36,14 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {input : Input compi
     (certificates := certificates) (expressionSyntax := expressionSyntax)
     (header := packet.header) (administrative := administrative))
 
+include accepted nativeMember complete wellFormed children in
 /-- One genuine parameter entry drives one paired extraction. The returned
 rich Profile keeps the original actual administrative context and issuer. -/
-noncomputable def profiles :
-    CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.ProfilesFor
+theorem profiles :
+    Nonempty (CallableIndexedOwnedPreparedCatalogNamedBodyContinuations.ProfilesFor
       (headers := headers) (registry := registry) (certificates := certificates) (expressionSyntax := expressionSyntax)
-      functions origin.owner (header := packet.header) := by
+      functions origin.owner (header := packet.header)) := by
+  refine ⟨?_⟩
   intro arguments before initialStore mapping world administrative actualContext actual ξ frameLocation current ghost entry
   have captureZero := origin.capture_zero
   rw [captureZero] at entry

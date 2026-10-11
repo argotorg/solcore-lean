@@ -101,47 +101,118 @@ theorem exists_issued {compiled : SourceCoreUnifiedCompilation.Compiled}
   exact ⟨⟨selected, header, aligned, function, reason,
     CallableIndexedOwnedFunctionValues.NamedSourceAt.of_retained_header row metadata dictionary⟩⟩
 
-noncomputable def issue {compiled : SourceCoreUnifiedCompilation.Compiled}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) (input : Input compiled) :
-    Issued input := Classical.choice (exists_issued input wellFormed)
-
-noncomputable def headers {compiled : SourceCoreUnifiedCompilation.Compiled}
+/-- The genuine issuer produces a witness inside Prop. A later consumer
+retains that exact packet instead of selecting a Type-valued witness again. -/
+theorem issue {compiled : SourceCoreUnifiedCompilation.Compiled}
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (inputs : List (Input compiled)) : List (Header compiled) :=
-  inputs.map (fun input => (issue wellFormed input).header)
+    (input : Input compiled) : Nonempty (Issued input) :=
+  exists_issued input wellFormed
+
+/-- Each physical input position retains its actual issued packet. Repeated
+inputs remain repeated positions, and Header construction follows this order. -/
+inductive Inventory {compiled : SourceCoreUnifiedCompilation.Compiled} :
+    List (Input compiled) → Type where
+  | nil : Inventory []
+  | cons {input : Input compiled} {inputs : List (Input compiled)}
+      (packet : Issued input) (rest : Inventory inputs) : Inventory (input :: inputs)
+
+/-- Membership identifies a literal packet in this exact retained inventory. -/
+inductive Inventory.HasRow {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {input : Input compiled} (packet : Issued input) :
+    {inputs : List (Input compiled)} → Inventory inputs → Prop where
+  | here {inputs : List (Input compiled)} (rest : Inventory inputs) :
+      HasRow packet (.cons packet rest)
+  | tail {first : Input compiled} {inputs : List (Input compiled)}
+      (head : Issued first) {rest : Inventory inputs} (member : HasRow packet rest) :
+      HasRow packet (.cons head rest)
+
+/-- This finite producer invokes the existing issuer once for each retained
+position. Elimination of its witnesses stays inside the Nonempty conclusion. -/
+theorem inventory {compiled : SourceCoreUnifiedCompilation.Compiled}
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (inputs : List (Input compiled)) : Nonempty (Inventory inputs) := by
+  induction inputs with
+  | nil => exact ⟨.nil⟩
+  | cons input inputs tail =>
+      obtain ⟨packet⟩ := issue wellFormed input
+      obtain ⟨rest⟩ := tail
+      exact ⟨.cons packet rest⟩
+
+def headers {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {inputs : List (Input compiled)} : Inventory inputs → List (Header compiled)
+  | .nil => []
+  | .cons packet rest => packet.header :: headers rest
+
+theorem Inventory.input_member {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {input : Input compiled} {packet : Issued input} {inputs : List (Input compiled)}
+    {rows : Inventory inputs} (member : Inventory.HasRow packet rows) : input ∈ inputs := by
+  induction member with
+  | here rest => exact List.mem_cons_self
+  | tail head member previous => exact List.mem_cons_of_mem _ previous
+
+theorem Inventory.header_member {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {input : Input compiled} {packet : Issued input} {inputs : List (Input compiled)}
+    {rows : Inventory inputs} (member : Inventory.HasRow packet rows) :
+    packet.header ∈ headers rows := by
+  induction member with
+  | here rest => exact List.mem_cons.mpr (Or.inl rfl)
+  | tail head member previous => exact List.mem_cons.mpr (Or.inr previous)
+
+theorem Inventory.row_at {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {inputs : List (Input compiled)} (rows : Inventory inputs) :
+    ∀ input, input ∈ inputs → ∃ packet : Issued input, Inventory.HasRow packet rows := by
+  induction rows with
+  | nil => intro input member; cases member
+  | cons packet rest previous =>
+      intro input member
+      rcases List.mem_cons.mp member with same | member
+      · subst input
+        exact ⟨packet, .here rest⟩
+      · obtain ⟨actual, retained⟩ := previous input member
+        exact ⟨actual, .tail packet retained⟩
+
+theorem Inventory.mem_headers {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {inputs : List (Input compiled)} (rows : Inventory inputs) :
+    ∀ header, header ∈ headers rows →
+      ∃ input, ∃ packet : Issued input, Inventory.HasRow packet rows ∧ packet.header = header := by
+  induction rows with
+  | nil => intro header member; cases member
+  | cons packet rest previous =>
+      intro header member
+      rcases List.mem_cons.mp member with same | member
+      · exact ⟨_, packet, .here rest, same.symm⟩
+      · obtain ⟨input, actual, retained, same⟩ := previous header member
+        exact ⟨input, actual, .tail packet retained, same⟩
 
 theorem globals {compiled : SourceCoreUnifiedCompilation.Compiled}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (inputs : List (Input compiled)) :
-    ∀ header, header ∈ headers wellFormed inputs →
+    {inputs : List (Input compiled)} (rows : Inventory inputs) :
+    ∀ header, header ∈ headers rows →
       header.globals = compiled.indexed.base.globals.length := by
   intro header member
-  obtain ⟨input, _member, same⟩ := List.mem_map.mp member
+  obtain ⟨input, packet, retained, same⟩ := rows.mem_headers header member
   subst header
-  exact (issue wellFormed input).aligned.globals
+  exact packet.aligned.globals
 
 theorem source_receipts {compiled : SourceCoreUnifiedCompilation.Compiled}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (inputs : List (Input compiled)) :
+    {inputs : List (Input compiled)} (rows : Inventory inputs) :
     CallableIndexedOwnedPreparedOrdinaryNamedEvidenceReceipts.SourceReceiptCover
-      (headers := headers wellFormed inputs) := by
+      (headers := headers rows) := by
   refine ⟨?_⟩
   intro header member
-  obtain ⟨input, _member, same⟩ := List.mem_map.mp member
+  obtain ⟨input, packet, retained, same⟩ := rows.mem_headers header member
   subst header
-  exact ⟨input.prepared.available, _, (issue wellFormed input).sourceAt⟩
+  exact ⟨input.prepared.available, _, packet.sourceAt⟩
 
 theorem ordered {compiled : SourceCoreUnifiedCompilation.Compiled}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    (inputs : List (Input compiled)) :
-    ∀ header, header ∈ headers wellFormed inputs →
+    {inputs : List (Input compiled)} (rows : Inventory inputs) :
+    ∀ header, header ∈ headers rows →
       header.instantiation.parameterSubstitution.map Prod.fst =
         (header.named.specialized.parameterSubstitution.map Prod.fst).reverse := by
   intro header member
-  obtain ⟨input, _member, same⟩ := List.mem_map.mp member
+  obtain ⟨input, packet, retained, same⟩ := rows.mem_headers header member
   subst header
-  have aligned := (issue wellFormed input).aligned
-  have named : (issue wellFormed input).header.named = input.prepared.named := aligned.named
+  have aligned := packet.aligned
+  have named : packet.header.named = input.prepared.named := aligned.named
   rw [aligned.metadata, named, input.prepared.same]
   simp only [CallableNamedCanonicalOrder.retainedInstantiation, List.map_reverse]
 
@@ -161,19 +232,19 @@ structure ReachedInputs {compiled : SourceCoreUnifiedCompilation.Compiled}
       input.prepared.named.signature = signature ∧ input.row = specialized
 
 theorem reached_coverage {compiled : SourceCoreUnifiedCompilation.Compiled}
-    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    {inputs : List (Input compiled)} {compilation : SourceCoreFunctions.Context}
-    {source : TypedSource} {admitted : ExpressionId → Prop}
+    {inputs : List (Input compiled)} (rows : Inventory inputs)
+    {compilation : SourceCoreFunctions.Context} {source : TypedSource}
+    {admitted : ExpressionId → Prop}
     (reached : ReachedInputs inputs compilation source admitted) :
     RecursiveNamedCallSelectionCertificates.ReachedCoverage
-      (headers wellFormed inputs) compilation source admitted := by
-  refine ⟨reached.plan, ?_, ordered wellFormed inputs⟩
+      (headers rows) compilation source admitted := by
+  refine ⟨reached.plan, ?_, ordered rows⟩
   intro policy id node callee arguments instantiation index signature specialized allowed found form selected record
   obtain ⟨input, member, slot, signatureEq, specializedEq⟩ :=
     reached.slots policy id node callee arguments instantiation index signature specialized
       allowed found form selected record
-  let issued := issue wellFormed input
-  exact ⟨issued.header, List.mem_map.mpr ⟨input, member, rfl⟩,
+  obtain ⟨issued, retained⟩ := rows.row_at input member
+  exact ⟨issued.header, Inventory.header_member retained,
     issued.aligned.slot.trans slot,
     (congrArg (·.signature) issued.aligned.named).trans signatureEq,
     (congrArg (·.specialized) issued.aligned.named).trans (input.prepared.same.trans specializedEq)⟩
