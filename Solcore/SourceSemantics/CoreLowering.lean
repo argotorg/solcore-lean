@@ -1401,6 +1401,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryAnnotationCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryPreparedScopeAnnotationCallsReady
 import Solcore.SourceSemantics.CoreLowering.CallableAppliedCodeScopeProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryDiscardSequenceReadiness
+import Solcore.SourceSemantics.CoreLowering.CallableAppliedDynamicSourceMaterialization
+import Solcore.SourceSemantics.CoreLowering.CallableClosedSchemeSubstitutionAgreement
+import Solcore.SourceSemantics.CoreLowering.CallableFlexibleSubstitutionAgreement
+import Solcore.SourceSemantics.CoreLowering.CallableAppliedRuntimeMaterialization
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
