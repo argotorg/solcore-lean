@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Applied ancestry and ordinary sequence readiness is committed in `55fe02aa`: two modules, 5 new declarations and five interfaces. All 18444 preceding declarations remain exact.
+
 Ordinary annotation call readiness is committed in `0d7c0a62`: three modules, 11 new declarations and eight interfaces. All 18433 preceding declarations remain exact.
 
 Prepared ordinary call provenance is committed in `5b8c8727`: seven modules, 98 new declarations and 24 interfaces. All 18335 preceding declarations remain exact.
@@ -34,6 +36,14 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Applied ancestry and ordinary sequence readiness
+
+`CallableAppliedCodeScopeProvenance` recovers the full lexical owner from an actual sealed applied read and code history. It identifies the complete sidecar, selected guard frame and principal caller specialization.
+
+`CallableIndexedOwnedPreparedStagedOrdinaryDiscardSequenceReadiness.ready_of_preparation` derives call ports for each exact child certificate issued by the retained discard-sequence packet. It uses original child typing and ordinary public preparation; its conditions do not assume call readiness.
+
+Verified in `55fe02aa`: strict, full declaration/API, build and registered test checks pass. The owner result requires actual code ancestry; general method readiness and generalized-local allocation/read semantics remain unfinished.
 
 ## Ordinary annotation call readiness
 

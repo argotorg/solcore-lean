@@ -30,7 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified ordinary annotation call readiness
+### Latest verified applied ancestry and ordinary sequence readiness
+
+The two modules in `55fe02aa` connect actual applied-read ancestry to its lexical code owner and construct ordinary discard-sequence call readiness from public preparation.
+
+A sealed applied read and its original code history identify the full owner key. Successful sidecar preparation at that key gives the same guard frame and principal method specialization. The ordinary sequence theorem uses each child's actual compiler certificate and original typing to derive call readiness.
+
+Private and normal strict checks have empty logs. The 5 declarations and five interfaces agree between private and normal checks. All 18444 preceding declarations retain their complete types and axiom lists; the scope grows to 18449 with no removals. Build 5943 rebuilds all 4 affected modules. Registered tests and repository policy pass.
+
+Actual code history, source receipts, original typing and compiler policy remain explicit. General method call readiness, live generalized-local allocation and reading, wider grammar and the final public semantics theorem remain open.
+
+The estimates above are unchanged.
+
+### Preceding verified ordinary annotation call readiness
 
 The three modules in `0d7c0a62` derive ordinary call readiness directly from original source annotations. A checked body's result annotation is either unit or its stored statement annotation. Equal original rigid sources therefore recover equal result annotations across independent declarative contexts.
 
