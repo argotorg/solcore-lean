@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-11)
 
-The latest compiler connection and closure factory are committed in `c2d799e7` and `46a03ca1`: two Sources expose 12 checked interfaces with literal private/normal agreement for 63 owned declarations.
+The latest discard sequence and static coverage additions are committed in `37b62b0b` and `5d708d56`: three Sources expose 13 checked interfaces with literal private/normal agreement for 155 owned declarations.
 
 - `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
 - `SelectedBodyCompilerCallbacks`, `SelectedNamedCompilerRecipes` and the selected closure/named factories retain the same contextual compiler site, actual body, callback, chosen packet and raw parameter authority. They derive support for those genuine occurrences; an arbitrary earlier Association or unrelated compiler site is not upgraded.
@@ -15,6 +15,8 @@ The latest compiler connection and closure factory are committed in `c2d799e7` a
 - The mixed user/indirect dispatch and call-head bounds feed `MixedRecursiveCallerBounds` and `MixedRecursiveBodyBounds`. The final body endpoints construct both execution directions internally, retaining the original Root contracts and exact caller post. They require static support for actual Associations and terminal named bodies.
 - `MixedRecursiveCallerCompilerBounds.preserves_compiled` and `reflects_compiled` issue the original certificate from accepted expression compilation and supply the supported recursive body family internally.
 - `MixedClosureCompilerFactories` constructs static support from the actual produced closure and accepted discard/terminal body action. `packet_for` and `support_for` cover that same ordinary Association. Coverage of arbitrary and principal Associations remains open.
+- `DiscardSequenceCompilerReceipts` extracts each ordered child and literal tail action from accepted compilation. `MixedDiscardSequenceFlowBounds` proves both execution directions using original child Roots, with actual intermediate state and fault prefixes.
+- `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation; whole-body integration of arbitrary sequences remains open.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
 

@@ -30,7 +30,15 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified compiler connection and closure factory
+### Latest verified discard sequences and static coverage
+
+The three Sources in `37b62b0b` and `5d708d56` extract ordered compiler receipts for any finite discard prefix followed by a supported terminal statement and prove preservation and reflection of that flow. Structural tail induction retains the actual intermediate state, temporary binder and fault prefix. Each expression uses the strict Root induction hypothesis; original raw typing remains explicit.
+
+The caller wrapper accepts propositional existence of a packet and matching support for every actual Association. A theorem-local choice supplies the existing recursive caller proof. It adds no exported computational selector; body shape and static coverage still require proof. The whole function-body typing and application joins for arbitrary sequences remain open.
+
+All three private and normal strict checks have empty logs. Complete TYPE/AXIOMS blocks agree for 155 owned declarations, and all 13 selected interfaces agree. The scope grows from 1465 to 1620 with no removals; all 54 preceding scoped modules remain exact. Build 5900, registered tests and the repository policy checker pass. The normal Source/BOTH snapshot grows from 5830 to 5833, and all five affected modules are rebuilt. The public all-pass theorem remains incomplete and the estimates above are unchanged.
+
+### Preceding verified compiler connection and closure factory
 
 The two Sources in `c2d799e7` and `46a03ca1` connect accepted expression compilation to the mixed recursive caller proof and construct discard-body support for the same ordinary closure produced by the compiler. The wrapper issues its original Source certificate internally. The factory retains the actual body action, parameter context, child roots and call readiness; it does not require a completed execution law.
 
