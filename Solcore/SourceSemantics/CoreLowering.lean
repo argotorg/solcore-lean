@@ -1378,6 +1378,14 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCa
 import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyExitReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardSequenceBodyExitBounds
+import Solcore.Frontend.SourceSpecializationAcceptance
+import Solcore.TypeSystem.CorrelatedParameterInstances
+import Solcore.Frontend.SourceStageAnalysisCongruence
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedSpecializationOrigins
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalSpecializationOrigins
+import Solcore.SourceSemantics.CoreLowering.CallablePreparedFinalSpecializationRanges
+import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationIdentity
+import Solcore.Frontend.CorrelatedTypedSourceInstances
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

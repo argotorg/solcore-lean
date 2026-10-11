@@ -1326,3 +1326,49 @@ ordered keys recorded by expression inference. -/
       instantiation.parameterSubstitution.map Prod.fst := by
   simp [applyInstantiation, List.map_map, Function.comp_def]
 end Solcore.Frontend.SourceSpecialization
+
+/-! Accepted canonical rigid replacements retain their original concrete check. -/
+namespace Solcore.Frontend.SourceSpecialization
+
+open SourceInference TypeSystem
+
+/-- Each replacement in the actual successful declaration-order checker is
+concrete. The executable checker and all existing public interfaces are unchanged. -/
+theorem canonicalSubstitution_concrete_replacements
+    {declared : List TypeParameterId}
+    {supplied canonical : ParameterSubstitution}
+    (accepted : canonicalSubstitution declared supplied = .ok canonical) :
+    ∀ entry ∈ canonical, firstNonConcrete entry.2 = none := by
+  induction declared generalizing canonical with
+  | nil =>
+      cases accepted
+      intro entry member
+      cases member
+  | cons parameter rest ih =>
+      cases found : supplied.lookup? parameter with
+      | none =>
+          simp only [canonicalSubstitution, found] at accepted
+          cases accepted
+      | some type =>
+          cases concrete : firstNonConcrete type with
+          | some reason =>
+              simp only [canonicalSubstitution, found, concrete, bind,
+                Except.bind, pure, Except.pure] at accepted
+              cases accepted
+          | none =>
+              cases remaining : canonicalSubstitution rest supplied with
+              | error error =>
+                  simp [canonicalSubstitution, found, concrete, remaining,
+                    bind, Except.bind] at accepted
+              | ok tail =>
+                  simp only [canonicalSubstitution, found, concrete, remaining,
+                    bind, Except.bind, pure, Except.pure,
+                    Except.ok.injEq] at accepted
+                  subst canonical
+                  intro entry member
+                  rcases List.mem_cons.mp member with same | member
+                  · subst entry
+                    exact concrete
+                  · exact ih remaining entry member
+
+end Solcore.Frontend.SourceSpecialization
