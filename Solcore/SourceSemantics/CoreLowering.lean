@@ -1374,6 +1374,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalScopeCallPorts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerRawTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedContextualLambdaPolicySupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalCallsReady
+import Solcore.SourceSemantics.Staging.RecursiveBodyErasure
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyExitReceipts
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
