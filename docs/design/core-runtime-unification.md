@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `de3c71e5`. Original body typing and compiler support for ordered discard sequences are integrated. |
-| Latest completed normal verification | Build 5902; two empty strict Source checks and four modules rebuilt; 47 declarations and 13 APIs with literal private/normal TYPE/AXIOMS and API agreement; scope 1620 → 1667; registered tests and repository policy pass. |
-| Working implementation | Original full-body typing now supplies each accepted sequence child's raw type and its final declared result. Application joins, arbitrary/principal Association coverage and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | The actual sequence receipt supplies each child compiler action and fuel. Original typing and constructive view transport issue its certificate; call readiness remains indexed by that exact certificate. |
-| Latest normally verified proof package | `staged-discard-sequence-typing-and-compiler-support`: two Sources, 47 owned declarations and 13 selected interfaces, verified in `de3c71e5`. |
+| Latest normally verified implementation commit | `1bc5d609`. Actual compiler body recipes are retained through ordinary and principal lambda formation. |
+| Latest completed normal verification | Build 5903; nine empty strict Source checks and 355 affected modules rebuilt; 325 owned declarations and 26 APIs; all 8646 scoped TYPE/AXIOMS blocks and API logs agree between private and normal checks; registered tests and repository policy pass. |
+| Working implementation | Retained production recipes connect each actual lambda Code to its body lowerer. Sequence application joins, complete formation coverage and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | Ordinary and principal provenance carry the same production body recipe through recapture. Original child syntax, compiler policies, scope/coercion authority and exact call readiness remain obligations. |
+| Latest normally verified proof package | `contextual-lambda-production-recipe-retention`: nine Sources, 325 owned declarations and 26 selected interfaces, verified in `1bc5d609`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified production recipe retention
+
+The changes in `1bc5d609` retain the actual compiler body recipe through ordinary and principal formation, provenance and prepared projections. The diagnostics, named code and compilation remain existential data inside a proposition. Recapture preserves the lowerer recipe for its resulting Code.
+
+All 355 affected modules pass private strict compilation and the normal build. The nine selected Sources own 325 declarations and expose 26 checked interfaces. The expanded audit measures 8635 → 8646 declarations, with 52 reviewed TYPE changes, eleven additions and no removals. All 21 existing selected interfaces retain their types and axioms. Build 5903, registered tests and repository policy pass.
+
+This provides the compiler identity needed by later packet factories. Child syntax, original policy and typing conditions, scope/coercion authority and exact call readiness still need genuine proofs. Core language forms and public runtime entry points are unchanged; complete production coverage and the public all-pass theorem remain open.
 
 ### Verified compiler factories and discard bodies
 

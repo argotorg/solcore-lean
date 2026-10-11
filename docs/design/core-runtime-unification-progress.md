@@ -30,7 +30,15 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified sequence typing and compiler support
+### Latest verified production recipe retention
+
+The nine Sources in `1bc5d609` retain the literal body-lowerer recipe from the same production site through ordinary and principal formations, producer receipts, provenance and prepared projections. The exact diagnostics, named code and compilation remain inside Prop. Recapture preserves the lowerer recipe for its resulting Code.
+
+All 355 affected modules pass private strict compilation and are rebuilt normally. The nine selected Sources also pass normal strict checks with empty logs. They own 325 declarations and expose 26 interfaces; all 21 existing selected interfaces retain their types and axioms. The expanded ownership scope measures 8635 → 8646, with 52 reviewed TYPE changes, eleven additions and no removals. Scope expansion counts existing declarations and is not new proof coverage. All 8646 complete TYPE/AXIOMS blocks and the complete API logs agree between private and normal checks. All 38 `Tests.Main` blocks remain exact across baseline, private and normal checks.
+
+Build 5903, registered tests and repository policy pass with zero findings. The normal Source/BOTH snapshot grows from 5835 to 5836. Unrelated user work is unchanged. The recipe enables later compiler packet factories; original policy, child syntax, scope/coercion authority and call readiness remain obligations. Sequence application joins and the public all-pass theorem are incomplete; the estimates above are unchanged.
+
+### Preceding verified sequence typing and compiler support
 
 The two Sources in `de3c71e5` derive each actual discard-sequence child's original stored node and raw type from full body typing, the closure frame and parameter extension. The terminal's raw result is proved equal to the function's declared result. Native type projection is not used to establish Source typing.
 

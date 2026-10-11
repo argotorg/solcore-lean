@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-11)
 
-The latest sequence typing and compiler support additions are committed in `de3c71e5`: two Sources expose 13 checked interfaces with literal private/normal agreement for 47 owned declarations.
+The latest production recipe retention changes are committed in `1bc5d609`: nine Sources expose 26 checked interfaces with literal private/normal agreement for 325 owned declarations. All 21 existing selected interface types and axiom lists are preserved. The preceding sequence typing and compiler support additions are in `de3c71e5` (13 interfaces, 47 owned declarations).
 
 - `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
 - `SelectedBodyCompilerCallbacks`, `SelectedNamedCompilerRecipes` and the selected closure/named factories retain the same contextual compiler site, actual body, callback, chosen packet and raw parameter authority. They derive support for those genuine occurrences; an arbitrary earlier Association or unrelated compiler site is not upgraded.
@@ -20,6 +20,14 @@ The latest sequence typing and compiler support additions are committed in `de3c
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation; whole-body integration of arbitrary sequences remains open.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Production recipe interfaces
+
+`CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe` records the literal equation for the same Code's body lowerer. `Retained` keeps the actual diagnostics, named code and compilation inside a proposition. `OrdinaryAt.body_recipe` and `PrincipalAt.body_recipe` project that witness from genuine provenance.
+
+Formation constructors retain this additional static authority. Producers, recapture and prepared projections forward the same recipe. Original selected-child syntax, paired compiler policies, scope/coercion authority and certificate-indexed call readiness remain explicit. Arbitrary Association packet coverage is still incomplete.
+
+The changes in `1bc5d609` pass private and normal strict checks, full literal comparison, build 5903, registered tests and repository policy. Public runtime entry points are unchanged.
 
 ## Public entry points
 
