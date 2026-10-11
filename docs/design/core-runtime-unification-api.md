@@ -1,25 +1,33 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-11.
+Last updated: 2026-10-12.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
-## Latest verified proof interfaces (2026-10-11)
+## Latest verified proof interfaces (2026-10-12)
 
-The latest production recipe retention changes are committed in `1bc5d609`: nine Sources expose 26 checked interfaces with literal private/normal agreement for 325 owned declarations. All 21 existing selected interface types and axiom lists are preserved. The preceding sequence typing and compiler support additions are in `de3c71e5` (13 interfaces, 47 owned declarations).
+The sequence body/application changes are committed in `a0778ccc`: five Sources expose 27 checked interfaces with literal private/normal agreement for 169 owned declarations. All 17 existing selected interface types and axiom lists are preserved. The preceding production recipe retention is in `1bc5d609` (26 interfaces, 325 owned declarations).
 
 - `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
 - `SelectedBodyCompilerCallbacks`, `SelectedNamedCompilerRecipes` and the selected closure/named factories retain the same contextual compiler site, actual body, callback, chosen packet and raw parameter authority. They derive support for those genuine occurrences; an arbitrary earlier Association or unrelated compiler site is not upgraded.
 - `DiscardSourceBodyInversion`, the discard compiler receipts and the flow/body bounds retain the original discard/return forms, actual child compiler actions, raw typing, intermediate state and literal emitted footer. Source and native grades remain independent.
-- `MixedBodyStaticSupport` and `MixedBodyCompilerSupport` retain terminal/discard packets and original roots at the same Code and parameter context. The mixed flow, body, lambda application, contextual application and parent bounds preserve the actual caller restoration for ordinary and principal Associations.
+- `MixedBodyStaticSupport` retains terminal/discard/sequence packets and original roots at the same Code and parameter context. `MixedBodyCompilerSupport` constructs the discard support from its actual compiler receipt. The mixed flow, body, lambda application, contextual application and parent bounds preserve the actual caller restoration for ordinary and principal Associations.
 - The mixed user/indirect dispatch and call-head bounds feed `MixedRecursiveCallerBounds` and `MixedRecursiveBodyBounds`. The final body endpoints construct both execution directions internally, retaining the original Root contracts and exact caller post. They require static support for actual Associations and terminal named bodies.
 - `MixedRecursiveCallerCompilerBounds.preserves_compiled` and `reflects_compiled` issue the original certificate from accepted expression compilation and supply the supported recursive body family internally.
 - `MixedClosureCompilerFactories` constructs static support from the actual produced closure and accepted discard/terminal body action. `packet_for` and `support_for` cover that same ordinary Association. Coverage of arbitrary and principal Associations remains open.
 - `DiscardSequenceCompilerReceipts` extracts each ordered child and literal tail action from accepted compilation. `MixedDiscardSequenceFlowBounds` proves both execution directions using original child Roots, with actual intermediate state and fault prefixes.
 - `DiscardSequenceSourceBodyTyping` derives each used child's original stored node and raw type from full body typing. `DiscardSequenceCompilerSupport.raw_result` proves the terminal raw result matches the declaration. Its `Static.certificate`, `Static.root` and `issued_tree` construct exact child authority and the typed tree from actual compilation, with `Ready` tied to the issued certificates.
-- `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation; whole-body integration of arbitrary sequences remains open.
+- `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Sequence body and application interfaces
+
+`MixedBodyStaticSupport.Sequence` stores the real ordered sequence receipt at the same Code. `SequenceSupport` retains its original closure frame and a propositional child Root for each used expression at every actual selected Source scope.
+
+`DiscardSequenceCompilerBodyBounds.issued_tree` derives the typed sequence tree. Its `preserves_body` and `reflects_body` assemble the accepted footer and preserve original result typing, state and faults. `DiscardSequenceLambdaBodyBounds` connects actual parameter entry to these body proofs; `DiscardSequenceLambdaApplicationBounds` supplies both application directions. `MixedClosureApplicationBounds` handles the sequence alternative for both ordinary and principal Associations while retaining the existing public types.
+
+Verified in `a0778ccc`: build 5906, registered tests, strict checks and repository policy pass. Complete compiler coverage and broader body grammar remain separate obligations.
 
 ## Production recipe interfaces
 

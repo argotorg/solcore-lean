@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-11.
+Created: 2026-09-30. Updated: 2026-10-12.
 
 ## Current Implementation Status
 
@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-11.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `1bc5d609`. Actual compiler body recipes are retained through ordinary and principal lambda formation. |
-| Latest completed normal verification | Build 5903; nine empty strict Source checks and 355 affected modules rebuilt; 325 owned declarations and 26 APIs; all 8646 scoped TYPE/AXIOMS blocks and API logs agree between private and normal checks; registered tests and repository policy pass. |
-| Working implementation | Retained production recipes connect each actual lambda Code to its body lowerer. Sequence application joins, complete formation coverage and the final public all-pass theorem remain incomplete. |
-| Latest proof scope | Ordinary and principal provenance carry the same production body recipe through recapture. Original child syntax, compiler policies, scope/coercion authority and exact call readiness remain obligations. |
-| Latest normally verified proof package | `contextual-lambda-production-recipe-retention`: nine Sources, 325 owned declarations and 26 selected interfaces, verified in `1bc5d609`. |
+| Latest normally verified implementation commit | `a0778ccc`. Ordered discard sequences connect to ordinary and principal lambda application proofs. |
+| Latest completed normal verification | Build 5906; five empty strict Source checks and 24 affected modules rebuilt; 169 owned declarations and 27 APIs; all 8723 scoped TYPE/AXIOMS blocks and API logs agree between private and normal checks; registered tests and repository policy pass. |
+| Working implementation | Retained recipes identify the actual body lowerer. Ordered discard sequences now compose with lambda application and caller restoration; complete formation coverage and the final public all-pass theorem remain incomplete. |
+| Latest proof scope | Sequence packets retain the original frame and every used child Root at the actual parameter context. Body/application proofs preserve state, faults and caller restoration. Compiler coverage and static call authority remain obligations. |
+| Latest normally verified proof package | `discard-sequence-packets-and-applications`: five Sources, 169 owned declarations and 27 selected interfaces, verified in `a0778ccc`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified sequence bodies and lambda applications
+
+The changes in `a0778ccc` connect any supported finite discard prefix and terminal statement to the actual closure body and lambda application. The packet retains the accepted compiler receipt; its support retains the original closure frame and each used child Root at every actual selected Source scope. Original full-body typing fixes the declared result. The proofs preserve the intermediate heap, nested faults and restored caller state, with independent Source and Core execution sizes.
+
+All 24 affected modules pass private strict compilation and rebuild normally. The five selected Sources own 169 declarations and expose 27 interfaces; all 17 existing selected interfaces remain exact. The scope grows from 8646 to 8723 with 77 additions and no removals. Seven generated TYPE changes are reviewed: three change only binder names and four add the new sequence branch. All complete private/normal TYPE/AXIOMS blocks agree. Build 5906, registered tests and repository policy pass.
+
+Compiler packet coverage for all actual formations, wider statement grammar and the final public all-pass theorem remain open. Core language forms and public execution paths are unchanged.
 
 ### Verified production recipe retention
 

@@ -1,6 +1,6 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-11
+Updated: 2026-10-12
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
@@ -20,7 +20,7 @@ In the progress response to the user on 2026-10-04, the second objective was est
 
 In the progress response to the user on 2026-10-05, the second objective was estimated at about 70% by amount of work. This reflects semantic preservation and completion reflection for integer functions with staging, preservation of reference authority in the catalog, derivation of lambda permissions from actual compiler receipts, and connection of additional child expressions to the sole compiler induction. The first objective remains 100%, and the overall estimate with equal weighting is about 85%. The final main theorem connecting general functions, lambda, indirect calls, method, and all passes is incomplete; the percentages do not estimate remaining time.
 
-## Current status (2026-10-11)
+## Current status (2026-10-12)
 
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
@@ -30,7 +30,15 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified production recipe retention
+### Latest verified sequence bodies and applications
+
+The five Sources in `a0778ccc` connect ordered discard sequences to closure bodies and lambda applications for both ordinary and principal Associations. Each packet keeps the accepted compiler receipt, original frame and real parameter context. Support supplies original child Roots at every actual Source-selected scope. Preservation and reflection retain raw result typing, reached states, failures and the exact caller post.
+
+All 24 affected modules pass private strict compilation and rebuild normally. All five normal strict Source logs are empty. There are 169 owned declarations and 27 selected interfaces; the 17 existing selected interfaces remain exact. The scope changes from 8646 to 8723, with 77 additions, seven generated TYPE changes and no removals. Three changes are only binder metadata; the other four add the sequence branch to generated eliminators. Every complete private/normal TYPE/AXIOMS block and the full API log agrees. All 38 Tests.Main blocks remain exact.
+
+Build 5906, registered tests and repository policy pass with zero findings. The normal Source/BOTH snapshot grows from 5836 to 5839. Unrelated user work is unchanged. Complete production packet coverage, broader grammar and the public all-pass theorem remain unfinished; estimates above are unchanged.
+
+### Preceding verified production recipe retention
 
 The nine Sources in `1bc5d609` retain the literal body-lowerer recipe from the same production site through ordinary and principal formations, producer receipts, provenance and prepared projections. The exact diagnostics, named code and compilation remain inside Prop. Recapture preserves the lowerer recipe for its resulting Code.
 

@@ -1,6 +1,6 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-11.
+Initial audit: 2026-09-30. Last updated: 2026-10-12.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
@@ -8,7 +8,7 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
-## Latest verified proof additions (2026-10-11)
+## Latest verified proof additions (2026-10-12)
 
 | Committed unit | Normal owned declarations / selected interfaces | Exact scoped census |
 | --- | --- | --- |
@@ -22,10 +22,19 @@ Compilation preparation has been separated into `SourceCompilationPlan`. The his
 | Ordered discard sequences and propositional coverage: `37b62b0b`, `5d708d56` | 155 / 13 | 1465 → 1620; no removals |
 | Original sequence typing and compiler support: `de3c71e5` | 47 / 13 | 1620 → 1667; no removals |
 | Production body recipe retention: `1bc5d609` | 325 / 26; all 21 preceding selected interfaces retained | Expanded scope 8635 → 8646; 52 TYPE changes, eleven additions, no removals |
+| Sequence bodies and lambda applications: `a0778ccc` | 169 / 27; all 17 preceding selected interfaces retained | 8646 → 8723; seven generated TYPE changes, 77 additions, no removals |
 
-Each unit has actual strict Source checks and complete private/normal literal TYPE/AXIOMS and API comparisons. The preceding sequence typing/support build passed 5902 jobs and rebuilt all four affected modules; all 57 preceding scoped modules retained their literal declarations. The latest recipe retention build passes 5903 jobs and rebuilds all 355 affected modules. Registered tests and repository policy pass, and unrelated user work is preserved. Supported caller/body recursion is constructed internally. Mixed packets retain the actual ordinary/principal Association parameter context and exact returned caller state. Original full-body typing now supplies every used sequence child's raw type and fixes the terminal's declared result. The accepted child action issues its exact certificate, and readiness remains indexed by that proof. Application joins for longer sequences, arbitrary/principal Association coverage and wider grammar remain unfinished; original compiler policy/read facts, raw typing and call authority stay explicit.
+Each unit has actual strict Source checks and complete private/normal literal TYPE/AXIOMS and API comparisons. The preceding sequence typing/support build passed 5902 jobs and rebuilt all four affected modules; all 57 preceding scoped modules retained their literal declarations. The recipe retention build passes 5903 jobs and rebuilds all 355 affected modules. The latest sequence body/application build passes 5906 jobs and rebuilds all 24 affected modules. Registered tests and repository policy pass, and unrelated user work is preserved. Supported caller/body recursion is constructed internally. Mixed packets retain the actual ordinary/principal Association parameter context and exact returned caller state. Original full-body typing now supplies every used sequence child's raw type and fixes the terminal's declared result. The accepted child action issues its exact certificate, and readiness remains indexed by that proof. Sequence application joins are now verified for both ordinary and principal Associations. Complete compiler packet coverage and wider grammar remain unfinished; original compiler policy/read facts, raw typing and call authority stay explicit.
 
 The last confirmed historical full census is 20948. After temporary evidence loss, that continuity is unavailable; the current scoped census starts from an authentic new measurement at 376. The seven witness replacements at `87b08905` retain exact Seed/Inventory packets and construct profile existence inside propositions. They intentionally change proof-interface types, with complete private/normal comparison and all 28 protected scoped modules unchanged. The final repository policy check passes with zero findings after the preceding nine findings. This closes the repository policy checks; it does not complete the public all-pass semantics theorem. The runtime/semantic/overall estimates remain 100% / about 70% / about 85%.
+
+## Verified sequence body/application migration (2026-10-12)
+
+The five Sources in `a0778ccc` connect real sequence receipts to the existing closure entry, application and caller-restoration proofs. All 24 private dependent-module checks pass; the five selected private and normal strict logs are empty. Both independent Source reviews and complete migration reviews are recorded before installation.
+
+The scope grows from 8646 to 8723 with 77 additions and no removals. Of seven changed complete TYPE blocks, three are alpha-identical and four add exactly one sequence-branch binder to generated eliminators. All common AXIOMS lists remain exact. The 17 preceding selected interfaces and all 38 Tests.Main blocks remain unchanged.
+
+All 8723 complete TYPE/AXIOMS blocks agree between private and normal checks, and the 27-interface API logs are byte-identical. Build 5906, registered tests and repository policy pass with zero findings. The normal Source/BOTH inventory grows from 5836 to 5839. Existing user work remains unchanged. This closes sequence application composition; complete production coverage and the public all-pass theorem remain incomplete.
 
 ## Verified production recipe migration (2026-10-11)
 
