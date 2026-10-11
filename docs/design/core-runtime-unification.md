@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `3059a7f5`. Canonical call readiness and exact ordinary body exits are derived. |
-| Latest completed normal verification | Build 5919; three empty strict Source checks and 5 affected modules rebuilt; 19 new declarations and nine APIs agree between private and normal checks. All 16974 preceding scoped declarations remain exact; registered tests and repository policy pass. |
-| Working implementation | Canonical call readiness follows the authentic compiler certificate. Staged bodies retain ordinary lexical exits. Complete formation coverage and the public all-pass theorem remain incomplete. |
-| Latest proof scope | Canonical call conditions and ordinary body exit receipts are derived. Other selected stage frames, global metadata, broader grammar and complete compiler coverage remain obligations. |
-| Latest normally verified proof package | `staged-canonical-call-authority-and-body-exits`: three modules, 19 new declarations and nine interfaces, verified in `3059a7f5`. |
+| Latest normally verified implementation commit | `552dfdfd`. Supported recursive discard sequences preserve and reflect their exact ordinary exits and stage rejections. |
+| Latest completed normal verification | Build 5920; one empty strict Source check and 3 affected modules rebuilt; 19 selected declarations and four APIs agree between private and normal checks. All 16993 preceding scoped declarations remain exact; registered tests and repository policy pass. |
+| Working implementation | Both directions of the recursive discard-sequence body proof now expose exact exit receipts. Complete formation coverage and the public all-pass theorem remain incomplete. |
+| Latest proof scope | Supported discard sequences retain lexical exits and exact stage rejections. Other selected stage frames, global metadata, broader grammar and complete compiler coverage remain obligations. |
+| Latest normally verified proof package | `staged-discard-sequence-body-exits`: one module, 19 selected declarations and four interfaces, verified in `552dfdfd`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified recursive discard-sequence exits
+
+The module in `552dfdfd` connects both preservation and reflection for supported recursive discard sequences to their exact exits. Ordinary returned values and semantic faults carry the reached lexical exit. Stage rejection retains its original scope, call, reason, context and prefix heap. The strict child laws are constructed inside the proof.
+
+Private and normal strict checks have empty logs. All 19 selected declarations and four public interfaces agree literally between private and normal checks. The scoped census grows from 16993 to 17012; every preceding declaration keeps its full type and axiom list, with no removals. Build 5920 rebuilds all 3 affected modules. Registered tests, all 38 Tests.Main declaration blocks and repository policy pass. The normal source/object inventory grows from 5852 to 5853.
+
+The result still requires genuine compiler packets and support for the selected closure and named bodies. Broader grammar, complete formation coverage, selected-frame correspondence and the final public theorem across all compiler passes remain unfinished.
 
 ### Verified canonical call readiness and ordinary body exits
 

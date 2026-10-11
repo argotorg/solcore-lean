@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Recursive discard-sequence exits are committed in `552dfdfd`: one module, 19 selected declarations and four public interfaces. All 16993 preceding scoped declarations remain exact.
+
 Canonical call readiness and ordinary body exits are committed in `3059a7f5`: three modules, 19 new declarations and nine interfaces. All 16974 preceding scoped declarations remain exact.
 
 Prepared policy, original call typing and canonical call contracts are committed in `23ac1a6c`: five modules, 256 selected declarations and 31 new interfaces. All 16727 preceding scoped declarations remain exact.
@@ -24,6 +26,14 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Recursive discard-sequence exits
+
+`CallableIndexedOwnedPreparedStagedDiscardSequenceBodyExitBounds.ExitReceipt` distinguishes returned values, semantic faults and exact stage rejection. The first two retain ordinary `ReachedExit`; the third retains the original staged statement trace.
+
+`exit_receipt_of_trace` constructs that receipt from the actual selected closure, environment and metadata extensions. `preserves_body_with_exit` and `reflects_body_with_exit` construct their strict recursive child laws internally and retain the existing result representation, heap/map/world extensions, administrative state and reached admission.
+
+Verified in `552dfdfd`: build 5920, strict checks, full declaration/API comparisons, registered tests and repository policy pass. The four APIs keep genuine static compiler/support premises; complete production coverage and the final public all-pass theorem remain open.
 
 ## Canonical call readiness and ordinary body exits
 
