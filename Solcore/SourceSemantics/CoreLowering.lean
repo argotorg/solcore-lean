@@ -1396,6 +1396,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableSelectedCanonicalSourceErasu
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinarySpecializationErasedStageCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReachedNamedConcreteRangeReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryPreparedScopeCallsReady
+import Solcore.SourceSemantics.SourceBodyResultAnnotation
+import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryAnnotationCoherence
+import Solcore.SourceSemantics.CoreLowering.CallableOrdinaryPreparedScopeAnnotationCallsReady
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
