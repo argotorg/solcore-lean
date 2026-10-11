@@ -30,7 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified applied ancestry and ordinary sequence readiness
+### Latest verified applied source and runtime materialization
+
+The four modules in `f0f6a910` connect an actual runtime instantiation of a generalized local closure to its compiler-selected source and lambda header.
+
+Authenticated source ancestry tracks ordinary, lambda and applied views. Closed-scheme matching determines the same substitution lookups as the actual runtime instantiation. Equal substitution lookups preserve complete typed sources, contexts and closures, including the masking of quantified variables. The combined theorem retains the actual produced evidence followed by caller evidence.
+
+Private and normal strict checks have empty logs. The 90 selected declarations and sixteen interfaces agree between private and normal checks. Of those declarations, 84 are new; six imported generated helpers match their existing types and axiom lists exactly. All 18449 preceding declarations retain their complete types and axiom lists; the scope grows to 18533 with no removals. Build 5947 rebuilds all 6 affected modules. Registered tests and repository policy pass.
+
+The runtime theorem still requires the descriptor's authenticated source attachment, captured environment, unique source occurrences and matching scheme and raw type. Producing those conditions at generalized allocation and reading, executing the selected body, broader grammar and the final public semantics theorem remain open.
+
+The estimates above are unchanged.
+
+### Preceding verified applied ancestry and ordinary sequence readiness
 
 The two modules in `55fe02aa` connect actual applied-read ancestry to its lexical code owner and construct ordinary discard-sequence call readiness from public preparation.
 

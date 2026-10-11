@@ -10,13 +10,23 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `55fe02aa`. Applied read ancestry identifies its lexical owner; public preparation derives ordinary discard-sequence call readiness. |
-| Latest completed normal verification | Build 5943; all 4 affected modules rebuilt and two selected strict checks empty; 5 declarations and five APIs agree privately and normally. All 18444 preceding declarations remain exact. |
-| Working implementation | Actual code history identifies applied owners, and original preparation supplies ordinary sequence call authority under explicit typing, source and compiler premises. Complete production coverage and the public theorem remain open. |
-| Latest proof scope | Applied owner and guard-frame provenance, principal caller identity and ordinary discard-sequence readiness. |
-| Latest normally verified proof package | `staged-applied-ancestry-and-ordinary-sequence-readiness`: two modules, 5 new declarations and five interfaces, verified in `55fe02aa`. |
+| Latest normally verified implementation commit | `f0f6a910`. Actual runtime instantiation preserves authenticated applied source ancestry and the compiler-selected lambda header. |
+| Latest completed normal verification | Build 5947; all 6 affected modules rebuilt and four selected strict checks empty; 90 declarations and sixteen APIs agree privately and normally. All 18449 preceding declarations remain exact. |
+| Working implementation | Actual runtime instantiation agrees with the sealed compiler read at matching scheme and raw type, preserving the complete source and actual evidence. Live descriptor formation, generalized allocation/read integration and the public theorem remain open. |
+| Latest proof scope | Applied source ancestry, closed-scheme substitution agreement and runtime closure materialization. |
+| Latest normally verified proof package | `staged-applied-source-and-runtime-materialization`: four modules, 84 new declarations and sixteen interfaces, verified in `f0f6a910`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified applied source and runtime materialization
+
+The four modules in `f0f6a910` connect an actual runtime instantiation of a generalized local closure to its compiler-selected source and lambda header.
+
+Authenticated source ancestry tracks ordinary, lambda and applied views. Closed-scheme matching determines the same substitution lookups as the actual runtime instantiation. Equal substitution lookups preserve complete typed sources, contexts and closures, including the masking of quantified variables. The combined theorem retains the actual produced evidence followed by caller evidence.
+
+Private and normal strict checks have empty logs. The 90 selected declarations and sixteen interfaces agree between private and normal checks. Of those declarations, 84 are new; six imported generated helpers match their existing types and axiom lists exactly. All 18449 preceding declarations retain their complete types and axiom lists; the scope grows to 18533 with no removals. Build 5947 rebuilds all 6 affected modules. Registered tests and repository policy pass.
+
+The runtime theorem still requires the descriptor's authenticated source attachment, captured environment, unique source occurrences and matching scheme and raw type. Producing those conditions at generalized allocation and reading, executing the selected body, broader grammar and the final public semantics theorem remain open.
 
 ### Verified applied ancestry and ordinary sequence readiness
 
