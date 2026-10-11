@@ -1,0 +1,240 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTupleHeadBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGroupBounds
+
+/-! Internal structural caller fold for chosen terminal or discard closure
+bodies. The original Certificate, Point and CallsReady retain their static
+indices. Caller children are generated structurally, while strict numeric
+Root children feed the concrete mixed call-head assembly. The public numeric
+family constructs this internal IH and the named terminal restrictions. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+set_option maxRecDepth 8192
+namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
+open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
+open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
+open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedAdmittedStagedExpressionBounds
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls)
+universe u
+
+open CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds (Point CallsReady)
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
+  {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
+  {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
+  {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+
+variable {readFuel : Nat}
+
+variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
+    completion.result.extension completion.result.diagnostics)
+  {stages : Staging.Recursive.Registry}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled
+    compiled.indexed.ancestry.graph.inputs.callable)
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+  (covers : invocation.evidence.Covers context)
+  (unique : NodeOccurrencesUnique invocation.source)
+  (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
+  {identities : Dynamic.Value → Word → Prop}
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
+    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+  (extension : SourceCoreRawMetadata.Extends
+    (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry
+    completion.result.context.registry)
+  (semantic : ∀ reason token, semanticFaults reason token →
+    CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
+    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore), PacketFor association stages)
+  (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
+    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
+  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+
+variable
+  (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
+  (runtimeLedger : RuntimeRequirementLedgerValid context)
+  (uninitialized : ∀ current child code,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt current child code →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
+
+local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
+  bodyRegistry semanticFaults profile
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
+  completion.result.context.registry functions
+local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge (headers := headers) (keys := keys)
+local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+  completion.result.diagnostics
+
+include bridge receiver stagePrepared profile wellFormed runtime covers unique
+  actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
+  sameLedger runtimeLedger uninitialized in
+/-- Every strict Source child is supplied by structural recursion at its actual
+reached state. The numeric family supplies only the chosen called-body laws below the fixed
+budget; all caller child laws are constructed here. -/
+theorem preserves
+    (budget : Nat)
+    (bodyChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+      ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
+      PreservesBelow poolBridge header.context model stages child
+        (namedTerminals header member).certificate callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode) :
+    CallsReady root → ∀ size, size ≤ budget →
+      PreservesAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  induction root with
+  | leaf tree =>
+      intro _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves
+        bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
+        unique wellFormed runtime covers size tree
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+      intro ports size within
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (Point rootScope inner code) callFaults size := by
+        intro childSize _smaller current child actual point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact ih (fun compiler inside => ports compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size
+        childMeaning size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes header sequence children ih =>
+      intro ports size within
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun compiler inside => ports compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves
+        bridge functions callFaults unique wellFormed runtime covers size childMeaning
+        ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
+      intro ports size within
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun nested inside => ports nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      obtain ⟨port⟩ := ports compiler (.here sequence children)
+      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
+          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.preserves
+        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
+        actualFunctionType observations closurePackets closureSupport namedTerminals
+        compiler port calleeCertified sequence size childMeaning
+        budget bodyChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
+
+include bridge receiver stagePrepared profile wellFormed runtime covers unique
+  actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
+  sameLedger runtimeLedger uninitialized in
+/-- Every child native grade comes from structural recursion. The returned
+Source grade is independent, including exact nested stage failure scope. -/
+theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    (budget : Nat)
+    (bodyChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+      ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
+      ReflectsBelow poolBridge header.context model stages child
+        (namedTerminals header member).certificate callFaults size)
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode) :
+    CallsReady root → ∀ size, size ≤ budget →
+      ReflectsAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  induction root with
+  | leaf tree =>
+      intro _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects
+        bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
+        unique wellFormed runtime covers size tree
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+      intro ports size within
+      have childMeaning : ReflectsAt bridge context model stages invocation
+          (Point rootScope inner code) callFaults size := by
+        intro current child actual point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact ih (fun compiler inside => ports compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size within ⟨rfl, rfl, rfl⟩
+      intro current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size
+        childMeaning (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes header sequence children ih =>
+      intro ports size within
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults (size + 1) := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun compiler inside => ports compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt_succ _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects
+        bridge functions callFaults unique wellFormed runtime covers size childMeaning
+        ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
+      intro ports size within
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun nested inside => ports nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      obtain ⟨port⟩ := ports compiler (.here sequence children)
+      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
+          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedMixedGeneralCallHeadBounds.reflects
+        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
+        actualFunctionType observations closurePackets closureSupport namedTerminals
+        stageEq compiler port calleeCertified sequence size childMeaning
+        budget bodyChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
+
+end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds
