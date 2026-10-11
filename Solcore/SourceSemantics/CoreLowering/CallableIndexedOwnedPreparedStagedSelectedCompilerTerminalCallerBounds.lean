@@ -85,7 +85,7 @@ def named_terminals
 
 /-- Original raw typing and acceptance are manufactured by the authentic
 factory at every selected body scope. No body meaning is stored in the bundle. -/
-noncomputable def closure_support {mapping world function native bindings parameterCore resultCore}
+def closure_support {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) :
     ClosureSupportFor association stages (closure_terminals factories association) :=
@@ -95,7 +95,7 @@ noncomputable def closure_support {mapping world function native bindings parame
 
 /-- Named support uses the original Header source and the same chosen packet;
 it does not infer an expression callback from the Header's statement policy. -/
-noncomputable def named_support
+def named_support
     (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) :
     NamedSupport header stages (named_terminals factories header member) semanticFaults :=

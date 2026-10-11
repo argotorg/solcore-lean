@@ -43,9 +43,9 @@ structure OriginalConditions (compiled : SourceCoreUnifiedCompilation.Compiled)
       invocation.source context reasonAt current id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)
 
-/-- Classical choice packages a genuinely proved raw Source node. It does not
-choose an execution, body result or compiler action. -/
-noncomputable def original_authority
+/-- The actual Source lookup supplies its own node. Raw typing proves that
+lookup succeeds; no choice of an execution, compiler action or node is needed. -/
+def original_authority
     {compiled : SourceCoreUnifiedCompilation.Compiled} {policy : SourceCoreFunctions.Policy}
     {compilation : SourceCoreFunctions.Context} {readFuel : Nat} {context : SourceSemantics.Context}
     {invocation : Staging.Recursive.Scope} {reasonAt : ExpressionId → Word}
@@ -56,11 +56,23 @@ noncomputable def original_authority
     (raw : ∃ node, invocation.source.lookupExpression? expression = some node ∧
       node.type = rawType ∧ ExpressionHasType invocation.source context expression node.type) :
     CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.OriginalAuthority compiled policy compilation readFuel context invocation
-      reasonAt scope expression rawType semanticFaults :=
-  { node := Classical.choose raw
-    found := (Classical.choose_spec raw).1
-    rawResult := (Classical.choose_spec raw).2.1
-    typed := (Classical.choose_spec raw).2.2
+      reasonAt scope expression rawType semanticFaults := by
+  have available : (invocation.source.lookupExpression? expression).isSome := by
+    obtain ⟨original, originalFound, _⟩ := raw
+    exact Option.isSome_of_eq_some originalFound
+  let node := (invocation.source.lookupExpression? expression).get available
+  have found : invocation.source.lookupExpression? expression = some node :=
+    Option.eq_some_of_isSome available
+  have properties : node.type = rawType ∧
+      ExpressionHasType invocation.source context expression node.type := by
+    obtain ⟨original, originalFound, properties⟩ := raw
+    have same : original = node := Option.some.inj (originalFound.symm.trans found)
+    simpa only [same] using properties
+  exact {
+    node := node
+    found := found
+    rawResult := properties.1
+    typed := properties.2
     declarations := conditions.declarations
     coercions := conditions.coercions
     sameLedger := conditions.sameLedger
@@ -177,7 +189,7 @@ def ClosureReady
 
 /-- The selected singleton and every original Root are built internally.
 No universal arbitrary-terminal body law is required. -/
-noncomputable def selected_body
+def selected_body
     (authority : ClosureAuthority code inputs packet (semanticFaults := semanticFaults))
     (ready : ClosureReady authority) :
     SelectedBody code inputs stages (CallableIndexedOwnedPreparedStagedSelectedTerminalCertificates.closure code packet) semanticFaults where
@@ -224,7 +236,7 @@ def ClosureReadyFor
 
 /-- The original contextual Association chooses the actual parameter context
 and narrows only its retained terminal certificate. -/
-noncomputable def closure_support_for
+def closure_support_for
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore)
     (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.TerminalFor association stages)
@@ -324,7 +336,7 @@ def NamedReady
 
 /-- The original Source parameter context, raw result and reason function
 remain this Header's fields, and all genuine selected child scopes are covered. -/
-noncomputable def named_support
+def named_support
     (authority : NamedAuthority header packet (stages := stages) (semanticFaults := semanticFaults))
     (ready : NamedReady authority) :
     NamedSupport header stages (CallableIndexedOwnedPreparedStagedSelectedTerminalCertificates.named header packet) semanticFaults where
