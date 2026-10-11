@@ -1,8 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedDiscardLambdaApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardSequenceLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalClosureParentPreservation
 
-/-! Contextual application over the statically chosen terminal or discard body.
-Both branches use the same authentic Association Code and BodyWith.toContext.
+/-! Contextual application over the statically chosen terminal, discard or sequence body.
+All branches use the same authentic Association Code and BodyWith.toContext.
 The strict Root IH constructs body ports internally; the original parameter
 installation and saved caller restoration return their literal pool and post. -/
 set_option autoImplicit false
@@ -117,6 +118,21 @@ theorem application_preserves (budget : Nat)
         metadata, returned, related, post⟩ := result
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | sequence sequence =>
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedDiscardSequenceLambdaApplicationBounds.application_preserves
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := sequence) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
@@ -144,6 +160,22 @@ theorem application_preserves (budget : Nat)
         CallableIndexedOwnedPreparedStagedMixedDiscardLambdaApplicationBounds.application_preserves
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := discard) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+
+    | sequence sequence =>
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedDiscardSequenceLambdaApplicationBounds.application_preserves
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := sequence) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
           (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
           (heaps := heaps) (locals := raw.captures) (reference := reference)
@@ -221,6 +253,21 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         metadata, returned, related, post⟩ := result
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | sequence sequence =>
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedDiscardSequenceLambdaApplicationBounds.application_reflects
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := sequence) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) (valid := valid) children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
@@ -248,6 +295,22 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         CallableIndexedOwnedPreparedStagedMixedDiscardLambdaApplicationBounds.application_reflects
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := discard) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) (valid := valid) children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+
+    | sequence sequence =>
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedDiscardSequenceLambdaApplicationBounds.application_reflects
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := sequence) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
           (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
           (heaps := heaps) (locals := raw.captures) (reference := reference)
