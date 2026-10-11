@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaExpr
 
 /-! Formation retains the actual chosen Site rather than a later code-shaped
 replacement. Binder policy comes from the original contextual producer; full
-Syntax is an independent static receipt at the same body context. -/
+Syntax and the production recipe are retained at that same body context. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
@@ -13,7 +13,7 @@ open CallableIndexedLambdaValues CallableIndexedOwnedContextualLambdaProvenance
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
 
-/-- The original ordinary formation plus the two static facets it omitted. -/
+/-- The original ordinary formation with its same-Site static facets. -/
 structure OrdinaryFormation
     (caller : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
@@ -21,6 +21,7 @@ structure OrdinaryFormation
     extends CallableIndexedOwnedGeneralOrdinaryLambdaFormationHeads.Formation
       (registry := registry) (faults := faults) caller context evidence scope id lowered where
   binderPolicy : BinderPolicy caller.named site.code
+  recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code
   syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
     (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
     (.statements true statements) result
@@ -33,6 +34,7 @@ structure PrincipalFormation {method : ExecutableImplMethods.CheckedMethod}
     extends CallableIndexedOwnedMethodLambdaExpressionHeads.Formation
       (registry := registry) (faults := faults) principal context scope id lowered where
   binderPolicy : BinderPolicy principal.named site.code
+  recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained principal.named site.code
 
 theorem OrdinaryFormation.at
     {caller : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
@@ -42,7 +44,7 @@ theorem OrdinaryFormation.at
     (environment : Dynamic.Environment) :
     OrdinaryAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured caller receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.syntaxTree environment
 
 theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     {principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method}
@@ -52,7 +54,7 @@ theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     (environment : Dynamic.Environment) :
     PrincipalAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured principal receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.syntaxTree environment
 
 /-- Actual producer selection and independently accepted same-Site body
 receipts construct the ordinary certificate without choosing another head. -/
@@ -89,6 +91,7 @@ def ordinary_of_producer
   ordinary := ordinary
   coercions := coercions
   binderPolicy := produced.binderPolicy
+  recipe := produced.recipe
   syntaxTree := syntaxTree
 
 /-- The principal certificate keeps its own Source dictionary and exact
@@ -125,6 +128,7 @@ def principal_of_producer {method : ExecutableImplMethods.CheckedMethod}
   ordinary := ordinary
   coercions := coercions
   binderPolicy := produced.binderPolicy
+  recipe := produced.recipe
   syntaxTree := syntaxTree
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts

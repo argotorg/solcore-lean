@@ -105,7 +105,7 @@ theorem plain_source_origin {history : History code}
     CallableIndexedOwnedOrdinaryLambdaSupport.SourceOrigin
       (plain support actualSites sites) history := ⟨origin.metadata⟩
 
-/-- The actual Site and its binder policy supply provenance for this projection. -/
+/-- The actual Site, binder policy and body recipe supply provenance for this projection. -/
 theorem plain_provenance (prepared : PreparedAt code support) :
     CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code
       (plain support actualSites sites) := by
@@ -113,7 +113,9 @@ theorem plain_provenance (prepared : PreparedAt code support) :
   | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy
       body binderPolicy environment =>
     exact .recaptured caller site expressionSyntax certificates
-      (bodyWith body actualSites sites) binderPolicy body.syntaxTree environment
+      (bodyWith body actualSites sites) binderPolicy
+      (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation body.recipe)
+      body.syntaxTree environment
 
 section Flow
 variable

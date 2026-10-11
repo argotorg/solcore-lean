@@ -1,9 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaBinderProjections
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
 
 /-! Contextual provenance retains the original chosen Site, its real binder
-policy and independent body Syntax. Constructor indices describe exactly the
+policy, production recipe and independent body Syntax. Constructor indices describe exactly the
 existing recapture operation; no Site or Syntax is recovered from Code. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
@@ -61,6 +62,7 @@ inductive OrdinaryAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
       (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
         expressionSyntax certificates site.code (Program.ofChecked compiled.sourceProgram) registry faults)
       (binderPolicy : BinderPolicy caller.named site.code)
+      (recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code)
       (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
         (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
         (.statements true statements) result)
@@ -84,6 +86,7 @@ inductive PrincipalAt : {function : Dynamic.Closure} → {scope : SourceCoreLoca
       (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
         expressionSyntax certificates site.code (Program.ofChecked compiled.sourceProgram) registry faults)
       (binderPolicy : BinderPolicy principal.named site.code)
+      (recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained principal.named site.code)
       (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source principal.named)
         (expressionSyntax (CallableIndexedNamedGeneration.source principal.named)) body.context
         (.statements true statements) result)
@@ -100,7 +103,7 @@ theorem OrdinaryAt.binder_policy
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
     (receipt : OrdinaryAt code support) : BinderPolicy support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy syntaxTree environment => exact binderPolicy
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact binderPolicy
 
 theorem OrdinaryAt.syntax
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
@@ -108,13 +111,13 @@ theorem OrdinaryAt.syntax
     GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
       support.body.context (.statements true function.body) function.resultType := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy syntaxTree environment => exact syntaxTree
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact syntaxTree
 
 theorem PrincipalAt.binder_policy
     {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
     (receipt : PrincipalAt code support) : BinderPolicy support.principal.named code := by
   cases receipt with
-  | recaptured principal site expressionSyntax certificates body binderPolicy syntaxTree environment => exact binderPolicy
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact binderPolicy
 
 theorem PrincipalAt.syntax
     {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
@@ -122,6 +125,24 @@ theorem PrincipalAt.syntax
     GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
       support.body.context (.statements true function.body) function.resultType := by
   cases receipt with
-  | recaptured principal site expressionSyntax certificates body binderPolicy syntaxTree environment => exact syntaxTree
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact syntaxTree
+
+/-- The same original production recipe survives recapture at the ordinary seed. -/
+theorem OrdinaryAt.body_recipe
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) :
+    CallableIndexedOwnedContextualLambdaBodyRecipes.Retained support.caller.named code := by
+  cases receipt with
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
+      exact recipe
+
+/-- Method provenance retains its own principal and the same production recipe. -/
+theorem PrincipalAt.body_recipe
+    {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
+    (receipt : PrincipalAt code support) :
+    CallableIndexedOwnedContextualLambdaBodyRecipes.Retained support.principal.named code := by
+  cases receipt with
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
+      exact recipe
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance

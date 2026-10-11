@@ -49,7 +49,7 @@ theorem ordinary_projected_bindings
     ∀ binding ∈ code.receipt.loweredParameters,
       compiled.compatible.checked.catalog.project binding.1.scheme.body = .ok binding.2 := by
   cases provenance with
-  | recaptured caller site expressionSyntax certificates body binderPolicy syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
     exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings
       site binderPolicy body.extended
 
@@ -60,7 +60,7 @@ theorem principal_projected_bindings
     ∀ binding ∈ code.receipt.loweredParameters,
       compiled.compatible.checked.catalog.project binding.1.scheme.body = .ok binding.2 := by
   cases provenance with
-  | recaptured principal site expressionSyntax certificates body binderPolicy syntaxTree environment =>
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
     exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings
       site binderPolicy body.extended
 

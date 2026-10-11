@@ -148,7 +148,9 @@ theorem PreparedAt.plain_provenance (prepared : PreparedAt code support) :
   cases prepared with
   | recaptured principal site expressionSyntax certificates issued diagnosticPolicy body binderPolicy environment =>
     exact .recaptured principal site expressionSyntax certificates
-      (bodyWith body actualSites sites) binderPolicy body.syntaxTree environment
+      (bodyWith body actualSites sites) binderPolicy
+      (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe principal.cached.compilation body.recipe)
+      body.syntaxTree environment
 
 theorem PreparedAt.projected_bindings (prepared : PreparedAt code support) :
     ∀ binding ∈ code.receipt.loweredParameters,

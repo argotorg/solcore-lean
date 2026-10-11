@@ -66,7 +66,9 @@ theorem provenance
       (.statements true statements) result)
     (environment : Dynamic.Environment) :
     OrdinaryAt (code produced environment) (ordinary_support produced body environment) :=
-  .recaptured caller produced.site expressionSyntax certificates body produced.binder syntaxTree environment
+  .recaptured caller produced.site expressionSyntax certificates body produced.binder
+    (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation produced.recipe)
+    syntaxTree environment
 
 /-- The retained compiler recipe survives recapture without an equality cast
 between different Codes or an assumption about a BodyWith expression callback. -/

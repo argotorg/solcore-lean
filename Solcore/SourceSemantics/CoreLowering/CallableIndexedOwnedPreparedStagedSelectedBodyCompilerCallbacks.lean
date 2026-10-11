@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaGeneration
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaSemanticInvocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedTerminalCertificates
 
@@ -80,6 +81,7 @@ structure Produced (compiled : SourceCoreUnifiedCompilation.Compiled)
   binder : site.code.policy.lowerBinder = SourceCoreGeneralFunctions.contextualBinder
     ((representation compiled.indexed).atContext named.signature.key [])
     compiled.indexed.base.locals named.signature.key []
+  recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation site.code
   callback : site.code.lowerBody
       (FunctionCode.children site.code.policy site.code.lowerBody site.code.fuel site.code.compilation) =
     SourceCoreLoops.lowerStatementsWithPolicy
@@ -125,6 +127,7 @@ theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
     identifier := identifier
     emitted := emitted
     binder := binder
+    recipe := recipe
     callback := ?_ }⟩
   have applied := congrArg
     (fun body : SourceCoreFunctions.BodyLowerer =>

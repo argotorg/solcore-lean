@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
 
 /-! The accepted original contextual producer chooses one Site and retains
-its actual binder policy. Later static body receipts are indexed by that same
+its actual binder policy and production recipe. Later static body receipts are indexed by that same
 Site; this packet has no execution callback. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProducerReceipts
@@ -19,9 +19,10 @@ structure Produced (named : Named) (parameters : List TypedBinder) (result : Typ
   identifier : site.code.id = id
   emitted : site.code.lowered = lowered
   binderPolicy : BinderPolicy named site.code
+  recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named site.code
 
 /-- This calls the original contextual producer once and keeps its exact
-selected Site and policy equation together. -/
+selected Site, policy equation and full lowerer recipe together. -/
 theorem of_contextual
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)
@@ -49,9 +50,10 @@ theorem of_contextual
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy⟩ := CallableIndexedLambdaGeneration.of_contextual_with_binder
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe⟩ := CallableIndexedLambdaGeneration.of_contextual_with_body_recipe
     compiled.indexed compilation record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
     found form owner requirements coercions ordinary read accepted typed
-  exact ⟨⟨site, identifier, emitted, binderPolicy⟩⟩
+  exact ⟨⟨site, identifier, emitted, binderPolicy,
+    CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation recipe⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProducerReceipts
