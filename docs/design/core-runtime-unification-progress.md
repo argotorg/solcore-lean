@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified specialization and source-instance foundations
+### Latest verified ordinary specialization coherence and calls
+
+The three modules in `4f01d1fb` prove that original statement annotations determine body-result summaries across independent declarative contexts. For authentic ordinary specializations, equal complete sources after local substitution recover equal rigid bodies, inferred results and stage analyses. The resulting guard-frame equality transfers canonical call authority to the selected ordinary scope.
+
+All three private and normal strict checks have empty logs. Their 570 selected declarations and twelve interfaces agree between private and normal checks. There are 565 new declaration names; five imported generated helpers match their existing types and axiom lists exactly. All 17770 preceding declarations retain their complete types and axiom lists; the scope grows to 18335 without removals. Build 5931 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5861 to 5864.
+
+The call theorem requires genuine program typing, ordinary specialization origins, complete raw range formation, full source receipts and the original compiler certificate. Arbitrary applied views, implementation-method histories and the final public semantics theorem remain open. Core instructions and runtime behavior are unchanged.
+
+The estimates above are unchanged.
+
+### Preceding verified specialization and source-instance foundations
 
 The nine-module foundation in `74b762a7` connects successful executable-plan preparation to the actual specialization receipts for every retained row. Accepted canonical replacements are concrete and contain no flexible variables. Equal local instances of one original source recover its complete rigid instances, including ordered nodes, binders and qualified metadata. Genuine ordinary catalog origins identify the same original checked function. A separate congruence theorem transports successful stage analyses when their actual inputs agree.
 

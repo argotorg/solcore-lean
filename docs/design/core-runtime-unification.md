@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `74b762a7`. Actual preparation retains specialization provenance; correlated source instances and ordinary catalog identity have checked foundations. |
-| Latest completed normal verification | Build 5928; all 2505 affected modules rebuilt and nine selected strict checks empty; 758 selected declarations and 21 APIs agree privately and normally. All 17652 baseline declarations remain exact. |
-| Working implementation | Preparation origins, accepted concrete replacements and correlated source instances are verified. Selected call authority and the public all-pass theorem are still being connected. |
-| Latest proof scope | Actual specialization receipts, ordinary original identity and complete correlated source recovery. General method identity, compiler coverage and full staged execution composition remain obligations. |
-| Latest normally verified proof package | `source-specialization-and-staged-coherence`: nine selected modules, 118 new declaration names and 21 interfaces, verified in `74b762a7`. |
+| Latest normally verified implementation commit | `4f01d1fb`. Original annotations establish ordinary specialization stage coherence and selected-scope call authority. |
+| Latest completed normal verification | Build 5931; all 5 affected modules rebuilt and three selected strict checks empty; 570 declarations and 12 APIs agree privately and normally. All 17770 preceding declarations remain exact. |
+| Working implementation | Ordinary specialization stage coherence and selected-scope call authority are verified under explicit typing, origin and range premises. Complete preparation coverage and the public all-pass theorem remain open. |
+| Latest proof scope | Independent annotation summaries, ordinary specialized results and analyses, and full guard-frame transport of genuine call ports. General methods, applied-view coverage and the public theorem remain obligations. |
+| Latest normally verified proof package | `staged-ordinary-specialization-coherence-and-call-authority`: three modules, 565 new declaration names and 12 interfaces, verified in `4f01d1fb`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified ordinary specialization coherence and calls
+
+The three modules in `4f01d1fb` prove that original statement annotations determine body-result summaries across independent declarative contexts. For authentic ordinary specializations, equal complete sources after local substitution recover equal rigid bodies, inferred results and stage analyses. The resulting guard-frame equality transfers canonical call authority to the selected ordinary scope.
+
+All three private and normal strict checks have empty logs. Their 570 selected declarations and twelve interfaces agree between private and normal checks. There are 565 new declaration names; five imported generated helpers match their existing types and axiom lists exactly. All 17770 preceding declarations retain their complete types and axiom lists; the scope grows to 18335 without removals. Build 5931 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5861 to 5864.
+
+The call theorem requires genuine program typing, ordinary specialization origins, complete raw range formation, full source receipts and the original compiler certificate. Arbitrary applied views, implementation-method histories and the final public semantics theorem remain open. Core instructions and runtime behavior are unchanged.
 
 ### Verified specialization and source-instance foundations
 

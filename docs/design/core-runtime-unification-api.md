@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Ordinary specialization coherence and selected-scope calls are committed in `4f01d1fb`: three modules, 565 new declaration names and twelve interfaces. All 17770 preceding declarations remain exact.
+
 Specialization and source-instance foundations are committed in `74b762a7`: nine selected modules, 118 new declaration names and 21 interfaces. All 17652 expanded baseline declarations remain exact.
 
 Recursive discard-sequence exits are committed in `552dfdfd`: one module, 19 selected declarations and four public interfaces. All 16993 preceding scoped declarations remain exact.
@@ -28,6 +30,16 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Ordinary specialization coherence and selected-scope calls
+
+`SourceAnnotationSummaryUniqueness` proves that the same unique stored statements determine their type, value and return summaries across independent typing derivations. Its body-facts theorem compares actual annotations; the declaration-result theorem extracts the required annotation equations from original declaration typing.
+
+`CallableOrdinarySpecializationStageCoherence` derives specialized body typing and annotations from original checked-program typing, genuine ordinary origins and complete raw range formation. Equal complete sources after local substitution determine the rigid bodies, results and stage analyses. Equal preparation plans then determine the complete ledger frame.
+
+`CallableIndexedOwnedPreparedStagedOrdinaryScopeCallsReady` combines two genuine preparation/source receipts with that coherence theorem. It transports the exact canonical call ports to the selected ordinary scope, preserving original typing, occurrence uniqueness and the actual compiler certificate.
+
+Verified in `4f01d1fb`: build 5931, strict checks, full declaration/API comparisons, registered tests and repository policy pass. These interfaces still require their stated origins, range formation and full source receipts; applied views and general method histories need further correspondence proofs.
 
 ## Specialization and source-instance foundations
 
