@@ -30,7 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified prepared policy and canonical call contracts
+### Latest verified canonical call readiness and ordinary body exits
+
+The three modules in `3059a7f5` construct call readiness at the canonical invocation of the same generated Code. The proof recovers the original supported grammar from the compiler certificate, follows each actual call occurrence and combines original typing with the retained compiler policy.
+
+The staged body projection preserves ordinary returned values, fallthrough and semantic faults with their exact stopping context and heap. Genuine map/world growth and heap metadata construct the lexical exit used by the existing body consumers. Stage rejection keeps its separate semantics.
+
+All three private and normal strict checks have empty logs. Their 19 new declarations and 9 interfaces agree literally between private and normal checks. All 16974 preceding scoped declarations retain their complete types and axiom lists; the scope grows to 16993 without removals. Build 5919 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5849 to 5852, and all 38 Tests.Main declaration blocks remain exact.
+
+The call-readiness theorem still requires original metadata, source provenance, occurrence uniqueness and the actual compiler certificate. Other selected invocation frames need their own correspondence proof. Complete formation coverage, broader grammar and the final public theorem across all passes remain unfinished.
+
+The estimates above are unchanged.
+
+### Preceding verified prepared policy and canonical call contracts
 
 The five modules in `23ac1a6c` derive supported compiler policies from the retained callbacks and original metadata conditions. Ordinary and principal formations carry the same policy through recapture and prepared qualification. Original root typing supplies the raw parent type at each compiler-issued nested call. The actual Code selects its canonical sidecar and call contract.
 

@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Canonical call readiness and ordinary body exits are committed in `3059a7f5`: three modules, 19 new declarations and nine interfaces. All 16974 preceding scoped declarations remain exact.
+
 Prepared policy, original call typing and canonical call contracts are committed in `23ac1a6c`: five modules, 256 selected declarations and 31 new interfaces. All 16727 preceding scoped declarations remain exact.
 
 Contextual compiler policy retention is committed in `806e809c`: three modules expose eleven new interfaces, with literal private/normal agreement for 133 owned declarations. All 16679 preceding scoped declarations remain exact. The earlier retained-recipe factories and source typing lemmas are in `96a60f2f` (32 interfaces, 139 new declarations); sequence body/application changes are in `a0778ccc` (27 interfaces, 169 owned declarations).
@@ -22,6 +24,16 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Canonical call readiness and ordinary body exits
+
+`CallableIndexedOwnedPreparedStagedCanonicalCallsReady` reconstructs supported syntax from an authentic certificate and follows its exact call paths. `canonical_calls_ready` combines that syntax, original typing and retained policy at the sidecar selected from the same Code. Argument order and duplicate occurrences are retained.
+
+`Staging.Recursive.Statements.returned_plain`, `fallthrough_plain` and `semanticFault_plain`, exported by `Staging.RecursiveBodyErasure`, project staged execution to ordinary execution with the same final context and heap. They do not project stage rejection to an ordinary outcome.
+
+`CallableIndexedOwnedPreparedStagedBodyExitReceipts` builds `lexical_unchanged` from actual map/world and heap-metadata extensions. `reached_returned` and `reached_semanticFault` combine it with genuine selected-source provenance and the original staged trace.
+
+Verified in `3059a7f5`: build 5919, all three strict checks, literal declaration comparisons, registered tests and repository policy pass. Other selected guard frames and the final theorem across all compiler passes remain open.
 
 ## Prepared policy and canonical call contracts
 

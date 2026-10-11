@@ -10,13 +10,23 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `23ac1a6c`. Retained policies reach prepared formations; original typing and canonical scopes supply call contracts. |
-| Latest completed normal verification | Build 5916; five empty strict Source checks and 7 affected modules rebuilt; 256 selected declarations and 31 new APIs agree between private and normal checks. All 16727 preceding scoped declarations remain exact; registered tests and repository policy pass. |
-| Working implementation | Actual compiler policy and formation receipts connect to original call typing and canonical call contracts. Complete formation coverage and the public all-pass theorem remain incomplete. |
-| Latest proof scope | Canonical invocation scopes and original nested-call typing are derived. Global metadata, other selected stage frames, broader grammar and complete call readiness remain obligations. |
-| Latest normally verified proof package | `staged-high-policy-profiles-and-prepared-support`: five modules, 256 selected declarations and 31 new interfaces, verified in `23ac1a6c`. |
+| Latest normally verified implementation commit | `3059a7f5`. Canonical call readiness and exact ordinary body exits are derived. |
+| Latest completed normal verification | Build 5919; three empty strict Source checks and 5 affected modules rebuilt; 19 new declarations and nine APIs agree between private and normal checks. All 16974 preceding scoped declarations remain exact; registered tests and repository policy pass. |
+| Working implementation | Canonical call readiness follows the authentic compiler certificate. Staged bodies retain ordinary lexical exits. Complete formation coverage and the public all-pass theorem remain incomplete. |
+| Latest proof scope | Canonical call conditions and ordinary body exit receipts are derived. Other selected stage frames, global metadata, broader grammar and complete compiler coverage remain obligations. |
+| Latest normally verified proof package | `staged-canonical-call-authority-and-body-exits`: three modules, 19 new declarations and nine interfaces, verified in `3059a7f5`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified canonical call readiness and ordinary body exits
+
+The three modules in `3059a7f5` construct call readiness at the canonical invocation of the same generated Code. The proof recovers the original supported grammar from the compiler certificate, follows each actual call occurrence and combines original typing with the retained compiler policy.
+
+The staged body projection preserves ordinary returned values, fallthrough and semantic faults with their exact stopping context and heap. Genuine map/world growth and heap metadata construct the lexical exit used by the existing body consumers. Stage rejection keeps its separate semantics.
+
+All three private and normal strict checks have empty logs. Their 19 new declarations and 9 interfaces agree literally between private and normal checks. All 16974 preceding scoped declarations retain their complete types and axiom lists; the scope grows to 16993 without removals. Build 5919 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5849 to 5852, and all 38 Tests.Main declaration blocks remain exact.
+
+The call-readiness theorem still requires original metadata, source provenance, occurrence uniqueness and the actual compiler certificate. Other selected invocation frames need their own correspondence proof. Complete formation coverage, broader grammar and the final public theorem across all passes remain unfinished.
 
 ### Verified prepared policy and canonical call contracts
 
