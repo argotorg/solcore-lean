@@ -30,7 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified ordinary specialization coherence and calls
+### Latest verified prepared ordinary call provenance
+
+The seven modules in `5b8c8727` connect successful executable-plan preparation to the catalog origin of every retained specialization. Each row comes from an ordinary function request or an actual implementation-method selector. Signature catalog disjointness then identifies the ordinary rows at a function owner.
+
+Authentic paired ancestry preserves canonical source correspondence after erasing requirement IDs. For ordinary functions, the original checked function determines the requirement profiles and recovers equality of the canonical contextual sources. This derives the selected guard frame and transfers the real canonical call ports. A separate theorem combines admissible reached-call metadata with accepted concrete replacements to establish complete catalog type formation for the matched callee.
+
+All seven private and normal strict checks have empty logs. Their 98 declarations and 24 interfaces agree between private and normal checks. All 18335 preceding declarations retain their complete types and axiom lists; the scope grows to 18433 with 98 additions and no removals. Build 5938 rebuilds all 9 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5864 to 5871.
+
+Ordinary call readiness still requires raw replacement formation for the selected owner's retained rows, original typing, full source receipts and genuine compiler certificates. Qualified generalized-local materialization, general method-frame correspondence, wider grammar and the final public semantics theorem remain open.
+
+The estimates above are unchanged.
+
+### Preceding verified ordinary specialization coherence and calls
 
 The three modules in `4f01d1fb` prove that original statement annotations determine body-result summaries across independent declarative contexts. For authentic ordinary specializations, equal complete sources after local substitution recover equal rigid bodies, inferred results and stage analyses. The resulting guard-frame equality transfers canonical call authority to the selected ordinary scope.
 

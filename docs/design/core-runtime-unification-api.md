@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Prepared ordinary call provenance is committed in `5b8c8727`: seven modules, 98 new declarations and 24 interfaces. All 18335 preceding declarations remain exact.
+
 Ordinary specialization coherence and selected-scope calls are committed in `4f01d1fb`: three modules, 565 new declaration names and twelve interfaces. All 17770 preceding declarations remain exact.
 
 Specialization and source-instance foundations are committed in `74b762a7`: nine selected modules, 118 new declaration names and 21 interfaces. All 17652 expanded baseline declarations remain exact.
@@ -30,6 +32,18 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Prepared ordinary call provenance
+
+`CallablePreparedOrdinaryRequestOrigins` follows real worklist execution and canonical replay. `CallablePreparedFinalCatalogOrigins` follows public evidence preparation through coercion and operator scanning, retaining an ordinary origin or the actual checked method selector for every final row.
+
+`CallableOrdinaryMethodCatalogSeparation` uses signature catalog disjointness to rule out a method row at an ordinary function owner. This identifies the ordinary branch without treating an implementation owner as an individual method identity.
+
+`CallableSelectedCanonicalSourceErasure` derives canonical source correspondence from authentic paired ancestry. `CallableOrdinarySpecializationErasedStageCoherence` uses the original ordinary function's requirement profiles to recover equality of the two canonical contextual sources. `CallableOrdinaryPreparedScopeCallsReady` combines these results with actual preparation to derive the selected frame and its exact call ports.
+
+`CallableIndexedOwnedReachedNamedConcreteRangeReceipts` combines genuine admissible declaration metadata, exact compiler selection and accepted concrete replacements. It establishes raw range formation for the matched reached callee, including retained unused replacements.
+
+Verified in `5b8c8727`: build 5938, strict checks, full declaration/API comparisons, registered tests and repository policy pass. The ordinary scope theorem still requires `RangesAt` for that owner's retained rows and the original source/compiler receipts. Erasure alone does not establish execution equivalence for a rewritten applied source.
 
 ## Ordinary specialization coherence and selected-scope calls
 

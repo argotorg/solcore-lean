@@ -10,13 +10,23 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `4f01d1fb`. Original annotations establish ordinary specialization stage coherence and selected-scope call authority. |
-| Latest completed normal verification | Build 5931; all 5 affected modules rebuilt and three selected strict checks empty; 570 declarations and 12 APIs agree privately and normally. All 17770 preceding declarations remain exact. |
-| Working implementation | Ordinary specialization stage coherence and selected-scope call authority are verified under explicit typing, origin and range premises. Complete preparation coverage and the public all-pass theorem remain open. |
-| Latest proof scope | Independent annotation summaries, ordinary specialized results and analyses, and full guard-frame transport of genuine call ports. General methods, applied-view coverage and the public theorem remain obligations. |
-| Latest normally verified proof package | `staged-ordinary-specialization-coherence-and-call-authority`: three modules, 565 new declaration names and 12 interfaces, verified in `4f01d1fb`. |
+| Latest normally verified implementation commit | `5b8c8727`. Public preparation retains ordinary and method catalog origins; ordinary selected scopes inherit canonical call authority. |
+| Latest completed normal verification | Build 5938; all 9 affected modules rebuilt and seven selected strict checks empty; 98 declarations and 24 APIs agree privately and normally. All 18335 preceding declarations remain exact. |
+| Working implementation | Actual preparation supplies catalog origins and ordinary selected-scope call authority under explicit typing, range and source premises. Complete production coverage and the public theorem remain open. |
+| Latest proof scope | Catalog provenance through method scanning, ordinary/method separation, canonical source correspondence after requirement erasure, reached-callee range formation and ordinary call ports. |
+| Latest normally verified proof package | `staged-ordinary-catalog-and-prepared-call-authority`: seven modules, 98 new declarations and 24 interfaces, verified in `5b8c8727`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified prepared ordinary call provenance
+
+The seven modules in `5b8c8727` connect successful executable-plan preparation to the catalog origin of every retained specialization. Each row comes from an ordinary function request or an actual implementation-method selector. Signature catalog disjointness then identifies the ordinary rows at a function owner.
+
+Authentic paired ancestry preserves canonical source correspondence after erasing requirement IDs. For ordinary functions, the original checked function determines the requirement profiles and recovers equality of the canonical contextual sources. This derives the selected guard frame and transfers the real canonical call ports. A separate theorem combines admissible reached-call metadata with accepted concrete replacements to establish complete catalog type formation for the matched callee.
+
+All seven private and normal strict checks have empty logs. Their 98 declarations and 24 interfaces agree between private and normal checks. All 18335 preceding declarations retain their complete types and axiom lists; the scope grows to 18433 with 98 additions and no removals. Build 5938 rebuilds all 9 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5864 to 5871.
+
+Ordinary call readiness still requires raw replacement formation for the selected owner's retained rows, original typing, full source receipts and genuine compiler certificates. Qualified generalized-local materialization, general method-frame correspondence, wider grammar and the final public semantics theorem remain open.
 
 ### Verified ordinary specialization coherence and calls
 
