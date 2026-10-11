@@ -30,7 +30,23 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest normally verified selected terminal body/caller proof scope
+### Latest verified mixed bodies and applications
+
+Eight mixed body/application Sources are normally verified and committed in `448ad204` and `333c5d61`: 150 owned declarations and 28 interfaces with complete literal private/normal TYPE/AXIOMS and API agreement. Build 5889, registered tests and the repository policy checker pass with zero findings. The exact scope grows from 1182 to 1332 without removals; all 38 preceding scoped modules retain their declarations. The normal Source/BOTH snapshot grows from 5814 to 5822 and the ten-module dependency cone is rebuilt. Existing user work is preserved.
+
+The same ordinary or principal Association retains a terminal or discard packet at its actual parameter context. Discard flow, body application and caller restoration preserve the reached state, exact returned pool, failures and independent Source/native grades. Compiler/static authority stays explicit. The common recursive caller/body composition, complete packet factories for actual formations, wider grammar and the public all-pass theorem remain incomplete.
+
+### Preceding verified compiler factories and static witnesses
+
+The nine proof additions are committed in `7a321ac5` and `18031d7a`: nine Sources, 360 owned declarations and 56 selected interfaces. All private and normal strict Source logs are empty; complete owned TYPE/AXIOMS blocks and API logs agree literally. Build 5881 and the registered tests pass. The exact module scope grows from 597 to 957, with 360 additions and no removals; all nineteen preceding scoped modules retain their literal declarations. The normal Source/BOTH snapshot grows from 5805 to 5814, and every module in the eleven-module dependency cone is rebuilt. Existing user work is preserved.
+
+These additions derive concrete callbacks and selected closure/named support from authentic compiler receipts. Discard followed by a terminal return retains original head/tail typing, actual intermediate state, independent grades and the emitted finish footer. Genuine compiler/static authority and call readiness remain explicit. The subsequent mixed body/application family is integrated above; its common recursive caller/body composition and wider grammar remain incomplete.
+
+The preceding compiler-root/support/caller unit was verified in `d5d5e123` and `02006e66`: three Sources, 219 declarations and 36 interfaces, build 5872, scoped 376 → 595. Its seven successful normal receipts include one repaired cumulative import check; successful Source checks were reused. Constructive replacements in `db1ab3d2` retain all 25 public interface types and literal private/normal agreement for 175 declarations. Two generated proof additions change the scope from 595 to 597; the four-module cone is rebuilt.
+
+The historical full census last confirmed 20948. Its temporary census evidence is unavailable, so continuity from that count is not claimed; the current scoped census begins at the newly measured 376. The subsequent seven witness replacements are verified and committed at `87b08905`: 184 owned declarations and 47 selected interfaces with exact private/normal agreement. Explicit Seed and physical Inventory rows replace repeated computational selection; profile families are constructed inside propositions. The expanded explicit scope changes from 1117 to 1182, with 43 recorded TYPE changes, 72 additions and seven generated removals. The original 28 protected scoped modules retain their literal declarations. All twelve dependent modules are rebuilt and registered tests pass. The repository policy checker now returns zero findings, closing the nine preceding findings. Runtime syntax and public entry points are unchanged; the full semantics theorem remains incomplete. Estimates stay 100% / about 70% / about 85%.
+
+### Selected terminal body/caller checkpoint (historical)
 
 The selected `staged-selected-callers-and-recursive-body-bounds` unit is normally verified in `7db7dd2c`, `dda78f9c`, `31549a17`: sixteen proof Sources, 376 owned declarations and 53 selected interfaces. Each Source has an isolated strict author pass and two independent nonauthor Source reviews, excluding contributing repair authors.
 

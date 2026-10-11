@@ -4,6 +4,17 @@ Last updated: 2026-10-11.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Latest verified proof interfaces (2026-10-11)
+
+The public runtime entry points below remain unchanged. The latest mixed body/application additions are committed in `448ad204` and `333c5d61`: eight Sources expose 28 checked interfaces with literal private/normal agreement for 150 owned declarations.
+
+- `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
+- `SelectedBodyCompilerCallbacks`, `SelectedNamedCompilerRecipes` and the selected closure/named factories retain the same contextual compiler site, actual body, callback, chosen packet and raw parameter authority. They derive support for those genuine occurrences; an arbitrary earlier Association or unrelated compiler site is not upgraded.
+- `DiscardSourceBodyInversion`, the discard compiler receipts and the flow/body bounds retain the original discard/return forms, actual child compiler actions, raw typing, intermediate state and literal emitted footer. Source and native grades remain independent.
+- `MixedBodyStaticSupport` and `MixedBodyCompilerSupport` retain terminal/discard packets and original roots at the same Code and parameter context. The mixed flow, body, lambda application, contextual application and parent bounds preserve the actual caller restoration for ordinary and principal Associations.
+
+These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. General mixed recursive body composition, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
 ## Public entry points
 
 `Solcore.Frontend.SourceCompiler` reexports the types and functions of `SourceCoreExecution`. It has no separate backend, compiler representation, or session implementation.
