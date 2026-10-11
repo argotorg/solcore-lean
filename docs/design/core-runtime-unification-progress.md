@@ -30,7 +30,17 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified contextual compiler policy retention
+### Latest verified prepared policy and canonical call contracts
+
+The five modules in `23ac1a6c` derive supported compiler policies from the retained callbacks and original metadata conditions. Ordinary and principal formations carry the same policy through recapture and prepared qualification. Original root typing supplies the raw parent type at each compiler-issued nested call. The actual Code selects its canonical sidecar and call contract.
+
+All five private and normal strict checks have empty logs. Their 256 selected declarations and 31 new interfaces agree between private and normal checks. Nine existing generated helpers appear in the selected-only audit; their complete types and axiom lists match the preceding scope. There are 247 genuinely new declaration names. All 16727 preceding scoped declarations retain their complete types and axiom lists; the scope grows to 16974 with no removals. Build 5916 rebuilds all 7 affected modules. Registered tests and repository policy pass, and the normal source/object inventory grows from 5844 to 5849. All 38 Tests.Main declaration blocks remain exact.
+
+The call contract proof covers the canonical invocation selected from the same Code. Other selected invocation scopes still need their stage-frame correspondence. Global metadata conditions, complete formation coverage, broader grammar and the final public all-pass theorem remain unfinished.
+
+The estimates above are unchanged.
+
+### Preceding verified contextual compiler policy retention
 
 The three modules in `806e809c` retain the actual contextual compiler policy together with the body recipe, named compilation and generated Code. The receipt records initializer overrides, evidence, local reads and the original fuel choices. Generation and producer projections preserve this same witness.
 

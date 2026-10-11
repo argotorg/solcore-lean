@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Prepared policy, original call typing and canonical call contracts are committed in `23ac1a6c`: five modules, 256 selected declarations and 31 new interfaces. All 16727 preceding scoped declarations remain exact.
+
 Contextual compiler policy retention is committed in `806e809c`: three modules expose eleven new interfaces, with literal private/normal agreement for 133 owned declarations. All 16679 preceding scoped declarations remain exact. The earlier retained-recipe factories and source typing lemmas are in `96a60f2f` (32 interfaces, 139 new declarations); sequence body/application changes are in `a0778ccc` (27 interfaces, 169 owned declarations).
 
 - `SelectedBodyCompilerRoots` issues original Source certificates from authentic accepted compiler actions. `SelectedBodySupportFactories` and `SelectedCompilerTerminalCallerBounds` construct exact static support and consume the supported recursive caller proof; their original unit was verified in `d5d5e123` and `02006e66`. The constructive replacement `db1ab3d2` preserves its 25 public interface types.
@@ -20,6 +22,16 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Prepared policy and canonical call contracts
+
+`RecursiveCallerPolicyProfiles.MetadataFor` states the original metadata conditions for the supported expression grammar. Its `retained_policy_for`, `retained_paired_policy_for` and `retained_selected_policy_for` derive actual callback behavior from the retained policy recipe. They do not infer global metadata conditions from compiler success alone.
+
+`ContextualLambdaPolicyFormationReceipts` carries policy retention through ordinary and principal formation and recapture. `PreparedContextualLambdaPolicySupport` attaches the same receipt to prepared support and qualification, keeping the actual compilation, capture embedding and principal dictionary.
+
+`RecursiveCallerRawTyping.parent_typed` follows the issued call certificate to recover its original parent type. `CanonicalScopeCallPorts.canonical_scope_port` constructs the call contract at the canonical invocation of the same Code; ordinary and principal ports preserve that provenance.
+
+Verified in `23ac1a6c`: build 5916, all five strict checks, literal declaration comparisons, registered tests and repository policy pass. Complete call readiness and correspondence with every other selected invocation frame remain separate obligations.
 
 ## Contextual compiler policy retention
 

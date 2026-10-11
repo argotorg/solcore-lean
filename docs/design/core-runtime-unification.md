@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `806e809c`. Generation retains the actual contextual compiler policy with the same body recipe and Code. |
-| Latest completed normal verification | Build 5911; three empty strict Source checks and 753 affected modules rebuilt; 133 selected declarations and eleven new interfaces agree between private and normal checks. All 16679 preceding scoped declarations remain exact; registered tests and repository policy pass. |
-| Working implementation | Body recipes and contextual compiler policies are retained at the same generation site. Complete formation coverage and the public all-pass theorem remain incomplete. |
-| Latest proof scope | Generation retains its actual policy callbacks and fuel choices. Global metadata profiles, wider grammar and exact call readiness remain obligations. |
-| Latest normally verified proof package | `contextual-lambda-full-policy-provenance`: three modules, 133 owned declarations and eleven new interfaces, verified in `806e809c`. |
+| Latest normally verified implementation commit | `23ac1a6c`. Retained policies reach prepared formations; original typing and canonical scopes supply call contracts. |
+| Latest completed normal verification | Build 5916; five empty strict Source checks and 7 affected modules rebuilt; 256 selected declarations and 31 new APIs agree between private and normal checks. All 16727 preceding scoped declarations remain exact; registered tests and repository policy pass. |
+| Working implementation | Actual compiler policy and formation receipts connect to original call typing and canonical call contracts. Complete formation coverage and the public all-pass theorem remain incomplete. |
+| Latest proof scope | Canonical invocation scopes and original nested-call typing are derived. Global metadata, other selected stage frames, broader grammar and complete call readiness remain obligations. |
+| Latest normally verified proof package | `staged-high-policy-profiles-and-prepared-support`: five modules, 256 selected declarations and 31 new interfaces, verified in `23ac1a6c`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified prepared policy and canonical call contracts
+
+The five modules in `23ac1a6c` derive supported compiler policies from the retained callbacks and original metadata conditions. Ordinary and principal formations carry the same policy through recapture and prepared qualification. Original root typing supplies the raw parent type at each compiler-issued nested call. The actual Code selects its canonical sidecar and call contract.
+
+All five private and normal strict checks have empty logs. Their 256 selected declarations and 31 new interfaces agree between private and normal checks. Nine existing generated helpers appear in the selected-only audit; their complete types and axiom lists match the preceding scope. There are 247 genuinely new declaration names. All 16727 preceding scoped declarations retain their complete types and axiom lists; the scope grows to 16974 with no removals. Build 5916 rebuilds all 7 affected modules. Registered tests and repository policy pass, and the normal source/object inventory grows from 5844 to 5849. All 38 Tests.Main declaration blocks remain exact.
+
+The call contract proof covers the canonical invocation selected from the same Code. Other selected invocation scopes still need their stage-frame correspondence. Global metadata conditions, complete formation coverage, broader grammar and the final public all-pass theorem remain unfinished.
 
 ### Verified contextual compiler policy retention
 
