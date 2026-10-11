@@ -6,6 +6,8 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
+Ordinary annotation call readiness is committed in `0d7c0a62`: three modules, 11 new declarations and eight interfaces. All 18433 preceding declarations remain exact.
+
 Prepared ordinary call provenance is committed in `5b8c8727`: seven modules, 98 new declarations and 24 interfaces. All 18335 preceding declarations remain exact.
 
 Ordinary specialization coherence and selected-scope calls are committed in `4f01d1fb`: three modules, 565 new declaration names and twelve interfaces. All 17770 preceding declarations remain exact.
@@ -32,6 +34,16 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Ordinary annotation call readiness
+
+`SourceBodyResultAnnotation` obtains the stored result annotation from original body typing. The result across equal rigid source instances follows without constructing a second substituted typing derivation.
+
+`CallableOrdinaryAnnotationCoherence` combines genuine ordinary origins, original program typing and concrete replacements. It proves equality of the full rigid source, inferred result, stage analysis and selected guard frame.
+
+`CallableOrdinaryPreparedScopeAnnotationCallsReady` obtains the ordinary row origins from actual public preparation, derives the selected frame and transfers the exact canonical call ports. This endpoint removes the `RangesAt` premise from the earlier ordinary prepared-scope result. Original typing, source metadata, compiler policy and the exact certificate remain explicit.
+
+Verified in `0d7c0a62`: build 5941, strict checks, full declaration/API comparisons, registered tests and repository policy pass. General implementation methods and live generalized-local materialization are outside this result.
 
 ## Prepared ordinary call provenance
 

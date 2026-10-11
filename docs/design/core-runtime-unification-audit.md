@@ -31,10 +31,23 @@ Compilation preparation has been separated into `SourceCompilationPlan`. The his
 | Specialization and source-instance foundations: `74b762a7` | 758 selected (118 new) / 21 | Expanded scope 17652 → 17770; all preceding declarations exact, no removals |
 | Ordinary specialization coherence and calls: `4f01d1fb` | 570 selected (565 new) / 12 | Scope 17770 → 18335; all preceding declarations exact, no removals |
 | Prepared ordinary call provenance: `5b8c8727` | 98 new / 24 | Scope 18335 → 18433; all preceding declarations exact, no removals |
+| Ordinary annotation call readiness: `0d7c0a62` | 11 new / 8 | Scope 18433 → 18444; all preceding declarations exact, no removals |
 
 Each unit has actual strict Source checks and complete private/normal literal TYPE/AXIOMS and API comparisons. The preceding sequence typing/support build passed 5902 jobs and rebuilt all four affected modules; all 57 preceding scoped modules retained their literal declarations. The recipe retention build passes 5903 jobs and rebuilds all 355 affected modules. The sequence body/application build passes 5906 jobs and rebuilds all 24 affected modules. The retained-recipe factory build passes 5910 jobs and rebuilds all six affected modules. The policy-retention build passes 5911 jobs and rebuilds all 753 affected modules. The prepared-policy and call-contract build passes 5916 jobs and rebuilds all seven affected modules. The call-readiness and ordinary-exit build passes 5919 jobs and rebuilds all 5 affected modules. The discard-sequence exit build passes 5920 jobs and rebuilds all 3 affected modules. Registered tests and repository policy pass, and unrelated user work is preserved. Supported caller/body recursion is constructed internally. Mixed packets retain the actual ordinary/principal Association parameter context and exact returned caller state. Original full-body typing now supplies every used sequence child's raw type and fixes the terminal's declared result. The accepted child action issues its exact certificate, and readiness remains indexed by that proof. Sequence application joins are now verified for both ordinary and principal Associations. Complete compiler packet coverage and wider grammar remain unfinished; original compiler policy/read facts, raw typing and call authority stay explicit.
 
 The last confirmed historical full census is 20948. After temporary evidence loss, that continuity is unavailable; the current scoped census starts from an authentic new measurement at 376. The seven witness replacements at `87b08905` retain exact Seed/Inventory packets and construct profile existence inside propositions. They intentionally change proof-interface types, with complete private/normal comparison and all 28 protected scoped modules unchanged. The final repository policy check passes with zero findings after the preceding nine findings. This closes the repository policy checks; it does not complete the public all-pass semantics theorem. The runtime/semantic/overall estimates remain 100% / about 70% / about 85%.
+
+## Verified ordinary annotation call readiness (2026-10-12)
+
+The three modules in `0d7c0a62` derive ordinary call readiness directly from original source annotations. A checked body's result annotation is either unit or its stored statement annotation. Equal original rigid sources therefore recover equal result annotations across independent declarative contexts.
+
+Actual ordinary origins identify the common original function. Accepted concrete replacements recover its rigid source, and annotation agreement gives the same stage analysis and selected guard frame. The prepared scope then inherits canonical call ports without requiring raw range formation for every retained row.
+
+All three private and normal strict checks have empty logs. Their 11 declarations and eight interfaces agree between private and normal checks. All 18433 preceding declarations retain their complete types and axiom lists; the scope grows to 18444 with no removals. Build 5941 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5871 to 5874.
+
+The readiness theorem retains original function typing, actual preparation, full source receipts, exact compiler certificates and the supported compiler policy. General methods, live generalized-local cells, wider grammar and the final public semantics theorem remain open.
+
+Each source has actual strict/full/API author results and two independent complete reviews. All eleven selected names are distinct and absent from the preceding scope. No shared-helper exception is needed. Declaration counts do not measure semantic coverage.
 
 ## Verified prepared ordinary call provenance (2026-10-12)
 

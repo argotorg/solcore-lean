@@ -10,13 +10,23 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `5b8c8727`. Public preparation retains ordinary and method catalog origins; ordinary selected scopes inherit canonical call authority. |
-| Latest completed normal verification | Build 5938; all 9 affected modules rebuilt and seven selected strict checks empty; 98 declarations and 24 APIs agree privately and normally. All 18335 preceding declarations remain exact. |
-| Working implementation | Actual preparation supplies catalog origins and ordinary selected-scope call authority under explicit typing, range and source premises. Complete production coverage and the public theorem remain open. |
-| Latest proof scope | Catalog provenance through method scanning, ordinary/method separation, canonical source correspondence after requirement erasure, reached-callee range formation and ordinary call ports. |
-| Latest normally verified proof package | `staged-ordinary-catalog-and-prepared-call-authority`: seven modules, 98 new declarations and 24 interfaces, verified in `5b8c8727`. |
+| Latest normally verified implementation commit | `0d7c0a62`. Original source annotations derive ordinary prepared-scope call readiness without retained-row range premises. |
+| Latest completed normal verification | Build 5941; all 5 affected modules rebuilt and three selected strict checks empty; 11 declarations and eight APIs agree privately and normally. All 18433 preceding declarations remain exact. |
+| Working implementation | Actual preparation and original annotations derive ordinary selected-scope call authority under explicit typing, source and compiler premises. Complete production coverage and the public theorem remain open. |
+| Latest proof scope | Original body-result annotations, ordinary specialization stage coherence and prepared-scope call ports without retained-row range formation. |
+| Latest normally verified proof package | `staged-ordinary-annotation-and-prepared-call-authority`: three modules, 11 new declarations and eight interfaces, verified in `0d7c0a62`. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Verified ordinary annotation call readiness
+
+The three modules in `0d7c0a62` derive ordinary call readiness directly from original source annotations. A checked body's result annotation is either unit or its stored statement annotation. Equal original rigid sources therefore recover equal result annotations across independent declarative contexts.
+
+Actual ordinary origins identify the common original function. Accepted concrete replacements recover its rigid source, and annotation agreement gives the same stage analysis and selected guard frame. The prepared scope then inherits canonical call ports without requiring raw range formation for every retained row.
+
+All three private and normal strict checks have empty logs. Their 11 declarations and eight interfaces agree between private and normal checks. All 18433 preceding declarations retain their complete types and axiom lists; the scope grows to 18444 with no removals. Build 5941 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5871 to 5874.
+
+The readiness theorem retains original function typing, actual preparation, full source receipts, exact compiler certificates and the supported compiler policy. General methods, live generalized-local cells, wider grammar and the final public semantics theorem remain open.
 
 ### Verified prepared ordinary call provenance
 

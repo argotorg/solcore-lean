@@ -30,7 +30,19 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
-### Latest verified prepared ordinary call provenance
+### Latest verified ordinary annotation call readiness
+
+The three modules in `0d7c0a62` derive ordinary call readiness directly from original source annotations. A checked body's result annotation is either unit or its stored statement annotation. Equal original rigid sources therefore recover equal result annotations across independent declarative contexts.
+
+Actual ordinary origins identify the common original function. Accepted concrete replacements recover its rigid source, and annotation agreement gives the same stage analysis and selected guard frame. The prepared scope then inherits canonical call ports without requiring raw range formation for every retained row.
+
+All three private and normal strict checks have empty logs. Their 11 declarations and eight interfaces agree between private and normal checks. All 18433 preceding declarations retain their complete types and axiom lists; the scope grows to 18444 with no removals. Build 5941 rebuilds all 5 affected modules. Registered tests and repository policy pass. The normal source/object inventory grows from 5871 to 5874.
+
+The readiness theorem retains original function typing, actual preparation, full source receipts, exact compiler certificates and the supported compiler policy. General methods, live generalized-local cells, wider grammar and the final public semantics theorem remain open.
+
+The estimates above are unchanged.
+
+### Preceding verified prepared ordinary call provenance
 
 The seven modules in `5b8c8727` connect successful executable-plan preparation to the catalog origin of every retained specialization. Each row comes from an ordinary function request or an actual implementation-method selector. Signature catalog disjointness then identifies the ordinary rows at a function owner.
 
