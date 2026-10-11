@@ -1,0 +1,256 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardTerminalCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds
+
+/-! A chosen called body has either the existing terminal receipt or the
+literal discard-and-terminal receipt for the same Code. Original expression
+Roots are retained at every actual Source-selected scope. These packets do
+not contain execution, body meaning, Below laws or desired results. The
+whole-body application assembly and numeric family remain separate. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
+open CallableIndexedLambdaValues CallableIndexedOwnedFunctionState
+open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (RootAt SelectedBody)
+open CallableIndexedOwnedPreparedStagedDiscardTerminalCompilerReceipts (Receipt)
+
+def parameterScope {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative) : SourceCoreLocalCell.Scope :=
+  code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope
+
+/-- The statement action is indexed by the exact emitted body, not by a
+fresh expression or a guessed compiler view. -/
+structure Discard {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  policy : SourceCoreLoops.Policy
+  fuel : Nat
+  statement : StatementId
+  next : StatementId
+  rest : List StatementId
+  firstExpression : ExpressionId
+  terminalExpression : ExpressionId
+  reasonAt : ExpressionId → Word
+  fellThrough : Word
+  escaped : Word
+  body : function.body = statement :: next :: rest
+  receipt : Receipt policy fuel code.view (parameterScope code)
+    statement firstExpression terminalExpression (next :: rest)
+    code.receipt.resultCore reasonAt fellThrough escaped code.receipt.body
+  child : Staging.Recursive.Scope
+  selected : stages.Closure function child
+
+/-- This sum changes only the chosen static body shape. A discard packet is
+not represented as a terminal Head. -/
+inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
+  | discard (packet : Discard code stages)
+
+/-- Original raw statement form and both original expression Roots remain
+explicit at all genuinely selected scopes. In particular, the first raw type
+is unrestricted; only the returned tail has the function's raw result type. -/
+structure DiscardSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Discard code stages)
+    (semanticFaults : FunctionCalls.FaultRep) where
+  heads : ∀ (child : Staging.Recursive.Scope), stages.Closure function child →
+    ∃ node : StatementNode,
+      ContainsStatement child.source packet.statement node ∧
+      node.form = .expression packet.firstExpression true ∧
+      CallableIndexedOwnedAdmittedStagedTerminalStatements.Head child
+        packet.terminalExpression (packet.next :: packet.rest)
+  roots : ∀ (child : Staging.Recursive.Scope), stages.Closure function child →
+    RootAt compiled inputs.context child (parameterScope code)
+        packet.firstExpression packet.receipt.first semanticFaults ×
+      { terminalRoot : RootAt compiled inputs.context child (parameterScope code)
+          packet.terminalExpression packet.receipt.tail.child semanticFaults //
+        terminalRoot.rawType = function.resultType }
+
+/-- The terminal branch reuses its checked support. The discard branch keeps
+the two authentic original child receipts and the same retained input context. -/
+def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Packet code stages)
+    (semanticFaults : FunctionCalls.FaultRep) : Type :=
+  match packet with
+  | .terminal terminal => SelectedBody code inputs stages terminal semanticFaults
+  | .discard discard => DiscardSupport code inputs stages discard semanticFaults
+
+/-- The Association is destructed only to retain its real Code and the actual
+BodyWith.toContext. Neither branch invents a new parameter context. -/
+def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
+    {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
+    {parameterCore resultCore : Ty}
+    (association : CallableIndexedOwnedContextualTypedClosureReceipts.Association
+      headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore) (stages : Staging.Recursive.Registry) : Type :=
+  match association with
+  | .ordinary _ _ code _ _ _ _ _ _ _ _ => Packet code stages
+  | .principal _ _ code _ _ _ _ _ _ _ _ => Packet code stages
+
+def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    {mapping : LocationMap} {world : StoreTyping} {function : Dynamic.Closure}
+    {native : Value} {bindings : List CallableIndexedParameterCertificates.Binding}
+    {parameterCore resultCore : Ty}
+    (association : CallableIndexedOwnedContextualTypedClosureReceipts.Association
+      headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore) (stages : Staging.Recursive.Registry)
+    (packet : PacketFor association stages) : Type :=
+  match association, packet with
+  | .ordinary _ _ code _ support _ _ _ _ _ _, packet =>
+      Support code support.body.toContext stages packet semanticFaults
+  | .principal _ _ code _ support _ _ _ _ _ _, packet =>
+      Support code support.body.toContext stages packet semanticFaults
+
+section NumericProjections
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {stages : Staging.Recursive.Registry} {bodyRegistry : SourceCoreRawMetadata.Registry}
+  {semanticFaults : FunctionCalls.FaultRep}
+  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+
+/-- The helper law uses the same concrete pool-zero carrier as the numeric
+family. It is an internal induction target, not a field of static support. -/
+abbrev PreservesBelowAt (context : SourceSemantics.Context) (child : Staging.Recursive.Scope)
+    (scope : SourceCoreLocalCell.Scope) (expression : ExpressionId)
+    (lowered : SourceCoreBasic.LoweredExpr) (size : Nat) : Prop :=
+  CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+    (CallableIndexedOwnedBodyRestorationAdmission.bridge
+      (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram)
+      (headers := headers) (keys := keys))
+    context
+    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry
+      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+    stages child
+    (CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point scope expression lowered)
+    (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) size
+
+abbrev ReflectsBelowAt (context : SourceSemantics.Context) (child : Staging.Recursive.Scope)
+    (scope : SourceCoreLocalCell.Scope) (expression : ExpressionId)
+    (lowered : SourceCoreBasic.LoweredExpr) (size : Nat) : Prop :=
+  CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
+    (CallableIndexedOwnedBodyRestorationAdmission.bridge
+      (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram)
+      (headers := headers) (keys := keys))
+    context
+    (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry
+      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+    stages child
+    (CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point scope expression lowered)
+    (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) size
+
+/-- Strictness is supplied by the actual evaluated child inversion. The
+numeric family closes this hypothesis; no stored packet contains this law. -/
+theorem root_preserves_below {context child scope expression lowered}
+    (root : RootAt compiled context child scope expression lowered semanticFaults)
+    {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget) :
+    PreservesBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile context child scope expression lowered size := by
+  intro childSize smaller current id actual point
+  exact children childSize (Nat.lt_of_lt_of_le smaller within) root point
+
+theorem root_reflects_below {context child scope expression lowered}
+    (root : RootAt compiled context child scope expression lowered semanticFaults)
+    {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget) :
+    ReflectsBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile context child scope expression lowered size := by
+  intro childSize smaller current id actual point
+  exact children childSize (Nat.lt_of_lt_of_le smaller within) root point
+
+variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+  {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+  {inputs : CallableIndexedLambdaEntryPrefix.Context
+    (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code}
+  {packet : Discard code stages}
+  (support : DiscardSupport code inputs stages packet semanticFaults)
+
+include support in
+/-- Preservation receives each actual Source-selected scope independently. -/
+theorem first_preserves_below {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
+    PreservesBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile inputs.context child (parameterScope code)
+      packet.firstExpression packet.receipt.first size :=
+  root_preserves_below profile (support.roots child selected).1 children within
+
+include support in
+theorem terminal_preserves_below {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
+    PreservesBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile inputs.context child (parameterScope code)
+      packet.terminalExpression packet.receipt.tail.child size :=
+  root_preserves_below profile (support.roots child selected).2.val children within
+
+include support in
+/-- Reflection uses the packet's literal chosen scope and its authentic
+selection proof, without quantifying a fresh arbitrary terminal packet. -/
+theorem first_reflects_below {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget) :
+    ReflectsBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile inputs.context packet.child (parameterScope code)
+      packet.firstExpression packet.receipt.first size :=
+  root_reflects_below profile (support.roots packet.child packet.selected).1 children within
+
+include support in
+theorem terminal_reflects_below {budget : Nat}
+    (children : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
+        (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+        (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    {size : Nat} (within : size ≤ budget) :
+    ReflectsBelowAt (completion := completion) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults) profile inputs.context packet.child (parameterScope code)
+      packet.terminalExpression packet.receipt.tail.child size :=
+  root_reflects_below profile (support.roots packet.child packet.selected).2.val children within
+end NumericProjections
+
+end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
