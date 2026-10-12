@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Named direct calls and retained closure captures (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt` records the authentic direct compiler action. `DirectCallAuthority.Port` identifies its header from the complete initialized inventory. `DirectHeadBounds.preserves` and `reflects` compose ordered argument evaluation, real parameter entry and the selected body at the current owned pool. These shortened module names share the `CallableIndexedOwnedPreparedStaged` prefix.
+
+`CanonicalRecursiveCallerBounds` derives both child directions from the generated certificate. `MixedRecursiveBodyBounds` constructs the ordinary and canonical body families in one numeric induction. `NamedCanonicalTerminalSupport.of_actual` obtains original Source and canonical scope authority from the real named compiler hook. Ordinary public callers derive both families internally.
+
+The closed test endpoints are `Tests.SourceCoreDirectCalls.closed_sequence_meaning` and `closed_forward_meaning`. `SequenceWitness` retains all six Source traces, exact reached heaps and histories. `SequenceWitness.forward` gives sufficient public fuel for the three relay calls. `Tests.SourceCoreDirectCalls.runForward` is registered in the test runner.
+
+Validation: all 696 affected modules pass coherent checks. The full build (6,494 jobs), all registered tests (12,858 build jobs and the final pass marker), kernel policy and 72 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected direct declaration fragment uses empty instantiation substitutions and predicates, and empty caller assumptions at direct sites. Wider specialization and evidence paths, other compiler alternatives and composition across every pass remain incomplete. Runtime unification is complete; the full meaning-preservation theorem is still in progress.
+
 ## Recursive constructor children and public handle reuse (2026-10-13)
 
 `624b8d0e` adds independent staged Source traces for constructor payloads, including ordered child execution and failure propagation. `5bf2f084` connects the actual compiler receipts to preservation and reflection through the recursive caller family. The original constructor metadata and every payload value remain represented. Validity uses the actual closed substitution range, including unused entries; a native type projection alone does not establish this condition.

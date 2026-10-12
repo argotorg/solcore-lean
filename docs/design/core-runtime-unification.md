@@ -4,6 +4,18 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Named direct calls and retained closure captures (2026-10-13)
+
+Direct declaration calls now enter the same public proof family as indirect calls. Their static certificate retains the actual accepted compiler action, specialization, global slot and ordered child actions. The complete initialized inventory supplies the selected function header. At execution, canonical caller bindings supply the slot and the reached owned pool supplies its current capture.
+
+The recursive proof handles ordinary callers and callers with canonical global bindings together. Each selected named body is proved below the same enclosing numeric budget. This connects nested direct calls without asking the public caller to supply child execution or body meaning. Parameter entry and caller restoration retain their actual heap and state relations.
+
+The public fixture in `bc453668` obtains distinct closures from `make(identity(seed))`, allocates a third closure between calls to the first two, and proves retained captures `10 / 20 / 10`. The runtime and Core representation are unchanged.
+
+Validation: all 696 affected modules pass coherent checks. The full build (6,494 jobs), all registered tests (12,858 build jobs and the final pass marker), kernel policy and 72 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected direct declaration fragment uses empty instantiation substitutions and predicates, and empty caller assumptions at direct sites. Wider specialization and evidence paths, other compiler alternatives and composition across every pass remain incomplete. Runtime unification is complete; the full meaning-preservation theorem is still in progress.
+
 ## Recursive constructor children and public handle reuse (2026-10-13)
 
 `624b8d0e` adds independent staged Source traces for constructor payloads, including ordered child execution and failure propagation. `5bf2f084` connects the actual compiler receipts to preservation and reflection through the recursive caller family. The original constructor metadata and every payload value remain represented. Validity uses the actual closed substitution range, including unused entries; a native type projection alone does not establish this condition.
@@ -200,7 +212,7 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Latest completed verification | Full build (6450 jobs), all registered tests, kernel policy and 82 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional, finite while/for and match closure bodies retain separate mutable captures across intervening calls. |
 | Latest proof scope | Named for calls return `12 / 22`; captured for calls return `10 / 20 / 11` across intervening closure creation. Each derives exact successive Source heaps/histories and sufficient public fuel at its original checkpoints. Earlier operator, block, match and closure guarantees remain checked. |
-| Current implementation priority | Connect recursive constructor payloads and their actual output handle collection/reuse to public execution, then widen remaining compiler coverage. |
+| Current implementation priority | Connect direct builtin calls and direct calls inside retained closure bodies to public execution, then widen remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

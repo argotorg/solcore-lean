@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Named direct calls and retained closure captures (2026-10-13)
+
+The direct-call connection is committed in `25b9a92a`, `8626c646` and `bc453668`. Source evaluation follows the actual argument vector and selected global application. It introduces neither a runtime evaluation of the synthetic declaration reference nor an indirect-call gate. Ordinary erasure retains the actual invocation dictionary, and failure preservation composes the argument and invocation heap extensions.
+
+Compiler authority includes the exact specialization and physical row, not just the declaration key. The original raw Source types determine parameter typing before native packing. Complete inventory and authentic canonical caller bindings determine the global slot; the current pool determines the capture after argument effects. The simultaneous ordinary/canonical induction closes named child meaning with strictly smaller budgets. Legacy finite callers derive their direct-call exclusion from their actual supported syntax.
+
+The actual three-function fixture executes six linked public calls and retains distinct captures across an intervening allocation. Its forward result derives export fuel, the returned handle type, payload encoding and the exact Source heap from Source success. A final kernel-policy check corrected one prohibited keyword in a comment; theorem declarations were unchanged.
+
+Validation: all 696 affected modules pass coherent checks. The full build (6,494 jobs), all registered tests (12,858 build jobs and the final pass marker), kernel policy and 72 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected direct declaration fragment uses empty instantiation substitutions and predicates, and empty caller assumptions at direct sites. Wider specialization and evidence paths, other compiler alternatives and composition across every pass remain incomplete. Runtime unification is complete; the full meaning-preservation theorem is still in progress.
+
 ## Recursive constructor children and public handle reuse (2026-10-13)
 
 `624b8d0e` adds independent staged Source traces for constructor payloads, including ordered child execution and failure propagation. `5bf2f084` connects the actual compiler receipts to preservation and reflection through the recursive caller family. The original constructor metadata and every payload value remain represented. Validity uses the actual closed substitution range, including unused entries; a native type projection alone does not establish this condition.

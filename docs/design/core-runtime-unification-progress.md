@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Named direct calls and retained closure captures (2026-10-13)
+
+`25b9a92a` adds independent staged Source rules for direct declaration calls. `8626c646` connects actual compiler selection and canonical global entries to preservation and reflection. The complete specialization record, physical argument count, original argument types and selected body come from the real compiler and finite inventory. Ordered arguments run before the selected named body.
+
+`bc453668` proves the public sequence `relay(10); relay(20); A(); relay(30); B(); A()`, where `relay(seed)` returns `make(identity(seed))` and `make` returns a closure over `seed`. The direct handle results are `10 / 20 / 10`. Each step uses the preceding returned session, retains the exact Source heap and preserves the complete reusable handle history. Independent Source success also gives sufficient execution and output fuel for all three relay calls at their actual checkpoints.
+
+Validation: all 696 affected modules pass coherent checks. The full build (6,494 jobs), all registered tests (12,858 build jobs and the final pass marker), kernel policy and 72 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected direct declaration fragment uses empty instantiation substitutions and predicates, and empty caller assumptions at direct sites. Wider specialization and evidence paths, other compiler alternatives and composition across every pass remain incomplete. Runtime unification is complete; the full meaning-preservation theorem is still in progress.
+
 ## Recursive constructor children and public handle reuse (2026-10-13)
 
 `624b8d0e` adds independent staged Source traces for constructor payloads, including ordered child execution and failure propagation. `5bf2f084` connects the actual compiler receipts to preservation and reflection through the recursive caller family. The original constructor metadata and every payload value remain represented. Validity uses the actual closed substitution range, including unused entries; a native type projection alone does not establish this condition.
