@@ -41,6 +41,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function mixedUse(first: function(Word) returns (Word), step: Word, table: mapping(Word => Word), convert: function(Word) returns (integer), again: function(Word) returns (Word)) returns (integer) { return convert(first(step) + step + table[step] + again(step + 1)); }",
     "enum NestedFunctions { Hold(function(Word) returns (Word), function(Word) returns (integer)) }",
     "function nestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), Word)), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
+    "function closureNestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, namedFunction) { return integerAdd(convert(first(2) + again(6)), last(namedFunction(0))); } default { return 997; } } } default { return 996; } } }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -80,10 +81,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 13 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 14 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -103,7 +104,7 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 13 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 14 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
   have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
   let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
@@ -169,6 +170,31 @@ def run : IO Unit := do
   let second ← execute first.session (← key 1) [made.value, word 3]
   require (first.value == word 12 && second.value == word 15) "public session lost shared capture"
   require (initial.heapSize < made.session.heapSize && made.session.heapSize < second.session.heapSize) "public session replaced its native heap"
+  let independent ← execute second.session (← key 0) [word 100]
+  let closureMutated ← execute independent.session (← key 1) [made.value, word 5]
+  require (closureMutated.value == word 20) "used-session closure did not retain its earlier capture"
+  let closureNamed ← get "named after closure allocation and mutation"
+    (← closureMutated.session.namedWithReceipt (← key 2))
+  let closureBuiltin ← get "builtin after closure mutation and named issuance"
+    (← closureNamed.val.session.builtinWithReceipt .wordToInteger)
+  have _preservedClosureState : closureMutated.session.SameRuntime closureBuiltin.val.session :=
+    closureNamed.property.same_runtime.trans closureBuiltin.property.same_runtime
+  require (closureBuiltin.val.session.heapSize == closureMutated.session.heapSize)
+    "later function issuance changed the used closure heap"
+  let closureHolder : Value := .constructed nestedMetadata [made.value, closureBuiltin.val.value]
+  let closurePairType : TypeSystem.Ty := .product (.function .word .word) (.function .word .word)
+  let closureTable : Value := .mapping .word closurePairType
+    [(word 3, .product made.value closureNamed.val.value),
+      (word 3, .product independent.value closureNamed.val.value)]
+  let closureBundle : Value := .product closureHolder (.product closureTable closureBuiltin.val.value)
+  let closureNested ← execute closureBuiltin.val.session (← key 13) [closureBundle]
+  require (closureNested.value == .integer 81)
+    "nested closure inputs lost current capture, shared aliases or first-match mapping order"
+  let closureContinued ← execute closureNested.session (← key 1) [made.value, word 1]
+  require (closureContinued.value == word 29) "nested closure execution lost the returned capture mutation"
+  let independentContinued ← execute closureContinued.session (← key 1) [independent.value, word 1]
+  require (independentContinued.value == word 101)
+    "nested closure input aliased an independently allocated capture"
   let recursive ← execute second.session (← key 2) [word 5]
   require (recursive.value == word 31) "public recursive result changed"
   let localResult ← execute recursive.session (← key 3) [.bool true]
