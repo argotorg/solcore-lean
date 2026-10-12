@@ -66,6 +66,62 @@ include receiver stagePrepared profile observations semantic family namedTermina
   history entry member entryType input in
 /-- A failed public resume reflects to Source at its actual input registry.
 The exact after-heap, old captures and new receiver continue together. -/
+theorem public_resume_failed_at_arity
+    (atRegistry : session.RegistryAt completion.result.context.registry)
+    {inputFuel : Nat} {checkpoint : Checkpoint artifact}
+    {actualParameter actualResult : TypeSystem.Ty} {nativeParameter nativeResult : Core.Ty}
+    {callable packed : Core.Value} {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt session entry.handle argument inputFuel checkpoint recipe world store
+      actualParameter actualResult nativeParameter nativeResult callable packed encodedValues)
+    {publicArtifact : SourceCoreExecution.Artifact}
+    {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
+    {publicSession : SourceCoreExecution.Session publicArtifact}
+    {executionFuel outputFuel : Nat} {reason : Word}
+    (atCheckpoint : publicCheckpoint.IndexedAt checkpoint)
+    (resumed : publicCheckpoint.ResumeAt executionFuel outputFuel (.failed reason publicSession))
+    (invocation : Staging.Recursive.Scope) :
+    ∃ receiving : CallableIndexedOwnedPublicFaultReceivers.Receiver recipe.compiled.indexed,
+      receiving.result.context = encodedValues ∧
+      CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt recipe.compiled.indexed receiving.entry
+        receiving.result.context.registry receiving.result.extension receiving.result.diagnostics ∧
+      SourceCoreRawMetadata.Extends completion.result.context.registry receiving.result.context.registry ∧
+      (∀ token, checkpoint.diagnostic token = .ok (receiving.result.diagnostics.diagnostic? token)) ∧
+    ∃ (actual : Session artifact) (value : Core.Value) (finalStore : Store)
+      (sources : List Dynamic.Value) (sourceSize : Nat) (failure : Staging.Recursive.Failure)
+      (after : Dynamic.Heap) (finalMap : LocationMap) (finalWorld : StoreTyping)
+      (reached : Caller headers keys finalMap finalWorld after finalStore),
+      checkpoint.FailedResultAt executionFuel value finalStore reason actual ∧
+      publicSession.IndexedAt actual ∧
+      Dynamic.ValuesPack sources packedSource ∧
+      RecursivePublicCallableArity.Arity (Program.ofChecked recipe.compiled.sourceProgram) entry.source sources.length ∧
+      Staging.Recursive.Size.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages sourceSize
+        invocation anchor.function.context before entry.source sources (.fault failure) after ∧
+      ResultAt (registry := receiving.result.context.registry) functions caller anchor.function.context result nativeResult
+        (.fault failure) after value finalStore finalMap finalWorld
+        (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics) ∧
+      Relates caller reached ∧
+      History headers keys functions receiving.result.context.registry anchor actual
+        finalMap finalWorld after finalStore reached entries ∧
+      actual.RegistryAt encodedValues.registry := by
+  obtain ⟨receiving, _indexed, contextAt, issued, extended, retained, _represented, _typed, diagnostics⟩ :=
+    RecursiveNamedPublicActualRegistryStart.packed_input history atRegistry member entryType input started
+  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present history
+  have semanticAt : ∀ reason token, semanticFaults reason token →
+      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics (.semantic reason) token := by
+    intro reason token related
+    exact CompatibleRegistryDiagnosticExtension.staged_preserved recipe.compiled
+      receiver issued present extended (semantic reason token related)
+  have metadata : SourceCoreRawMetadata.Extends encodedValues.registry receiving.result.context.registry := by
+    rw [contextAt]
+    exact .refl _
+  refine ⟨receiving, contextAt, issued, extended, diagnostics, ?_⟩
+  exact RecursiveNamedPublicDirectCallableFailures.public_resume_failed_at_arity
+    (completion := receiving) issued stagePrepared profile observations receiving.result.extension
+    semanticAt family namedTerminals namedSupport wellFormed retained entry member entryType input
+    started metadata atCheckpoint resumed invocation
+
+include receiver stagePrepared profile observations semantic family namedTerminals namedSupport wellFormed
+  history entry member entryType input in
 theorem public_resume_failed
     (atRegistry : session.RegistryAt completion.result.context.registry)
     {inputFuel : Nat} {checkpoint : Checkpoint artifact}
@@ -102,22 +158,10 @@ theorem public_resume_failed
       History headers keys functions receiving.result.context.registry anchor actual
         finalMap finalWorld after finalStore reached entries ∧
       actual.RegistryAt encodedValues.registry := by
-  obtain ⟨receiving, _indexed, contextAt, issued, extended, retained, _represented, _typed, diagnostics⟩ :=
-    RecursiveNamedPublicActualRegistryStart.packed_input history atRegistry member entryType input started
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present history
-  have semanticAt : ∀ reason token, semanticFaults reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token related
-    exact CompatibleRegistryDiagnosticExtension.staged_preserved recipe.compiled
-      receiver issued present extended (semantic reason token related)
-  have metadata : SourceCoreRawMetadata.Extends encodedValues.registry receiving.result.context.registry := by
-    rw [contextAt]
-    exact .refl _
-  refine ⟨receiving, contextAt, issued, extended, diagnostics, ?_⟩
-  exact RecursiveNamedPublicDirectCallableFailures.public_resume_failed
-    (completion := receiving) issued stagePrepared profile observations receiving.result.extension
-    semanticAt family namedTerminals namedSupport wellFormed retained entry member entryType input
-    started metadata atCheckpoint resumed invocation
+  obtain ⟨receiving, contextAt, issued, extended, diagnostics, actual, value, finalStore, sources, sourceSize, failure, after, finalMap, finalWorld, reached, failed, sessionAt, packing, _arity, rest⟩ := public_resume_failed_at_arity
+    receiver stagePrepared profile observations semantic family namedTerminals namedSupport
+      wellFormed history entry member entryType input atRegistry started atCheckpoint resumed invocation
+  exact ⟨receiving, contextAt, issued, extended, diagnostics, actual, value, finalStore, sources, sourceSize, failure, after, finalMap, finalWorld, reached, failed, sessionAt, packing, rest⟩
 
 include receiver stagePrepared profile observations semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input atRecipe in

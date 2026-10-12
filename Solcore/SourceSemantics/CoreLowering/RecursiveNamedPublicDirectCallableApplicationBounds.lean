@@ -76,6 +76,37 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- The authentic source function branch supplies its actual ordered argument
 row; the same native completion reflects independent Source application. -/
+theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
+    {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
+    (completed : EvaluationSize size (native :: packedNative :: tail) store
+      CallableIndexedLambdaCalls.applyPayload value finalStore) :
+    ∃ sources, Dynamic.ValuesPack sources packedSource ∧
+      RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) function sources.length ∧
+      ∃ sourceSize outcome after finalMap finalWorld,
+        Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+          invocation context before function sources outcome after ∧
+        ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+          outcome after value finalStore finalMap finalWorld callFaults := by
+  cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
+  | closure closure =>
+      obtain ⟨sources, packing, arity, reflected⟩ :=
+        RecursiveNamedPublicDirectClosureApplicationBounds.reflects_packed
+          receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+          wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
+      exact ⟨sources, packing, arity.symm ▸ RecursivePublicCallableArity.Arity.closure closure, reflected⟩
+  | global global =>
+      exact RecursiveNamedPublicDirectNamedApplicationBounds.reflects_packed_at_arity
+        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
+  | builtin builtin =>
+      cases builtin with
+      | mk id =>
+        exact RecursiveNamedPublicDirectBuiltinApplicationBounds.reflects_packed_at_arity
+          (stagePrepared := stagePrepared) (profile := profile)
+          observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated completed
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 theorem reflects_packed {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
@@ -86,23 +117,9 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
           invocation context before function sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
           outcome after value finalStore finalMap finalWorld callFaults := by
-  cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
-  | closure closure =>
-      obtain ⟨sources, packing, _arity, reflected⟩ :=
-        RecursiveNamedPublicDirectClosureApplicationBounds.reflects_packed
-          receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
-          wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
-      exact ⟨sources, packing, reflected⟩
-  | global global =>
-      exact RecursiveNamedPublicDirectNamedApplicationBounds.reflects_packed
-        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
-        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
-  | builtin builtin =>
-      cases builtin with
-      | mk id =>
-        exact RecursiveNamedPublicDirectBuiltinApplicationBounds.reflects_packed
-          (stagePrepared := stagePrepared) (profile := profile)
-          observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated completed
+  obtain ⟨sources, packing, _arity, meaning⟩ := reflects_packed_at_arity receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+      wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
+  exact ⟨sources, packing, meaning⟩
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in

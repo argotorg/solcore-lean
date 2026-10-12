@@ -78,11 +78,12 @@ local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 include observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated in
 /-- Actual complete builtin execution determines the same Source primitive
 result and unchanged caller; no builtin body law is supplied by a caller. -/
-theorem reflects_packed {invocation : Staging.Recursive.Scope}
+theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
     ∃ sources, Dynamic.ValuesPack sources packedSource ∧
+      RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) (.builtin ⟨function⟩) sources.length ∧
       ∃ sourceSize outcome after finalMap finalWorld,
         Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
           invocation context before (.builtin ⟨function⟩) sources outcome after ∧
@@ -119,12 +120,27 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
     CallableIndexedOwnedPreparedStagedBuiltinApplicationBounds.reflects functions observations builtin rows evaluation
   subst finalStore
   rw [← signature.2, ← nativeTypes.2] at representedResult
-  refine ⟨sources, packing, Staging.Recursive.Size.stepSize [], .value sourceResult,
+  refine ⟨sources, packing, rows.length.1.symm ▸ RecursivePublicCallableArity.Arity.builtin ⟨function⟩, Staging.Recursive.Size.stepSize [], .value sourceResult,
     before, mapping, world, trace, representedResult, heaps, .refl _, .refl _, .refl _ _, .refl _,
     caller, (protocol headers keys).refl caller, stable, ?_⟩
   intro source same
   cases same
   exact ⟨signature.2 ▸ applied.preserves.2, heapTyped⟩
+
+include observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated in
+theorem reflects_packed {invocation : Staging.Recursive.Scope}
+    {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
+    (completed : EvaluationSize size (native :: packedNative :: tail) store
+      CallableIndexedLambdaCalls.applyPayload value finalStore) :
+    ∃ sources, Dynamic.ValuesPack sources packedSource ∧
+      ∃ sourceSize outcome after finalMap finalWorld,
+        Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+          invocation context before (.builtin ⟨function⟩) sources outcome after ∧
+        ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+          outcome after value finalStore finalMap finalWorld callFaults := by
+  obtain ⟨sources, packing, _arity, meaning⟩ := reflects_packed_at_arity (stagePrepared := stagePrepared) (profile := profile)
+      observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated completed
+  exact ⟨sources, packing, meaning⟩
 
 include observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated in
 /-- The actual primitive argument arity fixes its unpacking. Typed primitive

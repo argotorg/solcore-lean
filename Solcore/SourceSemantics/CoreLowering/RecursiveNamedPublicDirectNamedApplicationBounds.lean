@@ -81,11 +81,12 @@ include receiver stagePrepared profile observations extension semantic family na
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
 /-- Actual direct completion reflects the same global function, dictionary,
 ordered arguments, captured native environment and full returned caller. -/
-theorem reflects_packed {invocation : Staging.Recursive.Scope}
+theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
     {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
     (completed : EvaluationSize size (native :: packedNative :: tail) store
       CallableIndexedLambdaCalls.applyPayload value finalStore) :
     ∃ sources, Dynamic.ValuesPack sources packedSource ∧
+      RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) (.global function) sources.length ∧
       ∃ sourceSize outcome after finalMap finalWorld,
         Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
           invocation context before (.global function) sources outcome after ∧
@@ -164,7 +165,26 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   have actualResult : resultCore = header.output := nativeTypes.2.trans header.resultType
   have finalResult := resultAt.2
   rw [← signature.2, ← actualResult] at finalResult
-  exact ⟨sources, packing, sourceSize, outcome, after, finalMap, finalWorld, trace, finalResult⟩
+  have count : header.sourceBody.source.inputs.length = sources.length := by
+    rw [← sourceAt.frame.parameters]
+    exact arity
+  exact ⟨sources, packing, count ▸ RecursivePublicCallableArity.Arity.global sourceAt.frame.instantiated, sourceSize, outcome, after, finalMap, finalWorld, trace, finalResult⟩
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
+theorem reflects_packed {invocation : Staging.Recursive.Scope}
+    {size : Nat} {value : Value} {finalStore : Store} {tail : Environment}
+    (completed : EvaluationSize size (native :: packedNative :: tail) store
+      CallableIndexedLambdaCalls.applyPayload value finalStore) :
+    ∃ sources, Dynamic.ValuesPack sources packedSource ∧
+      ∃ sourceSize outcome after finalMap finalWorld,
+        Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+          invocation context before (.global function) sources outcome after ∧
+        ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+          outcome after value finalStore finalMap finalWorld callFaults := by
+  obtain ⟨sources, packing, _arity, meaning⟩ := reflects_packed_at_arity receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+      wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated completed
+  exact ⟨sources, packing, meaning⟩
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in

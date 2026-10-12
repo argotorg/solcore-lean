@@ -102,6 +102,30 @@ include receiver stagePrepared profile observations extension semantic family na
   history entry member entryType input started parameterView metadata in
 /-- Actual current history and packed encoding close the direct native result
 against independent Source execution, including the ordered Source arguments. -/
+theorem completed_reflects_at_arity
+    {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
+    (completed : checkpoint.NativeDone executionFuel value finalStore)
+    (invocation : Staging.Recursive.Scope) :
+    ∃ sources,
+      Dynamic.ValuesPack sources packedSource ∧
+      RecursivePublicCallableArity.Arity (Program.ofChecked recipe.compiled.sourceProgram) entry.source sources.length ∧
+      ∃ sourceSize outcome after finalMap finalWorld,
+        Staging.Recursive.Size.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages sourceSize
+          invocation anchor.function.context before entry.source sources outcome after ∧
+        ResultAt (registry := completion.result.context.registry) functions caller anchor.function.context result nativeResult
+          outcome after value finalStore finalMap finalWorld callFaults := by
+  obtain ⟨calleeRelated, calleeTyped, packedRelated, packedTyped⟩ :=
+    current_inputs profile history entry member entryType input started parameterView metadata
+  obtain ⟨_native, heaps, stable, heapTyped, _entries⟩ := history.current
+  obtain ⟨size, measured⟩ := evaluation_has_size
+    (runStateful_evaluation_sound (started.initial.native_done_iff.mp completed))
+  exact RecursiveNamedPublicDirectCallableApplicationBounds.reflects_packed_at_arity receiver stagePrepared profile
+    observations extension semantic family namedTerminals namedSupport wellFormed caller stable
+    (anchor_runtime wellFormed) heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+    (invocation := invocation) measured
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
+  history entry member entryType input started parameterView metadata in
 theorem completed_reflects
     {executionFuel : Nat} {value : Core.Value} {finalStore : Store}
     (completed : checkpoint.NativeDone executionFuel value finalStore)
@@ -113,15 +137,10 @@ theorem completed_reflects
           invocation anchor.function.context before entry.source sources outcome after ∧
         ResultAt (registry := completion.result.context.registry) functions caller anchor.function.context result nativeResult
           outcome after value finalStore finalMap finalWorld callFaults := by
-  obtain ⟨calleeRelated, calleeTyped, packedRelated, packedTyped⟩ :=
-    current_inputs profile history entry member entryType input started parameterView metadata
-  obtain ⟨_native, heaps, stable, heapTyped, _entries⟩ := history.current
-  obtain ⟨size, measured⟩ := evaluation_has_size
-    (runStateful_evaluation_sound (started.initial.native_done_iff.mp completed))
-  exact RecursiveNamedPublicDirectCallableApplicationBounds.reflects_packed receiver stagePrepared profile
-    observations extension semantic family namedTerminals namedSupport wellFormed caller stable
-    (anchor_runtime wellFormed) heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
-    (invocation := invocation) measured
+  obtain ⟨sources, packing, _arity, meaning⟩ := completed_reflects_at_arity receiver stagePrepared profile observations
+    extension semantic family namedTerminals namedSupport wellFormed history entry member entryType input
+    started parameterView metadata completed invocation
+  exact ⟨sources, packing, meaning⟩
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input started parameterView metadata in
