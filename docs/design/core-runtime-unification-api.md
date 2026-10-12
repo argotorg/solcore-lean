@@ -1,8 +1,30 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-12.
+Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
+
+## Captured-read factory and retained static provenance (2026-10-13)
+
+Commit `4c2dbe39` leaves the public runtime API unchanged. `SourceCoreCapturedLambdaPublicExecution.public_factory_meaning` now instantiates the public seed theorem for the actual compiled `make(seed: Word)` factory, called with Word `10`, whose result is `lam() { return seed; }`. It returns an independent Source application and singleton History for the actual exported handle and returned session. The fixture derives Source typing, body support, inventory, family and metadata premises internally.
+
+The proof adapters retain the following facts at the same compiler Code:
+
+| Interface | Retained or derived fact |
+| --- | --- |
+| `LambdaPolicyRecipes.Retained` | The original body and full policy recipe, with its outer root fuel independent of a nested Code's fuel. |
+| `BodyView` | Exact original metadata at expressions reachable from the closure body. |
+| `BodyReasons` | Ordinary body tokens from the actual compiled diagnostic issuer. |
+| Ordinary provenance and prepared adapters | Source lexical declarations for the original captured scope and context. |
+| `NamedLambdaProducer` / `NamedReturnLambdaFormation` | The actual terminal compiler Site, exact view/reason provenance and same-Code return body. |
+| `SingleReadSequence.sequence` | The captured-reference sequence family, constructed from original nodes and authentic provenance. |
+| `StartAt.simple_registry` | Metadata identity for accepted simple inputs, including the actual Word argument. |
+
+Concrete compiler producers derive these facts. Generic APIs accepting arbitrary Sites require authentic static receipts; they cannot infer original source schemes or diagnostic identity from native typing. Existing empty-body, terminal and discard adapters forward the added provenance.
+
+The fixture's later `invokePacked` call checks Word `10` at runtime. The public Source theorem currently covers creation, capture, export and History; the later public read through that history is still being connected. The receiving diagnostic table is issued by a separate genuine indexed execution of the same artifact. Progress estimates are unchanged.
+
+Validation: strict Lean, full build (6019 jobs), all registered tests, kernel policy, the concrete public fixture and the six-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
 ## Closed compiler-to-public lambda factory (2026-10-12)
 
@@ -26,7 +48,7 @@ The runtime regression mutates the first of two retained product-output closures
 
 Validation: strict Lean, full build (6003 jobs), all registered tests and the kernel policy pass. Independent review found no issue in the failed-session, history or public adapters. The twelve checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The preceding startup/product/lambda unit is `82944a4e`, documented in `4bea6081`. Suspended/export-error continuations, an initial history from a first failed call, full body coverage, non-product output collection, model/registry changes and all-pass composition remain open.
 
-## Current proof interfaces (2026-10-12)
+## Earlier proof interface checkpoint (2026-10-12)
 
 The current connection derives actual public startup and Source selection for history-based successful calls, collects selected function leaves from product outputs, and supports ordinary lambda formation at a named terminal expression. Earlier issuance, restoration and nested-input interfaces remain available. Validation: strict Lean, full build (5997 jobs), all registered tests and kernel policy pass. Independent reviews found no issues in output collection, public startup recovery or the lambda state connection. The twenty-one checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The empty-body certificate helper also passes the full build and axiom audit. Exact raw types, metadata extensions and supported static body certificates remain explicit. The mutable assignment/match regression is runtime coverage; the closed empty unit-lambda factory now instantiates the public theorem as described above. Captured-body fixtures and returned-closure invocation remain open.
 

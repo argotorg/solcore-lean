@@ -1,12 +1,28 @@
 # Core unification: T0 audit of features, semantics, and proof boundaries
 
-Initial audit: 2026-09-30. Last updated: 2026-10-12.
+Initial audit: 2026-09-30. Last updated: 2026-10-13.
 
 This document preserves the initial audit for the [implementation design](core-runtime-unification.md) and subsequent dated investigations. Sections 1–9 record the state on 2026-09-30; later sections record the state on their respective dates. References to the "current" implementation, "unfinished" work, "next steps," or old API names describe that historical state.
 
 Runtime Core unification was completed in `a3168382`. See the [API migration record](core-runtime-unification-api.md) for the current public entry points. The [implementation record](core-runtime-unification-progress.md) and the latest dated audit section describe the latest commits, validation, and uncommitted work.
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
+
+## Captured-reference factory audit (2026-10-13)
+
+Commit `4c2dbe39` adds the closed `SourceCoreCapturedLambdaPublicExecution` fixture, which proves Source factory execution and exported-handle History for an actual checked/compiled `make(seed: Word)` call with Word `10`. The body returns `lam() { return seed; }`. Its theorem constructs the Source program proof, nonempty inventory, body support, closure family and input metadata relation from original receipts; no dynamic representation or body execution premise is supplied.
+
+The connection exposed four static facts that the old generic Association did not retain: the full compiler policy, original metadata at reached body expressions, lexical declarations of captured variables and actual read-diagnostic issuer tokens. These are now carried through the same Code and recapture. Native type equality alone does not identify a Source binder scheme. Equality with a generic Header's reason function alone does not identify an issued diagnostic token. Concrete named producers derive both facts from the actual header/terminal receipts; arbitrary-Site adapters retain authentic static evidence.
+
+The policy audit also distinguishes the original outer callback fuel from a nested Site's compilation fuel. A genuine nested child reuses the original policy, so its policy receipt retains that original fuel rather than asserting equality with `Code.fuel`. Compatible reads continue to use the prepared read budget.
+
+The single-read sequence producer restricts authentic lambda bodies using the complete original node table. It derives the read certificate, unchanged reached metadata, declaration scope and receiving fault interpretation at that exact Code. The named formation uses the actual installed parameter state and preserves captured references. `StartAt.simple_registry` derives the Word-input registry identity from the real encoder.
+
+The separate indexed run supplies a genuine receiving diagnostic table for the same artifact. The later exported-handle invocation returns Word `10` in the runtime test, but that invocation is not yet included in the closed Source theorem. The next public retained-handle read, broader body grammar and final all-pass composition remain open. Estimates remain 100% / about 70% / about 85%.
+
+Validation: strict Lean, full build (6019 jobs), all registered tests, kernel policy, the concrete public fixture and the six-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The initial private validation missed part of the dependency closure after a frontend proof change and produced compiler panics with mixed objects. That attempt is not accepted as validation. A fresh canonical dependency build replaced it; the private checker now includes the frontend overlay and treats panic output as failure even when the process exits successfully.
 
 ## Closed compiler-to-public lambda factory (2026-10-12)
 

@@ -2,7 +2,7 @@
 
 Status: The first goal (runtime unification on Core) is complete. Implementation and proofs for the second goal (preserving meaning across the full compilation pipeline) are ongoing.
 
-Created: 2026-09-30. Updated: 2026-10-12.
+Created: 2026-09-30. Updated: 2026-10-13.
 
 ## Current Implementation Status
 
@@ -10,12 +10,26 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `6b22e7b5` connects an actual checked and compiled empty lambda factory to public Source execution and returned-handle History. `aba75ce5` supplies reusable histories after failed calls. |
-| Latest completed verification | Strict Lean, full build (6008 jobs), all registered tests, kernel policy and independent review pass. Eleven endpoints, including the closed public fixture, use only the standard three axioms. |
+| Latest verified implementation | `4c2dbe39`: the captured-read factory now derives Source execution and exported-handle History from actual public execution with Word `10`. The earlier empty factory and reusable failed histories remain supported. |
+| Latest completed verification | Strict Lean, full build (6019 jobs), all registered tests, kernel policy, the captured factory runtime and six endpoint axiom checks pass. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
-| Latest proof scope | Retained and issued functions support nested inputs, ready restoration and selected product outputs. Direct terminal lambda formation uses actual compiler receipts and captures. The model and registries stay fixed; raw input, metadata and static body conditions remain explicit. The mutable assignment/match regression is runtime coverage, not a closed semantic fixture. |
-| Current implementation priority | Connect a captured-body factory and reuse of its exported closure through the same public theorem, and broaden body coverage. Suspended/export-error continuations, non-product output collection and model/registry changes remain open. |
+| Latest proof scope | The captured-reference return family and first public export are instantiated from actual compiler receipts. Retained functions support nested inputs, ready restoration and selected product outputs. The model and registries stay fixed. The subsequent handle invocation and mutable assignment/match fixtures remain runtime coverage. |
+| Current implementation priority | Connect a later public read of the exported captured closure through its returned History, then broaden body coverage. Suspended/export-error continuations, non-product output collection and model/registry changes remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Captured-read factory connected to public execution (2026-10-13)
+
+Commit `4c2dbe39` adds `SourceCoreCapturedLambdaPublicExecution`, which checks and compiles `function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; }`, then calls it with Word `10`. Its `public_factory_meaning` theorem constructs an independent Source application and a singleton History for the handle and session returned by that actual public execution. The checker, compiler, initialization, Word input encoder, nonempty header inventory and run receipts supply all premises of the public seed theorem.
+
+The closure family now handles the actual single captured-reference return. `SingleReadSequence.sequence` builds its static sequence conditions from the complete original occurrence table and the authentic compiler provenance of each Association. The named producer constructs the same-Code body receipt, parameter captures and Source declarations. Read faults refer to the actual diagnostic issuer and receiving table. No caller supplies an argument representation, Source typing judgment, child execution theorem or body execution law in the closed fixture.
+
+The same model retains the original compiler policy, metadata equality on reached body expressions, ordinary lexical declarations and issued diagnostic tokens. The policy keeps the original outer compilation fuel even when a nested Site is compiled at a smaller budget. Actual producers derive these facts; generic adapters for arbitrary Sites retain the corresponding static receipts. `StartAt.simple_registry` derives the input metadata relation for the actual Word argument. Core language forms and public runtime behavior are unchanged.
+
+The fixture also invokes the exported handle and checks that it returns Word `10`. That last invocation is runtime coverage; the formal conclusion currently covers factory execution, capture formation, export and returned History. Connecting a later public `read(f) { return f(); }` call to that History is in progress. Broader bodies, suspended/export-error continuations, non-product output collection, changes of model or registry, and the final theorem across all passes remain open.
+
+Validation: strict Lean, full build (6019 jobs), all registered tests, kernel policy, the concrete public fixture and the six-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Estimates remain 100% for runtime unification, about 70% for meaning preservation and about 85% overall. Earlier dated sections below retain their checkpoint-specific scope and validation.
 
 ### Closed compiler-to-public lambda factory (2026-10-12)
 

@@ -1,6 +1,6 @@
 # Core runtime unification implementation log
 
-Updated: 2026-10-12
+Updated: 2026-10-13
 
 References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-unification-audit.md).
 
@@ -20,15 +20,27 @@ In the progress response to the user on 2026-10-04, the second objective was est
 
 In the progress response to the user on 2026-10-05, the second objective was estimated at about 70% by amount of work. This reflects semantic preservation and completion reflection for integer functions with staging, preservation of reference authority in the catalog, derivation of lambda permissions from actual compiler receipts, and connection of additional child expressions to the sole compiler induction. The first objective remains 100%, and the overall estimate with equal weighting is about 85%. The final main theorem connecting general functions, lambda, indirect calls, method, and all passes is incomplete; the percentages do not estimate remaining time.
 
-## Current status (2026-10-12)
+## Current status (2026-10-13)
 
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Public success now derives actual startup and Source selection from the public start and current history. Product-output collection extends histories, and named terminal lambda formation uses actual parameter captures. Strict Lean, full build (5997 jobs), all registered tests, kernel policy and the twenty-one-endpoint axiom audit pass. The empty-body helper is included in the full build and axiom audit. Failed continuations now derive final heap typing and return reusable histories; full build (6003 jobs), all registered tests, kernel policy, independent review and twelve endpoint axiom checks pass. The closed empty lambda factory now derives Source execution and exported-handle History from actual public execution; full build (6008 jobs), all tests, kernel policy, independent review and eleven endpoint axiom checks pass. Captured bodies, returned-closure invocation, broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Actual public startup, reusable successful/failed histories, product outputs and terminal lambda formation are connected. The captured Word factory now derives Source execution and exported-handle History with its actual argument/capture state; strict Lean, full build (6019 jobs), all registered tests, kernel policy, the runtime fixture and six endpoint axiom checks pass. The later semantic handle invocation, broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Captured-read factory: actual public Source result and History (2026-10-13)
+
+Commit `4c2dbe39` adds the registered `SourceCoreCapturedLambdaPublicExecution` fixture, which connects the actual checked and compiled `make(seed: Word)` factory to the public semantic seed theorem. It passes Word `10`, forms `lam() { return seed; }`, exports the real handle and derives both an independent Source application and History at the returned public session. The fixture constructs Source program typing, complete inventory, actual compiler body support, the universal closure family and initial metadata relation internally.
+
+The single-read family uses each authentic Association's retained Code and the complete four-node Source table. Original compiler policy, reached metadata, lexical declarations and diagnostic issuer tokens now survive formation and recapture. The compatible read budget remains the prepared budget; the special callback retains its original outer policy fuel independently of the nested Code fuel. The exact named producer derives the same-Code return body, capture scope and diagnostic provenance from the accepted terminal occurrence. Arbitrary-Site adapters carry genuine static facts without adding a body meaning assumption.
+
+`StartAt.simple_registry` supplies the actual Word-input registry identity. A subsequent `invokePacked` call returns Word `10` in the runtime test. Its semantic continuation is not yet part of this fixture's theorem: the closed proof ends at factory execution, export and History. The next connection is the actual public `read(f) { return f(); }` call, using that returned history and its current captured cell.
+
+Validation: strict Lean, full build (6019 jobs), all registered tests, kernel policy, the concrete public fixture and the six-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The estimates remain 100% / about 70% / about 85%. Broader body coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. Earlier dated sections retain their historical scope.
 
 ### Closed compiler-to-public lambda factory (2026-10-12)
 
