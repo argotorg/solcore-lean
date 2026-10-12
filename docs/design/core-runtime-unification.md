@@ -4,6 +4,18 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct output collection and forward public Word execution (2026-10-13)
+
+Commit `af456bf5` connects direct-call outputs to subsequent calls. The actual fixture creates a closure capturing `10`, issues the named `make` handle, directly invokes it with `20`, remembers that newly exported closure, then invokes the original, new and original closures. The Source results are exactly `10 / 20 / 10`; the two closure handles are distinct, and every step retains all entries at the actual returned session and heap.
+
+`History.collect_packed_success` and `DirectCallableOutputHistory.public_invoke_succeeded_collects_function_tree` append selected function leaves from the real output codec and full Source result. Selection currently supports whole functions and product leaves. The actual requested raw result type is kept separately from its Source type; runtime compatibility suffices, including erased annotations. Earlier entries remain in order.
+
+The forward direction is now public for successful Word-returning closure applications. `DirectWordPreservation.public_resume_has_sufficient_fuel` starts with the independent Source trace, current History, structural input and genuine packed startup. It derives a native execution threshold. Every actual public resume above that threshold, with output validation fuel at least `1`, succeeds with the same Word and a retained History at the exact Source after-heap. It assumes neither native completion nor export success. Successful Source allocation derives actual arity; raw handle result annotations may differ after runtime normalization.
+
+The registered packed fixture now also proves this universal forward statement for its two original public checkpoints (arguments `99` and `123`, captured result `10`). It reuses the same actual calls and derives its Source traces through the independent reflection theorem.
+
+Validation: strict Lean, full build (6072 jobs), all registered tests, kernel policy and independent reviews pass. Ten audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. General forward callable/output coverage, constructor/mapping output selection, lexical and imperative body coverage, suspended/export-error continuations, receiving-model changes and all-pass composition remain open. Work estimates are unchanged.
+
 ## Direct named/builtin calls and failed histories (2026-10-13)
 
 Commit `cb736645` connects direct public invocation for named functions, builtins and closures through the same current History. The registered `SourceCoreDirectIssuedPublicExecution` fixture creates a capture of Word `10`, issues the named `read` handle, directly calls it with the captured closure, issues `wordFromInteger`, and directly calls it with integer `37`. The independent Source results are Word `10` and `37`, with exact singleton argument vectors and histories for all three retained functions at the actual returned sessions.
@@ -46,8 +58,8 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `cb736645`: direct named, builtin and closure calls share the public semantic connection. Genuine named/builtin issuance and successful direct execution have a closed Source fixture; direct failures retain earlier histories at their actual returned heaps. |
-| Latest completed verification | Strict Lean, the direct issued-call runtime fixture, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass. Twelve audited endpoints use only the standard three axioms. |
+| Latest verified implementation | `af456bf5`: direct outputs join current histories and are reused with distinct captures; successful Source closure applications derive sufficient public execution and Word export fuel. |
+| Latest completed verification | Strict Lean, closed direct-output and forward Word fixtures, full build (6072 jobs), all registered tests, kernel policy and independent reviews pass. Ten audited endpoints use only the standard three axioms. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
 | Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
 | Current implementation priority | Connect packed arguments and nonzero lambda parameters through direct public execution, then broaden genuine compiler/body coverage. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
