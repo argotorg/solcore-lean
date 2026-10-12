@@ -36,6 +36,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function main() returns (Word) { return 55; }",
     "function uninitialized() returns (Word) { let absent: Word; return absent; }",
     "function marked(comptime value: Word) returns (Word) { return value; }",
+    "function builtinUse(f: function(Word) returns (integer)) returns (integer) { return f(9); }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -75,10 +76,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 9 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 10 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -98,7 +99,11 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 9 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 10 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
+  have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
+  let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
+  require (builtinApplied.value == .integer 9) "single builtin input lost its source function"
   let made ← execute initial (← key 0) [word 10]
   let first ← execute made.session (← key 1) [made.value, word 2]
   let second ← execute first.session (← key 1) [made.value, word 3]

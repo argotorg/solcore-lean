@@ -2937,3 +2937,118 @@ theorem Checkpoint.RootStart.imported_function {artifact : Artifact} {session : 
   exact ⟨root, encoded.native, selected, arguments_function_at resolved found accepted, initial⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem builtin_factory_descriptor {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {origin : SourceCoreStageCodebook.Origin} {id : Core.Word}
+    (accepted : callableDescriptor compiled origin = .ok id) :
+    ∃ descriptor : SourceCoreCallableContracts.Descriptor
+      compiled.indexed.ancestry.graph.inputs.callable.table origin, descriptor.id = id := by
+  unfold callableDescriptor at accepted
+  rw [compiled.indexed.ancestry.graph.inputs.callableSelected] at accepted
+  simp only [bind, Except.bind, pure, Except.pure] at accepted
+  cases found : compiled.indexed.ancestry.graph.inputs.callable.table.idAt? origin with
+  | none => simp [found, throw, throwThe] at accepted
+  | some actual =>
+      simp only [found] at accepted
+      cases entry : compiled.indexed.ancestry.graph.inputs.callable.table.entryAt? actual with
+      | none => simp [entry, throw, throwThe] at accepted
+      | some entryValue =>
+          simp only [entry] at accepted
+          split at accepted
+          · have same : actual = id := Except.ok.inj accepted
+            subst id
+            cases issued : SourceCoreCallableContracts.descriptor
+                compiled.indexed.ancestry.graph.inputs.callable.table origin with
+            | error error =>
+                unfold SourceCoreCallableContracts.descriptor at issued
+                split at issued
+                · rename_i absent
+                  rw [found] at absent
+                  contradiction
+                · cases issued
+            | ok descriptor =>
+                refine ⟨descriptor, ?_⟩
+                unfold SourceCoreCallableContracts.descriptor at issued
+                split at issued
+                · cases issued
+                · rename_i identifier selected
+                  have same : identifier = actual := Option.some.inj (selected.symm.trans found)
+                  cases issued
+                  exact same
+          · cases accepted
+
+private theorem builtin_factory_shape {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {builtins : List (BuiltinFunctionId × CallableFactory compiled)}
+    (prepared : prepareBuiltins compiled = .ok builtins)
+    {function : BuiltinFunctionId} {row : BuiltinFunctionId × CallableFactory compiled}
+    (selected : builtins.find? (fun row => decide (row.1 = function)) = some row) :
+    row.2.sourceType = function.type ∧
+      ∃ (index : Nat) (identity : Core.Word) (descriptor : SourceCoreCallableContracts.Descriptor
+        compiled.indexed.ancestry.graph.inputs.callable.table (.builtin function)),
+        BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index) ∧
+        Core.Word.ofNat? (compiled.indexed.base.globals.length + index + 1) = some identity ∧
+        row.2.value = .pair (.pair (.inRight .unit (.word identity))
+          (.closure (SourceCoreInteger.builtinParameter function)
+            (Core.LanguageResult.resultType (SourceCoreInteger.builtinResult function))
+            (Core.LanguageResult.success (SourceCoreInteger.builtinBody function)) [])) (.word descriptor.id) := by
+  have rowFunction : row.1 = function := by simpa using List.find?_some selected
+  obtain ⟨⟨actual, index⟩, member, produced⟩ :=
+    root_factory_mapM_member prepared (List.mem_of_find?_eq_some selected)
+  simp only [SourceCoreInteger.builtinClosure] at produced
+  obtain ⟨identity, number, produced⟩ := root_factory_bind_ok produced
+  obtain ⟨id, descriptor, produced⟩ := root_factory_bind_ok produced
+  obtain ⟨factory, callable, produced⟩ := root_factory_bind_ok produced
+  cases produced
+  change actual = function at rowFunction
+  subst actual
+  have inventory : BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) =
+      some (function, index) := by
+    cases function <;> simp_all [BuiltinFunctionId.all, List.zipIdx]
+  have identityFound : Core.Word.ofNat? (compiled.indexed.base.globals.length + index + 1) = some identity := by
+    unfold callableIdentity at number
+    split at number
+    · cases number; assumption
+    · contradiction
+  obtain ⟨descriptor, identifier⟩ := builtin_factory_descriptor descriptor
+  unfold prepareCallable at callable
+  split at callable
+  · contradiction
+  · dsimp only at callable
+    split at callable
+    · cases callable
+      exact ⟨rfl, index, identity, descriptor, inventory, identityFound, by rw [identifier]⟩
+    · contradiction
+
+/-- The accepted recipe fixes the actual closed builtin code, raw source type,
+nonwrapping identity and descriptor in its cached callable factory. -/
+theorem Recipe.BuiltinCallableAt.prepared
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (prepared : Recipe.prepare compiled = .ok recipe)
+    {function : BuiltinFunctionId} {expected : Ty} {native : Core.Value}
+    (factory : recipe.BuiltinCallableAt function expected native) :
+    expected = function.type ∧
+      ∃ (index : Nat) (identity : Core.Word) (descriptor : SourceCoreCallableContracts.Descriptor
+        compiled.indexed.ancestry.graph.inputs.callable.table (.builtin function)),
+        BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index) ∧
+        Core.Word.ofNat? (compiled.indexed.base.globals.length + index + 1) = some identity ∧
+        native = .pair (.pair (.inRight .unit (.word identity))
+          (.closure (SourceCoreInteger.builtinParameter function)
+            (Core.LanguageResult.resultType (SourceCoreInteger.builtinResult function))
+            (Core.LanguageResult.success (SourceCoreInteger.builtinBody function)) [])) (.word descriptor.id) := by
+  unfold Recipe.prepare at prepared
+  obtain ⟨roots, _roots, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨templates, _templates, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨named, _named, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨builtins, builtinsPrepared, prepared⟩ := root_factory_bind_ok prepared
+  dsimp only at prepared
+  split at prepared
+  · cases prepared
+    obtain ⟨row, selected, sourceType, nativeValue⟩ := factory
+    obtain ⟨actualType, shape⟩ := builtin_factory_shape builtinsPrepared selected
+    exact ⟨sourceType.symm.trans actualType, nativeValue ▸ shape⟩
+  · contradiction
+
+end Solcore.Frontend.SourceCoreIndexedSession
