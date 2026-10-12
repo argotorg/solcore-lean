@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Connected ordinary sequence callers (2026-10-12)
+
+Committed in `80a41cf5`. `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` now connect actual preparation and retained compiler recipes to the existing recursive caller/body proof.
+
+For ordinary closure Associations, the consumer obtains its scope from the actual Code, constructs the sequence packet with `choose_for`, and derives call readiness for each used child. It also derives readiness for the accepted caller's exact expression certificate. Both directions use the combined named/anonymous stage registry, including its named branch. The resulting packets and readiness are consumed by `MixedCoveredCallerCompilerBounds`.
+
+Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
+
+Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+
+Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
+
 ## Latest verified proof additions (2026-10-12)
 
 | Committed unit | Normal owned declarations / selected interfaces | Exact scoped census |

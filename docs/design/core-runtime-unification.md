@@ -10,13 +10,25 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `f0f6a910`. Actual runtime instantiation preserves authenticated applied source ancestry and the compiler-selected lambda header. |
-| Latest completed normal verification | Build 5947; all 6 affected modules rebuilt and four selected strict checks empty; 90 declarations and sixteen APIs agree privately and normally. All 18449 preceding declarations remain exact. |
-| Working implementation | Actual runtime instantiation agrees with the sealed compiler read at matching scheme and raw type, preserving the complete source and actual evidence. Live descriptor formation, generalized allocation/read integration and the public theorem remain open. |
-| Latest proof scope | Applied source ancestry, closed-scheme substitution agreement and runtime closure materialization. |
-| Latest normally verified proof package | `staged-applied-source-and-runtime-materialization`: four modules, 84 new declarations and sixteen interfaces, verified in `f0f6a910`. |
+| Latest normally verified implementation commit | `80a41cf5`. Actual preparation and retained recipes now feed the supported ordinary caller/body preservation and reflection proofs. |
+| Latest completed normal verification | Strict Lean, full build, registered tests, kernel policy and independent review pass. Both new endpoints use only the standard three axioms. |
+| Working implementation | Ordinary sequence packets and exact caller/child readiness are constructed and consumed internally. Principal and named static support remain explicit. Public execution outcome integration is next. |
+| Latest proof scope | Supported ordinary callers and recursive sequence bodies, with actual compilation provenance and combined named/anonymous staging. |
+| Current implementation priority | Connect existing proof producers to actual public execution consumers. Defer generalized-cell helper expansion until a consumer needs it. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Connected ordinary sequence callers (2026-10-12)
+
+Committed in `80a41cf5`. `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` now connect actual preparation and retained compiler recipes to the existing recursive caller/body proof.
+
+For ordinary closure Associations, the consumer obtains its scope from the actual Code, constructs the sequence packet with `choose_for`, and derives call readiness for each used child. It also derives readiness for the accepted caller's exact expression certificate. Both directions use the combined named/anonymous stage registry, including its named branch. The resulting packets and readiness are consumed by `MixedCoveredCallerCompilerBounds`.
+
+Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
+
+Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+
+Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
 
 ### Verified applied source and runtime materialization
 

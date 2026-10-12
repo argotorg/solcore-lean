@@ -30,6 +30,18 @@ In the progress response to the user on 2026-10-05, the second objective was est
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
 
+### Connected ordinary sequence callers (2026-10-12)
+
+Committed in `80a41cf5`. `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` now connect actual preparation and retained compiler recipes to the existing recursive caller/body proof.
+
+For ordinary closure Associations, the consumer obtains its scope from the actual Code, constructs the sequence packet with `choose_for`, and derives call readiness for each used child. It also derives readiness for the accepted caller's exact expression certificate. Both directions use the combined named/anonymous stage registry, including its named branch. The resulting packets and readiness are consumed by `MixedCoveredCallerCompilerBounds`.
+
+Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
+
+Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+
+Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
+
 ### Latest verified applied source and runtime materialization
 
 The four modules in `f0f6a910` connect an actual runtime instantiation of a generalized local closure to its compiler-selected source and lambda header.
@@ -348,7 +360,9 @@ Actual literal indirect selection now consumes the original compiler callsite an
 
 ### Next implementation units and remaining obligations
 
-Next: carry positive cells through actual sized callee, argument, child and body results in the receiving-model joint family, and discharge each live-cell obligation at its genuine input. The existing `LiveFor` quantifies over old-General heaps; strong cells provide no inverse for that model. Positive reads retain a genuine closure/global/builtin variant, while selected-code association, physical arity and stage gates require their own real receipts.
+Immediate priority: connect existing proof producers to their actual consumers. The ordinary sequence caller connection is complete in `80a41cf5`; the next connection is the public start/resume outcome boundary. Generalized-cell helper expansion is deferred until a consumer requires it.
+
+Remaining receiving-model work: carry positive cells through actual sized callee, argument, child and body results in the joint family, and discharge each live-cell obligation at its genuine input. The existing `LiveFor` quantifies over old-General heaps; strong cells provide no inverse for that model. Positive reads retain a genuine closure/global/builtin variant, while selected-code association, physical arity and stage gates require their own real receipts.
 
 Typed closure receipts, positive cells, qualified formation, canonical parameter protocols and named/bootstrap adapters pass normal checks. The shared positive function model, native occurrence collectors and indirect dispatcher are integrated at `922ac60f`. Constructive closure, global and builtin packets now support accepted indirect call branches. General stage rejection, the strict expression/body family at actual parameter entries, complete compiler occurrence coverage and the final public theorem across all passes remain open. The estimates stay 70% / 85%.
 
