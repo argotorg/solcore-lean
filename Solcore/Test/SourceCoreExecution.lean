@@ -83,11 +83,21 @@ def run : IO Unit := do
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
   let artifact := opened.val
-  let bootstrap ← artifact.bootstrap
-  let pending ← match bootstrap.resume 1 with
-    | .outOfFuel pending => pure pending | _ => throw (IO.userError "public bootstrap did not suspend")
-  let initial ← match pending.resume 300000 with
-    | .ready session => pure session | _ => throw (IO.userError "public bootstrap resume failed")
+  let fresh ← artifact.bootstrapWithReceipt
+  let bootstrap := fresh.val
+  let first : {pending : Bootstrap artifact // bootstrap.resume 1 = .outOfFuel pending} ←
+    match suspended : bootstrap.resume 1 with
+    | .outOfFuel pending => pure ⟨pending, suspended⟩
+    | _ => throw (IO.userError "public bootstrap did not suspend")
+  let second : {pending : Bootstrap artifact // first.val.resume 1 = .outOfFuel pending} ←
+    match suspended : first.val.resume 1 with
+    | .outOfFuel pending => pure ⟨pending, suspended⟩
+    | _ => throw (IO.userError "public bootstrap did not suspend twice")
+  let completed : {session : Session artifact // bootstrap.ReadyAt (1 + (1 + 300000)) session} ←
+    match ready : second.val.resume 300000 with
+    | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
+    | _ => throw (IO.userError "public bootstrap resume failed")
+  let initial := completed.val
   require (artifact.rootCount == 9 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let made ← execute initial (← key 0) [word 10]
   let first ← execute made.session (← key 1) [made.value, word 2]

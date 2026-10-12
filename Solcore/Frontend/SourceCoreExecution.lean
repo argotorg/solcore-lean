@@ -283,6 +283,18 @@ def Bootstrap.IndexedAt {artifact : Artifact} (bootstrap : Bootstrap artifact)
   | ⟨_, .empty _⟩, ⟨_⟩ => False
   | ⟨_, .indexed _ _ actual _⟩, ⟨payload⟩ => actual = native ∧ HEq payload indexed
 
+/-- The same public bootstrap identifies one original native checkpoint. -/
+theorem Bootstrap.IndexedAt.unique {artifact : Artifact} {bootstrap : Bootstrap artifact}
+    {native : SourceCoreIndexedSession.Artifact} {left right : SourceCoreIndexedSession.Bootstrap native}
+    (first : bootstrap.IndexedAt left) (second : bootstrap.IndexedAt right) : left = right := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim first
+  | indexed recipe selected actual atRecipe =>
+      rcases bootstrap with ⟨payload⟩
+      rcases first with ⟨rfl, same⟩
+      exact (eq_of_heq same).symm.trans (eq_of_heq second.2)
+
 /-- Fresh bootstrap mints one original session authority and retains its proof. -/
 def Artifact.bootstrapWithReceipt (artifact : Artifact) : IO {bootstrap : Bootstrap artifact // bootstrap.FreshAt} := by
   rcases artifact with ⟨compiled, opened⟩
@@ -333,6 +345,109 @@ theorem Bootstrap.ready_indexed {artifact : Artifact} {compiled : Compiled}
           exact ⟨indexed, indexedSession, ⟨rfl, HEq.rfl⟩, fresh, ⟨rfl, HEq.rfl⟩, completed⟩
       | outOfFuel checkpoint => simp only [Bootstrap.resume, completed] at ready; cases ready
       | error error => simp only [Bootstrap.resume, completed] at ready; cases ready
+
+/-- A finite sequence of actual bootstrap resumptions, ending at the exact
+public session returned to the caller. Fuel is the sum of all resume budgets. -/
+inductive Bootstrap.ReadyAt {artifact : Artifact} : Bootstrap artifact → Nat → Session artifact → Prop where
+  | single {bootstrap : Bootstrap artifact} {fuel : Nat} {session : Session artifact}
+      (ready : bootstrap.resume fuel = .ready session) : ReadyAt bootstrap fuel session
+  | suspend {bootstrap checkpoint : Bootstrap artifact} {spent additional : Nat} {session : Session artifact}
+      (exhausted : bootstrap.resume spent = .outOfFuel checkpoint)
+      (continued : ReadyAt checkpoint additional session) : ReadyAt bootstrap (spent + additional) session
+
+private theorem Bootstrap.resume_ready_indexed {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    {bootstrap : Bootstrap artifact} {session : Session artifact} {fuel : Nat}
+    (opened : artifact.IndexedAt compiled recipe native)
+    (ready : bootstrap.resume fuel = .ready session) :
+    ∃ (indexed : SourceCoreIndexedSession.Bootstrap native)
+      (indexedSession : SourceCoreIndexedSession.Session native),
+      bootstrap.IndexedAt indexed ∧ session.IndexedAt indexedSession ∧
+      indexed.resume fuel = .ready indexedSession := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      rcases bootstrap with ⟨indexed⟩
+      cases completed : indexed.resume fuel with
+      | ready indexedSession =>
+          simp only [Bootstrap.resume, completed] at ready
+          cases ready
+          exact ⟨indexed, indexedSession, ⟨rfl, HEq.rfl⟩, ⟨rfl, HEq.rfl⟩, completed⟩
+      | outOfFuel checkpoint => simp only [Bootstrap.resume, completed] at ready; cases ready
+      | error error => simp only [Bootstrap.resume, completed] at ready; cases ready
+
+private theorem Bootstrap.resume_outOfFuel_indexed {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    {bootstrap checkpoint : Bootstrap artifact} {fuel : Nat}
+    (opened : artifact.IndexedAt compiled recipe native)
+    (exhausted : bootstrap.resume fuel = .outOfFuel checkpoint) :
+    ∃ (indexed indexedCheckpoint : SourceCoreIndexedSession.Bootstrap native),
+      bootstrap.IndexedAt indexed ∧ checkpoint.IndexedAt indexedCheckpoint ∧
+      indexed.resume fuel = .outOfFuel indexedCheckpoint := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      rcases bootstrap with ⟨indexed⟩
+      cases completed : indexed.resume fuel with
+      | ready indexedSession => simp only [Bootstrap.resume, completed] at exhausted; cases exhausted
+      | outOfFuel indexedCheckpoint =>
+          simp only [Bootstrap.resume, completed] at exhausted
+          cases exhausted
+          exact ⟨indexed, indexedCheckpoint, ⟨rfl, HEq.rfl⟩, ⟨rfl, HEq.rfl⟩, completed⟩
+      | error error => simp only [Bootstrap.resume, completed] at exhausted; cases exhausted
+
+private theorem Bootstrap.ReadyAt.indexed_receipt {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    {bootstrap : Bootstrap artifact} {session : Session artifact} {fuel : Nat}
+    (ready : bootstrap.ReadyAt fuel session)
+    (opened : artifact.IndexedAt compiled recipe native) :
+    ∃ (indexed : SourceCoreIndexedSession.Bootstrap native)
+      (indexedSession : SourceCoreIndexedSession.Session native) (value : Core.Value) (store : Core.Store),
+      bootstrap.IndexedAt indexed ∧ session.IndexedAt indexedSession ∧
+      indexed.NativeDone fuel value store ∧ indexedSession.BootstrappedFrom indexed store := by
+  induction ready with
+  | single ready =>
+      obtain ⟨indexed, indexedSession, atBootstrap, atSession, completed⟩ :=
+        Bootstrap.resume_ready_indexed opened ready
+      obtain ⟨value, store, done, _, booted⟩ := indexed.resume_ready_receipt _ completed
+      exact ⟨indexed, indexedSession, value, store, atBootstrap, atSession, done, booted⟩
+  | suspend exhausted continued ih =>
+      obtain ⟨indexed, indexedCheckpoint, atBootstrap, atCheckpoint, suspended⟩ :=
+        Bootstrap.resume_outOfFuel_indexed opened exhausted
+      obtain ⟨continuedCheckpoint, indexedSession, value, store, atContinued, atSession, done, booted⟩ := ih
+      have same : indexedCheckpoint = continuedCheckpoint := atCheckpoint.unique atContinued
+      cases same
+      obtain ⟨completed, bootedOriginal⟩ :=
+        (indexed.resume_outOfFuel_receipt _ suspended).completed done booted
+      exact ⟨indexed, indexedSession, value, store, atBootstrap, atSession, completed, bootedOriginal⟩
+
+/-- Arbitrarily many real suspensions connect the fresh public checkpoint to
+its original initial machine and the exact ready session. -/
+theorem Bootstrap.ReadyAt.indexed {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    {bootstrap : Bootstrap artifact} {session : Session artifact} {fuel : Nat}
+    (ready : bootstrap.ReadyAt fuel session)
+    (opened : artifact.IndexedAt compiled recipe native) (fresh : bootstrap.FreshAt) :
+    ∃ (indexed : SourceCoreIndexedSession.Bootstrap native)
+      (indexedSession : SourceCoreIndexedSession.Session native) (value : Core.Value) (store : Core.Store),
+      bootstrap.IndexedAt indexed ∧ indexed.InitialAt recipe {} ∧ session.IndexedAt indexedSession ∧
+      indexed.NativeDone fuel value store ∧ indexedSession.BootstrappedFrom indexed store := by
+  obtain ⟨indexed, indexedSession, value, store, atBootstrap, atSession, completed, booted⟩ :=
+    ready.indexed_receipt opened
+  refine ⟨indexed, indexedSession, value, store, atBootstrap, ?_, atSession, completed, booted⟩
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      rcases bootstrap with ⟨payload⟩
+      have same : payload = indexed := eq_of_heq atBootstrap.2
+      cases same
+      exact fresh
 
 def Session.heapSize {artifact : Artifact} (session : Session artifact) : Nat :=
   match artifact, session with

@@ -4,7 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleArgumentRe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
 
 /-! Actual public bootstrap and startup supply the initial owned state and
-simple input arguments for the supported mixed caller. The final theorems call
+simple input arguments for the supported mixed caller, including arbitrary
+finite bootstrap suspension and resumption. The final theorems call
 the existing public success, failure and Word endpoints. Static body support
 remains explicit. Reflection recovers source arguments from the actual public
 encoder; Word preservation matches independently supplied arguments. Initial
@@ -73,7 +74,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {encodedValues : SourceCoreCompatibleValues.Context}
   (opened : publicArtifact.IndexedAt publicCompiled recipe nativeArtifact)
   (fresh : publicBootstrap.FreshAt)
-  (ready : publicBootstrap.resume bootstrapFuel = .ready publicSession)
+  (ready : publicBootstrap.ReadyAt bootstrapFuel publicSession)
   (atSession : publicSession.IndexedAt nativeSession)
   (atCheckpoint : publicCheckpoint.IndexedAt nativeCheckpoint)
   (started : RecursiveNamedPublicStartMeaning.StartAt nativeSession key publicArguments

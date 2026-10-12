@@ -1,4 +1,5 @@
 import Solcore.Frontend.SourceCorePublicValues
+import Solcore.Core.FuelResumptionProperties
 import Solcore.Frontend.SourceCoreUnifiedCompilation
 import Solcore.Frontend.SourceCoreCallableIndexedTemplates
 import Solcore.Frontend.SourceCoreHeapSnapshot
@@ -2292,6 +2293,70 @@ theorem Bootstrap.resume_ready_receipt {artifact : Artifact} (checkpoint : Boots
   · cases accepted
   · rename_i error state executed
     exact (Core.well_typed_runStateful_never_faults checkpoint.typed executed).elim
+
+/-- A suspended bootstrap retains the original authority and Source prefix,
+with exactly the machine returned by the exhausted run. -/
+def Bootstrap.ResumedFrom {artifact : Artifact} (checkpoint original : Bootstrap artifact)
+    (fuel : Nat) : Prop :=
+  Core.runStateful fuel original.state = .outOfFuel checkpoint.state ∧
+    checkpoint.authority = original.authority ∧ checkpoint.sourcePrefix = original.sourcePrefix
+
+private theorem Bootstrap.finish_ne_outOfFuel {artifact : Artifact} (checkpoint : Bootstrap artifact)
+    (fuel : Nat) (value : Core.Value) (store : Core.Store)
+    (finished : Core.runStateful fuel checkpoint.state = .done value store)
+    (pending : Bootstrap artifact) : checkpoint.finish fuel value store finished ≠ .outOfFuel pending := by
+  intro accepted
+  by_cases same : value = .inRight .word .unit
+  · subst value
+    dsimp only [Bootstrap.finish] at accepted
+    cases globals : checkGlobals artifact store with
+    | error error =>
+        simp only [globals] at accepted
+        cases accepted
+    | ok checkedGlobals =>
+        cases environment : validateEnvironment artifact.program.layouts.definitions
+            (store.map Core.Value.type) (environment artifact) with
+        | error error =>
+            simp only [globals, environment] at accepted
+            cases accepted
+        | ok validated =>
+            simp only [globals, environment] at accepted
+            cases accepted
+  · cases value <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+    case inRight annotation payload =>
+      cases annotation <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+      case word =>
+        cases payload <;> try { dsimp only [Bootstrap.finish] at accepted; cases accepted }
+        case unit => exact (same rfl).elim
+
+/-- The receipt comes from the actual suspension equation. -/
+theorem Bootstrap.resume_outOfFuel_receipt {artifact : Artifact} (original : Bootstrap artifact)
+    (fuel : Nat) {checkpoint : Bootstrap artifact}
+    (exhausted : original.resume fuel = .outOfFuel checkpoint) :
+    checkpoint.ResumedFrom original fuel := by
+  unfold Bootstrap.resume at exhausted
+  split at exhausted
+  · rename_i value store executed
+    exact (original.finish_ne_outOfFuel fuel value store executed checkpoint exhausted).elim
+  · rename_i state executed
+    cases exhausted
+    exact ⟨executed, rfl, rfl⟩
+  · rename_i error state executed
+    exact (Core.well_typed_runStateful_never_faults original.typed executed).elim
+
+/-- Actual resumption costs add; authority and Source prefix remain those of
+that first checkpoint. This composes receipts without executing the machine. -/
+theorem Bootstrap.ResumedFrom.completed {artifact : Artifact}
+    {checkpoint original : Bootstrap artifact} {spent additional : Nat}
+    (resumed : checkpoint.ResumedFrom original spent)
+    {session : Session artifact} {value : Core.Value} {store : Core.Store}
+    (completed : checkpoint.NativeDone additional value store)
+    (booted : session.BootstrappedFrom checkpoint store) :
+    original.NativeDone (spent + additional) value store ∧
+      session.BootstrappedFrom original store := by
+  refine ⟨(Core.runStateful_resume resumed.1 additional).symm.trans completed, ?_⟩
+  exact ⟨booted.1.trans resumed.2.1, booted.2.1, booted.2.2.1,
+    booted.2.2.2.1.trans resumed.2.2, booted.2.2.2.2⟩
 
 /-- Full native equality remains proof-only. -/
 theorem Session.BootstrappedFrom.native_at {artifact : Artifact} {session : Session artifact}

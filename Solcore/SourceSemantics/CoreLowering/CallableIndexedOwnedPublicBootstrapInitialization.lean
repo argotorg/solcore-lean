@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
 
 /-! The original public fresh bootstrap and the public root startup share one
 actual indexed Session. Successful bootstrap identifies its exact initialized
-store/world, and startup retains those same indices. This covers one fresh
-initial checkpoint completed at one supplied fuel; it does not replay native
-execution or assume an initial owned pool, source heap or argument relation. -/
+store/world, and startup retains those same indices. Any finite sequence of
+actual bootstrap suspensions may precede completion. The proof does not replay
+native execution or assume an initial owned pool, source heap or argument relation. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
 open Core Frontend SourceInference
@@ -26,7 +26,7 @@ theorem at_started {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : 
     {encodedValues : SourceCoreCompatibleValues.Context}
     (opened : publicArtifact.IndexedAt publicCompiled recipe nativeArtifact)
     (fresh : publicBootstrap.FreshAt)
-    (ready : publicBootstrap.resume bootstrapFuel = .ready publicSession)
+    (ready : publicBootstrap.ReadyAt bootstrapFuel publicSession)
     (atSession : publicSession.IndexedAt nativeSession)
     (started : StartAt nativeSession key publicArguments inputFuel nativeCheckpoint recipe root
       world store payloads encodedValues) :
@@ -42,12 +42,10 @@ theorem at_started {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : 
       StartAt nativeSession key publicArguments inputFuel nativeCheckpoint recipe root
         ((RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type)
         (RecursiveNamedCatalogPreparedInitialization.store compiled) payloads encodedValues := by
-  obtain ⟨indexedBootstrap, indexedSession, _atBootstrap, initial, sessionAt, accepted⟩ :=
-    publicBootstrap.ready_indexed opened fresh ready
+  obtain ⟨indexedBootstrap, indexedSession, value, finalStore, _atBootstrap, initial, sessionAt, completed, booted⟩ :=
+    ready.indexed opened fresh
   have sameSession : indexedSession = nativeSession := sessionAt.unique atSession
   subst indexedSession
-  obtain ⟨value, finalStore, completed, _success, booted⟩ :=
-    Bootstrap.resume_ready_receipt indexedBootstrap bootstrapFuel accepted
   have actualCompletion := initial.native_done completed
   have initialized := RecursiveNamedCatalogPreparedInitialization.completed_store prepared actualCompletion
   rw [initialized.2] at actualCompletion

@@ -58,7 +58,7 @@ export SourceCoreExecution.Artifact
 end Artifact
 
 namespace Bootstrap
-export SourceCoreExecution.Bootstrap (resume FreshAt IndexedAt ready_indexed)
+export SourceCoreExecution.Bootstrap (resume FreshAt IndexedAt ReadyAt ready_indexed)
 end Bootstrap
 
 namespace BootResult
