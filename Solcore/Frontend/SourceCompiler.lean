@@ -41,7 +41,7 @@ end CompileError
 
 namespace Compiled
 export SourceCoreExecution.Compiled
-  (program plan roots keys rootCount root? «open» plan_validated)
+  (program plan roots keys rootCount root? «open» openWithReceipt plan_validated)
 end Compiled
 
 namespace StaticWordRoot
@@ -53,7 +53,7 @@ export SourceCoreExecution.StaticWordProgram (compiled roots count rootForSelect
 end StaticWordProgram
 
 namespace Artifact
-export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix preparePrefix)
+export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix preparePrefix CompiledAt IndexedAt)
 end Artifact
 
 namespace Bootstrap
@@ -67,11 +67,12 @@ end BootResult
 namespace Session
 export SourceCoreExecution.Session
   (heapSize functionCount start startHandlePacked Authenticates authenticate
-   diagnostic handleDiagnostic named builtin run invokePacked snapshot restoreSnapshot)
+   diagnostic handleDiagnostic named builtin run runWithReceipt RunAt IndexedAt start_indexed
+   invokePacked snapshot restoreSnapshot)
 end Session
 
 namespace Checkpoint
-export SourceCoreExecution.Checkpoint (heapSize diagnostic resume snapshot)
+export SourceCoreExecution.Checkpoint (heapSize diagnostic resume resumeWithReceipt ResumeAt IndexedAt snapshot)
 end Checkpoint
 
 namespace Authentication

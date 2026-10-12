@@ -1406,6 +1406,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableClosedSchemeSubstitutionAgre
 import Solcore.SourceSemantics.CoreLowering.CallableFlexibleSubstitutionAgreement
 import Solcore.SourceSemantics.CoreLowering.CallableAppliedRuntimeMaterialization
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

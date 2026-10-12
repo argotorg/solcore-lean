@@ -179,15 +179,57 @@ private inductive Opened (compiled : Compiled) where
   | empty (selected : compiled.recipe = none)
   | indexed (recipe : SourceCoreIndexedSession.Recipe) (selected : compiled.recipe = some recipe)
       (native : SourceCoreIndexedSession.Artifact)
+      (atRecipe : native.RecipeAt recipe)
 
 structure Artifact where private mk ::
   private compilation : Compiled
   private opened : Opened compilation
 
-def Compiled.open (compiled : Compiled) : IO Artifact := do
+/-- The public artifact retains its original compiled facade in proofs only. -/
+def Artifact.CompiledAt (artifact : Artifact) (compiled : Compiled) : Prop :=
+  Artifact.casesOn (motive := fun _ => Prop) artifact (fun actual _ => actual = compiled)
+
+/-- The exact opened indexed artifact, including its original selected recipe. -/
+def Artifact.IndexedAt (artifact : Artifact) (compiled : Compiled)
+    (recipe : SourceCoreIndexedSession.Recipe) (native : SourceCoreIndexedSession.Artifact) : Prop :=
+  Artifact.casesOn (motive := fun _ => Prop) artifact fun actual opened =>
+    actual = compiled ∧ match opened with
+    | .empty _ => False
+    | .indexed actualRecipe _ actualNative _ => actualRecipe = recipe ∧ actualNative = native
+
+/-- An opened recipe is the recipe already retained by the compiled facade. -/
+theorem Artifact.IndexedAt.compiled_recipe {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    (opened : artifact.IndexedAt compiled recipe native) :
+    Compiled.casesOn (motive := fun _ => Prop) compiled (fun _ actual _ => actual = some recipe) := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      exact selected
+
+/-- Opening uses the same original recipe, rather than a second recipe choice. -/
+theorem Artifact.IndexedAt.recipe_at {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    (opened : artifact.IndexedAt compiled recipe native) : native.RecipeAt recipe := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      exact atRecipe
+
+/-- Mint the original indexed authority once and retain its erased proof. -/
+def Compiled.openWithReceipt (compiled : Compiled) : IO {artifact : Artifact // artifact.CompiledAt compiled} := do
   match selected : compiled.recipe with
-  | none => pure ⟨compiled, .empty selected⟩
-  | some recipe => pure ⟨compiled, .indexed recipe selected (← recipe.open)⟩
+  | none => pure ⟨⟨compiled, .empty selected⟩, rfl⟩
+  | some recipe =>
+      let native ← recipe.openWithReceipt
+      pure ⟨⟨compiled, .indexed recipe selected native.val native.property⟩, rfl⟩
+
+def Compiled.open (compiled : Compiled) : IO Artifact := do
+  pure (← compiled.openWithReceipt).val
 
 def Artifact.keys (artifact : Artifact) := artifact.compilation.keys
 def Artifact.rootCount (artifact : Artifact) := artifact.compilation.rootCount
@@ -196,15 +238,22 @@ def Artifact.root? (artifact : Artifact) (index : Nat) := artifact.compilation.r
 private def SessionPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Unit
-  | .indexed _ _ native => SourceCoreIndexedSession.Session native
+  | .indexed _ _ native _ => SourceCoreIndexedSession.Session native
 
 structure Session (artifact : Artifact) where private mk ::
   private payload : SessionPayload artifact
 
+/-- Equality with the actual indexed session is proof-only. -/
+def Session.IndexedAt {artifact : Artifact} (session : Session artifact)
+    {native : SourceCoreIndexedSession.Artifact} (indexed : SourceCoreIndexedSession.Session native) : Prop :=
+  match artifact, session with
+  | ⟨_, .empty _⟩, ⟨_⟩ => False
+  | ⟨_, .indexed _ _ actual _⟩, ⟨payload⟩ => actual = native ∧ HEq payload indexed
+
 private def BootstrapPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Unit
-  | .indexed _ _ native => SourceCoreIndexedSession.Bootstrap native
+  | .indexed _ _ native _ => SourceCoreIndexedSession.Bootstrap native
 
 structure Bootstrap (artifact : Artifact) where private mk ::
   private payload : BootstrapPayload artifact
@@ -213,7 +262,7 @@ def Artifact.bootstrap (artifact : Artifact) : IO (Bootstrap artifact) := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure ⟨()⟩
-  | indexed recipe selected native => exact do return ⟨← native.bootstrapFresh⟩
+  | indexed recipe selected native _atRecipe => exact do return ⟨← native.bootstrapFresh⟩
 
 inductive BootResult (artifact : Artifact) where
   | ready (session : Session artifact)
@@ -223,7 +272,7 @@ inductive BootResult (artifact : Artifact) where
 def Bootstrap.resume {artifact : Artifact} (bootstrap : Bootstrap artifact) (fuel : Nat) : BootResult artifact :=
   match artifact, bootstrap with
   | ⟨_, .empty _⟩, ⟨_⟩ => .ready ⟨()⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ =>
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ =>
       match native.resume fuel with
       | .ready session => .ready ⟨session⟩
       | .outOfFuel checkpoint => .outOfFuel ⟨checkpoint⟩
@@ -232,32 +281,63 @@ def Bootstrap.resume {artifact : Artifact} (bootstrap : Bootstrap artifact) (fue
 def Session.heapSize {artifact : Artifact} (session : Session artifact) : Nat :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => 0
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.heapSize
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.heapSize
 def Session.functionCount {artifact : Artifact} (session : Session artifact) : Nat :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => 0
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.functionCount
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.functionCount
 
 private def CheckpointPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Empty
-  | .indexed _ _ native => SourceCoreIndexedSession.Checkpoint native
+  | .indexed _ _ native _ => SourceCoreIndexedSession.Checkpoint native
 
 structure Checkpoint (artifact : Artifact) where private mk ::
   private payload : CheckpointPayload artifact
 
+/-- Equality with the original indexed checkpoint, without a state getter. -/
+def Checkpoint.IndexedAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    {native : SourceCoreIndexedSession.Artifact} (indexed : SourceCoreIndexedSession.Checkpoint native) : Prop :=
+  match artifact, checkpoint with
+  | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
+  | ⟨_, .indexed _ _ actual _⟩, ⟨payload⟩ => actual = native ∧ HEq payload indexed
+
 def Checkpoint.heapSize {artifact : Artifact} (checkpoint : Checkpoint artifact) : Nat :=
   match artifact, checkpoint with
   | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.heapSize
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.heapSize
 
 def Session.start {artifact : Artifact} (session : Session artifact) (key : Key)
     (arguments : List Value) (fuel : Nat := 1024) : Except SourceCoreIndexedSession.Error (Checkpoint artifact) :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .missingEntry key⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => do
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => do
       let checkpoint ← native.start key arguments fuel
       pure ⟨checkpoint⟩
+
+/-- Public startup uses the same indexed artifact, session and checkpoint.
+The successful original action supplies the checkpoint equation internally. -/
+theorem Session.start_indexed {compiled : Compiled} {artifact : Artifact}
+    {session : Session artifact} {key : Key} {arguments : List Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} (opened : artifact.CompiledAt compiled)
+    (accepted : session.start key arguments fuel = .ok checkpoint) :
+    ∃ (recipe : SourceCoreIndexedSession.Recipe) (native : SourceCoreIndexedSession.Artifact)
+      (indexedSession : SourceCoreIndexedSession.Session native)
+      (indexedCheckpoint : SourceCoreIndexedSession.Checkpoint native),
+      artifact.IndexedAt compiled recipe native ∧ session.IndexedAt indexedSession ∧
+      checkpoint.IndexedAt indexedCheckpoint ∧ indexedSession.start key arguments fuel = .ok indexedCheckpoint := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => cases accepted
+  | indexed recipe selected native atRecipe =>
+      rcases session with ⟨indexedSession⟩
+      change actual = compiled at opened
+      subst compiled
+      change (indexedSession.start key arguments fuel >>= fun next => .ok ⟨next⟩) = .ok checkpoint at accepted
+      obtain ⟨indexedCheckpoint, issued, accepted⟩ := bind_ok accepted
+      cases accepted
+      exact ⟨recipe, native, indexedSession, indexedCheckpoint,
+        ⟨rfl, rfl, rfl⟩, ⟨rfl, HEq.rfl⟩, ⟨rfl, HEq.rfl⟩, issued⟩
 
 /-- Start the owned callable with its source parameters packed into one value.
 The native descriptor retains arity and the existing staging guards. -/
@@ -265,7 +345,7 @@ def Session.startHandlePacked {artifact : Artifact} (session : Session artifact)
     (argument : Value) (fuel : Nat := 1024) : Except SourceCoreIndexedSession.Error (Checkpoint artifact) :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .unknownHandle⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => do
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => do
       let checkpoint ← native.startHandlePacked handle argument fuel
       pure ⟨checkpoint⟩
 
@@ -273,7 +353,7 @@ def Session.Authenticates {artifact : Artifact} (session : Session artifact)
     (fuel : Nat) (expected : TypeSystem.Ty) (value : Value) : Prop :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => False
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.Authenticates fuel expected value
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.Authenticates fuel expected value
 
 structure Authentication {artifact : Artifact} (session : Session artifact)
     (fuel : Nat) (expected : TypeSystem.Ty) (value : Value) : Type where private mk ::
@@ -285,7 +365,7 @@ def Session.authenticate {artifact : Artifact} (session : Session artifact)
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact .error ⟨[], .unknownHandle⟩
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases session with ⟨session⟩
       exact do
         let checked ← session.authenticate fuel expected value
@@ -295,19 +375,19 @@ def Session.diagnostic {artifact : Artifact} (session : Session artifact) (key :
     (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .missingEntry key⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.diagnostic key reason
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.diagnostic key reason
 
 def Checkpoint.diagnostic {artifact : Artifact} (checkpoint : Checkpoint artifact)
     (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
   match artifact, checkpoint with
   | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.diagnostic reason
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.diagnostic reason
 
 def Session.handleDiagnostic {artifact : Artifact} (session : Session artifact) (handle : Handle)
     (reason : Core.Word) : Except SourceCoreIndexedSession.Error (Option SourceCoreFaultSites.Diagnostic) :=
   match artifact, session with
   | ⟨_, .empty _⟩, ⟨_⟩ => .error ⟨[], .unknownHandle⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.handleDiagnostic handle reason
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.handleDiagnostic handle reason
 
 structure Completion (artifact : Artifact) where private mk ::
   value : Value
@@ -327,7 +407,7 @@ def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure (.error ⟨[], .missingEntry key⟩)
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases session with ⟨session⟩
       exact do
         match ← session.named key boundaryFuel with
@@ -340,7 +420,7 @@ def Session.builtin {artifact : Artifact} (session : Session artifact) (function
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure (.error ⟨[], .missingBuiltin function⟩)
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases session with ⟨session⟩
       exact do
         match ← session.builtin function boundaryFuel with
@@ -348,26 +428,129 @@ def Session.builtin {artifact : Artifact} (session : Session artifact) (function
         | .ok completion => pure (.ok ⟨completion.value, completion.sourceType,
             ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
 
-def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
-    (boundaryFuel : Nat := 1024) : IO (Outcome artifact) := by
+private def wrapCompletion {compiled : Compiled} {recipe : SourceCoreIndexedSession.Recipe}
+    {selected : compiled.recipe = some recipe} {native : SourceCoreIndexedSession.Artifact}
+    {atRecipe : native.RecipeAt recipe} (completion : SourceCoreIndexedSession.Completion native) :
+    Completion ⟨compiled, .indexed recipe selected native atRecipe⟩ :=
+  ⟨completion.value, completion.sourceType, ⟨completion.session⟩,
+    completion.boundaryFuel, completion.authenticated⟩
+
+private def wrapOutcome {compiled : Compiled} {recipe : SourceCoreIndexedSession.Recipe}
+    {selected : compiled.recipe = some recipe} {native : SourceCoreIndexedSession.Artifact}
+    {atRecipe : native.RecipeAt recipe} (outcome : SourceCoreIndexedSession.Outcome native) :
+    Outcome ⟨compiled, .indexed recipe selected native atRecipe⟩ :=
+  match outcome with
+  | .succeeded completion => .succeeded (wrapCompletion completion)
+  | .failed reason session => .failed reason ⟨session⟩
+  | .outOfFuel checkpoint => .outOfFuel ⟨checkpoint⟩
+  | .exportError error session => .exportError error ⟨session⟩
+
+/-- The public result comes from the original indexed resume action. -/
+def Checkpoint.ResumeAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (fuel boundaryFuel : Nat) (outcome : Outcome artifact) : Prop :=
+  match artifact, checkpoint with
+  | ⟨_, .empty _⟩, ⟨impossible⟩ => nomatch impossible
+  | ⟨_, .indexed _ _ _ _⟩, ⟨indexed⟩ =>
+      ∃ actual, indexed.ResumeAt fuel boundaryFuel actual ∧ wrapOutcome actual = outcome
+
+/-- Retain the actual native execution/export receipt and execute once. -/
+def Checkpoint.resumeWithReceipt {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
+    (boundaryFuel : Nat := 1024) : IO {outcome : Outcome artifact // checkpoint.ResumeAt fuel boundaryFuel outcome} := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
-  | indexed recipe selected native =>
-      rcases checkpoint with ⟨checkpoint⟩
+  | indexed recipe selected native atRecipe =>
+      rcases checkpoint with ⟨indexed⟩
       exact do
-          match ← checkpoint.resume fuel boundaryFuel with
-          | .succeeded completion => pure (.succeeded ⟨completion.value, completion.sourceType,
-              ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
-          | .failed reason session => pure (.failed reason ⟨session⟩)
-          | .outOfFuel checkpoint => pure (.outOfFuel ⟨checkpoint⟩)
-          | .exportError error session => pure (.exportError error ⟨session⟩)
+        let resumed ← indexed.resumeWithReceipt fuel boundaryFuel
+        pure ⟨wrapOutcome resumed.val, resumed.val, resumed.property, rfl⟩
+
+def Checkpoint.resume {artifact : Artifact} (checkpoint : Checkpoint artifact) (fuel : Nat)
+    (boundaryFuel : Nat := 1024) : IO (Outcome artifact) := do
+  pure (← checkpoint.resumeWithReceipt fuel boundaryFuel).val
+
+/-- A public success retains the exact native completion and full export
+receipt. It does not infer Source execution from authentication alone. -/
+theorem Checkpoint.ResumeAt.indexed_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {completion : Completion artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.succeeded completion)) :
+    ∃ (actual : SourceCoreIndexedSession.Completion native)
+      (generation : SourceCorePublicValues.ExportGeneration) (value : Core.Value) (store : Core.Store),
+      indexed.NativeDone fuel value store ∧
+      indexed.SucceededResultAt fuel boundaryFuel generation value store actual ∧
+      completion.value = actual.value ∧ completion.sourceType = actual.sourceType ∧
+      completion.boundaryFuel = actual.boundaryFuel ∧ completion.session.IndexedAt actual.session := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨outcome, resumed, returned⟩ := receipt
+      cases outcome with
+      | succeeded actual =>
+          cases returned
+          obtain ⟨generation, value, store, completed, exported⟩ := resumed.succeeded
+          exact ⟨actual, generation, value, store, completed, exported, rfl, rfl, rfl, rfl, HEq.rfl⟩
+      | failed reason session => cases returned
+      | outOfFuel checkpoint => cases returned
+      | exportError error session => cases returned
+
+/-- A public failure retains the exact native failed-result receipt; its
+independent Source fault meaning is established by the semantic layer. -/
+theorem Checkpoint.ResumeAt.indexed_failed {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {reason : Core.Word}
+    {session : Session artifact} {native : SourceCoreIndexedSession.Artifact}
+    {indexed : SourceCoreIndexedSession.Checkpoint native}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.failed reason session)) :
+    ∃ (actualSession : SourceCoreIndexedSession.Session native)
+      (_generation : SourceCorePublicValues.ExportGeneration) (value : Core.Value) (store : Core.Store),
+      indexed.NativeDone fuel value store ∧ indexed.FailedResultAt fuel value store reason actualSession ∧
+      session.IndexedAt actualSession := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨outcome, resumed, returned⟩ := receipt
+      cases outcome with
+      | succeeded actual => cases returned
+      | failed actualReason actualSession =>
+          cases returned
+          obtain ⟨generation, value, store, completed, failed⟩ := resumed.failed
+          exact ⟨actualSession, generation, value, store, completed, failed, rfl, HEq.rfl⟩
+      | outOfFuel checkpoint => cases returned
+      | exportError error session => cases returned
+
+/-- Both public run branches retain their original startup result; a completed
+run also retains the one original indexed resume receipt. -/
+def Session.RunAt {artifact : Artifact} (session : Session artifact) (key : Key)
+    (arguments : List Value) (options : RunOptions)
+    (result : Except SourceCoreIndexedSession.Error (Outcome artifact)) : Prop :=
+  match result with
+  | .error error => session.start key arguments options.inputValidationFuel = .error error
+  | .ok outcome => ∃ checkpoint,
+      session.start key arguments options.inputValidationFuel = .ok checkpoint ∧
+      checkpoint.ResumeAt options.executionFuel options.outputValidationFuel outcome
+
+def Session.runWithReceipt {artifact : Artifact} (session : Session artifact) (key : Key)
+    (arguments : List Value) (options : RunOptions := {}) :
+    IO {result : Except SourceCoreIndexedSession.Error (Outcome artifact) // session.RunAt key arguments options result} := do
+  match started : session.start key arguments options.inputValidationFuel with
+  | .error error => pure ⟨.error error, started⟩
+  | .ok checkpoint =>
+      let resumed ← checkpoint.resumeWithReceipt options.executionFuel options.outputValidationFuel
+      pure ⟨.ok resumed.val, checkpoint, started, resumed.property⟩
 
 def Session.run {artifact : Artifact} (session : Session artifact) (key : Key)
     (arguments : List Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
-  match session.start key arguments options.inputValidationFuel with
-  | .error error => pure (.error error)
-  | .ok checkpoint => pure (.ok (← checkpoint.resume options.executionFuel options.outputValidationFuel))
+  pure (← session.runWithReceipt key arguments options).val
 
 def Session.invokePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
     (argument : Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
@@ -379,7 +562,7 @@ def Session.invokePacked {artifact : Artifact} (session : Session artifact) (han
 private def PrefixPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Unit
-  | .indexed _ _ native => SourceCoreIndexedSession.PrefixSnapshot native
+  | .indexed _ _ native _ => SourceCoreIndexedSession.PrefixSnapshot native
 
 structure PrefixSnapshot (artifact : Artifact) where private mk ::
   private payload : PrefixPayload artifact
@@ -387,7 +570,7 @@ structure PrefixSnapshot (artifact : Artifact) where private mk ::
 def PrefixSnapshot.cells {artifact : Artifact} (inert : PrefixSnapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
   match artifact, inert with
   | ⟨_, .empty _⟩, ⟨_⟩ => []
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.cells
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.cells
 
 def PrefixSnapshot.heapSize {artifact : Artifact} (inert : PrefixSnapshot artifact) : Nat := inert.cells.length
 
@@ -395,7 +578,7 @@ def Artifact.bootstrapFromPrefix (artifact : Artifact) (inert : PrefixSnapshot a
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure ⟨()⟩
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases inert with ⟨inert⟩
       exact do return ⟨← native.bootstrapFromPrefix inert⟩
 
@@ -408,7 +591,7 @@ def importPrefix (artifact : Artifact)
     Option (PrefixSnapshot artifact) :=
   match artifact with
   | ⟨_, .empty _⟩ => none
-  | ⟨_, .indexed _ _ native⟩ => (provider native).map fun inert => ⟨inert⟩
+  | ⟨_, .indexed _ _ native _⟩ => (provider native).map fun inert => ⟨inert⟩
 end Internal
 
 /-- Build an initial inert heap using the common data carrier. Existing
@@ -420,7 +603,7 @@ def Artifact.preparePrefix (artifact : Artifact) (cells : List SourceCoreHeapInp
   cases opened with
   | empty selected =>
       exact if cells.isEmpty then .ok ⟨()⟩ else .error ⟨[], .emptyArtifactHeap cells.length⟩
-  | indexed recipe selected native => exact do
+  | indexed recipe selected native _atRecipe => exact do
       let state ← SourceCoreHeapInput.Internal.convert cells conversionFuel
       match SourceCoreIndexedSession.Legacy.preparePrefix native state validationFuel with
       | some inert => pure ⟨inert⟩
@@ -429,7 +612,7 @@ def Artifact.preparePrefix (artifact : Artifact) (cells : List SourceCoreHeapInp
 private def SnapshotPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Unit
-  | .indexed _ _ native => SourceCoreIndexedSession.Snapshot native
+  | .indexed _ _ native _ => SourceCoreIndexedSession.Snapshot native
 
 structure Snapshot (artifact : Artifact) where private mk ::
   private payload : SnapshotPayload artifact
@@ -437,19 +620,19 @@ structure Snapshot (artifact : Artifact) where private mk ::
 def Snapshot.cells {artifact : Artifact} (snapshot : Snapshot artifact) : List SourceCoreHeapSnapshot.Cell :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => []
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.cells
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.cells
 
 def Snapshot.heapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.cells.length
 
 def Snapshot.nativeHeapSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => 0
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.nativeHeapSize
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.nativeHeapSize
 
 def Snapshot.pendingAllocation {artifact : Artifact} (snapshot : Snapshot artifact) : Bool :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => false
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => native.pendingAllocation
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => native.pendingAllocation
 
 def Snapshot.cellAt? {artifact : Artifact} (snapshot : Snapshot artifact) (location : Nat) : Option SourceCoreHeapSnapshot.Cell :=
   snapshot.cells[location]?
@@ -459,7 +642,7 @@ uses `restore`, retaining their native world and session ownership. -/
 def Snapshot.prefix {artifact : Artifact} (snapshot : Snapshot artifact) : PrefixSnapshot artifact :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => ⟨()⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => ⟨native.prefix⟩
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => ⟨native.prefix⟩
 
 def Snapshot.prefixSize {artifact : Artifact} (snapshot : Snapshot artifact) : Nat := snapshot.prefix.heapSize
 
@@ -471,7 +654,7 @@ def Snapshot.exportPrefix {artifact : Artifact} (snapshot : Snapshot artifact)
     Except SourceCoreIndexedSession.Error (PrefixSnapshot artifact) :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => .ok ⟨()⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ => (native.exportPrefix validationFuel boundaryFuel).map fun inert => ⟨inert⟩
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ => (native.exportPrefix validationFuel boundaryFuel).map fun inert => ⟨inert⟩
 
 theorem Snapshot.exportPrefix_length {artifact : Artifact} {snapshot : Snapshot artifact}
     {validationFuel boundaryFuel : Nat} {exported : PrefixSnapshot artifact}
@@ -484,7 +667,7 @@ theorem Snapshot.exportPrefix_length {artifact : Artifact} {snapshot : Snapshot 
       simp only [Snapshot.exportPrefix] at accepted
       cases accepted
       rfl
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases snapshot with ⟨snapshot⟩
       unfold Snapshot.exportPrefix at accepted
       cases result : snapshot.exportPrefix validationFuel boundaryFuel with
@@ -501,7 +684,7 @@ inductive RestoredSnapshot (artifact : Artifact) where
 def Snapshot.restore {artifact : Artifact} (snapshot : Snapshot artifact) : RestoredSnapshot artifact :=
   match artifact, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩ => .ready ⟨()⟩
-  | ⟨_, .indexed _ _ _⟩, ⟨native⟩ =>
+  | ⟨_, .indexed _ _ _ _⟩, ⟨native⟩ =>
       match native.restore with
       | .ready session => .ready ⟨session⟩
       | .suspended checkpoint => .suspended ⟨checkpoint⟩
@@ -510,7 +693,7 @@ def Session.restoreSnapshot {artifact : Artifact} (session : Session artifact) (
     Except SourceCoreIndexedSession.Error (RestoredSnapshot artifact) :=
   match artifact, session, snapshot with
   | ⟨_, .empty _⟩, ⟨_⟩, ⟨_⟩ => .ok (.ready ⟨()⟩)
-  | ⟨_, .indexed _ _ _⟩, ⟨session⟩, ⟨snapshot⟩ => do
+  | ⟨_, .indexed _ _ _ _⟩, ⟨session⟩, ⟨snapshot⟩ => do
       match ← session.restoreSnapshot snapshot with
       | .ready session => pure (.ready ⟨session⟩)
       | .suspended checkpoint => pure (.suspended ⟨checkpoint⟩)
@@ -520,7 +703,7 @@ def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundar
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure (.ok ⟨()⟩)
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases session with ⟨session⟩
       exact do return (← session.snapshot boundaryFuel).map fun snapshot => ⟨snapshot⟩
 
@@ -529,7 +712,7 @@ def Checkpoint.snapshot {artifact : Artifact} (checkpoint : Checkpoint artifact)
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases checkpoint with ⟨checkpoint⟩
       exact do return (← checkpoint.snapshot boundaryFuel).map fun snapshot => ⟨snapshot⟩
 
@@ -540,7 +723,7 @@ theorem Snapshot.restore_native_size {artifact : Artifact} (snapshot : Snapshot 
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => rfl
-  | indexed recipe selected native =>
+  | indexed recipe selected native _atRecipe =>
       rcases snapshot with ⟨snapshot⟩
       have same := snapshot.restore_native_size
       cases restored : snapshot.restore with

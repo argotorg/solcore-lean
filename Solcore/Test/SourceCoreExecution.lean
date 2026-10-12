@@ -44,7 +44,8 @@ private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   | _ => throw (IO.userError s!"single public execution fixture missing {name}")
 private def execute {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value) :
     IO (Completion artifact) := do
-  match ← session.run key arguments {executionFuel := 300000} with
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
   | .ok (.succeeded result) => pure result
   | .ok (.exportError error _) => throw (IO.userError s!"public export: {reprStr error}")
   | .ok (.failed reason _) => throw (IO.userError s!"public language failure: {reprStr reason}")
@@ -79,7 +80,8 @@ def run : IO Unit := do
   require (compiled.rootCount == 9 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
-  let artifact ← compiled.open
+  let opened ← compiled.openWithReceipt
+  let artifact := opened.val
   let bootstrap ← artifact.bootstrap
   let pending ← match bootstrap.resume 1 with
     | .outOfFuel pending => pure pending | _ => throw (IO.userError "public bootstrap did not suspend")
@@ -99,9 +101,11 @@ def run : IO Unit := do
   let mapped ← execute localResult.session (← key 4) [raw]
   require (mapped.value == raw) "public value lost raw mapping metadata or duplicate order"
   let started ← get "public call start" (mapped.session.start (← key 1) [made.value, word 4])
-  let checkpoint ← match ← started.resume 1 with
+  let suspended ← started.resumeWithReceipt 1
+  let checkpoint ← match suspended.val with
     | .outOfFuel checkpoint => pure checkpoint | _ => throw (IO.userError "public call did not suspend")
-  let resumed ← match ← checkpoint.resume 300000 with
+  let finished ← checkpoint.resumeWithReceipt 300000
+  let resumed ← match finished.val with
     | .succeeded result => pure result | _ => throw (IO.userError "public call did not resume")
   require (resumed.value == word 19) "public checkpoint lost capture"
   let named ← get "public named handle" (← resumed.session.named (← key 2))
