@@ -74,6 +74,31 @@ structure MetadataFor (prepared : CallableIndexedNamedGeneration.Prepared checke
       prepared.base.locals.bindings.any (fun binding =>
         decide (binding.caller = (context prepared named).owner ∧ binding.binder.id = binder)) = false
 
+structure MetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) (allowed : ExpressionId → Prop) : Prop where
+  requirements : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id →
+    ∀ node, source.lookupExpression? id = some node → node.requirements = []
+  coercions : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id →
+    ∀ node, source.lookupExpression? id = some node → node.coercions = []
+  initializer : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id →
+    prepared.base.locals.bindings.find? (fun binding =>
+      decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none
+  arguments : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id →
+    ∀ node, source.lookupExpression? id = some node → ∀ callee ids metadata,
+      node.form = .call callee ids (.indirect metadata) → metadata.argumentCoercions = []
+  localRead : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id →
+    ∀ node, source.lookupExpression? id = some node → ∀ name binder,
+      node.form = .reference name (.local binder) →
+      prepared.base.locals.bindings.any (fun binding =>
+        decide (binding.caller = (context prepared named).owner ∧ binding.binder.id = binder)) = false
+
+theorem MetadataFor.on (metadata : MetadataFor prepared named source)
+    (allowed : ExpressionId → Prop) : MetadataOn prepared named source allowed :=
+  ⟨fun id _ tree => metadata.requirements id tree,
+   fun id _ tree => metadata.coercions id tree,
+   fun id _ tree => metadata.initializer id tree,
+   fun id _ tree => metadata.arguments id tree,
+   fun id _ tree => metadata.localRead id tree⟩
+
 private theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? id = some node) (supported : SupportedForm node.form)
     (ordinary : ∀ name binder, node.form = .reference name (.local binder) →
@@ -192,6 +217,76 @@ theorem retained_policy_for
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_for recipe metadata scope reasonAt
+
+private theorem special_none_on
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+    (compilation : Compilation prepared named diagnostics namedCode) (rootFuel : Nat)
+    {allowed : ExpressionId → Prop}
+    (metadata : MetadataOn prepared named source allowed)
+    {id : ExpressionId}
+    (admitted : allowed id)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax source id)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat)
+    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compilation rootFuel
+      (context prepared named) child budget source scope id reasonAt = .ok none := by
+  obtain ⟨node, found, supported⟩ := syntax_node tree
+  have sameSource := contextual_same found supported (metadata.localRead id admitted tree node found)
+  have noEvidence := evidence_none prepared.base.sourceProgram
+    ((representation prepared).atContext named.signature.key []).expressions.projectType
+    named.specialized (context prepared named) child budget scope reasonAt
+    (SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext []) found supported
+    (metadata.requirements id admitted tree node found) (metadata.coercions id admitted tree node found)
+    (metadata.arguments id admitted tree node found)
+  unfold CallableIndexedOwnedContextualLambdaPolicyRecipes.special
+  simp only [sameSource, bind, Except.bind, found, pure, Except.pure,
+    metadata.initializer id admitted tree, Option.filter_none, noEvidence]
+  generalize form : node.form = shape at supported
+  cases supported with
+  | literal atomic => cases atomic <;> rfl
+  | read name binder => simp only [metadata.localRead id admitted tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
+  | group => rfl
+  | tuple => rfl
+  | call => rfl
+
+theorem recipe_policy_on
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
+    {compilation : Compilation prepared named diagnostics namedCode}
+    {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}
+    (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
+    {allowed : ExpressionId → Prop}
+    (metadata : MetadataOn prepared named source allowed)
+    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn policy (context prepared named)
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+  constructor
+  · intro id admitted tree child budget
+    rw [recipe.lowerSpecial]
+    exact special_none_on compilation rootFuel metadata admitted tree child budget scope reasonAt
+  · intro id admitted tree
+    obtain ⟨node, found, supported⟩ := syntax_node tree
+    have sameSource := contextual_same found supported (metadata.localRead id admitted tree node found)
+    rw [recipe.readExpression]
+    simp only [sameSource, bind, Except.bind]
+    rfl
+  · exact recipe.lowerRead
+  · exact recipe.leafLowerer
+
+/-- The full profile is proved from one actual retained production recipe.
+The independent raw typing, scope declarations and CallsReady remain separate. -/
+theorem retained_policy_on
+    {function : Dynamic.Closure} {parameterScope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
+    (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
+    {allowed : ExpressionId → Prop}
+    (metadata : MetadataOn prepared named source allowed)
+    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn code.policy code.compilation
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
+  rw [sameCompilation]
+  exact recipe_policy_on recipe metadata scope reasonAt
+
 
 /-- Original and viewed Sources each retain the global Syntax quantifier.
 Reached-node metadata transport alone does not discharge either global input. -/

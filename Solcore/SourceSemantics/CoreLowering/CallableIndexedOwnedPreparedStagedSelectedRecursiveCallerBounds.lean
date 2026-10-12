@@ -26,6 +26,7 @@ open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls)
 universe u
+open CallableLambdaBodyReachability
 
 def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
     (lowered : SourceCoreBasic.LoweredExpr) : GenericExpressionMeaning.Certificate :=
@@ -92,6 +93,13 @@ variable
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt current child code →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
+  {faultRoot : ExpressionId}
+  (uninitializedOn : ∀ current child code,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt current child code →
+    Reaches invocation.source [.expression faultRoot] (.expression child) →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
 
 local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
@@ -100,6 +108,200 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge (headers := headers) (keys := keys)
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
+
+include bridge receiver stagePrepared profile wellFormed runtime covers unique
+  actualFunctionType observations extension semantic closureTerminals namedTerminals
+  sameLedger runtimeLedger uninitializedOn in
+/-- Every strict Source child is supplied by structural recursion at its actual
+reached state. The numeric family supplies only the chosen called-body laws below the fixed
+budget; all caller child laws are constructed here. -/
+theorem preserves_reached
+    (budget : Nat)
+    (closureChildren : ∀ size, size ≤ budget →
+      ∀ {mapping world function native bindings parameterCore resultCore}
+      (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+        bindings parameterCore resultCore),
+      PreservesBelowFor (registry := completion.result.context.registry) (faults := callFaults)
+        association (closureTerminals association) functions size)
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+      ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child
+        (namedTerminals header member).certificate callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode)
+    (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
+    CallsReady root → ∀ size, size ≤ budget →
+      PreservesAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  revert reached
+  induction root with
+  | leaf tree =>
+      intro reached _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves_reached
+        bridge functions extension sameLedger runtimeLedger callFaults uninitializedOn semantic
+        unique wellFormed runtime covers size ⟨tree, reached⟩
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+      intro reached ports size within
+      have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (Point rootScope inner code) callFaults size := by
+        intro childSize _smaller current child actual point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact ih innerReached (fun compiler inside => ports compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size
+        childMeaning size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes header sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached header.metadata.found
+          (by simp [header.form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun compiler inside => ports compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves
+        bridge functions callFaults unique wellFormed runtime covers size childMeaning
+        ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ compiler.entries →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        apply Reaches.expression reached compiler.found
+        simp only [CallableIndirectCallCertificates.Receipt.entries, List.mem_cons] at member
+        rcases member with same | member
+        · have sameId : child = callee := congrArg Prod.fst same
+          simp [compiler.originalForm, ExpressionForm.references, sameId]
+        · simp [compiler.originalForm, ExpressionForm.references, (List.of_mem_zip member).1]
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun nested inside => ports nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      obtain ⟨port⟩ := ports compiler (.here sequence children)
+      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
+          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.preserves
+        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
+        actualFunctionType observations closureTerminals namedTerminals
+        compiler port calleeCertified sequence size childMeaning
+        (closureChildren size within) (namedChildren size within) ⟨rfl, rfl, rfl⟩
+
+include bridge receiver stagePrepared profile wellFormed runtime covers unique
+  actualFunctionType observations extension semantic closureTerminals namedTerminals
+  sameLedger runtimeLedger uninitializedOn in
+/-- Every child native grade comes from structural recursion. The returned
+Source grade is independent, including exact nested stage failure scope. -/
+theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    (budget : Nat)
+    (closureChildren : ∀ size, size ≤ budget →
+      ∀ {mapping world function native bindings parameterCore resultCore}
+      (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+        bindings parameterCore resultCore),
+      ReflectsBelowFor (registry := completion.result.context.registry) (faults := callFaults)
+        association (closureTerminals association) functions size)
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+      ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model stages child
+        (namedTerminals header member).certificate callFaults size)
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode)
+    (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
+    CallsReady root → ∀ size, size ≤ budget →
+      ReflectsAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  revert reached
+  induction root with
+  | leaf tree =>
+      intro reached _ports size _within current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects_reached
+        bridge functions extension sameLedger runtimeLedger callFaults uninitializedOn semantic
+        unique wellFormed runtime covers size ⟨tree, reached⟩
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+      intro reached ports size within
+      have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
+      have childMeaning : ReflectsAt bridge context model stages invocation
+          (Point rootScope inner code) callFaults size := by
+        intro current child actual point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact ih innerReached (fun compiler inside => ports compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size within ⟨rfl, rfl, rfl⟩
+      intro current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size
+        childMeaning (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes header sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached header.metadata.found
+          (by simp [header.form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults (size + 1) := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun compiler inside => ports compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt_succ _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects
+        bridge functions callFaults unique wellFormed runtime covers size childMeaning
+        ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ compiler.entries →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        apply Reaches.expression reached compiler.found
+        simp only [CallableIndirectCallCertificates.Receipt.entries, List.mem_cons] at member
+        rcases member with same | member
+        · have sameId : child = callee := congrArg Prod.fst same
+          simp [compiler.originalForm, ExpressionForm.references, sameId]
+        · simp [compiler.originalForm, ExpressionForm.references, (List.of_mem_zip member).1]
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun nested inside => ports nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      obtain ⟨port⟩ := ports compiler (.here sequence children)
+      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
+          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.reflects
+        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
+        actualFunctionType observations closureTerminals namedTerminals
+        stageEq compiler port calleeCertified sequence size childMeaning
+        (closureChildren size within) (namedChildren size within) ⟨rfl, rfl, rfl⟩
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closureTerminals namedTerminals
@@ -127,58 +329,12 @@ theorem preserves
     CallsReady root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
-  induction root with
-  | leaf tree =>
-      intro _ports size _within current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves
-        bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
-        unique wellFormed runtime covers size tree
-  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro ports size within
-      have childMeaning : PreservesBelow bridge context model stages invocation
-          (Point rootScope inner code) callFaults size := by
-        intro childSize _smaller current child actual point
-        obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih (fun compiler inside => ports compiler
-          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
-      intro current child actual point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size
-        childMeaning size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
-  | @tuple id node ids types codes header sequence children ih =>
-      intro ports size within
-      have childMeaning : PreservesBelow bridge context model stages invocation
-          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
-        intro childSize _smaller current child code entry
-        obtain ⟨rfl, member⟩ := entry
-        exact ih child code member
-          (fun compiler inside => ports compiler
-          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
-      intro current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves
-        bridge functions callFaults unique wellFormed runtime covers size childMeaning
-        ⟨node, ids, types, codes, rfl, header, sequence⟩
-  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro ports size within
-      have childMeaning : PreservesBelow bridge context model stages invocation
-          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
-        intro childSize _smaller current child code entry
-        obtain ⟨rfl, member⟩ := entry
-        exact ih child code member
-          (fun nested inside => ports nested
-          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
-      obtain ⟨port⟩ := ports compiler (.here sequence children)
-      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
-          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
-      intro current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.preserves
-        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
-        actualFunctionType observations closureTerminals namedTerminals
-        compiler port calleeCertified sequence size childMeaning
-        (closureChildren size within) (namedChildren size within) ⟨rfl, rfl, rfl⟩
+  exact preserves_reached (faultRoot := rootId) bridge receiver stagePrepared profile
+    wellFormed runtime covers unique actualFunctionType observations extension semantic
+    closureTerminals namedTerminals sameLedger runtimeLedger
+    (fun current child code receipt _reached => uninitialized current child code receipt)
+    budget closureChildren namedChildren root (.root (by simp))
+
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closureTerminals namedTerminals
@@ -206,57 +362,10 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
     CallsReady root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
-  induction root with
-  | leaf tree =>
-      intro _ports size _within current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects
-        bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
-        unique wellFormed runtime covers size tree
-  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro ports size within
-      have childMeaning : ReflectsAt bridge context model stages invocation
-          (Point rootScope inner code) callFaults size := by
-        intro current child actual point
-        obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih (fun compiler inside => ports compiler
-          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size within ⟨rfl, rfl, rfl⟩
-      intro current child actual point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size
-        childMeaning (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
-  | @tuple id node ids types codes header sequence children ih =>
-      intro ports size within
-      have childMeaning : ReflectsBelow bridge context model stages invocation
-          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults (size + 1) := by
-        intro childSize _smaller current child code entry
-        obtain ⟨rfl, member⟩ := entry
-        exact ih child code member
-          (fun compiler inside => ports compiler
-          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt_succ _smaller) within) ⟨rfl, rfl, rfl⟩
-      intro current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects
-        bridge functions callFaults unique wellFormed runtime covers size childMeaning
-        ⟨node, ids, types, codes, rfl, header, sequence⟩
-  | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro ports size within
-      have childMeaning : ReflectsBelow bridge context model stages invocation
-          (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
-        intro childSize _smaller current child code entry
-        obtain ⟨rfl, member⟩ := entry
-        exact ih child code member
-          (fun nested inside => ports nested
-          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
-      obtain ⟨port⟩ := ports compiler (.here sequence children)
-      have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
-          rootScope callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
-      intro current child code point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds.reflects
-        bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
-        actualFunctionType observations closureTerminals namedTerminals
-        stageEq compiler port calleeCertified sequence size childMeaning
-        (closureChildren size within) (namedChildren size within) ⟨rfl, rfl, rfl⟩
+  exact reflects_reached (faultRoot := rootId) bridge receiver stagePrepared profile
+    wellFormed runtime covers unique actualFunctionType observations extension semantic
+    closureTerminals namedTerminals sameLedger runtimeLedger
+    (fun current child code receipt _reached => uninitialized current child code receipt)
+    stageEq budget closureChildren namedChildren root (.root (by simp))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds

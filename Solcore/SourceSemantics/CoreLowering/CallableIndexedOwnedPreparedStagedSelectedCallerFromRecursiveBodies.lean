@@ -80,7 +80,7 @@ theorem preserves {context invocation scope expression lowered}
       (extension := extension) (semantic := semantic) (closureTerminals := closureTerminals)
       (namedTerminals := namedTerminals) (closureSupport := closureSupport) (namedSupport := namedSupport)
   intro current id child point
-  exact CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.preserves
+  exact CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.preserves_reached
     bridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
     root.support.covers root.support.unique root.support.actualFunctionType observations
     extension semantic closureTerminals namedTerminals root.support.sameLedger
@@ -89,7 +89,7 @@ theorem preserves {context invocation scope expression lowered}
       closureTerminals closureSupport (fun smaller _ => bodies smaller) within)
     (fun childSize within => CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_preserves_below
       namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
-    root.support.certificate root.support.callsReady size (Nat.le_refl _) point
+    root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _) point
 
 include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
@@ -110,7 +110,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       (extension := extension) (semantic := semantic) (closureTerminals := closureTerminals)
       (namedTerminals := namedTerminals) (closureSupport := closureSupport) (namedSupport := namedSupport) stageEq
   intro current id child point
-  exact CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.reflects
+  exact CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.reflects_reached
     bridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
     root.support.covers root.support.unique root.support.actualFunctionType observations
     extension semantic closureTerminals namedTerminals root.support.sameLedger
@@ -119,6 +119,6 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       closureTerminals closureSupport (fun smaller _ => bodies smaller) within)
     (fun childSize within => CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_reflects_below
       namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
-    root.support.certificate root.support.callsReady size (Nat.le_refl _) point
+    root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _) point
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedCallerFromRecursiveBodies

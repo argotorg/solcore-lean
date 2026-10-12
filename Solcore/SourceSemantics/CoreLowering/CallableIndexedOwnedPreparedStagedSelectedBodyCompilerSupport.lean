@@ -76,7 +76,7 @@ def Root.of_compiled
     runtime := runtime
     covers := covers
     actualFunctionType := actualFunctionType
-    uninitialized := uninitialized
+    uninitialized := fun current id code receipt _reached => uninitialized current id code receipt
     callsReady := callsReady }
 
 /-- Packaging retains all actual compiler indices while fixing the original

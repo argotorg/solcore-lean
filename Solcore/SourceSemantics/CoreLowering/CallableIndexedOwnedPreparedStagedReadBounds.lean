@@ -140,16 +140,17 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked rawRegistry functions
 local notation "reads" => LoweredRead fuel (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) invocation.source context reasonAt
 
-include extension uninitialized semantic unique wellFormed runtime covers in
+include extension semantic unique wellFormed runtime covers in
 /-- The accepted local-read compiler discharges preservation internally. A
 stage failure at this atomic occurrence is impossible; semantic failures keep
 their original token, heap and actual caller state. -/
-theorem preserves (size : Nat) :
-    PreservesAt bridge context model registry invocation reads faults size := by
-  intro scope id lowered receipt node found sourceTyped
+theorem preserves_local (size : Nat) :
+    PreservesAt bridge context model registry invocation
+      (fun scope id lowered => reads scope id lowered ∧
+        ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)) faults size := by
+  intro scope id lowered ⟨receipt, readFault⟩ node found sourceTyped
     mapping world administrative environment canonical actual actualContext before store ξ outcome after
     environments heaps locals agrees actualTyped initial admitted trace
-  have readFault := uninitialized scope id lowered receipt
   obtain ⟨certificate, typeEq, binding⟩ := receipt
   have nodeEq := Option.some.inj (certificate.metadata.found.symm.trans found)
   have plain : ∃ plainOutcome : Dynamic.ExpressionOutcome,
@@ -183,16 +184,17 @@ theorem preserves (size : Nat) :
       exact .fault (semantic _ _ matched)
   · exact after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped trace frame
 
-include extension uninitialized semantic unique wellFormed runtime covers in
+include extension semantic unique wellFormed runtime covers in
 /-- A completed native read reconstructs the original atomic Source outcome
 at grade one. Lazy mapping initialization retains its exact written cell and
 every caller row at the same final store. -/
-theorem reflects (size : Nat) :
-    ReflectsAt bridge context model registry invocation reads faults size := by
-  intro scope id lowered receipt node found sourceTyped
+theorem reflects_local (size : Nat) :
+    ReflectsAt bridge context model registry invocation
+      (fun scope id lowered => reads scope id lowered ∧
+        ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)) faults size := by
+  intro scope id lowered ⟨receipt, readFault⟩ node found sourceTyped
     mapping world administrative environment canonical actual actualContext before store ξ value finalStore
     environments heaps locals agrees actualTyped initial admitted completed
-  have readFault := uninitialized scope id lowered receipt
   obtain ⟨certificate, typeEq, binding⟩ := receipt
   have nodeEq := Option.some.inj (certificate.metadata.found.symm.trans found)
   obtain ⟨location, cell, lookup, read, _, _⟩ := locals.lookup binding.declared
@@ -215,5 +217,21 @@ theorem reflects (size : Nat) :
     | value payload => exact .value payload
     | fault matched => exact .fault (semantic _ _ matched)
   · exact after_expression_sized initial reached admitted wellFormed runtime covers locals sourceTyped staged frame
+
+include extension uninitialized semantic unique wellFormed runtime covers in
+/-- The global diagnostic interface follows by restricting it to the actual read. -/
+theorem preserves (size : Nat) :
+    PreservesAt bridge context model registry invocation reads faults size := by
+  intro scope id lowered receipt
+  exact preserves_local bridge functions extension semantic unique wellFormed runtime covers size
+    ⟨receipt, uninitialized scope id lowered receipt⟩
+
+include extension uninitialized semantic unique wellFormed runtime covers in
+/-- The global diagnostic interface follows by restricting it to the actual read. -/
+theorem reflects (size : Nat) :
+    ReflectsAt bridge context model registry invocation reads faults size := by
+  intro scope id lowered receipt
+  exact reflects_local bridge functions extension semantic unique wellFormed runtime covers size
+    ⟨receipt, uninitialized scope id lowered receipt⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedReadBounds

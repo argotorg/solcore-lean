@@ -243,10 +243,12 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
   {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
   {values : SourceCoreCompatibleValues.Context} {scope : SourceCoreLocalCell.Scope}
   {reasonAt : ExpressionId → Word}
-  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor
-    policy compilation readFuel values source scope reasonAt)
-  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor
-    policy compilation readFuel values view scope reasonAt)
+  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn
+    policy compilation readFuel values source scope reasonAt
+      (fun id => Reaches source roots (.expression id)))
+  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn
+    policy compilation readFuel values view scope reasonAt
+      (fun id => Reaches view roots (.expression id)))
   {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
   (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
 include edited avoids sourceProfile viewProfile
@@ -254,8 +256,8 @@ include edited avoids sourceProfile viewProfile
 private theorem policy_read_eq {id : ExpressionId} (tree : Syntax source id)
     (reached : Reaches source roots (.expression id)) :
     policy.readExpression source id = policy.readExpression view id := by
-  rw [sourceProfile.read id tree,
-    viewProfile.read id (syntax_view edited avoids tree reached)]
+  rw [sourceProfile.read id reached tree,
+    viewProfile.read id (reached.metadata edited.metadata) (syntax_view edited avoids tree reached)]
   exact compatible_read_eq edited.metadata (expression_lookup edited avoids reached)
 
 include callables in
@@ -270,11 +272,11 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
   have lookup := expression_lookup edited avoids reached
   have viewFound := lookup.symm.trans found
   have sameRead := policy_read_eq edited avoids sourceProfile viewProfile tree reached
-  have sourceBypass := sourceProfile.special id tree
+  have sourceBypass := sourceProfile.special id reached tree
     (fun budget childSource childScope childId childReasonAt =>
       SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
         compilation childSource childScope childId childReasonAt) (fuel + 1)
-  have viewBypass := viewProfile.special id (syntax_view edited avoids tree reached)
+  have viewBypass := viewProfile.special id (reached.metadata edited.metadata) (syntax_view edited avoids tree reached)
     (fun budget childSource childScope childId childReasonAt =>
       SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
         compilation childSource childScope childId childReasonAt) (fuel + 1)
@@ -297,12 +299,12 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
           all_goals simp only [viewReading]
       | ok output =>
           rcases output with ⟨actualNode, type⟩
-          have compatibleReading := (sourceProfile.read id tree).symm.trans reading
+          have compatibleReading := (sourceProfile.read id reached tree).symm.trans reading
           have actualMetadata := CompatibleExpressionReads.metadata_of_read compatibleReading
           cases Option.some.inj (actualMetadata.found.symm.trans found)
           have viewReading := sameRead.symm.trans reading
           have viewCompatibleReading :=
-            (viewProfile.read id (syntax_view edited avoids tree reached)).symm.trans viewReading
+            (viewProfile.read id (reached.metadata edited.metadata) (syntax_view edited avoids tree reached)).symm.trans viewReading
           have clipped : min (fuel + 1) fuel = fuel := Nat.min_eq_right (Nat.le_succ fuel)
           have readLower := compatible_lower_read_eq edited.metadata (fuel := readFuel)
             (values := values) (scope := scope) (reason := reasonAt id) lookup
@@ -410,7 +412,7 @@ reached node of the supported recursive grammar. Compiler fuel is identical;
 child equalities follow its real predecessor recursion, including ordered
 vectors. No evaluator, raw-type cast, or arbitrary source-insensitive policy is
 assumed. -/
-theorem compiler_eq (fuel : Nat) {id : ExpressionId} (tree : Syntax source id)
+theorem compiler_eq_on (fuel : Nat) {id : ExpressionId} (tree : Syntax source id)
     (reached : Reaches source roots (.expression id)) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt =
       SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope id reasonAt := by
@@ -426,14 +428,46 @@ include callables in
 /-- An accepted Code.view action transfers to the original Source through the
 same factory action, after its actual recursive syntax has been transported.
 Raw typing and declaration authority remain original-source issuer inputs. -/
-theorem accepted_original (fuel : Nat) {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+theorem accepted_original_on (fuel : Nat) {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (tree : Syntax view id) (reached : Reaches source roots (.expression id))
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
       compilation view scope id reasonAt = .ok lowered) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
       compilation source scope id reasonAt = .ok lowered := by
-  exact (compiler_eq edited avoids sourceProfile viewProfile callables fuel
+  exact (compiler_eq_on edited avoids sourceProfile viewProfile callables fuel
     (syntax_original edited avoids tree reached) reached).trans accepted
+end Compiler
+
+section Compiler
+variable {source view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
+  (edited : LocalView source view changed) (avoids : Avoids source roots changed)
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+  {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
+  {values : SourceCoreCompatibleValues.Context} {scope : SourceCoreLocalCell.Scope}
+  {reasonAt : ExpressionId → Word}
+  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor
+    policy compilation readFuel values source scope reasonAt)
+  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor
+    policy compilation readFuel values view scope reasonAt)
+  {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
+  (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
+include edited avoids sourceProfile viewProfile callables
+
+/-- Existing global policy callers restrict their facts to the actual body. -/
+theorem compiler_eq (fuel : Nat) {id : ExpressionId} (tree : Syntax source id)
+    (reached : Reaches source roots (.expression id)) :
+    SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt =
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope id reasonAt :=
+  compiler_eq_on edited avoids (sourceProfile.on _) (viewProfile.on _) callables fuel tree reached
+
+/-- Compatibility wrapper for complete global profiles. -/
+theorem accepted_original (fuel : Nat) {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (tree : Syntax view id) (reached : Reaches source roots (.expression id))
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
+      compilation view scope id reasonAt = .ok lowered) :
+    SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
+      compilation source scope id reasonAt = .ok lowered :=
+  accepted_original_on edited avoids (sourceProfile.on _) (viewProfile.on _) callables fuel tree reached accepted
 end Compiler
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport

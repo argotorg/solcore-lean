@@ -39,6 +39,26 @@ structure PolicyFor (policy : SourceCoreFunctions.Policy) (compilation : SourceC
   lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
   leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
 
+/-- Only occurrences admitted by the enclosing body need policy facts. -/
+structure PolicyOn (policy : SourceCoreFunctions.Policy) (compilation : SourceCoreFunctions.Context)
+    (readFuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
+    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word)
+    (allowed : ExpressionId → Prop) : Prop where
+  special : ∀ id, allowed id → Syntax source id → ∀ child budget, (match policy.lowerSpecial? with
+    | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+    | some lower => lower compilation child budget source scope id reasonAt) = .ok none
+  read : ∀ id, allowed id → Syntax source id → policy.readExpression source id =
+    SourceCoreCompatibleDataExpressions.readExpression values.checked source id
+  lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
+  leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
+
+theorem PolicyFor.on {policy : SourceCoreFunctions.Policy} {compilation : SourceCoreFunctions.Context}
+    {readFuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
+    (profile : PolicyFor policy compilation readFuel values source scope reasonAt)
+    (allowed : ExpressionId → Prop) : PolicyOn policy compilation readFuel values source scope reasonAt allowed :=
+  ⟨fun id _ tree => profile.special id tree, fun id _ tree => profile.read id tree, profile.lower, profile.leaf⟩
+
 inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
     (compilation : SourceCoreFunctions.Context) (readFuel : Nat)
     (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
@@ -119,11 +139,11 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       (inside : Calls compiler (children child childCode member)) :
       Calls compiler (.call outer sequence children)
 
-private theorem product_policy {scope : SourceCoreLocalCell.Scope}
-    (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt) :
-    CompatibleExpressionProducts.PolicyFor policy compilation readFuel values source scope reasonAt :=
-  ⟨fun id tree => policyFor.special id (.leaf tree),
-   fun id tree => policyFor.read id (.leaf tree), policyFor.lower, policyFor.leaf⟩
+private theorem product_policy_on {scope : SourceCoreLocalCell.Scope} {allowed : ExpressionId → Prop}
+    (policyFor : PolicyOn policy compilation readFuel values source scope reasonAt allowed) :
+    CompatibleExpressionProducts.PolicyOn policy compilation readFuel values source scope reasonAt allowed :=
+  ⟨fun id admitted tree => policyFor.special id admitted (.leaf tree),
+   fun id admitted tree => policyFor.read id admitted (.leaf tree), policyFor.lower, policyFor.leaf⟩
 
 private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α → Except ε β} {output : β}
     (accepted : action >>= next = .ok output) : ∃ value, action = .ok value ∧ next value = .ok output := by
@@ -250,61 +270,70 @@ private theorem child_certificates {scope : SourceCoreLocalCell.Scope} {budget :
 
 /-- The actual successful action supplies every recursive compiler child.
 Independent raw Source typing supplies child types before their extraction. -/
-theorem of_functions {scope : SourceCoreLocalCell.Scope}
+theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
-    (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt)
-    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
-    {id : ExpressionId} (syntaxTree : Syntax source id)
+    {allowed : ExpressionId → Prop}
+    (policyFor : PolicyOn policy compilation readFuel values source scope reasonAt allowed)
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) (admitted : allowed id)
     {node : ExpressionNode} (found : source.lookupExpression? id = some node)
     (typed : ExpressionHasType source context id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
       source scope id reasonAt = .ok lowered) :
     Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  revert admitted
   induction syntaxTree generalizing node fuel lowered with
   | leaf tree =>
-    exact .leaf (CallableIndexedOwnedPreparedStagedReadProductTreeBounds.of_functions
-      unique declarations (product_policy policyFor)
-      (fun id node tree found => coercions id node (.leaf tree) found) tree found typed accepted)
+    intro admitted
+    exact .leaf (CallableIndexedOwnedPreparedStagedReadProductTreeBounds.of_functions_on
+      unique declarations (product_policy_on policyFor) closed
+      (fun id node allowed tree found => coercions id node allowed (.leaf tree) found) tree admitted found typed accepted)
   | group originalFound form child ih =>
+    intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
       obtain ⟨metadata, generated⟩ := group_step originalFound form
-        (policyFor.special _ (.group originalFound form child))
-        (policyFor.read _ (.group originalFound form child)) accepted
+        (policyFor.special _ admitted (.group originalFound form child))
+        (policyFor.read _ admitted (.group originalFound form child)) accepted
       obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ :=
         CompatibleExpressionProducts.group_source_types unique originalFound form metadata.coercions typed
-      exact .group metadata form innerFound sourceType (ih innerFound childTyped generated)
+      exact .group metadata form innerFound sourceType (ih innerFound childTyped generated (closed admitted originalFound (by simp [form, ExpressionForm.references])))
   | tuple originalFound form children ih =>
+    intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
       obtain ⟨codes, generated, rfl, metadata⟩ := CompatibleExpressionTuples.of_functions
-        originalFound form (policyFor.special _ (.tuple originalFound form children))
-        (policyFor.read _ (.tuple originalFound form children)) policyFor.leaf accepted
+        originalFound form (policyFor.special _ admitted (.tuple originalFound form children))
+        (policyFor.read _ admitted (.tuple originalFound form children)) policyFor.leaf accepted
       obtain ⟨types, childTyped, sourceType⟩ := CompatibleExpressionTuples.source_types
         unique originalFound form metadata.coercions typed
       obtain ⟨count, nodes, certified⟩ := child_certificates unique childTyped generated
         (fun child member childNode code childFound childTyped childAccepted =>
-          ih child member childFound childTyped childAccepted)
+          ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
       exact .tuple ⟨metadata, form, sourceType⟩
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
             (_root_.List.zip _ _) scope child code))) certified
   | @call callId _original _callee _ids _metadata originalFound form calleeSyntax children calleeIH ih =>
+    intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
-      have special := policyFor.special _ (.call originalFound form calleeSyntax children)
-      have readPolicy := policyFor.read _ (.call originalFound form calleeSyntax children)
+      have special := policyFor.special _ admitted (.call originalFound form calleeSyntax children)
+      have readPolicy := policyFor.read _ admitted (.call originalFound form calleeSyntax children)
       obtain ⟨type, read⟩ := call_read originalFound form special readPolicy accepted
       obtain ⟨compiler⟩ := CallableIndirectCallCertificates.of_functions originalFound form special read form accepted
       have parent := CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.source_parent compiler readPolicy
@@ -317,9 +346,11 @@ theorem of_functions {scope : SourceCoreLocalCell.Scope}
       obtain ⟨calleeNode, contains, sourceType⟩ := calleeTyped.stored_type
       have calleeFound := lookupExpression?_complete unique contains
       have calleeCertified := calleeIH calleeFound (sourceType ▸ calleeTyped) compiler.calleeAccepted
+        (closed admitted originalFound (by simp [form, ExpressionForm.references]))
       obtain ⟨count, nodes, certified⟩ := child_certificates unique argumentsTyped compiler.argumentsAccepted
         (fun child member childNode code childFound childTyped childAccepted =>
-          ih child member childFound childTyped childAccepted)
+          ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
       refine .call compiler (CompatibleExpressionConstructors.sequence_of_nodes count nodes ?_) ?_
       · intro child code member
         exact ⟨rfl, List.mem_cons_of_mem _ member⟩
@@ -327,5 +358,21 @@ theorem of_functions {scope : SourceCoreLocalCell.Scope}
         rcases List.mem_cons.mp member with head | remaining
         · cases head; exact calleeCertified
         · exact certified child code remaining
+
+theorem of_functions {scope : SourceCoreLocalCell.Scope}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (policyFor : PolicyFor policy compilation readFuel values source scope reasonAt)
+    (coercions : ∀ id node, Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact of_functions_on unique declarations (policyFor.on (fun _ => True))
+    (fun _ _ _ => trivial) (fun id node _ tree found => coercions id node tree found)
+    syntaxTree trivial found typed accepted
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates

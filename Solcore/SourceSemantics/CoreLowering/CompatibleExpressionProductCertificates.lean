@@ -137,6 +137,27 @@ structure PolicyFor (policy : SourceCoreFunctions.Policy) (context : SourceCoreF
   lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
   leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
 
+/-- Policy facts are needed only at occurrences admitted by the enclosing
+body. The closed set is supplied independently of compiler execution. -/
+structure PolicyOn (policy : SourceCoreFunctions.Policy) (context : SourceCoreFunctions.Context)
+    (readFuel : Nat) (values : ValuesContext) (source : TypedSource) (scope : Scope)
+    (reasonAt : ExpressionId → Word) (allowed : ExpressionId → Prop) : Prop where
+  special : ∀ id, allowed id → Syntax source id → ∀ child budget, (match policy.lowerSpecial? with
+    | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+    | some lower => lower context child budget source scope id reasonAt) = .ok none
+  read : ∀ id, allowed id → Syntax source id → policy.readExpression source id =
+    SourceCoreCompatibleDataExpressions.readExpression values.checked source id
+  lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
+  leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
+
+/-- Existing global profiles supply every restricted profile. -/
+theorem PolicyFor.on {policy : SourceCoreFunctions.Policy} {context : SourceCoreFunctions.Context}
+    {readFuel : Nat} {values : ValuesContext} {source : TypedSource} {scope : Scope}
+    {reasonAt : ExpressionId → Word}
+    (profile : PolicyFor policy context readFuel values source scope reasonAt)
+    (allowed : ExpressionId → Prop) : PolicyOn policy context readFuel values source scope reasonAt allowed :=
+  ⟨fun id _ tree => profile.special id tree, fun id _ tree => profile.read id tree, profile.lower, profile.leaf⟩
+
 /- Actual successful compilation extracts the complete finite tree. The
 source typing proof supplies raw group/product shape and ordinary local scheme
 agreement; successful native projection is not used as a substitute. -/
@@ -164,6 +185,95 @@ theorem LiteralFactory.ordinary {policy body context values source scope reasonA
   have receipt := CompatibleExpressionLiterals.of_functions found atomic unitType special readPolicy leafPolicy accepted
   exact ⟨receipt, receipt⟩
 
+theorem tree_of_functions_with_literals_on
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
+    {source : TypedSource} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {sourceContext : SourceSemantics.Context}
+    (literals : GenericExpressionMeaning.Certificate)
+    (literalFactory : CompatibleExpressionProducts.LiteralFactory policy body context values source scope reasonAt literals)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope sourceContext)
+    {allowed : ExpressionId → Prop}
+    (policyFor : PolicyOn policy context readFuel values source scope reasonAt allowed)
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) (admitted : allowed id) {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source sourceContext id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
+    Tree.WithLiterals (fuel := readFuel) (values := values) (source := source)
+      (context := sourceContext) (solved := context.solvedRequirements) (reasonAt := reasonAt) literals scope id lowered := by
+  revert admitted
+  induction syntaxTree generalizing node fuel lowered with
+  | literal originalFound atomic =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    obtain ⟨receipt, leaf⟩ := literalFactory originalFound atomic
+      (unit_source_type unique originalFound (coercions _ _ admitted (.literal originalFound atomic) originalFound) typed)
+      (policyFor.special _ admitted (.literal originalFound atomic)) (policyFor.read _ admitted (.literal originalFound atomic)) policyFor.leaf accepted
+    exact ⟨_, .literal receipt leaf⟩
+  | read originalFound form =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.read originalFound form)) (policyFor.read _ admitted (.read originalFound form))
+        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
+      cases step with
+      | read otherForm read generated =>
+        exact ⟨_, .read (CompatibleExpressionReads.loweredRead_of_accepted generated read unique declarations typed)⟩
+      | group otherForm _ _ => simp [form] at otherForm
+      | pair otherForm _ _ _ => simp [form] at otherForm
+  | group originalFound form child ih =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.group originalFound form child)) (policyFor.read _ admitted (.group originalFound form child))
+        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
+      cases step with
+      | read otherForm _ _ => simp [form] at otherForm
+      | group otherForm metadata generated =>
+        have same := ExpressionForm.group.inj (form.symm.trans otherForm)
+        subst_vars
+        obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ := group_source_types unique originalFound form metadata.coercions typed
+        obtain ⟨acceptedChild1, acceptedChild1Sites⟩ := ih innerFound childTyped generated (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        exact ⟨_, .group metadata form innerFound sourceType acceptedChild1 acceptedChild1Sites⟩
+      | pair otherForm _ _ _ => simp [form] at otherForm
+  | pair originalFound form first second leftIH rightIH =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.pair originalFound form first second)) (policyFor.read _ admitted (.pair originalFound form first second))
+        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
+      cases step with
+      | read otherForm _ _ => simp [form] at otherForm
+      | group otherForm _ _ => simp [form] at otherForm
+      | pair otherForm metadata generated secondGenerated =>
+        have same := ExpressionForm.tuple.inj (form.symm.trans otherForm)
+        simp only [List.cons.injEq, and_true] at same
+        obtain ⟨rfl, rfl⟩ := same
+        obtain ⟨leftNode, rightNode, leftFound, rightFound, sourceType, leftTyped, rightTyped⟩ :=
+          pair_source_types unique originalFound form metadata.coercions typed
+        obtain ⟨acceptedChild2, acceptedChild2Sites⟩ := leftIH leftFound leftTyped generated (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        obtain ⟨acceptedChild3, acceptedChild3Sites⟩ := rightIH rightFound rightTyped secondGenerated (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        exact ⟨_, .pair metadata form leftFound rightFound sourceType
+          acceptedChild2 acceptedChild3 acceptedChild2Sites acceptedChild3Sites⟩
+
 theorem tree_of_functions_with_literals
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {readFuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
@@ -182,68 +292,9 @@ theorem tree_of_functions_with_literals
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope id reasonAt = .ok lowered) :
     Tree.WithLiterals (fuel := readFuel) (values := values) (source := source)
       (context := sourceContext) (solved := context.solvedRequirements) (reasonAt := reasonAt) literals scope id lowered := by
-  induction syntaxTree generalizing node fuel lowered with
-  | literal originalFound atomic =>
-    have same := Option.some.inj (originalFound.symm.trans found)
-    subst node
-    obtain ⟨receipt, leaf⟩ := literalFactory originalFound atomic
-      (unit_source_type unique originalFound (coercions _ _ (.literal originalFound atomic) originalFound) typed)
-      (policyFor.special _ (.literal originalFound atomic)) (policyFor.read _ (.literal originalFound atomic)) policyFor.leaf accepted
-    exact ⟨_, .literal receipt leaf⟩
-  | read originalFound form =>
-    have same := Option.some.inj (originalFound.symm.trans found)
-    subst node
-    cases fuel with
-    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
-    | succ fuel =>
-      have step := step_of_functions originalFound (by rw [form]; constructor)
-        (policyFor.special _ (.read originalFound form)) (policyFor.read _ (.read originalFound form))
-        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
-      cases step with
-      | read otherForm read generated =>
-        exact ⟨_, .read (CompatibleExpressionReads.loweredRead_of_accepted generated read unique declarations typed)⟩
-      | group otherForm _ _ => simp [form] at otherForm
-      | pair otherForm _ _ _ => simp [form] at otherForm
-  | group originalFound form child ih =>
-    have same := Option.some.inj (originalFound.symm.trans found)
-    subst node
-    cases fuel with
-    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
-    | succ fuel =>
-      have step := step_of_functions originalFound (by rw [form]; constructor)
-        (policyFor.special _ (.group originalFound form child)) (policyFor.read _ (.group originalFound form child))
-        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
-      cases step with
-      | read otherForm _ _ => simp [form] at otherForm
-      | group otherForm metadata generated =>
-        have same := ExpressionForm.group.inj (form.symm.trans otherForm)
-        subst_vars
-        obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ := group_source_types unique originalFound form metadata.coercions typed
-        obtain ⟨acceptedChild1, acceptedChild1Sites⟩ := ih innerFound childTyped generated
-        exact ⟨_, .group metadata form innerFound sourceType acceptedChild1 acceptedChild1Sites⟩
-      | pair otherForm _ _ _ => simp [form] at otherForm
-  | pair originalFound form first second leftIH rightIH =>
-    have same := Option.some.inj (originalFound.symm.trans found)
-    subst node
-    cases fuel with
-    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
-    | succ fuel =>
-      have step := step_of_functions originalFound (by rw [form]; constructor)
-        (policyFor.special _ (.pair originalFound form first second)) (policyFor.read _ (.pair originalFound form first second))
-        (congrFun (congrFun (congrFun (congrFun policyFor.lower source) scope) _) _) accepted
-      cases step with
-      | read otherForm _ _ => simp [form] at otherForm
-      | group otherForm _ _ => simp [form] at otherForm
-      | pair otherForm metadata generated secondGenerated =>
-        have same := ExpressionForm.tuple.inj (form.symm.trans otherForm)
-        simp only [List.cons.injEq, and_true] at same
-        obtain ⟨rfl, rfl⟩ := same
-        obtain ⟨leftNode, rightNode, leftFound, rightFound, sourceType, leftTyped, rightTyped⟩ :=
-          pair_source_types unique originalFound form metadata.coercions typed
-        obtain ⟨acceptedChild2, acceptedChild2Sites⟩ := leftIH leftFound leftTyped generated
-        obtain ⟨acceptedChild3, acceptedChild3Sites⟩ := rightIH rightFound rightTyped secondGenerated
-        exact ⟨_, .pair metadata form leftFound rightFound sourceType
-          acceptedChild2 acceptedChild3 acceptedChild2Sites acceptedChild3Sites⟩
+  exact tree_of_functions_with_literals_on literals literalFactory unique declarations
+    (policyFor.on (fun _ => True)) (fun _ _ _ => trivial)
+    (fun id node _ tree found => coercions id node tree found) syntaxTree trivial found typed accepted
 
 /-- Original tree-only API, projected from the single supported extraction. -/
 theorem tree_of_functions

@@ -16,8 +16,8 @@ open CallableLambdaViewEdits CallableLambdaBodyReachability
 open CallableIndexedOwnedPreparedStagedDiscardSequenceCompilerReceipts (FlowReceipt Receipt)
 open CallableIndexedOwnedPreparedStagedMixedDiscardSequenceFlowBounds (Tree)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (RootAt)
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Syntax PolicyFor Certificate)
-open CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories (OriginalConditions)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Syntax PolicyOn Certificate)
+open CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories (OriginalConditionsOn)
 
 private theorem tree_nonempty {compiled : SourceCoreUnifiedCompilation.Compiled}
     {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
@@ -118,11 +118,13 @@ structure Static (receipt : Receipt statementPolicy fuel view scope statements r
     reasonAt fellThrough escaped bodyCode) where
   edited : LocalView invocation.source view changed
   avoids : Avoids invocation.source (statements.map NodeId.statement) changed
-  sourceProfile : PolicyFor policy compilation readFuel
+  sourceProfile : PolicyOn policy compilation readFuel
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
     invocation.source scope reasonAt
-  viewProfile : PolicyFor policy compilation readFuel
+      (fun id => Reaches invocation.source (statements.map NodeId.statement) (.expression id))
+  viewProfile : PolicyOn policy compilation readFuel
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) view scope reasonAt
+      (fun id => Reaches view (statements.map NodeId.statement) (.expression id))
   callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active
   expressionCallback : statementPolicy.lowerExpression = fun childFuel source current id token =>
     SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min childFuel bodyFuel)
@@ -132,8 +134,8 @@ structure Static (receipt : Receipt statementPolicy fuel view scope statements r
   sameSource : invocation.source = function.source
   body : function.body = statements
   syntaxTree : ∀ expression child, receipt.tree.Children expression child → Syntax view expression
-  conditions : OriginalConditions compiled policy compilation readFuel context invocation
-    reasonAt scope semanticFaults
+  conditions : OriginalConditionsOn compiled policy compilation readFuel context invocation
+    reasonAt scope (statements.map NodeId.statement) semanticFaults
 
 variable {receipt : Receipt statementPolicy fuel view scope statements result reasonAt
     fellThrough escaped bodyCode}
@@ -174,8 +176,10 @@ def Static.authority (expression : ExpressionId) (child : SourceCoreBasic.Lowere
         expression child used
     have same : original = node := Option.some.inj (originalFound.symm.trans found)
     simpa only [same] using originalTyped
-  exact CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.original_authority
-    packet.conditions ⟨node, found, rfl, typed⟩
+  exact CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.original_authority_on
+    packet.conditions
+    (CallableIndexedOwnedPreparedStagedDiscardSequenceSourceBodyTyping.children_reached
+      receipt.tree packet.edited.metadata expression child used) ⟨node, found, rfl, typed⟩
 
 private theorem view_action {expression : ExpressionId} {child : SourceCoreBasic.LoweredExpr}
     (used : receipt.tree.Children expression child) :
@@ -191,7 +195,7 @@ theorem Static.certificate (expression : ExpressionId) (child : SourceCoreBasic.
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt scope expression child := by
   obtain ⟨childFuel, generated⟩ := view_action packet used
-  exact CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.issued_certificate
+  exact CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.issued_certificate_on
     packet.edited packet.avoids packet.sourceProfile packet.viewProfile packet.callables
     (packet.syntaxTree expression child used)
     (CallableIndexedOwnedPreparedStagedDiscardSequenceSourceBodyTyping.children_reached
@@ -209,7 +213,7 @@ theorem Static.root (ready : Ready packet) (expression : ExpressionId)
     (child : SourceCoreBasic.LoweredExpr) (used : receipt.tree.Children expression child) :
     Nonempty (RootAt compiled context invocation scope expression child semanticFaults) := by
   obtain ⟨childFuel, generated⟩ := view_action packet used
-  exact ⟨CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.rootAt_of_view_action
+  exact ⟨CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.rootAt_of_view_action_on
     packet.edited packet.avoids packet.sourceProfile packet.viewProfile packet.callables
     (packet.syntaxTree expression child used)
     (CallableIndexedOwnedPreparedStagedDiscardSequenceSourceBodyTyping.children_reached

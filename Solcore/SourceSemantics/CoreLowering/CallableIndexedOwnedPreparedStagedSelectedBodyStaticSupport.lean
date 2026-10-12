@@ -51,6 +51,7 @@ structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
     CompatibleExpressionReads.LoweredRead readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt current id code →
+    CallableLambdaBodyReachability.Reaches invocation.source [.expression expression] (.expression id) →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)
   callsReady : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
     (compiled := compiled) (invocation := invocation) certificate

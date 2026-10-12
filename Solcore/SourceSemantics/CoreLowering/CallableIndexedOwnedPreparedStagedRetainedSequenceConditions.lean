@@ -15,7 +15,7 @@ open CallableIndexedLambdaValues
 open CallableLambdaBodyReachability
 open CallableIndexedOwnedContextualLambdaProvenance (BodyView)
 open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Syntax)
-open CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles (MetadataFor retained_policy_for)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles (MetadataFor MetadataOn retained_policy_for retained_policy_on)
 open CallableIndexedOwnedPreparedStagedDiscardSequenceRecipeCompilerFactories (Choice Conditions)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (parameterScope)
 
@@ -31,11 +31,12 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     (Program.ofChecked compiled.sourceProgram) bodyRegistry semanticFaults)
 
 /-- Every proof refers to the same original Code, full Source and entry context. -/
-def conditions
+def conditions_on
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
     (bodyView : BodyView code)
     (original : MetadataFor compiled.indexed named function.source)
-    (viewed : MetadataFor compiled.indexed named code.view)
+    (viewed : MetadataOn compiled.indexed named code.view
+      (fun id => Reaches code.view (function.body.map NodeId.statement) (.expression id)))
     (treeSyntax : ∀ id, Reaches function.source (function.body.map NodeId.statement) (.expression id) →
       Syntax code.view id)
     (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
@@ -45,6 +46,7 @@ def conditions
       CompatibleExpressionReads.LoweredRead compiled.indexed.fuel
         (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         function.source body.context code.reasonAt current id lowered →
+      Reaches function.source (function.body.map NodeId.statement) (.expression id) →
       ∀ location, semanticFaults (.uninitializedLocation location) (code.reasonAt id))
     (choice : Choice code (stages := stages)) : Conditions code body choice where
   readFuel := compiled.indexed.fuel
@@ -60,8 +62,8 @@ def conditions
   sourceProfile := by
     intro child selected
     rw [stages.source selected]
-    exact retained_policy_for retained original _ _
-  viewProfile := retained_policy_for retained viewed _ _
+    exact (retained_policy_for retained original _ _).on _
+  viewProfile := retained_policy_on retained viewed _ _
   syntaxTree := by
     intro expression child used
     exact treeSyntax expression
@@ -69,9 +71,30 @@ def conditions
         choice.packet.receipt.tree code.viewOfSource expression child used)
   original := by
     intro child selected
-    exact CallableIndexedOwnedPreparedStagedLambdaOriginalConditions.at_selected_scope
+    exact CallableIndexedOwnedPreparedStagedLambdaOriginalConditions.at_selected_scope_on
       code body declarations (fun id node tree found => original.coercions id tree node found)
         wellFormed selected
       (by simpa only [stages.source selected, choice.reason] using uninitialized)
+
+/-- Legacy global metadata and faults specialize to the actual body. -/
+def conditions
+    (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
+    (bodyView : BodyView code)
+    (original : MetadataFor compiled.indexed named function.source)
+    (viewed : MetadataFor compiled.indexed named code.view)
+    (treeSyntax : ∀ id, Reaches function.source (function.body.map NodeId.statement) (.expression id) →
+      Syntax code.view id)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
+      scope function.context)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (uninitialized : ∀ current id lowered,
+      CompatibleExpressionReads.LoweredRead compiled.indexed.fuel
+        (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+        function.source body.context code.reasonAt current id lowered →
+      ∀ location, semanticFaults (.uninitializedLocation location) (code.reasonAt id))
+    (choice : Choice code (stages := stages)) : Conditions code body choice :=
+  conditions_on code body retained bodyView original (viewed.on _)
+    treeSyntax declarations wellFormed
+    (fun current id lowered receipt _reached => uninitialized current id lowered receipt) choice
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRetainedSequenceConditions

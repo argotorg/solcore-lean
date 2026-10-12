@@ -44,7 +44,94 @@ structure OriginalAuthority (compiled : SourceCoreUnifiedCompilation.Compiled)
     CompatibleExpressionReads.LoweredRead readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt current id code →
+    Reaches invocation.source [.expression expression] (.expression id) →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)
+
+section ViewActionOn
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+  {compilation : SourceCoreFunctions.Context} {readFuel fuel : Nat}
+  {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
+  {view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
+  {reasonAt : ExpressionId → Word} {scope : SourceCoreLocalCell.Scope}
+  {expression : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+  {rawType : TypeSystem.Ty} {semanticFaults : FunctionCalls.FaultRep}
+  {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
+
+variable
+  (edited : LocalView invocation.source view changed)
+  (avoids : Avoids invocation.source roots changed)
+  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn policy compilation readFuel
+    (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+    invocation.source scope reasonAt (fun id => Reaches invocation.source roots (.expression id)))
+  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyOn policy compilation readFuel
+    (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+    view scope reasonAt (fun id => Reaches view roots (.expression id)))
+  (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
+  (tree : Syntax view expression)
+  (reached : Reaches invocation.source roots (.expression expression))
+  (authority : OriginalAuthority compiled policy compilation readFuel context invocation
+    reasonAt scope expression rawType semanticFaults)
+  (acceptedView : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
+    compilation view scope expression reasonAt = .ok lowered)
+
+include edited avoids sourceProfile viewProfile callables tree reached authority acceptedView
+
+/-- The genuine original acceptance is constructed before recursive extraction.
+Only original lookup/type/declaration authority feeds that extractor. -/
+theorem issued_certificate_on :
+    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Certificate
+      policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt scope expression lowered := by
+  have acceptedOriginal :=
+    CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.accepted_original_on
+      edited avoids sourceProfile viewProfile callables fuel tree reached acceptedView
+  exact CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_functions_on
+    authority.unique authority.declarations sourceProfile
+    (fun parent found edge => Reaches.expression parent found edge)
+    (fun id node _ tree found => authority.coercions id node tree found)
+    (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original
+      edited avoids tree reached) reached authority.found authority.typed acceptedOriginal
+
+/-- Ready is static Port authority for calls inside this exact issued proof.
+It cannot stand for execution or a certificate family on unrelated terminals. -/
+def of_view_action_on
+    (ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
+      (compiled := compiled) (invocation := invocation)
+      (issued_certificate_on edited avoids sourceProfile viewProfile callables
+        tree reached authority acceptedView)) :
+    Root compiled policy body compilation readFuel context invocation reasonAt
+      scope expression lowered rawType semanticFaults where
+  compilerFuel := fuel
+  accepted := CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.accepted_original_on
+    edited avoids sourceProfile viewProfile callables fuel tree reached acceptedView
+  certificate := issued_certificate_on edited avoids sourceProfile viewProfile callables
+    tree reached authority acceptedView
+  node := authority.node
+  found := authority.found
+  rawResult := authority.rawResult
+  typed := authority.typed
+  sameLedger := authority.sameLedger
+  runtimeLedger := authority.runtimeLedger
+  unique := authority.unique
+  wellFormed := authority.wellFormed
+  runtime := authority.runtime
+  covers := authority.covers
+  actualFunctionType := authority.actualFunctionType
+  uninitialized := authority.uninitialized
+  callsReady := ready
+
+/-- Existential compiler packaging retains the same original indices. -/
+def rootAt_of_view_action_on
+    (ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
+      (compiled := compiled) (invocation := invocation)
+      (issued_certificate_on edited avoids sourceProfile viewProfile callables
+        tree reached authority acceptedView)) :
+    RootAt compiled context invocation scope expression lowered semanticFaults :=
+  RootAt.ofRoot (of_view_action_on edited avoids sourceProfile viewProfile callables
+    tree reached authority acceptedView ready)
+end ViewActionOn
 
 section ViewAction
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -76,50 +163,24 @@ variable
 
 include edited avoids sourceProfile viewProfile callables tree reached authority acceptedView
 
-/-- The genuine original acceptance is constructed before recursive extraction.
-Only original lookup/type/declaration authority feeds that extractor. -/
 theorem issued_certificate :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Certificate
       policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
-      invocation.source context reasonAt scope expression lowered := by
-  have acceptedOriginal :=
-    CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.accepted_original
-      edited avoids sourceProfile viewProfile callables fuel tree reached acceptedView
-  exact CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_functions
-    authority.unique authority.declarations sourceProfile authority.coercions
-    (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original
-      edited avoids tree reached) authority.found authority.typed acceptedOriginal
+      invocation.source context reasonAt scope expression lowered :=
+  issued_certificate_on edited avoids (sourceProfile.on _) (viewProfile.on _) callables
+    tree reached authority acceptedView
 
-/-- Ready is static Port authority for calls inside this exact issued proof.
-It cannot stand for execution or a certificate family on unrelated terminals. -/
 def of_view_action
     (ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := invocation)
       (issued_certificate edited avoids sourceProfile viewProfile callables
         tree reached authority acceptedView)) :
     Root compiled policy body compilation readFuel context invocation reasonAt
-      scope expression lowered rawType semanticFaults where
-  compilerFuel := fuel
-  accepted := CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.accepted_original
-    edited avoids sourceProfile viewProfile callables fuel tree reached acceptedView
-  certificate := issued_certificate edited avoids sourceProfile viewProfile callables
-    tree reached authority acceptedView
-  node := authority.node
-  found := authority.found
-  rawResult := authority.rawResult
-  typed := authority.typed
-  sameLedger := authority.sameLedger
-  runtimeLedger := authority.runtimeLedger
-  unique := authority.unique
-  wellFormed := authority.wellFormed
-  runtime := authority.runtime
-  covers := authority.covers
-  actualFunctionType := authority.actualFunctionType
-  uninitialized := authority.uninitialized
-  callsReady := ready
+      scope expression lowered rawType semanticFaults :=
+  of_view_action_on edited avoids (sourceProfile.on _) (viewProfile.on _) callables
+    tree reached authority acceptedView ready
 
-/-- Existential compiler packaging retains the same original indices. -/
 def rootAt_of_view_action
     (ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := invocation)

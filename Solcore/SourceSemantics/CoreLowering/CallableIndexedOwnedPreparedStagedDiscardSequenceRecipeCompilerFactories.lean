@@ -18,8 +18,8 @@ open CallableIndexedLambdaValues CallableIndexedNamedGeneration
 open CallableIndexedOwnedContextualLambdaBodyRecipes (Retained BodyRecipe)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedSelectedBodyCompilerCallbacks (loop_policy)
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Syntax PolicyFor)
-open CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories (OriginalConditions)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Syntax PolicyOn)
+open CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories (OriginalConditionsOn)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
   (Sequence SequenceSupport PacketFor SupportFor parameterScope)
 open CallableLambdaViewEdits CallableLambdaBodyReachability
@@ -91,17 +91,19 @@ structure Conditions where
   avoids : ∀ child, stages.Closure function child →
     Avoids child.source (function.body.map NodeId.statement) changed
   sourceProfile : ∀ child, stages.Closure function child →
-    PolicyFor code.policy code.compilation readFuel
+    PolicyOn code.policy code.compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) child.source
       (parameterScope code) choice.packet.reasonAt
-  viewProfile : PolicyFor code.policy code.compilation readFuel
+      (fun id => Reaches child.source (function.body.map NodeId.statement) (.expression id))
+  viewProfile : PolicyOn code.policy code.compilation readFuel
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) code.view
     (parameterScope code) choice.packet.reasonAt
+    (fun id => Reaches code.view (function.body.map NodeId.statement) (.expression id))
   syntaxTree : ∀ expression childCode,
     choice.packet.receipt.tree.Children expression childCode → Syntax code.view expression
   original : ∀ child, stages.Closure function child →
-    OriginalConditions compiled code.policy code.compilation readFuel body.toContext.context child
-      choice.packet.reasonAt (parameterScope code) semanticFaults
+    OriginalConditionsOn compiled code.policy code.compilation readFuel body.toContext.context child
+      choice.packet.reasonAt (parameterScope code) (function.body.map NodeId.statement) semanticFaults
 
 /-- The checked issuer transports actual reached actions to original Source.
 Frame and parameter typing come from the same BodyWith input context. -/

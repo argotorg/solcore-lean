@@ -62,7 +62,7 @@ theorem preserves (size : Nat) :
   induction size using Nat.strongRecOn with
   | ind size ih =>
     intro context invocation scope expression lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.preserves
+    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.preserves_reached
       poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
       root.support.covers root.support.unique root.support.actualFunctionType observations
       extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
@@ -70,7 +70,7 @@ theorem preserves (size : Nat) :
       (fun childSize within =>
         CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_preserves_below
           namedTerminals namedSupport ih within)
-      root.support.certificate root.support.callsReady size (Nat.le_refl _)
+      root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
 /-- Only called-body evaluation decreases numerically. Structural group and
@@ -82,7 +82,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
   induction size using Nat.strongRecOn with
   | ind size ih =>
     intro context invocation scope expression lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.reflects
+    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.reflects_reached
       poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
       root.support.covers root.support.unique root.support.actualFunctionType observations
       extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
@@ -90,6 +90,6 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       (fun childSize within =>
         CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_reflects_below
           namedTerminals namedSupport ih within)
-      root.support.certificate root.support.callsReady size (Nat.le_refl _)
+      root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds

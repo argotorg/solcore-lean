@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedReadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedProductTreeBounds
 
@@ -16,6 +17,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 universe u
+open CallableLambdaBodyReachability
 
 /-- The original compiler tree and LiteralSites are paired at the same code,
 Source context and read fuel. Only static receipts are retained. -/
@@ -59,6 +61,34 @@ theorem of_functions
     (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate compilation.solvedRequirements source id code)
     selected_literals unique declarations policyFor coercions syntaxTree found typed accepted
 
+/-- Accepted extraction needs compiler facts only along the admitted source paths. -/
+theorem of_functions_on
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {readFuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
+    {context : SourceSemantics.Context}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {allowed : ExpressionId → Prop}
+    (policyFor : CompatibleExpressionProducts.PolicyOn policy compilation readFuel values source scope reasonAt allowed)
+    (closed : ∀ {parent node child}, allowed parent →
+      source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → CompatibleExpressionProducts.Syntax source id →
+      source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : CompatibleExpressionProducts.Syntax source id)
+    (admitted : allowed id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate readFuel values source context compilation.solvedRequirements reasonAt scope id lowered := by
+  exact CompatibleExpressionProducts.tree_of_functions_with_literals_on
+    (fun _ id code => CompatibleExpressionLiteralRuntime.Certificate compilation.solvedRequirements source id code)
+    selected_literals unique declarations policyFor closed coercions syntaxTree admitted found typed accepted
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
@@ -81,6 +111,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
     CompatibleExpressionReads.LoweredRead readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt scope id lowered →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
+  {faultRoot : ExpressionId}
+  (uninitializedOn : ∀ scope id lowered,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt scope id lowered →
+    Reaches invocation.source [.expression faultRoot] (.expression id) →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id))
   (semantic : ∀ reason token, semanticFaults reason token → faults (.semantic reason) token)
   (unique : NodeOccurrencesUnique invocation.source)
@@ -108,82 +145,122 @@ private theorem product_values :
   intro mapping world leftType rightType left right first second firstType secondType firstValue secondValue
   exact .product firstValue secondValue
 
-include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
+include extension sameLedger runtimeLedger uninitializedOn semantic unique wellFormed runtime covers in
 /-- LiteralSites recursion proves each actual Source child internally. A read
 uses its genuine local certificate; no read or whole-child meaning is supplied. -/
-theorem preserves (size : Nat) :
-    PreservesAt bridge context valueModel registry invocation trees faults size := by
-  intro scope id lowered ⟨tree, sites⟩
+theorem preserves_reached (size : Nat) :
+    PreservesAt bridge context valueModel registry invocation
+      (fun scope id lowered => trees scope id lowered ∧
+        Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
+  intro scope id lowered ⟨⟨tree, sites⟩, reached⟩
+  revert reached
   induction sites generalizing size with
   | literal _ receipt =>
-      intro actualNode
+      intro _reached actualNode
       exact CallableIndexedOwnedPreparedStagedLiteralGroupBounds.literal_preserves
         functions bridge sameLedger runtimeLedger unique wellFormed runtime covers faults size receipt
   | read receipt =>
-      intro actualNode
-      exact CallableIndexedOwnedPreparedStagedReadBounds.preserves bridge functions extension
-        uninitialized semantic unique wellFormed runtime covers size receipt
+      intro reached actualNode
+      exact CallableIndexedOwnedPreparedStagedReadBounds.preserves_local bridge functions extension
+        semantic unique wellFormed runtime covers size ⟨receipt, uninitializedOn scope _ _ receipt reached⟩
   | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
+      intro reached
+      have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have children : PreservesBelow bridge context valueModel registry invocation
           (Point scope inner lowered) faults size := by
         intro childSize _smaller current child code point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih childSize
+        exact ih childSize innerReached
       intro actualNode
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size children
         size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType
       leftTree rightTree leftSites rightSites leftIH rightIH =>
+      intro reached
+      have leftReached : Reaches invocation.source [.expression faultRoot] (.expression left) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
+      have rightReached : Reaches invocation.source [.expression faultRoot] (.expression right) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have children : PreservesBelow bridge context valueModel registry invocation
           (Two scope left right first second) faults size := by
         intro childSize _smaller current child code point
         obtain ⟨rfl, alternative⟩ := point
         cases alternative with
-        | inl left => obtain ⟨rfl, rfl⟩ := left; exact leftIH childSize
-        | inr right => obtain ⟨rfl, rfl⟩ := right; exact rightIH childSize
+        | inl left => obtain ⟨rfl, rfl⟩ := left; exact leftIH childSize leftReached
+        | inr right => obtain ⟨rfl, rfl⟩ := right; exact rightIH childSize rightReached
       intro actualNode
       exact CallableIndexedOwnedPreparedStagedPairBounds.pair_preserves bridge unique wellFormed
         runtime covers (product_values functions) size children size (Nat.le_refl _)
         (.actual metadata form leftFound rightFound sourceType
           ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
 
-include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
+include extension sameLedger runtimeLedger uninitializedOn semantic unique wellFormed runtime covers in
 /-- Reflection follows the same finite sites at independent native grades.
 Grouping recurses at the same grade; actual pair binds supply strict children. -/
-theorem reflects (size : Nat) :
-    ReflectsAt bridge context valueModel registry invocation trees faults size := by
-  intro scope id lowered ⟨tree, sites⟩
+theorem reflects_reached (size : Nat) :
+    ReflectsAt bridge context valueModel registry invocation
+      (fun scope id lowered => trees scope id lowered ∧
+        Reaches invocation.source [.expression faultRoot] (.expression id)) faults size := by
+  intro scope id lowered ⟨⟨tree, sites⟩, reached⟩
+  revert reached
   induction sites generalizing size with
   | literal _ receipt =>
-      intro actualNode
+      intro _reached actualNode
       exact CallableIndexedOwnedPreparedStagedLiteralGroupBounds.literal_reflects
         functions bridge sameLedger runtimeLedger wellFormed runtime covers faults size receipt
   | read receipt =>
-      intro actualNode
-      exact CallableIndexedOwnedPreparedStagedReadBounds.reflects bridge functions extension
-        uninitialized semantic unique wellFormed runtime covers size receipt
+      intro reached actualNode
+      exact CallableIndexedOwnedPreparedStagedReadBounds.reflects_local bridge functions extension
+        semantic unique wellFormed runtime covers size ⟨receipt, uninitializedOn scope _ _ receipt reached⟩
   | @group id node inner innerNode lowered metadata form innerFound sourceType child childSites ih =>
+      intro reached
+      have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have children : ReflectsAt bridge context valueModel registry invocation
           (Point scope inner lowered) faults size := by
         intro current child code point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih size
+        exact ih size innerReached
       intro actualNode
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size children
         (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @pair id node left right leftNode rightNode first second metadata form leftFound rightFound sourceType
       leftTree rightTree leftSites rightSites leftIH rightIH =>
+      intro reached
+      have leftReached : Reaches invocation.source [.expression faultRoot] (.expression left) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
+      have rightReached : Reaches invocation.source [.expression faultRoot] (.expression right) :=
+        .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have children : ReflectsBelow bridge context valueModel registry invocation
           (Two scope left right first second) faults size := by
         intro childSize _smaller current child code point
         obtain ⟨rfl, alternative⟩ := point
         cases alternative with
-        | inl left => obtain ⟨rfl, rfl⟩ := left; exact leftIH childSize
-        | inr right => obtain ⟨rfl, rfl⟩ := right; exact rightIH childSize
+        | inl left => obtain ⟨rfl, rfl⟩ := left; exact leftIH childSize leftReached
+        | inr right => obtain ⟨rfl, rfl⟩ := right; exact rightIH childSize rightReached
       intro actualNode
       exact CallableIndexedOwnedPreparedStagedPairBounds.pair_reflects bridge unique wellFormed
         runtime covers (product_values functions) size children size (Nat.le_refl _)
         (.actual metadata form leftFound rightFound sourceType
           ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩)
+
+include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
+/-- Global diagnostic facts restrict to each authentic expression root. -/
+theorem preserves (size : Nat) :
+    PreservesAt bridge context valueModel registry invocation trees faults size := by
+  intro scope id lowered tree
+  exact preserves_reached (faultRoot := id) bridge functions extension sameLedger runtimeLedger faults
+    (fun current child code receipt _reached => uninitialized current child code receipt)
+    semantic unique wellFormed runtime covers size ⟨tree, .root (by simp)⟩
+
+include extension sameLedger runtimeLedger uninitialized semantic unique wellFormed runtime covers in
+/-- Global diagnostic facts restrict to each authentic expression root. -/
+theorem reflects (size : Nat) :
+    ReflectsAt bridge context valueModel registry invocation trees faults size := by
+  intro scope id lowered tree
+  exact reflects_reached (faultRoot := id) bridge functions extension sameLedger runtimeLedger faults
+    (fun current child code receipt _reached => uninitialized current child code receipt)
+    semantic unique wellFormed runtime covers size ⟨tree, .root (by simp)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedReadProductTreeBounds

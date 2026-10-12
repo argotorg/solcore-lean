@@ -18,6 +18,17 @@ inductive Reaches (source : TypedSource) (roots : List NodeId) : NodeId → Prop
       (found : source.lookupStatement? id = some node) (edge : child ∈ node.form.references) :
       Reaches source roots child
 
+/-- Extend an already reached node by a finite path rooted at that node. -/
+theorem Reaches.from_root {source : TypedSource} {roots : List NodeId} {root id : NodeId}
+    (parent : Reaches source roots root) (path : Reaches source [root] id) :
+    Reaches source roots id := by
+  induction path with
+  | @root id member =>
+    have same : id = root := by simpa using member
+    exact same ▸ parent
+  | expression _ found edge ih => exact .expression ih found edge
+  | statement _ found edge ih => exact .statement ih found edge
+
 def Avoids (source : TypedSource) (roots : List NodeId) (changed : List ExpressionId) : Prop :=
   ∀ id ∈ changed, ¬Reaches source roots (.expression id)
 

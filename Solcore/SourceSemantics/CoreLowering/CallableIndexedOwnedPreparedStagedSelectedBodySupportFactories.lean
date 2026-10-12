@@ -43,6 +43,50 @@ structure OriginalConditions (compiled : SourceCoreUnifiedCompilation.Compiled)
       invocation.source context reasonAt current id lowered →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)
 
+structure OriginalConditionsOn (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (policy : SourceCoreFunctions.Policy) (compilation : SourceCoreFunctions.Context)
+    (readFuel : Nat) (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
+    (reasonAt : ExpressionId → Word) (scope : SourceCoreLocalCell.Scope)
+    (roots : List NodeId) (semanticFaults : FunctionCalls.FaultRep) where
+  declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context
+  coercions : ∀ id node, Syntax invocation.source id →
+    invocation.source.lookupExpression? id = some node → node.coercions = []
+  sameLedger : context.solvedRequirements = compilation.solvedRequirements
+  runtimeLedger : RuntimeRequirementLedgerValid context
+  unique : NodeOccurrencesUnique invocation.source
+  wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
+  runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source
+  covers : invocation.evidence.Covers context
+  actualFunctionType : policy.callables.functionType = CallableContract.functionType
+  uninitialized : ∀ current id lowered,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt current id lowered →
+    Reaches invocation.source roots (.expression id) →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt id)
+
+/-- Global static authority restricts to any actual body root set. -/
+theorem OriginalConditions.on
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {policy : SourceCoreFunctions.Policy}
+    {compilation : SourceCoreFunctions.Context} {readFuel : Nat} {context : SourceSemantics.Context}
+    {invocation : Staging.Recursive.Scope} {reasonAt : ExpressionId → Word}
+    {scope : SourceCoreLocalCell.Scope} {semanticFaults : FunctionCalls.FaultRep}
+    (conditions : OriginalConditions compiled policy compilation readFuel context invocation
+      reasonAt scope semanticFaults) (roots : List NodeId) :
+    OriginalConditionsOn compiled policy compilation readFuel context invocation
+      reasonAt scope roots semanticFaults where
+  declarations := conditions.declarations
+  coercions := conditions.coercions
+  sameLedger := conditions.sameLedger
+  runtimeLedger := conditions.runtimeLedger
+  unique := conditions.unique
+  wellFormed := conditions.wellFormed
+  runtime := conditions.runtime
+  covers := conditions.covers
+  actualFunctionType := conditions.actualFunctionType
+  uninitialized := fun current id lowered receipt _reached =>
+    conditions.uninitialized current id lowered receipt
+
 /-- The actual Source lookup supplies its own node. Raw typing proves that
 lookup succeeds; no choice of an execution, compiler action or node is needed. -/
 def original_authority
@@ -82,7 +126,51 @@ def original_authority
     runtime := conditions.runtime
     covers := conditions.covers
     actualFunctionType := conditions.actualFunctionType
-    uninitialized := conditions.uninitialized }
+    uninitialized := fun current id lowered receipt _reached =>
+      conditions.uninitialized current id lowered receipt }
+
+/-- Read authority follows the actual child path within the same body. -/
+def original_authority_on
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {policy : SourceCoreFunctions.Policy}
+    {compilation : SourceCoreFunctions.Context} {readFuel : Nat} {context : SourceSemantics.Context}
+    {invocation : Staging.Recursive.Scope} {reasonAt : ExpressionId → Word}
+    {scope : SourceCoreLocalCell.Scope} {expression : ExpressionId} {rawType : TypeSystem.Ty}
+    {semanticFaults : FunctionCalls.FaultRep}
+    {roots : List NodeId}
+    (conditions : OriginalConditionsOn compiled policy compilation readFuel context invocation
+      reasonAt scope roots semanticFaults)
+    (reached : Reaches invocation.source roots (.expression expression))
+    (raw : ∃ node, invocation.source.lookupExpression? expression = some node ∧
+      node.type = rawType ∧ ExpressionHasType invocation.source context expression node.type) :
+    CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.OriginalAuthority compiled policy compilation readFuel context invocation
+      reasonAt scope expression rawType semanticFaults := by
+  have available : (invocation.source.lookupExpression? expression).isSome := by
+    obtain ⟨original, originalFound, _⟩ := raw
+    exact Option.isSome_of_eq_some originalFound
+  let node := (invocation.source.lookupExpression? expression).get available
+  have found : invocation.source.lookupExpression? expression = some node :=
+    Option.eq_some_of_isSome available
+  have properties : node.type = rawType ∧
+      ExpressionHasType invocation.source context expression node.type := by
+    obtain ⟨original, originalFound, properties⟩ := raw
+    have same : original = node := Option.some.inj (originalFound.symm.trans found)
+    simpa only [same] using properties
+  exact {
+    node := node
+    found := found
+    rawResult := properties.1
+    typed := properties.2
+    declarations := conditions.declarations
+    coercions := conditions.coercions
+    sameLedger := conditions.sameLedger
+    runtimeLedger := conditions.runtimeLedger
+    unique := conditions.unique
+    wellFormed := conditions.wellFormed
+    runtime := conditions.runtime
+    covers := conditions.covers
+    actualFunctionType := conditions.actualFunctionType
+    uninitialized := fun current id lowered receipt path =>
+      conditions.uninitialized current id lowered receipt (Reaches.from_root reached path) }
 
 section Closure
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
