@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Packed input and raw signature audit (2026-10-13)
+
+Commit `ac3a55b3` closes a public captured-closure sequence with nonempty arguments: `make(10)`, `invokePacked(handle, 99)`, then `invokePacked(handle, 123)`. The theorem derives exact Source vectors `[99]` and `[123]`, results `10 / 10`, and the corresponding actual session/heap histories. Review checked genuine binder ownership, the lambda's retained lexical capture, actual arity and the original encoder/completion. No independent Source execution or callable-representation premise is supplied by the fixture.
+
+A general equality between a remembered entry's raw Source type and its handle type would be false: decoding a product normalizes child types, so a function leaf may be registered without its inner annotations. The new startup adapter instead derives runtime compatibility from actual resolution and preserves the selected raw signature separately. Whole-function export still supports exact raw equality where it is used by the concrete Word fixture.
+
+Packed reflection and preservation use the actual closure parameter list to distinguish zero arguments from a singleton Unit argument. Metadata-free scalar/handle/product inputs derive registry identity. Metadata-bearing inputs retain the real encoder-to-receiving extension condition. Native sufficient fuel is proved at the actual startup checkpoint; this does not yet prove sufficient public output-validation fuel.
+
+Validation: strict Lean, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Direct named/builtin semantic dispatch, failed direct continuations, output collection and final compiler composition remain open. Estimates remain 100% / about 70% / about 85%.
+
 ## Direct public handle execution (2026-10-13)
 
 Commit `dbfcaf47` adds the closed `SourceCoreCapturedDirect.sequence_meaning` theorem. Three genuine factory calls and three direct public invocations preserve separate captures through an intervening allocation, with Source Word results `10`, `20` and `10` and six linked actual session/heap states.

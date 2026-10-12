@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Packed closure arguments through actual public execution (2026-10-13)
+
+Commit `ac3a55b3` connects direct closure calls with packed arguments to independent Source applications and returned histories. The registered `SourceCoreCapturedPackedPublicExecution` fixture compiles `make(seed: Word)`, whose result is `lam(x: Word) { return seed; }`, then performs `make(10)`, `invokePacked(handle, 99)` and `invokePacked(handle, 123)`. It proves the exact Source argument lists `[99]` and `[123]`, results `10` and `10`, and continuity of the actual sessions and captured heap.
+
+The genuine lambda parameter context now comes from Source binder ownership and the original compiler receipt. Packed application uses the selected callable's real parameter count, preserving the distinction between no arguments and one Unit argument. The public wrapper derives Source input meaning from History, the structural input description and the actual encoder. Scalar/handle/product trees derive unchanged metadata; the resumption wrapper also admits metadata-bearing inputs with the genuine encoder-to-receiver extension.
+
+The selected handle's raw signature and the Source signature need only agree after runtime normalization. Nested product export may erase annotations on function leaves. The proof retains both raw signatures and derives their compatibility from actual handle resolution. Exact raw equality is used only where an actual whole-function export guarantees it.
+
+Validation: strict Lean, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass. Eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Native preservation also derives sufficient execution fuel at the original packed checkpoint. Direct named/builtin semantic dispatch, direct failure continuation, new output collection, forward public export/fuel composition and the broader compiler theorem remain open. Estimates remain unchanged. Earlier dated sections retain their checkpoint-specific scope.
+
 ## Direct public calls preserve distinct captures (2026-10-13)
 
 Commit `dbfcaf47` connects direct `invokePacked(handle, unit)` calls to independent Source applications and the actual returned histories. The registered `SourceCoreCapturedDirectPublicExecution` fixture performs `make(10)`, `make(20)`, direct invocation of the first handle, `make(30)`, direct invocation of the second handle, and direct invocation of the first handle again. It proves Word results `10`, `20` and `10`, using the exact previous session and Source heap at every step.
@@ -26,8 +36,8 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `dbfcaf47`: six actual public calls connect factory creation and direct handle invocation to Source applications and returned histories, preserving distinct captures through an intervening factory call. |
-| Latest completed verification | Strict Lean, the direct six-call runtime fixture, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. Eleven audited endpoints use only the standard three axioms. |
+| Latest verified implementation | `ac3a55b3`: packed closure arguments now connect actual public invocation to exact Source argument vectors, captured results and continuous returned histories; nonempty lambda parameter contexts come from the compiler. |
+| Latest completed verification | Strict Lean, the packed closure runtime fixture, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass. Eleven audited endpoints use only the standard three axioms. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
 | Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
 | Current implementation priority | Connect packed arguments and nonzero lambda parameters through direct public execution, then broaden genuine compiler/body coverage. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |

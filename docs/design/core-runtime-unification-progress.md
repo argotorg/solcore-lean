@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Packed arguments retain captures through public execution (2026-10-13)
+
+Commit `ac3a55b3` connects the actual sequence `make(10)`, `invokePacked(handle, 99)`, `invokePacked(handle, 123)` to three independent Source applications and their returned histories. Both direct calls return the captured Word `10`; the theorem also identifies the Source argument lists exactly as `[99]` and `[123]`.
+
+The compiler producer now constructs nonempty lambda parameter contexts from genuine Source ownership and lowering. Packed application uses real closure arity. Current History and the actual encoder derive the callable and input meaning. Runtime compatibility replaces an invalid general raw-type equality assumption for function leaves exported inside products. Successful public invocation covers scalar/handle/product inputs automatically; metadata-bearing resumption uses its actual registry extension. Native forward execution has sufficient fuel at the original checkpoint.
+
+Validation: strict Lean, full build (6054 jobs), all registered tests, kernel policy, independent reviews and eleven standard-axiom endpoint audits pass. Direct named/builtin semantic dispatch, direct failure histories, output collection, public forward export/fuel and all-pass composition remain open. The estimates are unchanged.
+
 ## Direct invocation through the actual returned histories (2026-10-13)
 
 Commit `dbfcaf47` closes the direct `invokePacked` route for the captured-read program. The actual sequence is `make(10)`, `make(20)`, `invokePacked(first, unit)`, `make(30)`, `invokePacked(second, unit)`, `invokePacked(first, unit)`. The independent Source outcomes of the direct calls are Word `10`, `20` and `10`.
@@ -41,7 +49,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Six actual public calls now create and directly invoke distinct captured closures, proving exact Source Word results and continuous returned histories. Strict Lean, the runtime fixture, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Actual public calls now also pass nonempty arguments to retained closures, proving exact Source argument vectors, captured results and continuous returned histories. Strict Lean, the runtime fixture, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.

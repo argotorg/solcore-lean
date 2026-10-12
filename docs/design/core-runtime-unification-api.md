@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Packed direct closure input and returned History (2026-10-13)
+
+Commit `ac3a55b3` adds the semantic packed-input route without changing runtime API behavior.
+
+- `DirectPackedInputMeaning.actual_start_compatible` derives the actual selected raw parameter/result, packed encoder and checkpoint state from startup and the current handle import. Runtime compatibility with the Source signature is proved by resolution; exact raw equality is not required.
+- `DirectClosureApplicationBounds.reflects_packed` and `preserves_packed` use actual closure arity to unpack the Source argument vector, with complete result and caller/heap postconditions.
+- `DirectPackedHistory.completed_reflects` and `has_sufficient_fuel` obtain callable and input meaning from current History and the original encoder. The latter concludes native completion for sufficient fuel at that exact checkpoint.
+- `DirectPackedPublicHistory.public_invoke_succeeded_function_tree` derives input metadata identity for scalar/handle/product trees and returns the real public completion, Source trace and reusable History. `public_resume_succeeded` also accepts metadata-bearing inputs with their actual registry extension.
+- `NamedReturnLambdaFormation.of_terminal_parameters` constructs genuine nonempty lambda parameter contexts. The old nullary wrapper remains available.
+
+The registered `SourceCoreCapturedPackedPublicExecution.sequence_meaning` proves actual `make(10)`, direct invocation with `99`, and reuse with `123`: exact Source argument lists, captured results `10 / 10`, and both returned histories. Static compiler support is constructed inside the fixture.
+
+Validation: strict Lean, full build (6054 jobs), all registered tests, kernel policy, independent review and eleven standard-axiom audits pass. These public semantic wrappers currently select closures. Direct named/builtin semantic dispatch, failed direct histories, output collection and the forward public export/fuel connection remain unfinished.
+
 ## Direct retained-closure invocation (2026-10-13)
 
 Commit `dbfcaf47` adds proof receipts to direct public invocation. `invokePacked` retains its existing result and performs one startup and one resume. `invokePackedWithReceipt` additionally returns `Session.InvokeAt`, tying that same execution to its startup and completion.
