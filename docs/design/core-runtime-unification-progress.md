@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual input registries and general public output (2026-10-13)
+
+`8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.
+
+Independent successful Source execution now supplies execution and output fuel bounds for all represented output shapes, including constructors, mappings, proxies and function leaves. The codec proof retains mapping order and duplicate rows, follows the genuine handle registry, and reuses an existing metadata ID even when the registry budget is full. The bound is uniform over execution fuel and export generations.
+
+`2f941db0` connects the same general output proof to the first named call. Actual bootstrap, its export authority and the input encoder derive the initial heap, arguments and receiving context. The returned session starts a reusable History. The closed mapping-input example checks the original factory checkpoint and two direct calls with ordered mapping rows; both return the captured Word `10`. Its proofs cover reflection and sufficient public fuel from Source success. The mapping metadata already exists in the static registry; this example does not assert strict registry growth.
+
+Validation: full build (6205 jobs), all registered tests and kernel policy pass. The ten actual-registry production endpoints, eight mapping endpoints and two initial-output endpoints audited for these units use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Next connections are collection of handles inside constructor/mapping outputs, following named calls at the actual registry, and direct Source failures with authenticated argument arity. Broader control flow, suspended/export-error continuations and final composition across every compiler pass remain incomplete. Earlier dated sections describe their own checkpoints.
+
 ## Captured-cell assignment and six linked calls (2026-10-13)
 
 `b1e23802` connects the assignment rules introduced in `c0a118be` to actual compiler output, closure body preservation/reflection and public execution. `818d4435` first narrows uninitialized-projection diagnostics to nonempty projection paths; bare assignment no longer requires an unreachable diagnostic. The assignment proof keeps the target snapshot from before the RHS, uses the RHS's reached heap for the write and retains effects before a failure. Static body support supplies original Source typing, accepted compiler receipts and only reachable read conditions.
@@ -113,7 +125,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Lexical bodies, distinct retained captures and initial failure continuation enter the public family. Source success now derives sufficient public function export for initial named calls and direct calls, with reusable Histories. Full build (6152 jobs), registered tests, kernel policy and endpoint audits pass. The bare-assignment Source extension is verified; its compiler/body connection, general output decoding, broader control flow and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Captured-cell assignment, actual receiving registries and general output decoding are connected to the public proof family. Initial and direct Source success derive both fuel bounds and reusable Histories. Full build (6205 jobs), registered tests, kernel policy and endpoint audits pass. Nested output collection, broader control flow, suspended/export-error continuations and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.

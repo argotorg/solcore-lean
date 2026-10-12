@@ -4,6 +4,30 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual input registries and general public output (2026-10-13)
+
+`8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.
+
+Independent successful Source execution now supplies execution and output fuel bounds for all represented output shapes, including constructors, mappings, proxies and function leaves. The codec proof retains mapping order and duplicate rows, follows the genuine handle registry, and reuses an existing metadata ID even when the registry budget is full. The bound is uniform over execution fuel and export generations.
+
+`2f941db0` connects the same general output proof to the first named call. Actual bootstrap, its export authority and the input encoder derive the initial heap, arguments and receiving context. The returned session starts a reusable History. The closed mapping-input example checks the original factory checkpoint and two direct calls with ordered mapping rows; both return the captured Word `10`. Its proofs cover reflection and sufficient public fuel from Source success. The mapping metadata already exists in the static registry; this example does not assert strict registry growth.
+
+Validation: full build (6205 jobs), all registered tests and kernel policy pass. The ten actual-registry production endpoints, eight mapping endpoints and two initial-output endpoints audited for these units use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Next connections are collection of handles inside constructor/mapping outputs, following named calls at the actual registry, and direct Source failures with authenticated argument arity. Broader control flow, suspended/export-error continuations and final composition across every compiler pass remain incomplete. Earlier dated sections describe their own checkpoints.
+
+The main new proof entry points are:
+
+| Module | Entry point | Connection |
+| --- | --- | --- |
+| `CallableIndexedOwnedPublicFaultReceivers` | `Receiver.at_context` | Authentic diagnostic receiver without a completed execution. |
+| `RecursiveNamedPublicActualRegistryStart` | `packed_input` | Actual encoded input, current captures and exact metadata context. |
+| `RecursiveNamedPublicActualRegistryReflection` | `public_resume_succeeded`, `public_invoke_succeeded` | Public completion to independent Source execution and returned History. |
+| `RecursiveNamedPublicActualRegistryOutputPreservation` | `public_resume_has_sufficient_fuel` | Direct Source success to sufficient public fuel for general output. |
+| `CallableIndexedOwnedPreparedStagedInitializedOutputPreservation` | `public_resume_has_sufficient_fuel` | Fresh initialization and first Source success to public output and initial History. |
+
+These endpoints retain the fixed function model, authentic static body support and structural public inputs. Returning a nested function value and adding that function to the retained history are distinct proof steps; nested collection is the next integration unit.
+
 ## Captured-cell assignment proof support (2026-10-13)
 
 At `b1e23802`, the static mixed-body packet also supports imperative closure bodies containing bare plain assignment. `CallableIndexedOwnedPreparedStagedImperativeLambdaCompilerReceipts` and `CallableIndexedOwnedPreparedStagedImperativeLambdaReadRoots.of_reads` retain actual compiler and reachable-read receipts. `CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds.application_preserves` and `application_reflects` feed the existing recursive public family. The public runtime API is unchanged.
