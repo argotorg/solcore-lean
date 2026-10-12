@@ -151,6 +151,29 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
       | conditional conditionTyped _ _ =>
           exact expressionIH testSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap conditionTyped test
+  | @builtinArgumentsFault childrenSize scope context environment before after id callee arguments function failure
+      occurrence children =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | builtinCall _calleeValid argumentsTyped =>
+          exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap argumentsTyped children
+  | @builtinApplied childrenSize invocationSize scope context environment before argumentsHeap after
+      id callee arguments function values outcome occurrence children invocation =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | builtinCall _calleeValid argumentsTyped =>
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values wellFormed
+            runtime covers locals heap argumentsTyped children
+          have calleeTyped : ValueHasType context argumentsHeap (.builtin ⟨function⟩)
+              (.function (TypeSystem.Ty.productMany function.parameterTypes) function.returnType) := by
+            simpa [BuiltinFunctionId.type] using
+              (ValueHasType.builtin (context := context) (heap := argumentsHeap) ⟨function⟩)
+          obtain ⟨packed, packing⟩ := ValuesPack.exists_pack values
+          have argumentTyped := packing.hasType valuesTyped
+          obtain ⟨afterTyped, invocationExtends⟩ := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
+            runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
+          exact ⟨afterTyped, argumentExtends.trans invocationExtends⟩
   | @directArgumentsFault childrenSize scope context environment before after id callee arguments instantiation name failure
       occurrence _calleeOccurrence children =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence

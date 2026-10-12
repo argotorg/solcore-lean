@@ -36,7 +36,7 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
       subst_vars
       exact ⟨rfl, rfl⟩
   | group occurrence _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
-  | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
+  | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | constructorFault occurrence _ | tupleFault occurrence _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryRightFault occurrence _ _ _ | binaryInvalid occurrence _ _ _ _

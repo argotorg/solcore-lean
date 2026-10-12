@@ -156,6 +156,15 @@ mutual
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry scope context environment before condition (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
+    | builtinArgumentsFault {scope context environment before after id callee arguments function failure}
+        (occurrence : Occurrence scope id (.call callee arguments (.builtinFunction function)))
+        (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | builtinApplied {scope context environment before argumentsHeap after id callee arguments function values outcome}
+        (occurrence : Occurrence scope id (.call callee arguments (.builtinFunction function)))
+        (children : Expressions program registry scope context environment before arguments (.values values) argumentsHeap)
+        (invocation : Applies program registry scope context argumentsHeap (.builtin ⟨function⟩) values outcome after) :
+        Expression program registry scope context environment before id outcome after
     | directArgumentsFault {scope context environment before after id callee arguments instantiation name failure}
         (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
         (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))

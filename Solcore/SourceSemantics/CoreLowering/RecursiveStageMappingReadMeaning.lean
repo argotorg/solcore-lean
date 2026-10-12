@@ -157,7 +157,7 @@ private theorem reference_no_stage {invocation : Staging.Recursive.Scope} {id : 
     (trace : Staging.Recursive.Expression program stages invocation context environment before id
       (.fault (.stage failedScope call reason)) after) : False := by
   cases trace with
-  | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
+  | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
   | constructorFault owned children | tupleFault owned children =>
     have same := occurrence_form unique found owned
     rw [form] at same

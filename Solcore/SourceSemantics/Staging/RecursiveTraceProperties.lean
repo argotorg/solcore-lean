@@ -59,6 +59,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
     case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | builtinArgumentsFault occurrence children ih
       | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
@@ -98,6 +99,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
     case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | builtinArgumentsFault occurrence children ih
       | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
@@ -137,6 +139,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
     case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | builtinArgumentsFault occurrence children ih
       | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
@@ -177,6 +180,7 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
     case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | builtinArgumentsFault occurrence children ih
       | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same

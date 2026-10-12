@@ -142,6 +142,15 @@ mutual
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry testSize scope context environment before condition (.fault failure) after) :
         Expression program registry (stepSize [testSize]) scope context environment before id (.fault failure) after
+    | builtinArgumentsFault {childrenSize : Nat} {scope context environment before after id callee arguments function failure}
+        (occurrence : Occurrence scope id (.call callee arguments (.builtinFunction function)))
+        (children : Expressions program registry childrenSize scope context environment before arguments (.fault failure) after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | builtinApplied {childrenSize invocationSize : Nat} {scope context environment before argumentsHeap after id callee arguments function values outcome}
+        (occurrence : Occurrence scope id (.call callee arguments (.builtinFunction function)))
+        (children : Expressions program registry childrenSize scope context environment before arguments (.values values) argumentsHeap)
+        (invocation : Applies program registry invocationSize scope context argumentsHeap (.builtin ⟨function⟩) values outcome after) :
+        Expression program registry (stepSize [childrenSize, invocationSize]) scope context environment before id outcome after
     | directArgumentsFault {childrenSize : Nat} {scope context environment before after id callee arguments instantiation name failure}
         (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
         (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
@@ -606,6 +615,8 @@ local macro "erase_stage_grade" : tactic =>
     case binaryInvalid => apply Recursive.Expression.binaryInvalid <;> assumption
     case conditional => apply Recursive.Expression.conditional <;> assumption
     case conditionalFault => apply Recursive.Expression.conditionalFault <;> assumption
+    case builtinArgumentsFault => apply Recursive.Expression.builtinArgumentsFault <;> assumption
+    case builtinApplied => apply Recursive.Expression.builtinApplied <;> assumption
     case directArgumentsFault => apply Recursive.Expression.directArgumentsFault <;> assumption
     case directApplied => apply Recursive.Expression.directApplied <;> assumption
     case calleeFault => apply Recursive.Expression.calleeFault <;> assumption
@@ -754,6 +765,13 @@ local macro "construct_stage_grade" : tactic =>
     case conditionalFault occurrence test ih_test =>
       obtain ⟨testSize, graded_test⟩ := ih_test
       exact ⟨_, .conditionalFault occurrence graded_test⟩
+    case builtinArgumentsFault occurrence children ih_children =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      exact ⟨_, .builtinArgumentsFault occurrence graded_children⟩
+    case builtinApplied occurrence children invocation ih_children ih_invocation =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      obtain ⟨_, graded_invocation⟩ := ih_invocation
+      exact ⟨_, .builtinApplied occurrence graded_children graded_invocation⟩
     case directArgumentsFault occurrence calleeOccurrence children ih_children =>
       obtain ⟨_, graded_children⟩ := ih_children
       exact ⟨_, .directArgumentsFault occurrence calleeOccurrence graded_children⟩

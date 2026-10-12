@@ -382,6 +382,28 @@ private theorem global_fault_evidence {program : Program} {context : Context}
   | globalArity instantiates mismatch => exact .globalArity instantiates mismatch
   | globalBody instantiates same body => cases same; exact .globalBody instantiates rfl body
 
+private theorem builtin_applies_evidence {program : Program} {context : Context}
+    {callerEvidence invocationEvidence : EvidenceEnvironment} {before after : Heap}
+    {function : BuiltinFunction} {arguments : List Value} {result : Value}
+    (applies : CallableApplies program context callerEvidence invocationEvidence before
+      (.builtin function) arguments result after) :
+    CallableApplies program context callerEvidence [] before
+      (.builtin function) arguments result after := by
+  cases applies with
+  | builtin primitive => exact .builtin primitive
+
+private theorem builtin_fault_evidence {program : Program} {context : Context}
+    {callerEvidence invocationEvidence : EvidenceEnvironment} {before after : Heap}
+    {function : BuiltinFunction} {arguments : List Value} {reason : SemanticFault}
+    (fault : CallableFaults program context callerEvidence invocationEvidence before
+      (.builtin function) arguments reason after) :
+    CallableFaults program context callerEvidence [] before
+      (.builtin function) arguments reason after := by
+  cases fault with
+  | notCallable invalid => exact False.elim (invalid trivial)
+  | builtinArity mismatch => exact .builtinArity mismatch
+  | builtinArgumentType arity mismatch => exact .builtinArgumentType arity mismatch
+
 private theorem projection {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
     (trace : Expression program registry scope context environment before id outcome after) :
@@ -474,6 +496,22 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact fault_occurrence occurrence (.conditionalCondition rfl ih)
+  case builtinArgumentsFault occurrence children ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.builtinArguments rfl ih)
+  case builtinApplied occurrence children invocation a b =>
+    rename_i outcome
+    cases outcome with
+    | value =>
+      obtain ⟨_, applied⟩ := b
+      exact value_occurrence occurrence (.builtinCall rfl a (builtin_applies_evidence applied))
+    | fault failure => cases failure with
+      | stage => trivial
+      | semantic =>
+        obtain ⟨_, fault⟩ := b
+        exact fault_occurrence occurrence (.builtinApply rfl a (builtin_fault_evidence fault))
   case directArgumentsFault occurrence calleeOccurrence children ih =>
     rename_i failure
     cases failure with
