@@ -42,6 +42,7 @@ private def workspace : Workspace.RawWorkspace := {
     "enum NestedFunctions { Hold(function(Word) returns (Word), function(Word) returns (integer)) }",
     "function nestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), Word)), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
     "function closureNestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, namedFunction) { return integerAdd(convert(first(2) + again(6)), last(namedFunction(0))); } default { return 997; } } } default { return 996; } } }",
+    "function distinctClosureUse(bundle: (function(Word) returns (Word), mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))))) returns (Word) { match (bundle) { case (first, table) { match (table[3]) { case (again, other) { return first(2) + again(6) + other(7); } default { return 995; } } } default { return 994; } } }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -81,10 +82,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse", "distinctClosureUse"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 14 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 15 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -104,7 +105,7 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 14 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 15 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
   have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
   let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
@@ -195,6 +196,24 @@ def run : IO Unit := do
   let independentContinued ← execute closureContinued.session (← key 1) [independent.value, word 1]
   require (independentContinued.value == word 101)
     "nested closure input aliased an independently allocated capture"
+  let afterDistinctIssuance ← get "new named handle after both closure mutations"
+    (← independentContinued.session.namedWithReceipt (← key 0))
+  have _preservedDistinctState : independentContinued.session.SameRuntime afterDistinctIssuance.val.session :=
+    afterDistinctIssuance.property.same_runtime
+  require (afterDistinctIssuance.val.session.heapSize == independentContinued.session.heapSize &&
+    afterDistinctIssuance.val.session.functionCount == independentContinued.session.functionCount + 1)
+    "new factory issuance changed capture storage or failed to extend the handle registry"
+  let distinctTable : Value := .mapping .word closurePairType
+    [(word 3, .product made.value independent.value),
+      (word 3, .product independent.value made.value)]
+  let distinctBundle : Value := .product made.value distinctTable
+  let distinctApplied ← execute afterDistinctIssuance.val.session (← key 14) [distinctBundle]
+  require (distinctApplied.value == word 176)
+    "two nested closure inputs lost current captures, repeated aliases or ordered entries"
+  let firstDistinct ← execute distinctApplied.session (← key 1) [made.value, word 1]
+  require (firstDistinct.value == word 38) "first closure lost its shared mutation after distinct input execution"
+  let secondDistinct ← execute firstDistinct.session (← key 1) [independent.value, word 1]
+  require (secondDistinct.value == word 109) "second closure lost its independent mutation after distinct input execution"
   let recursive ← execute second.session (← key 2) [word 5]
   require (recursive.value == word 31) "public recursive result changed"
   let localResult ← execute recursive.session (← key 3) [.bool true]
