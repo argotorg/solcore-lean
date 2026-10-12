@@ -10,13 +10,19 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `9b6cb2c7` and `6976ab8c`. Actual fresh bootstrap and input encoding now construct the initial state and argument conditions consumed by public semantics. |
-| Latest completed normal verification | Strict Lean, full build (5952 jobs), registered tests, kernel policy and independent review pass. The checked endpoints use only the standard three axioms. |
+| Latest normally verified implementation commits | `1ebb4c6a`, `b6c24d8f`, `54bc83a5` and `83bf7430`. Resumption, data inputs and singleton builtin handles connect to public semantics. |
+| Latest completed normal verification | Strict Lean, full build (5957 jobs), registered tests, kernel policy and independent review pass. The checked endpoints use only the standard three axioms. |
 | Working implementation | Public success/failure reflection and Word preservation derive the initial owned state, stable rows, global references, heap relations and argument typing/representation internally. |
-| Latest proof scope | Supported ordinary bodies, a fresh bootstrap completed in one resume, and scalar/product public inputs. Authentic static family support and startup receipts remain explicit. |
-| Current implementation priority | Extend this connected boundary to resumed initialization and further input families, and derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
+| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving handle issuance. Scalar/product inputs, raw-typed data with a receiving registry extension, and one builtin input at its exact raw type are connected. |
+| Current implementation priority | Extend builtin input support to mixed lists and connect named/closure handle provenance to Source function representation; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Function input connection (2026-10-12)
+
+`54bc83a5` connects original handle issuance to state-preserving public startup. `83bf7430` completes the Source argument connection for a single builtin handle at its exact raw parameter type. Accepted recipe preparation fixes its closed code, identity and descriptor. Actual issuance and encoding supply that same native value, from which the proof constructs the receiving function representation and Source typing. The final public success/failure and Word endpoints consume those facts and retain complete returned state.
+
+The public regression invokes a root with an issued `wordToInteger` handle as its only argument. Broader named/closure function provenance, mixed argument lists and nested handles remain separate work. No arbitrary function meaning follows from native authentication alone.
 
 ### Actual initialization and encoded inputs (2026-10-12)
 
@@ -24,7 +30,7 @@ Commits `9b6cb2c7` and `6976ab8c` remove the supplied initial-state and argument
 
 The existing initialization constructor supplies the owned pool, stable rows, real global references and empty Source heap correspondence. Successful scalar/product encoding supplies both Source argument typing and representation at the body's receiving registry. Public success/failure reflection recovers the Source arguments existentially; Word preservation matches the arguments in its supplied Source trace. These facts are consumed immediately by the existing public execution endpoints, retaining the full staged result and returned state.
 
-This connection covers a fresh initial bootstrap completed at one supplied fuel and `SimplePublic` inputs: unit, Boolean, Word, integer and nested products. Multiple bootstrap resumes, restored or previously used sessions, handles and metadata-bearing inputs need further connections. Accepted runtime projection alone does not establish exact raw Source typing for every metadata-bearing value. Static inventory, supported body grammar, compiler policy, diagnostics and genuine startup receipts remain explicit. The final theorem across all compiler passes remains unfinished; the percentage estimates are unchanged.
+`1ebb4c6a` extends this connection to any finite sequence of actual bootstrap suspensions. `b6c24d8f` connects metadata-bearing data to the same public endpoints under independent raw structural typing and preservation of actual metadata IDs in the receiving registry. Scalar/product inputs still derive typing directly from accepted encoding. Runtime projection alone does not establish exact raw Source typing for every metadata-bearing value. The newer builtin connection below covers a single builtin argument. Named/closure input meaning and restored or previously executed sessions remain open. Static inventory, supported body grammar, compiler policy, diagnostics and genuine startup receipts remain explicit. The final theorem across all compiler passes remains unfinished; the percentage estimates are unchanged.
 
 ### Cached roots and public execution outcomes (2026-10-12)
 

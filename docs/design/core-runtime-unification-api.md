@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest connections are `9b6cb2c7` and `6976ab8c`: actual fresh bootstrap and scalar/product encoding construct the state and argument conditions for public semantics. They consume the public execution endpoints from `6199f27d` and `a3d8877f`. Static family support remains explicit.
+The latest connections are `1ebb4c6a`, `b6c24d8f`, `54bc83a5` and `83bf7430`: repeated bootstrap resumption, raw data inputs, state-preserving handle issuance and singleton builtin inputs reach the public semantic endpoints. They consume the public execution endpoints from `6199f27d` and `a3d8877f`. Static family support remains explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -51,7 +51,21 @@ These ports keep genuine compiler policy/read conditions, original typing and ca
 
 `CallableIndexedOwnedPreparedStagedInitializedPublicBounds` consumes these producers in `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. Their inputs no longer include an initial caller, stable rows, global reference, heap representation/typing or argument representation/typing. Reflection recovers its Source arguments existentially. Exact startup/checkpoint/bootstrap receipts and static compiler/body support remain inputs; full staged results and returned state remain conclusions.
 
-This entry covers a fresh bootstrap completed in one resume and `SimplePublic` values (unit, Boolean, Word, integer and nested products). Multiple bootstrap resumes, restored/used sessions, handles and metadata-bearing inputs need separate extensions. Committed in `9b6cb2c7` and `6976ab8c`; strict checks, full build, tests, kernel policy, standard-axiom checks and independent review pass.
+The original scalar entry was committed in `9b6cb2c7` and `6976ab8c`. `1ebb4c6a` generalizes its bootstrap premise to `Bootstrap.ReadyAt`: `.single ready` records completion and `.suspend exhausted continued` adds an actual suspended step. `ReadyAt.indexed` recovers the exact native initial completion at the sum of the budgets and the same returned session.
+
+`b6c24d8f` adds `RecursiveNamedPublicDataArgumentReceipts` and `CallableIndexedOwnedPreparedStagedInitializedDataPublicBounds`. The three public endpoints also accept metadata-bearing data under `PublicDataTypes` at the selected raw Source signature and an actual `Extends encodedValues.registry receiving` relation. The latter preserves the encoded tag IDs. It cannot be replaced by two independent extensions of the static registry. Singleton builtin handles have the additional connection below; named and closure handles require further Source provenance. Restored or previously executed sessions and complete compiler coverage remain open.
+
+## Issued function inputs (2026-10-12)
+
+`Session.namedWithReceipt` and `builtinWithReceipt` return the original completion plus `NamedIssuedAt` or `BuiltinIssuedAt`. The existing methods delegate to them once. `Completion.IndexedAt` retains the exact native completion. The receipt's `same_runtime` theorem preserves native memory, authority, metadata and Source prefix; it makes no equality claim about physical handle slots.
+
+Initialized public endpoints now accept `ready : bootstrap.ReadyAt fuel bootstrapSession` and `sameRuntime : bootstrapSession.SameRuntime publicSession`. Use `.refl` when no handle was issued, or compose actual issuance receipts with `.trans`. Initial state is still derived from the original bootstrap completion.
+
+`RecursiveNamedPublicIssuedFunctionInputs.StartAt.named_argument` and `builtin_argument` recover the actual issued callable at its startup argument position. `Recipe.BuiltinCallableAt.prepared` additionally derives the exact closed builtin code, raw type, descriptor and identity from accepted preparation. `RecursiveNamedPublicBuiltinArgumentReceipts.StartAt.builtin_arguments_receiving` constructs complete argument representation and typing for a singleton builtin input at the Header's exact raw parameter type.
+
+`CallableIndexedOwnedPreparedStagedInitializedBuiltinPublicBounds` consumes that result in `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. These endpoints retain the same static body support and full staged result/state as the scalar and data endpoints. The user-supplied conditions describe actual preparation, issuance, startup and raw parameter agreement; no Source function representation or argument typing is assumed.
+
+Committed in `54bc83a5` and `83bf7430`. Named/closure Source input interpretation, mixed lists and nested handle carriers remain outside this singleton builtin boundary.
 
 ## Public execution receipts and semantic consumers (2026-10-12)
 

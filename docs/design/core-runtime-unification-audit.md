@@ -8,6 +8,22 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Issued function and builtin input audit (2026-10-12)
+
+`54bc83a5` preserves the original single issuance operation and binds its cached factory to the actual startup argument index. Review checked deterministic handle resolution and exact state-preservation transport. It does not equate physical handle registries or infer Source function meaning from authentication.
+
+`83bf7430` adds the missing Source meaning for singleton builtin inputs. Preparation supplies literal closed code with empty captures, a nonwrapping identity and the real contract descriptor. The Header supplies exact raw parameter agreement and native projection; actual startup supplies the same issued value. The proof constructs function representation, argument representation and Source typing internally before calling all three public semantic endpoints. Native and Source execution results retain their full state relations.
+
+Strict Lean, full build (5957 jobs), all registered tests, kernel policy and independent review pass. The six selected builtin endpoints use only the standard three axioms. A public runtime regression passes the freshly issued builtin handle into a cached root after two bootstrap suspensions. Named/closure Source provenance, mixed lists, nested handles and all-pass composition remain unfinished.
+
+## Resumed initialization and data input audit (2026-10-12)
+
+`1ebb4c6a` derives initial completion from any finite chain of genuine public bootstrap suspensions. The consumer retains the exact ready session, original authority and Source prefix, and total fuel. The public execution regression retains two suspension equations and the final ready equation. Out-of-fuel remains a suspension.
+
+`b6c24d8f` connects raw data arguments to the initialized public success/failure and Word endpoints. Review checked the direction of the metadata extension, encoded registry to receiving registry; exact raw proxy and constructor annotations; ordered mapping rows; independent structural input typing; and full returned state. No caller-supplied argument representation or body execution law is introduced. The raw typing and registry extension conditions remain explicit. Their necessity is not discharged by native type erasure or by sharing a static registry ancestor.
+
+The targeted strict builds, public execution regression, kernel policy and independent review pass. All nine selected resumption/data endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The older one-resume limitation below describes the earlier commits.
+
 ## Verified initialization-to-public connection (2026-10-12)
 
 Commits `9b6cb2c7` and `6976ab8c` derive the initial conditions used by the supported public consumer. Review followed one fresh bootstrap receipt through its actual ready session and the same startup session. Native completion fixes the full store; store typing fixes the world. The genuine initialization constructor supplies the fixed singleton owner, stable empty history, installed global references and empty Source heap relation.

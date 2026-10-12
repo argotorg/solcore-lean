@@ -25,10 +25,30 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product argument conditions derived from actual fresh startup. Broader inputs, resumed initialization, compiler-grammar coverage and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product argument conditions derived from actual fresh startup. Raw metadata inputs now have a conditional public connection. Named/closure function inputs, broader compiler grammar and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Issued functions and singleton builtin input (2026-10-12)
+
+`54bc83a5` retains the original named/builtin issuance operation, selected cached factory and single export generation. Existing operations delegate to `namedWithReceipt` and `builtinWithReceipt`. Their receipts preserve the actual native memory, authority, metadata and Source prefix while allowing the physical handle registry to grow. `at_started` and the initialized public endpoints consume this state preservation, including composed issuance steps. The exact issued callable is also recovered at its actual startup argument index.
+
+`83bf7430` connects a single builtin handle to public semantics for the supported body family. Accepted recipe preparation fixes the builtin's raw Source type, closed code with empty captures, nonwrapping identity and actual contract descriptor. Actual issuance and startup fix the same native argument. The selected Header's one raw parameter must equal that builtin type. `RecursiveNamedPublicBuiltinArgumentReceipts` then constructs the receiving function representation, complete argument relation and deep Source typing internally. `CallableIndexedOwnedPreparedStagedInitializedBuiltinPublicBounds` consumes them in public success/failure reflection and Word preservation, retaining full staged outcomes and returned state.
+
+The public regression starts from a twice-resumed bootstrap, issues `wordToInteger`, passes its opaque handle as the only argument to a cached root, and obtains integer 9. Existing shared-capture, named handle, data metadata, fault and suspension tests also pass. Final validation: strict Lean, full build (5957 jobs), all registered tests, kernel policy, standard-axiom checks and independent review. The six selected builtin endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Current function-input scope is one builtin at its exact raw parameter type, used in the session returned by issuance. Named and closure input Source provenance, mixed argument lists, nested handle carriers, restored/previously executed sessions and broader compiler coverage remain open. The full compiler theorem is incomplete; estimates remain unchanged.
+
+### Resumable initialization and metadata-bearing inputs (2026-10-12)
+
+`1ebb4c6a` connects any finite sequence of actual bootstrap suspensions to the public success/failure and Word endpoints. `Bootstrap.ReadyAt` records the original suspension and ready equations. The proof adds their fuel budgets using Core resumption, retaining the initial authority, Source prefix and exact returned session. It then consumes the existing initialization constructor. The public regression test suspends twice before completing and uses that same session for execution.
+
+`b6c24d8f` adds `CallableIndexedOwnedPreparedStagedInitializedDataPublicBounds`. Constructors, proxies, nested products and ordered mappings now reach the same three public endpoints. Actual input encoding supplies the interpreted arguments and native representation. `PublicDataTypes` supplies an independent structural check of their raw Source types; `Extends encodedValues.registry receiving` preserves their actual metadata IDs. These are explicit conditions, not consequences of erased native type equality. The initialized caller, heap and argument representation remain internally constructed.
+
+The metadata condition is stronger than two registries extending a common static registry. Raw annotations also matter: `proxy (comptime Word)` and `proxy Word` have the same runtime projection, but the independent Source typing distinguishes them. The new endpoints retain this distinction and the original mapping row order and duplicates.
+
+Targeted strict builds, the public execution regression, kernel policy, standard-axiom checks and independent reviews pass. The resumption build covered 2452 jobs; the metadata build covered 2450 jobs. Final repository-wide verification is recorded with the handle integration below.
 
 ### Initial conditions derived from actual execution (2026-10-12)
 
@@ -38,7 +58,7 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 Validation passes: strict Lean checks, full build (5952 jobs), all registered tests, kernel policy and independent review. The nine checked facade/initialization/input/public semantic endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Existing public bootstrap tests exercise the receipt operation; suspended bootstrap and other public runtime tests still pass.
 
-Scope: fresh bootstrap completed in one resume, `SimplePublic` inputs, and the supported static body family. Multiple bootstrap resumes, restored/used sessions, handles and metadata-bearing inputs remain outside this new entry theorem. Static compiler coverage and all-pass composition remain open. Further helpers should discharge a condition in these connected consumers; no percentage increase is inferred from this unit's proof count.
+Original scope at those two commits: fresh bootstrap completed in one resume, `SimplePublic` inputs, and the supported static body family. The newer connections above extend resumption and data inputs. Restored/used sessions and Source meaning for named/closure handle inputs remain separate work. Static compiler coverage and all-pass composition remain open. Further helpers should discharge a condition in these connected consumers; no percentage increase is inferred from this unit's proof count.
 
 ### Connected cached roots and public outcomes (2026-10-12)
 
