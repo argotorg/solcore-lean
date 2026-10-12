@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Lexical closures, callable preservation and failure continuation (2026-10-13)
+
+The latest verified implementation checkpoint is `b9c241f9`. The full build (6147 jobs), all registered tests and kernel policy pass. The endpoint audits for these additions use only `propext`, `Classical.choice` and `Quot.sound`.
+
+- `3341275f` connects lexical closure bodies through genuine compiler receipts, both semantic directions and the existing recursive public family. Static packets retain the actual allocator, accepted flow and expression children at their reached contexts; they do not assume a body execution law.
+- `fc167824` derives sufficient public execution fuel for successful Word results from named, builtin and closure applications. With output fuel at least `1`, the actual checkpoint returns the same Word and a History at the Source after-heap. The closed named/builtin example proves captured Word `10` and builtin Word `37` at its original checkpoints.
+- `b9b55505` closes six actual calls for a factory returning `lam() { let copy = seed; return copy; }`. Separate handles retain captures `10` and `20`, including after an intervening factory allocation. Direct results are `10 / 20 / 10`; every step uses its predecessor's actual session and heap.
+- `354a2345` connects an initial uninitialized-local failure to a later successful identity call. The proof identifies the absent allocated cell, exact Source failure, subsequent Word `37` allocation and both returned Histories.
+- `b9c241f9` proves sufficient public fuel for that initial Source failure, with any output budget. Actual bootstrap and input receipts derive the starting conditions; the result retains the same Source after-heap and a reusable failed History. The closed example includes output fuel `0`.
+
+Next work connects forward function-handle export using registry integrity derived from actual initialization, and captured-cell assignment through the same staged Source relation and public proof family. General imperative control flow, constructor/mapping output selection, suspended/export-error continuations, receiving-model changes and final composition across all compiler passes remain open. Historical percentages are unchanged; the completed connections above describe this checkpoint. Earlier dated sections retain their original scope.
+
 ## Lexical allocation and body-reachable reads (2026-10-13)
 
 Commits `8537c3c2` and `a0cd0dba` extend the existing public proof route to lexical named bodies. Review checked genuine compiler acceptance, actual local allocation, context extension, strict recursive child bounds, native frame restoration and full returned heap/pool conditions. The static body packet contains compiler evidence; it does not assume a body execution law. Terminal callers use an explicit compatibility adapter.

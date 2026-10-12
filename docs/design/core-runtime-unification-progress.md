@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Lexical closures, callable preservation and failure continuation (2026-10-13)
+
+The latest verified implementation checkpoint is `b9c241f9`. The full build (6147 jobs), all registered tests and kernel policy pass. The endpoint audits for these additions use only `propext`, `Classical.choice` and `Quot.sound`.
+
+- `3341275f` connects lexical closure bodies through genuine compiler receipts, both semantic directions and the existing recursive public family. Static packets retain the actual allocator, accepted flow and expression children at their reached contexts; they do not assume a body execution law.
+- `fc167824` derives sufficient public execution fuel for successful Word results from named, builtin and closure applications. With output fuel at least `1`, the actual checkpoint returns the same Word and a History at the Source after-heap. The closed named/builtin example proves captured Word `10` and builtin Word `37` at its original checkpoints.
+- `b9b55505` closes six actual calls for a factory returning `lam() { let copy = seed; return copy; }`. Separate handles retain captures `10` and `20`, including after an intervening factory allocation. Direct results are `10 / 20 / 10`; every step uses its predecessor's actual session and heap.
+- `354a2345` connects an initial uninitialized-local failure to a later successful identity call. The proof identifies the absent allocated cell, exact Source failure, subsequent Word `37` allocation and both returned Histories.
+- `b9c241f9` proves sufficient public fuel for that initial Source failure, with any output budget. Actual bootstrap and input receipts derive the starting conditions; the result retains the same Source after-heap and a reusable failed History. The closed example includes output fuel `0`.
+
+Next work connects forward function-handle export using registry integrity derived from actual initialization, and captured-cell assignment through the same staged Source relation and public proof family. General imperative control flow, constructor/mapping output selection, suspended/export-error continuations, receiving-model changes and final composition across all compiler passes remain open. Historical percentages are unchanged; the completed connections above describe this checkpoint. Earlier dated sections retain their original scope.
+
 ## Lexical bodies connected to the public proof route (2026-10-13)
 
 - `8537c3c2`: restrict read policy, original metadata and diagnostic conditions to expressions reachable from the selected body. The authentic compiler derives those conditions; captured-read closures can coexist with unrelated reads and lexical scopes in the source table.
@@ -81,7 +93,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Direct output closures now join histories and preserve distinct captures through later calls. Source Word-returning closure applications also derive sufficient public execution/export fuel at their real checkpoints. Strict Lean, closed runtime fixtures, full build (6072 jobs), all registered tests, kernel policy and independent reviews pass; ten audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Lexical named and closure bodies enter the full public family. Distinct captures survive later lexical allocations; initial failure retains a reusable History. Source Word applications for all three callable kinds and initial Source faults derive sufficient public fuel. Full build (6147 jobs), registered tests, kernel policy and endpoint audits pass. Forward function export, wider imperative bodies and final all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
