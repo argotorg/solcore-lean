@@ -438,6 +438,15 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     | stage => trivial
     | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono ih)
 
+  case blockReturned contains form inner ih =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form]) (.block contains form ih)
+  case blockFault contains form inner ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.block contains form ih)
+  case blockFallthrough contains form inner next innerIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.block contains form innerIH) nextIH
   case whileReturned contains form loop ih =>
     exact StatementsPlain.terminal contains (by intro e; simp [form]) (.whileLoop contains form ih)
   case whileFault contains form loop ih =>

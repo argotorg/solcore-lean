@@ -289,7 +289,20 @@ mutual
           (if truth then thenBody else elseBody.getD []) innerContext (.fallthrough innerEnvironment) branchHeap)
         (next : StatementsIn program registry mode nextSize scope context environment branchHeap rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [testSize, branchSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | blockReturned {innerSize : Nat} {mode scope context innerContext environment before after id rest node statements value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.returned value) after) :
+        StatementsIn program registry mode (stepSize [innerSize]) scope context environment before (id :: rest) context (.returned value) after
+    | blockFault {innerSize : Nat} {mode scope context innerContext environment before after id rest node statements failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [innerSize]) scope context environment before (id :: rest) context (.fault failure) after
+    /-- A block restores its entry bindings while retaining every write and allocation. -/
+    | blockFallthrough {innerSize nextSize : Nat} {mode scope context innerContext finalContext environment innerEnvironment before middle after id rest node statements outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.fallthrough innerEnvironment) middle)
+        (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [innerSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     | whileReturned {loopSize : Nat} {mode scope context environment before after id rest node condition statements value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
         (loop : While program registry loopSize scope context environment before condition statements (.returned value) after) :
@@ -303,6 +316,7 @@ mutual
         (loop : While program registry loopSize scope context environment before condition statements (.fallthrough environment) middle)
         (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [loopSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
     | assignBare {childSize nextSize : Nat} {mode scope context finalContext environment before middle written after
           id rest node assignment rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
@@ -386,7 +400,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough whileReturned whileFault whileFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough)
 end Statements
 
 
@@ -448,6 +462,9 @@ local macro "erase_stage_grade" : tactic =>
     case letUninitialized => apply Recursive.StatementsIn.letUninitialized <;> assumption
     case letInitialized => apply Recursive.StatementsIn.letInitialized <;> assumption
     case letFault => apply Recursive.StatementsIn.letFault <;> assumption
+    case blockReturned => apply Recursive.StatementsIn.blockReturned <;> assumption
+    case blockFault => apply Recursive.StatementsIn.blockFault <;> assumption
+    case blockFallthrough => apply Recursive.StatementsIn.blockFallthrough <;> assumption
     case whileReturned => apply Recursive.StatementsIn.whileReturned <;> assumption
     case whileFault => apply Recursive.StatementsIn.whileFault <;> assumption
     case whileFallthrough => apply Recursive.StatementsIn.whileFallthrough <;> assumption
@@ -633,6 +650,13 @@ local macro "construct_stage_grade" : tactic =>
     case letFault contains form monomorphic child ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .letFault contains form monomorphic graded_child⟩
+    case blockReturned contains form inner ih | blockFault contains form inner ih =>
+      obtain ⟨innerSize, graded⟩ := ih
+      first | exact ⟨_, .blockReturned contains form graded⟩ | exact ⟨_, .blockFault contains form graded⟩
+    case blockFallthrough contains form inner next innerIH nextIH =>
+      obtain ⟨innerSize, gradedInner⟩ := innerIH
+      obtain ⟨nextSize, gradedNext⟩ := nextIH
+      exact ⟨_, .blockFallthrough contains form gradedInner gradedNext⟩
     case whileReturned contains form loop ih | whileFault contains form loop ih =>
       obtain ⟨loopSize, graded⟩ := ih
       first | exact ⟨_, .whileReturned contains form graded⟩ | exact ⟨_, .whileFault contains form graded⟩

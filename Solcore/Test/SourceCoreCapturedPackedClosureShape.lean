@@ -38,6 +38,7 @@ private theorem returned_expression
   have same {other : StatementNode} (contains : ContainsStatement scope.source id other) : other = node :=
     Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
   cases trace with
+  | blockReturned contains otherForm _ | blockFallthrough contains otherForm _ _
   | whileReturned contains otherForm _ | whileFallthrough contains otherForm _ _
   | ifReturned contains otherForm _ _ | ifFallthrough contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm

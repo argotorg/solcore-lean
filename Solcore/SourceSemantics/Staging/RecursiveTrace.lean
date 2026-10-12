@@ -6,8 +6,8 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discards, conditional statements, finite while loops, and returns.
-Conditional arms use scoped fallthrough: their local bindings are restored while
+containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while loops, and returns.
+Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
 heap changes remain visible to the following statements. The profile has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
 evidence-selected operator methods, coercion paths, projected or compound assignments, for loops, and loop-control transfers require later recursive rules. These
@@ -292,6 +292,20 @@ mutual
           (if truth then thenBody else elseBody.getD []) innerContext (.fallthrough innerEnvironment) branchHeap)
         (next : StatementsIn program registry mode scope context environment branchHeap rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | blockReturned {mode scope context innerContext environment before after id rest node statements value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false scope context environment before statements innerContext (.returned value) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | blockFault {mode scope context innerContext environment before after id rest node statements failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false scope context environment before statements innerContext (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    /-- A block restores its entry bindings while retaining every write and allocation. -/
+    | blockFallthrough {mode scope context innerContext finalContext environment innerEnvironment before middle after id rest node statements outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false scope context environment before statements innerContext (.fallthrough innerEnvironment) middle)
+        (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     | whileReturned {mode scope context environment before after id rest node condition statements value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
         (loop : While program registry scope context environment before condition statements (.returned value) after) :
@@ -392,7 +406,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough whileReturned whileFault whileFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough)
 end Statements
 
 end Solcore.SourceSemantics.Staging.Recursive

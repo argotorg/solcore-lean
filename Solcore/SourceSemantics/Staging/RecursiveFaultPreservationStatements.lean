@@ -165,6 +165,28 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
       exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | @blockFault innerSize mode scope context innerContext environment before after
+      id rest node statements failure contains form inner =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | block innerTyped =>
+          exact statementsIH innerSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap innerTyped inner
+  | @blockFallthrough innerSize nextSize mode scope context innerContext finalContext environment innerEnvironment
+      before middle after id rest node statements outcome contains form inner next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) middle := .block contains form inner.sound.fallthrough_scoped
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before middle [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
   | @whileFault loopSize mode scope context environment before after id rest node condition statements failure
       contains form loop =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
