@@ -10,12 +10,34 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `62001b99` and `f950c96c`. Returned closure inputs connect to public semantics with their reached captures and heap. |
-| Latest completed normal verification | Strict Lean, full build (5978 jobs), all registered tests, kernel policy and independent review passed. Twelve checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
-| Working implementation | Public success/failure reflection and Word preservation derive caller, heap and input conditions from fresh initialization or the preceding successful semantic result. Returned closures retain their complete capture and reached state. |
-| Latest proof scope | Supported ordinary bodies. Fresh sessions admit nested named/builtin inputs. A preceding proved success admits the same returned closure at any finite number of positions inside data and argument lists, after optional state-preserving issuance. Both calls use the same receiving model/registry and retain exact raw input certificates. |
-| Current implementation priority | Retain several earlier exported handles across intervening executions and combine them with issued functions; connect restored sessions and receiving-model changes; derive remaining static body coverage from compiler output. |
+| Latest normally verified implementation commits | `1bf7248d` and `b5be3856`. Multiple retained closures connect through successful execution histories to public semantics. |
+| Latest completed normal verification | Strict Lean, full build (5986 jobs), all registered tests, kernel policy and independent review passed. Fourteen checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
+| Working implementation | Finite histories retain several exported functions across supported successful calls, including data-returning calls. Their current caller, heap and input evidence feed public success/failure reflection and Word preservation. Successful continuations retain a reusable history for the actual returned session. |
+| Latest proof scope | Supported ordinary bodies. Any finite number of retained exported functions may be passed together or repeated inside data and argument lists after successful intervening calls. Captured references retain identity while current heap contents may change. The model, body registry and receiving registry stay fixed; exact raw input certificates remain explicit. |
+| Current implementation priority | Add freshly issued named/builtin input leaves to used-session histories; connect failed continuations, restored sessions and receiving-model changes; derive remaining static body coverage from compiler output. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Retained function histories (2026-10-12)
+
+Code commits: `1bf7248d` and `b5be3856`.
+
+Validation: strict Lean, full build (5986 jobs), all registered tests, kernel policy and independent review passed. The fourteen checked handle-transport, history, argument, public-continuation and initialization endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+A finite history retains several independently exported functions across supported successful calls. Intervening calls may allocate or mutate captured cells and may return only data. Each retained closure keeps the identity of its captured references; its later execution observes the current Source heap and native store. Actual named/builtin issuance may occur between calls without changing that state.
+
+`RecursiveNamedPublicFunctionHistory.History` records the actual selected startup, native success and full semantic `ResultAt` for each execution. Startup provenance fixes the selected root, raw signature and native argument vector. A successful step keeps earlier entries and may remember its newly exported function. `History.current` derives current encoding, representation and Source typing for every retained entry, together with the actual caller, stable rows and heap conditions.
+
+`CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers` starts the history from the actual fresh bootstrap and finite resumption chain. It consumes the existing nested data/named/builtin input receipts and an observed successful function export. The initialized public theorem produces the Source application, full `ResultAt`, reached caller and first retained entry at the actual returned session. Subsequent supported calls extend that history without replaying initialization.
+
+`RecursiveNamedPublicFunctionHistoryInputs` permits distinct retained functions and repeated aliases at arbitrary finite depth inside products, constructor payloads and ordered mapping keys or values. Independent data certificates retain raw annotations, including comptime wrappers and proxies. The encoder and argument producers preserve exact positions, complete argument lengths, metadata, mapping defaults and duplicate-key order.
+
+`CallableIndexedOwnedPreparedStagedHistoryPublicBounds` consumes this history in public success/failure reflection and Word preservation. The continuation adapters return a new history for the actual successful returned session, either keeping the existing entries or also remembering a function returned directly as the result. Collecting functions nested inside an output container remains separate work; nested inputs are supported. Full Source outcomes, native results and stores, caller relations and `ResultAt` remain in the conclusions.
+
+All steps currently share one function model, body registry and receiving registry. Exact raw input descriptions, valid constructor metadata, the encoder's genuine extension to the receiving registry and supported static body facts remain explicit. Public failure reflection is connected; retaining a reusable history after failure remains open. Restored sessions, adding freshly issued named/builtin handles directly as used-session input leaves, receiving-model changes, complete body coverage and the final theorem across all compiler passes also remain unfinished.
+
+The runtime regression extends the existing `81`, `29` and `101` checks. After successful mutation calls and later factory issuance, a product/mapping input invokes two independently captured closures and repeats the older one. It returns Word `176` (`31 + 37 + 108`); subsequent calls observe captures `38` and `109`. The later issued factory handle is not an input to this call. These runtime checks exercise retained handles and mutation; the proof still requires its actual history and supported body receipts.
+
+Progress estimates are unchanged. The dated sections below preserve their original scope and verification records.
 
 ### Returned closure inputs (2026-10-12)
 

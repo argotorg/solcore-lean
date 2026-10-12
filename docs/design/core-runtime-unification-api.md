@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest returned-closure connection, `62001b99` and `f950c96c`, uses a preceding successful public execution and its complete semantic result to admit repeated or nested uses of the same returned function. Its captured environment and reached heap feed all three public endpoints. The earlier fresh-session connection (`9181cd2b`, `708e3f8b`) continues to admit nested named/builtin inputs. Exact raw types, genuine metadata extensions and supported static body facts remain explicit.
+The function-history connection (`1bf7248d`, `b5be3856`) extends `62001b99` and `f950c96c` to several retained exported functions across supported successful calls, including intervening data results and capture mutation. Exact startup provenance, current heap/caller evidence and nested input certificates feed all three public endpoints. Successful continuations return reusable histories for the actual returned session. The earlier fresh-session connection (`9181cd2b`, `708e3f8b`) continues to admit nested named/builtin inputs; exact raw types, metadata extensions and supported static body facts remain explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,32 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Retained functions across successful calls (2026-10-12)
+
+Code commits: `1bf7248d` and `b5be3856`.
+
+Validation: strict Lean, full build (5986 jobs), all registered tests, kernel policy and independent review passed. The fourteen checked handle-transport, history, argument, public-continuation and initialization endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+`RecursiveNamedPublicFunctionHistory.Entry` retains an exported handle, its exact raw Source type, independent Source value, complete native payload, native type and original export-validation budget. `History` ties a finite list of these entries to one actual current session, caller, map, world, Source heap and native store.
+
+`CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers` constructs the first history from actual fresh bootstrap/resumption, selected startup and existing nested data/named/builtin input receipts. It consumes the observed successful function-handle result and invokes initialized public reflection. Its conclusion retains the Source application, full `ResultAt`, explicit reached caller and caller relation, actual returned public/indexed session, and singleton history with the exact raw output type, Source/native payload and original output-validation budget. The first selected Header anchors the history's Source context.
+
+Each execution step retains its original `StartAt`, selected root and full native and semantic result receipts. The raw signature and ordered native arguments belong to that same selected call. A successful step can keep the existing entries when the result is data, or remember the actual new function export. Optional `IssuanceChain` steps transport earlier handles through genuine named/builtin issuance. These issuance steps preserve runtime state; execution steps use their real returned state and heap changes.
+
+`History.current` derives each entry's current `EncodesAt`, `ValueRep` and `Dynamic.ValueHasType`, along with the session's store/world, heap representation, deep heap typing and stable caller rows. Old native closure payloads retain their captured references. Their representation and typing move to the actual reached map, world and heap, so captured cell contents may change during intervening calls.
+
+`RecursiveNamedPublicFunctionHistoryInputs.Input.retained entry member` selects a literal retained history entry. The `data`, `product`, `constructed`, `mapping` and `comptime` cases preserve raw Source descriptions. `Inputs` and `Entries` retain ordered argument/payload vectors and mapping rows. The certificate supplies no native representation or body execution law.
+
+`RecursiveNamedPublicFunctionHistoryEncoding.Input.meaning` compares each actual encoded function with that entry's current authenticated payload and follows the original container encoding. `RecursiveNamedPublicFunctionHistoryArgumentsReceiving.StartAt.history_arguments_receiving` combines those facts with the selected Header's exact raw parameters and native arity. It constructs the complete `Arguments` and `ValuesHaveTypes` judgments, preserving repeated aliases, distinct handles, all list positions and mapping defaults.
+
+`CallableIndexedOwnedPreparedStagedHistoryPublicBounds` provides `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. Each consumes history-derived dynamic premises and retains the full staged Source application, native result/store, actual public result/session and complete caller `ResultAt`. `CallableIndexedOwnedPreparedStagedHistoryPublicContinuations.public_run_succeeded_retains` also returns a history for that actual returned session with all earlier entries. `public_run_succeeded_remembers` additionally appends a function returned directly as the result. The seed and continuation adapters do not yet collect functions nested inside an output container. The returned history can be consumed by the next supported call, including through nested inputs.
+
+The function model, body registry and receiving registry remain fixed across the chain. Callers retain exact structural input descriptions, genuine history/startup receipts, valid constructor metadata, supported static body facts and `Extends encodedValues.registry receiving`. A registry shared ancestor does not establish that last condition. Reusable histories after failure, snapshot restoration, directly adding newly issued named/builtin input leaves, changes of receiving model/registry and complete compiler composition remain open.
+
+The runtime continuation test invokes two independently captured closures from one product/mapping input after data-returning mutation calls and further factory issuance. The older closure appears twice; duplicate mapping keys retain first-entry behavior. It checks Word `176`, then captures `38` and `109`. This test uses the retained exported handles as function inputs; the newly issued factory handle is only an intervening issuance. Static body and history premises remain necessary to instantiate the semantic theorems.
+
+Progress estimates are unchanged. The interface records below retain their original scope and validation.
 
 ## Returned closure inputs (2026-10-12)
 

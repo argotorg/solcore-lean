@@ -25,10 +25,32 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes from fresh bootstrap or a preceding proved success. The latter admits repeated/nested uses of one returned closure with its reached captures and heap, after optional issuance and under the same receiving model/registry. Several old handles, arbitrary intervening execution, restored sessions, full static coverage, broader grammar and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The current history connection admits several retained exported functions across supported successful calls, including data-returning calls and capture mutation. Exact nested inputs and the actual current caller/heap feed public success/failure reflection and Word preservation. Successful continuations produce a reusable history for the returned session. Failed continuations, restored sessions, newly issued function input leaves, changes of model/registry, full static coverage and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Multiple retained functions across successful calls (2026-10-12)
+
+Code commits: `1bf7248d` and `b5be3856`.
+
+Validation: strict Lean, full build (5986 jobs), all registered tests, kernel policy and independent review passed. The fourteen checked handle-transport, history, argument, public-continuation and initialization endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+`RecursiveNamedPublicFunctionHistory` retains an arbitrary finite list of actual exported functions across supported successful calls. Each call keeps its exact `StartAt`, selected root, raw signature and native arguments, together with the actual native success and full semantic `ResultAt`. Calls returning data may keep all previous entries; calls returning a function may also remember the new export. Genuine state-preserving issuance steps may occur between calls.
+
+`CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers` constructs the first entry from actual fresh bootstrap completion, finite resumption, selected startup and the existing nested data/named/builtin input receipts. It invokes initialized public success reflection for an observed function export and returns its full Source trace and `ResultAt`, an explicit reached caller and relation, and a singleton history for the actual returned public/indexed session. The retained entry uses the exact raw output type, Source/native payload and original output-validation budget. Later supported calls continue from this history without repeating bootstrap.
+
+`History.current` derives each retained handle's encoding, Source meaning and deep typing at the actual current session and heap. Native closure payloads retain their captured references, while representation and typing move through the real returned location map, world and Source heap. Captured cells may be allocated or mutated during intervening executions. The same history derives the current owned caller, stable rows and heap conditions.
+
+`RecursiveNamedPublicFunctionHistoryInputs` admits distinct retained handles and repeated aliases in arbitrary finite argument lists, products, constructor payload vectors and ordered mappings. Exact raw types, comptime/proxy annotations, payload order, mapping defaults and duplicate rows remain intact. The encoder and argument producer consume those structural receipts and the actual selected startup to construct complete argument representation and Source typing.
+
+`CallableIndexedOwnedPreparedStagedHistoryPublicBounds` connects these produced premises to public success/failure reflection and Word preservation, retaining full Source outcomes, native result/store, public session and caller `ResultAt`. `CallableIndexedOwnedPreparedStagedHistoryPublicContinuations` returns a reusable history for the actual successful completion, either retaining earlier entries or also remembering a function returned directly as the result. Collecting functions nested inside output containers remains open; nested inputs are supported. Failure reflection does not yet produce a reusable history after failure.
+
+The model, body registry and receiving registry remain fixed across the chain. Exact raw input receipts, supported static body facts and the genuine extension from the startup encoder's registry to the receiving registry remain explicit. Snapshot restoration, reusable failed continuations, directly admitting newly issued named/builtin leaves in these used-session inputs, model/registry changes, complete static body coverage and the final all-pass theorem remain open.
+
+The runtime regression now invokes two independently captured closures from one product/mapping input after data-returning mutation calls and later factory issuance. Starting with captures `29` and `101`, it calls the older closure twice and the independent closure once, obtaining Word `176` (`31 + 37 + 108`). Follow-up calls observe `38` and `109`. A duplicate mapping key carries the handles in the opposite order, exercising first-entry behavior. The later-issued factory is an intervening issuance and is not itself an input leaf in this test.
+
+Progress estimates are unchanged. The dated entries below retain their historical scope and validation.
 
 ### Returned closure input connection (2026-10-12)
 

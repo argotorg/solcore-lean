@@ -8,6 +8,26 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Multiple retained function histories (2026-10-12)
+
+Code commits: `1bf7248d` and `b5be3856`.
+
+Validation: strict Lean, full build (5986 jobs), all registered tests, kernel policy and independent review passed. The fourteen checked handle-transport, history, argument, public-continuation and initialization endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The new boundary retains an arbitrary finite list of function exports through supported successful intervening executions, including calls that return data and calls that allocate or mutate captured cells. Every history execution keeps exact startup and selected-root provenance, its native success receipt and full semantic `ResultAt`. The real selected raw signature and original native argument vector tie the semantic step to that execution. Remembering a new function uses the actual public export, Source outcome and complete native payload.
+
+The initialized seed adapter derives the first history from the actual fresh bootstrap, finite resumption, selected startup and nested data/named/builtin input receipts. It invokes initialized public success reflection and retains its complete Source trace and `ResultAt`. The observed function export determines the first entry's exact raw type, Source/native payload and output-validation budget. The reached caller and relation to the initial caller are explicit outputs, so starting the history requires no separately assumed initial representation or closure meaning.
+
+Two obligations are tracked separately. The session proof preserves each older handle's exact registry binding through execution/export and optional issuance. The semantic proof moves its representation and Source typing to the actual returned map, world and heap using that execution's extension and heap-metadata receipts. Closure code and captured reference identity remain stable; the contents of captured cells may change. State equality from issuance does not replace this execution proof.
+
+The history producer derives the current owned caller, stable rows, deep heap typing, heap representation and per-entry meaning. The structural input certificate chooses exact history members and preserves distinct handles, repeated aliases, constructor payload packing and ordered mapping keys/values. The actual encoder supplies each native payload at its original position. Raw annotations and genuine encoded-to-receiving metadata extensions remain explicit, and mapping defaults follow the actual encoder.
+
+Public success/failure reflection and Word preservation consume those current-state facts and retain full results and returned state. Successful continuation adapters also return reusable histories for the actual returned public/indexed session. One keeps all earlier entries through a data result; another additionally records a function returned directly as the result. Collecting functions nested inside an output container remains open, although nested inputs are supported. Failure reflection is available, while constructing a reusable history after failure remains a separate obligation.
+
+The runtime regression first reaches independent captures `29` and `101` through successful calls that return data. It then issues another named factory without changing capture storage. A nested product/mapping argument uses the older closure twice and the independent closure once: `31 + 37 + 108` yields Word `176`. Follow-up calls return `38` and `109`, making both mutations and distinct captures observable. A duplicate mapping row swaps the handles, so selecting the wrong row changes the result. The newly issued factory is not an input leaf. The earlier mixed named/builtin test and its `81`, `29`, `101` checks remain separate runtime coverage.
+
+All history steps use one fixed function model, body registry and receiving registry, and retain supported static body evidence. Restored sessions, histories after failed execution, direct input leaves for newly issued named/builtin handles in a used session, model/registry changes, unrestricted bodies and the final all-pass theorem remain unfinished. The percentage estimates are unchanged. Earlier dated sections preserve their original scope and validation.
+
 ## Returned closure input connection (2026-10-12)
 
 Code commits: `62001b99` and `f950c96c`.
