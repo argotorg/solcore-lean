@@ -103,5 +103,39 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
           (stagePrepared := stagePrepared) (profile := profile)
           observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated completed
 
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
+/-- A successful independent Source application chooses its genuine callable
+branch and supplies arity. The full result remains at the actual reached heap. -/
+theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+    {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
+    {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+      invocation context before function sources (.value sourceResult) after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+        (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
+  cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
+  | closure closure =>
+      have arity : sources.length = closure.parameters.length := by
+        cases trace with
+        | closure _ _ _ allocate _ _ => exact allocate.length_eq.symm
+      exact RecursiveNamedPublicDirectClosureApplicationBounds.preserves_packed
+        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+        packing arity trace
+  | global global =>
+      exact RecursiveNamedPublicDirectNamedApplicationBounds.preserves_value_packed
+        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+        packing trace
+  | builtin builtin =>
+      cases builtin with
+      | mk id =>
+        exact RecursiveNamedPublicDirectBuiltinApplicationBounds.preserves_value_packed
+          (stagePrepared := stagePrepared) (profile := profile)
+          observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated packing trace
+
 end Packed
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableApplicationBounds

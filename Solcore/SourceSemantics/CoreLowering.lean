@@ -1531,6 +1531,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalLambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalBodyLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableWordPreservation
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that

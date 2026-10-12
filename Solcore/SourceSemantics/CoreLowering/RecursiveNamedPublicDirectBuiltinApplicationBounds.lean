@@ -124,5 +124,63 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   cases same
   exact ⟨signature.2 ▸ applied.preserves.2, heapTyped⟩
 
+include observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated in
+/-- The successful Source primitive determines its actual arity and native
+result. Packed input and all caller state are kept at the original checkpoint. -/
+theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+    {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
+    {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+      invocation context before (.builtin ⟨function⟩) sources (.value sourceResult) after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+        (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
+  have builtin := CallableIndexedOwnedPreparedStagedBuiltinArgumentRows.builtin_member calleeRelated ⟨function⟩ rfl
+  have nativeType : CallableContract.functionType parameterCore resultCore =
+      CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function) := by
+    generalize sourceTypeEq : function.type = sourceType at builtin
+    cases builtin
+    rfl
+  have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters nativeType
+  have signature : parameter = TypeSystem.Ty.productMany function.parameterTypes ∧ result = function.returnType := by
+    rcases calleeTyped.builtin_inv with ordinary | staged
+    · exact TypeSystem.Ty.function.inj ordinary
+    · obtain ⟨inner, impossible, _typed⟩ := staged
+      cases impossible
+  have packed := packedRelated
+  rw [signature.1] at packed
+  obtain ⟨decodedSources, values, nativeTypesRow, rows, decodedPacking, packedEq, packedType⟩ :=
+    RecursivePublicPackedArguments.values function.parameterTypes packed
+  have expectedLength : function.parameterTypes.length = (CompatibleBuiltinMeaning.argumentTypes function).length := by
+    cases function <;> rfl
+  have nativeRow : nativeTypesRow = CompatibleBuiltinMeaning.argumentTypes function :=
+    CallableIndexedOwnedStoredArgumentAlignment.native_rows_of_bundle
+      (rows.length.2.2.symm.trans expectedLength)
+      (packedType.symm.trans (nativeTypes.1.trans (CompatibleBuiltinMeaning.argumentTypes_pack function).symm))
+  rw [nativeRow] at rows
+  have arity : function.parameterTypes.length = sources.length := by
+    cases trace with
+    | builtin applied => exact (applied.preserves (context := context) (heap := before)).1.length_eq.symm
+  have sameSources : decodedSources = sources :=
+    decodedPacking.injective_of_length_eq packing (rows.length.1.symm.trans arity)
+  subst decodedSources
+  obtain ⟨nativeSize, value, evaluated, representedResult, sameHeap, _sourceGrade⟩ :=
+    CallableIndexedOwnedPreparedStagedBuiltinApplicationBounds.preserves functions observations builtin rows trace
+  subst after
+  rw [← signature.2, ← nativeTypes.2] at representedResult
+  have padded : EvaluationSize nativeSize (native :: packedNative :: tail) store
+      CallableIndexedLambdaCalls.applyPayload value store := by
+    rw [packedEq]
+    exact RecursiveNamedPublicDirectClosureApplicationBounds.application_tail evaluated
+  obtain ⟨source, sameOutcome, _sameHeap, _size, applied⟩ :=
+    CallableIndexedOwnedPreparedStagedBuiltinApplicationBounds.source_value functions observations rows trace
+  cases Staging.Recursive.Outcome.value.inj sameOutcome
+  refine ⟨value, store, mapping, world, padded.sound, representedResult, heaps,
+    .refl _, .refl _, .refl _ _, .refl _, caller, (protocol headers keys).refl caller, stable, ?_⟩
+  intro source same
+  cases same
+  exact ⟨signature.2 ▸ applied.preserves.2, heapTyped⟩
+
 end Packed
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectBuiltinApplicationBounds

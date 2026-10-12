@@ -164,5 +164,100 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   rw [← signature.2, ← actualResult] at finalResult
   exact ⟨sources, packing, sourceSize, outcome, after, finalMap, finalWorld, trace, finalResult⟩
 
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
+/-- A successful independent named application supplies its authentic argument
+count and drives the original native payload, retaining the full caller post. -/
+theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+    {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
+    {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+      invocation context before (.global function) sources (.value sourceResult) after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+        (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
+  classical
+  obtain ⟨owner, header, rawD, identity, capture, descriptor, member, sourceAt, _installed,
+    _number, _projection, _nativeTyped, _rawType, nativeEq, nativeType⟩ :=
+    CallableIndexedOwnedPreparedStagedNamedPayloadReceipts.named_payload profile calleeRelated function rfl
+  have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters nativeType
+  obtain ⟨_facts, certified⟩ :=
+    CallableIndexedOwnedPreparedCatalogGlobalIndirectInvocationBounds.source_certificate sourceAt wellFormed
+  have signature : parameter = TypeSystem.Ty.productMany header.types ∧ result = header.function.resultType := by
+    rcases calleeTyped.global_inv with ordinary | staged
+    · obtain ⟨typeEq, _valid, _evidence⟩ := ordinary
+      have signature := TypeSystem.Ty.function.inj (typeEq.trans certified.callable_type)
+      exact ⟨signature.1, signature.2.trans sourceAt.frame.result.symm⟩
+    · obtain ⟨inner, impossible, _typed⟩ := staged
+      cases impossible
+  have bindingTypes : header.types = header.bindings.map (fun binding => binding.1.scheme.body) := by
+    have same := Dynamic.MonoBindersExtend.bodyTypes_eq header.extended
+    rw [header.parameters] at same
+    simpa only [List.map_map, Function.comp_def] using same.symm
+  have packed := packedRelated
+  rw [signature.1] at packed
+  obtain ⟨decodedSources, values, nativeTypesRow, rows, decodedPacking, packedEq, packedType⟩ :=
+    RecursivePublicPackedArguments.values header.types packed
+  have typeLength : header.types.length = header.bindings.length := by rw [bindingTypes, List.length_map]
+  have nativeRow : nativeTypesRow = header.bindings.map Prod.snd :=
+    CallableIndexedOwnedStoredArgumentAlignment.native_rows_of_bundle
+      (by simpa only [List.length_map] using rows.length.2.2.symm.trans typeLength)
+      (packedType.symm.trans (nativeTypes.1.trans header.parameterType))
+  rw [bindingTypes, nativeRow] at rows
+  have represented := RecursivePublicPackedArguments.of_values header.bindings rows
+  have decodedArity : header.function.parameters.length = decodedSources.length := by
+    simpa only [header.parameters, List.length_map] using represented.length.1
+  have arity : header.function.parameters.length = sources.length := by
+    cases trace with
+    | global instantiates _ _ _ _ allocate _ _ =>
+      have same := BuiltinNamedCalls.instantiation_unique_of_wellFormed wellFormed
+        sourceAt.frame.instantiated instantiates
+      cases same
+      simpa only [sourceAt.frame.parameters] using allocate.length_eq
+  have sameSources : decodedSources = sources :=
+    decodedPacking.injective_of_length_eq packing (decodedArity.symm.trans arity)
+  subst decodedSources
+  obtain ⟨bodyHeap, argumentsTyped⟩ :=
+    CallableIndexedOwnedPreparedCatalogGlobalIndirectInvocationBounds.arguments_at_global
+      sourceAt wellFormed runtime heapTyped calleeTyped packing packedTyped arity
+  have supports := CallableIndexedOwnedPreparedStagedNamedArgumentRows.caller_supports sourceAt wellFormed runtime
+  let chosen : ∀ {mapping world function native bindings parameterCore resultCore}
+      (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+        bindings parameterCore resultCore),
+      Σ packet : PacketFor association callStages, SupportFor association callStages packet :=
+    fun association => Classical.choice
+      (CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.sequence_coverage stagePrepared family
+        (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed association)
+  let packet := namedTerminals header member
+  have children : ∀ {child : Staging.Recursive.Scope}, (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow
+        (headers := headers) (keys := keys) header
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        callStages child callFaults sourceSize := by
+    intro child childSelected
+    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+      (namedSupport header member) profile wellFormed childSelected
+    intro childSize _smaller childContext childScope current id lowered root
+    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
+      (profile := profile) (closurePackets := fun association => (chosen association).1)
+      (closureSupport := fun association => (chosen association).2)
+      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+      (extension := extension) (semantic := semantic) childSize root
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, resultAt⟩ :=
+    CallableIndexedOwnedPreparedStagedNamedApplicationBounds.application_preserves
+      functions owner caller header capture sourceAt packet.layouts member wellFormed
+      stable bodyHeap argumentsTyped represented heaps supports identity descriptor.id sourceSize children trace (Nat.le_refl _)
+  have actualResult : resultCore = header.output := nativeTypes.2.trans header.resultType
+  have finalResult := resultAt.2
+  rw [← signature.2, ← actualResult] at finalResult
+  obtain ⟨nativeSize, measured⟩ := evaluation_has_size evaluated
+  have padded : EvaluationSize nativeSize (native :: packedNative :: tail) store
+      CallableIndexedLambdaCalls.applyPayload value finalStore := by
+    rw [nativeEq, packedEq]
+    exact RecursiveNamedPublicDirectClosureApplicationBounds.application_tail measured
+  exact ⟨value, finalStore, finalMap, finalWorld, padded.sound, finalResult⟩
+
 end Packed
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectNamedApplicationBounds
