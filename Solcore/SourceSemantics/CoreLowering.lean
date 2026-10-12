@@ -1411,6 +1411,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstra
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedPublicBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDataArgumentReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedDataPublicBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
