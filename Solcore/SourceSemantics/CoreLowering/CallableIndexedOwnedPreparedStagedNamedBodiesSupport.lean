@@ -55,7 +55,9 @@ local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.brid
   (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys)
 
 include static wellFormed selected in
-theorem Support.preserves {budget : Nat}
+theorem Support.preserves
+    (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
+    {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
       RootAt compiled context child scope expression lowered semanticFaults →
       PreservesAt poolBridge context model stages child (Point scope expression lowered) faults size) :
@@ -84,10 +86,12 @@ theorem Support.preserves {budget : Nat}
         static aligned.globals profile selected layouts children
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves
-        static aligned.globals profile selected layouts children
+        static aligned.globals profile selected extension layouts children
 
 include static wellFormed selected in
-theorem Support.reflects {budget : Nat}
+theorem Support.reflects
+    (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
+    {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
       RootAt compiled context child scope expression lowered semanticFaults →
       ReflectsAt poolBridge context model stages child (Point scope expression lowered) faults size) :
@@ -116,6 +120,6 @@ theorem Support.reflects {budget : Nat}
         static aligned.globals profile selected layouts children
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects
-        static aligned.globals profile selected layouts children
+        static aligned.globals profile selected extension layouts children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport

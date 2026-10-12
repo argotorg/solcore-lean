@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalContextCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
@@ -16,6 +17,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedPreparedStagedNamedBranchingReceipts (Receipt parameterScope)
 open CallableIndexedOwnedPreparedStagedLexicalTree (TypedCertificate)
 open CallableIndexedOwnedPreparedLexicalContextCertificates
+open CallableLambdaViewEdits CallableLambdaBodyReachability
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {recipe : SourceCoreIndexedSession.Recipe}
@@ -81,6 +83,110 @@ theorem tree
 
 
 include aligned in
+/-- Child factories receive only original syntax/typing, actual callback
+acceptance and native typing, at the context reached by real lexical binders. -/
+theorem tree_of_imperative
+    (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    (receipt : Receipt header)
+    {expressionSyntax : ExpressionId → Prop}
+    {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
+    (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
+      header.context (.statements true header.function.body) header.function.resultType)
+    (children : ∀ context, Dynamic.RuntimeContextFields header.context context →
+      ∀ {scope fuel id node lowered},
+      CompatibleExpressionReads.ScopeDeclarations header.function.source scope context →
+      expressionSyntax id → header.function.source.lookupExpression? id = some node →
+      ExpressionHasType header.function.source context id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++
+        RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
+        lowered.expression nativeType compiled.indexed.layouts.definitions →
+      certificates context scope id lowered) :
+    GenericImperativeMatch.Tree header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+      header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
+      (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
+      (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
+      header.context (parameterScope header) (.statements true header.function.body) header.function.resultType header.output receipt.flow := by
+  have body := CallableIndexedOwnedPreparedNamedLexicalCollectors.body_typed prepared aligned ready member
+  rw [receipt.emitted] at body
+  obtain ⟨nativeType, flowTyped⟩ := TypedLexicalWhile.Native.finished_flow body
+  obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
+  have runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram)
+      header.function.context header.function.source := by
+    rw [header.frame.context, header.frame.source]
+    exact certificate.toBodyInstanceTypingCertificate.sourceRuntimeValid
+  have runtime := runtime.transport (RecursiveNamedInitialContextValidity.mono_fields header.extended)
+  have declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+    (prepared := compiled.indexed.ancestry) (program := Program.ofChecked compiled.sourceProgram) header
+  have assignments : CompatibleAssignmentStatements.AssignmentPolicy header.policy
+      (.initial compiled.compatible.checked)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
+    rw [aligned.policy]
+    exact RecursiveNamedPreparedHeaderPolicies.Prepared.assignments prepared
+  exact CallableIndexedOwnedPreparedNativeBranchingCollectors.tree
+    (expressionSyntax := expressionSyntax) (certificates := certificates) (LocalView.refl _)
+    (by intro id member; cases member) header.unique
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_binder prepared aligned)
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned)
+    assignments
+    (fun context fields scope fuel id node lowered declarations approved _reached found typed accepted nativeType native =>
+      children context fields (scope := scope) (fuel := fuel) (id := id) (node := node)
+        (lowered := lowered) declarations approved found typed accepted (nativeType := nativeType) native)
+    syntaxTree rfl receipt.shape (.refl _) runtime.variables_closed runtime.residual_variables_open
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
+    declarations (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩))
+    receipt.projection receipt.accepted flowTyped
+
+
+include aligned in
+/-- Static child receipts are assembled into the same named branching support
+consumed by the numeric body theorem. Source and native execution are absent
+from the factory's premises. -/
+def of_imperative_compiler
+    (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers)
+    (zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    (receipt : Receipt header) (stages : Staging.Recursive.Registry)
+    {expressionSyntax : ExpressionId → Prop}
+    (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
+      header.context (.statements true header.function.body) header.function.resultType)
+    (children : ∀ child, stages.Closure header.function child →
+      ∀ context, Dynamic.RuntimeContextFields header.context context →
+      ∀ {scope fuel id node lowered},
+      CompatibleExpressionReads.ScopeDeclarations header.function.source scope context →
+      expressionSyntax id → header.function.source.lookupExpression? id = some node →
+      ExpressionHasType header.function.source context id node.type →
+      header.policy.lowerExpression fuel header.function.source scope id header.reasonAt = .ok lowered →
+      ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++
+        RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
+        lowered.expression nativeType compiled.indexed.layouts.definitions →
+      CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Certificate
+        header bodyRegistry semanticFaults context child scope id lowered) :
+    CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
+      headers keys bodyRegistry header stages receipt semanticFaults := by
+  refine ⟨complete, zero, wellFormed, ?_⟩
+  intro child selected
+  rw [stages.source selected]
+  exact ⟨expressionSyntax, tree_of_imperative prepared aligned ready wellFormed member receipt syntaxTree (children child selected)⟩
+
+
+include aligned in
 /-- Static child receipts are assembled into the same named branching support
 consumed by the numeric body theorem. Source and native execution are absent
 from the factory's premises. -/
@@ -113,10 +219,8 @@ def of_compiler
       CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Certificate
         header bodyRegistry semanticFaults context child scope id lowered) :
     CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
-      headers keys bodyRegistry header stages receipt semanticFaults := by
-  refine ⟨complete, zero, wellFormed, ?_⟩
-  intro child selected
-  rw [stages.source selected]
-  exact tree prepared aligned ready wellFormed member receipt syntaxTree (children child selected)
+      headers keys bodyRegistry header stages receipt semanticFaults :=
+  of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt stages
+    (.body syntaxTree) children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors

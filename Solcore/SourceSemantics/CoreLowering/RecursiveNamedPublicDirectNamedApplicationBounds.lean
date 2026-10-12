@@ -142,7 +142,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
         callStages child callFaults size := by
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
-      (namedSupport header member) profile wellFormed childSelected
+      (namedSupport header member) profile wellFormed childSelected extension
     intro childSize _smaller childContext childScope current id lowered root
     exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
       (profile := profile) (closurePackets := fun association => (chosen association).1)
@@ -256,7 +256,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
         callStages child callFaults sourceSize := by
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
-      (namedSupport header member) profile wellFormed childSelected
+      (namedSupport header member) profile wellFormed childSelected extension
     intro childSize _smaller childContext childScope current id lowered root
     exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
       (profile := profile) (closurePackets := fun association => (chosen association).1)

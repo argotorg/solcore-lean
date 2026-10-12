@@ -126,7 +126,7 @@ theorem preserves_compiled
       sameLedger runtimeLedger uninitialized size (fun childSize _ => bodies childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
-          (namedSupport named member) profile wellFormed selected
+          (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller))
       root ports size (Nat.le_refl _) certified
 
@@ -174,7 +174,7 @@ theorem reflects_compiled
       sameLedger runtimeLedger uninitialized stageEq size (fun childSize _ => bodies childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
-          (namedSupport named member) profile wellFormed selected
+          (namedSupport named member) profile wellFormed selected extension
           (fun smaller _strict => bodies smaller))
       root ports size (Nat.le_refl _) certified
 

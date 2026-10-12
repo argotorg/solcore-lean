@@ -455,7 +455,7 @@ theorem preserves_root
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child rootFaults size := by
     intro child childSelected
     exact CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
-      (namedSupport header selected.member) profile wellFormed childSelected
+      (namedSupport header selected.member) profile wellFormed childSelected extension
       (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
         (profile := profile) (closurePackets := fun association => (chosen association).1)
         (closureSupport := fun association => (chosen association).2)
@@ -544,7 +544,7 @@ theorem reflects_root
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child rootFaults size := by
     intro child childSelected
     exact CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
-      (namedSupport header selected.member) profile wellFormed childSelected
+      (namedSupport header selected.member) profile wellFormed childSelected extension
       (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
         (profile := profile) (closurePackets := fun association => (chosen association).1)
         (closureSupport := fun association => (chosen association).2)

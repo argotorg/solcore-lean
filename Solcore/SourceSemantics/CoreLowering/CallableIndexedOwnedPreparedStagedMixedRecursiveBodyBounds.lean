@@ -70,7 +70,7 @@ theorem preserves (size : Nat) :
       root.support.runtimeLedger root.support.uninitialized size ih
       (fun childSize within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
-          (namedSupport named member) profile root.support.wellFormed selected
+          (namedSupport named member) profile root.support.wellFormed selected extension
           (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
       root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
@@ -91,7 +91,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       root.support.runtimeLedger root.support.uninitialized stageEq size ih
       (fun childSize within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
-          (namedSupport named member) profile root.support.wellFormed selected
+          (namedSupport named member) profile root.support.wellFormed selected extension
           (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
       root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
