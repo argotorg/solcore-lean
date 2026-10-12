@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBlockSequences
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedConditionalSequences
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
@@ -245,7 +246,12 @@ theorem reflects {budget : Nat}
             combined, related, finalHeaps,
             firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans preservation, firstMetadata.trans metadata,
             reached, callerProtocol.trans expressionRelated tailRelated, post⟩
-  | block found form inner remaining innerIH remainingIH => exact False.elim (shape.not_block found form)
+  | block found form inner remaining innerIH remainingIH =>
+      obtain ⟨innerShape, restShape⟩ := shape.block_children found form
+      exact CallableIndexedOwnedAdmittedStagedBlockSequences.reflects bridge functions condition
+        (fun {size} bounded => innerIH (size := size) (administrative := administrative) innerShape projection bounded)
+        found form (.inl (fun {size} bounded => remainingIH (size := size) (administrative := administrative) restShape projection bounded)) within
+        environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
       obtain ⟨leftShape, rightShape, restShape⟩ := shape.branches found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree
@@ -256,7 +262,12 @@ theorem reflects {budget : Nat}
         (fun {size} bounded => thenIH (size := size) (administrative := administrative) leftShape projection bounded) (fun {size} bounded => elseIH (size := size) (administrative := administrative) rightShape projection bounded)
         found form (.inl (fun {size} bounded => remainingIH (size := size) (administrative := administrative) restShape projection bounded)) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-  | terminalBlock _ found form inner stops issued ih => exact False.elim (shape.not_block found form)
+  | terminalBlock exactUnique found form inner stops issued ih =>
+      obtain ⟨innerShape, _restShape⟩ := shape.block_children found form
+      exact CallableIndexedOwnedAdmittedStagedBlockSequences.reflects bridge functions condition
+        (fun {size} bounded => ih (size := size) (administrative := administrative) innerShape projection bounded)
+        found form (.inr ⟨exactUnique, stops⟩) within
+        environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
   | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
       obtain ⟨leftShape, rightShape, _restShape⟩ := shape.branches found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree

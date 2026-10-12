@@ -66,9 +66,16 @@ theorem sites
       (head := head) (remaining := rest)
     · exact ih rfl remaining
     · exact GenericAssignmentStatements.Head.ReachableErrors.bare_equal (empty_steps head.shape bare)
-  | block found form _ _ _ _ | terminalBlock _ found form _ _ _ _ =>
+  | block found form inner remaining innerIH remainingIH =>
     cases atStatements
-    exact False.elim (shape.not_block found form)
+    obtain ⟨innerShape, restShape⟩ := shape.block_children found form
+    exact .block (found := found) (form := form) (inner := inner) (remaining := remaining)
+      (innerIH rfl innerShape) (remainingIH rfl restShape)
+  | terminalBlock unique found form inner stops issued innerIH =>
+    cases atStatements
+    exact .terminalBlock (unique := unique) (found := found) (form := form)
+      (inner := inner) (stops := stops) (issued := issued)
+      (innerIH rfl (shape.block_children found form).1)
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining leftIH rightIH nextIH =>
     cases atStatements
     obtain ⟨left, right, next⟩ := shape.branches found form

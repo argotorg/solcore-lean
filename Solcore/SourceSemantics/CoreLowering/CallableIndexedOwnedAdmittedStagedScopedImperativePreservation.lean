@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBlockSequences
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileSequences
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedWhileSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedLexicalPreservation
@@ -295,7 +297,15 @@ theorem preserves_at {budget : Nat}
         exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
           maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
           last, callerProtocol.trans related lastRelated, post⟩
-  | block found form inner remaining innerIH remainingIH => cases atStatements; exact False.elim (shape.not_block found form)
+  | block found form inner remaining innerIH remainingIH =>
+      cases atStatements
+      obtain ⟨innerShape, restShape⟩ := shape.block_children found form
+      have innerTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.inner unique sourceTyped found form
+      have restTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.suffix unique sourceTyped found form
+      exact CallableIndexedOwnedAdmittedStagedBlockSequences.preserves bridge functions condition
+        (innerIH rfl innerShape innerTyped projection)
+        unique found form (.inl (remainingIH rfl restShape restTyped projection)) within
+        environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
       cases atStatements
       obtain ⟨leftShape, rightShape, restShape⟩ := shape.branches found form
@@ -311,7 +321,14 @@ theorem preserves_at {budget : Nat}
         (thenIH rfl leftShape leftTyped projection) (elseIH rfl rightShape rightTyped projection)
         unique found form (.inl (remainingIH rfl restShape (CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping.suffix unique sourceTyped found form) projection)) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | terminalBlock _ found form _ _ _ _ => cases atStatements; exact False.elim (shape.not_block found form)
+  | terminalBlock exactUnique found form inner stops issued ih =>
+      cases atStatements
+      obtain ⟨innerShape, _restShape⟩ := shape.block_children found form
+      have innerTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.inner unique sourceTyped found form
+      exact CallableIndexedOwnedAdmittedStagedBlockSequences.preserves bridge functions condition
+        (ih rfl innerShape innerTyped projection)
+        unique found form (.inr stops) within
+        environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
       cases atStatements
       obtain ⟨leftShape, rightShape, _restShape⟩ := shape.branches found form

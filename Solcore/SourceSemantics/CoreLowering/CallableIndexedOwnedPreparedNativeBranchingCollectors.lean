@@ -315,9 +315,50 @@ theorem tree
         (ih rfl restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
           (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped)))
-  | block found form _ _ _ _ _ | terminalBlock _ found form _ _ _ _ | scopedBlock found form _ _ _ _ =>
+  | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH
+  | @scopedBlock context mode id node statements rest expected found form inner remaining innerIH restIH =>
     cases atStatements
-    exact False.elim (shape.not_block found form)
+    obtain ⟨innerShape, restShape⟩ := shape.block_children found form
+    have innerReached : ∀ child ∈ statements, Reaches source roots (.statement child) := by
+      intro child member
+      exact .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member])
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨innerCode, generatedInner, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, innerTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      exact .block found form
+        (innerIH rfl innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
+        (restIH rfl restShape fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
+  | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
+    cases atStatements
+    obtain ⟨innerShape, _restShape⟩ := shape.block_children found form
+    have innerReached : ∀ child ∈ statements, Reaches source roots (.statement child) := by
+      intro child member
+      exact .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member])
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨innerCode, generatedInner, accepted⟩ := bind_ok accepted
+      obtain ⟨suffix, generatedSuffix, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, innerTyped⟩, _⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      exact .terminalBlock exactUnique found form
+        (innerIH rfl innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
+        stops ((GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix).transport (statement_identity edited.metadata.symm))
   | @ifThen context mode id node condition conditionNode thenBody elseBody rest expected found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax remaining thenIH elseIH restIH =>
     cases atStatements
     obtain ⟨leftShape, rightShape, restShape⟩ := shape.branches found form
