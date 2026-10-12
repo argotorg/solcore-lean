@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Named while bodies from actual call entries (2026-10-13)
+
+Checkpoint `04a8a508` connects named bodies with plain assignment and finite while loops to the same public proof family. The actual argument bundle, global slots and retained frame determine the compiler's native input prefix. The proof restricts the canonical view to those used slots while preserving the complete runtime environment, heap and owned pool. Existing input metadata extension receipts supply the required registry condition throughout public dispatch.
+
+The closed `choose(flag, value, stop)` example executes one iteration on the first call and none on the following call, returning `11 / 22`. Both independent Source traces, exact reached heaps and reusable histories come from actual initialization and the successive returned sessions. Source success provides sufficient execution and output fuel at both original checkpoints. Static support is extracted from genuine compiler acceptance, including its assignment policy and native typing; no body execution law is supplied by the fixture.
+
+Validation: full build (6331 jobs), all registered tests and kernel policy pass. Twenty-two audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Scoped blocks are the next connection under verification. Broader expression/control-flow coverage and final composition across every compiler pass remain incomplete.
+
+`PreparedNamedBranchingCollectors.of_imperative_compiler` derives the named imperative tree; the existing lexical `of_compiler` remains a wrapper. `PreparedStagedNamedBranchingEntryPrefix.entry_prefix` and `packet_take` derive the used prefix from authentic call observations. `PreparedStagedNamedBranchingSupport.preserves` / `reflects` retain the full caller postcondition. The registered closed endpoint is `Tests.SourceCoreNamedWhile.closed_sequence_meaning`, executed by `run`.
+
 ## Finite while bodies and retained closure captures (2026-10-13)
 
 `494ac11a` adds finite staged while traces, their numeric grades, ordinary Source erasure and fault-heap preservation. `b658957a` connects them through authentic compiler receipts, closure application and public sessions. Each iteration restores its outer lexical bindings and retains its actual reached heap. The proof handles finite iteration counts, early return, condition failure and body failure; this fragment does not yet include `break` or `continue`.

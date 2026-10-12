@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Named while bodies from actual call entries (2026-10-13)
+
+Checkpoint `04a8a508` connects named bodies with plain assignment and finite while loops to the same public proof family. The actual argument bundle, global slots and retained frame determine the compiler's native input prefix. The proof restricts the canonical view to those used slots while preserving the complete runtime environment, heap and owned pool. Existing input metadata extension receipts supply the required registry condition throughout public dispatch.
+
+The closed `choose(flag, value, stop)` example executes one iteration on the first call and none on the following call, returning `11 / 22`. Both independent Source traces, exact reached heaps and reusable histories come from actual initialization and the successive returned sessions. Source success provides sufficient execution and output fuel at both original checkpoints. Static support is extracted from genuine compiler acceptance, including its assignment policy and native typing; no body execution law is supplied by the fixture.
+
+Validation: full build (6331 jobs), all registered tests and kernel policy pass. Twenty-two audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Scoped blocks are the next connection under verification. Broader expression/control-flow coverage and final composition across every compiler pass remain incomplete.
+
 ## Finite while bodies and retained closure captures (2026-10-13)
 
 `494ac11a` adds finite staged while traces, their numeric grades, ordinary Source erasure and fault-heap preservation. `b658957a` connects them through authentic compiler receipts, closure application and public sessions. Each iteration restores its outer lexical bindings and retains its actual reached heap. The proof handles finite iteration counts, early return, condition failure and body failure; this fragment does not yet include `break` or `continue`.

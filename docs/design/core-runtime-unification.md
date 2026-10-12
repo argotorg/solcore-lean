@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Named while bodies from actual call entries (2026-10-13)
+
+Checkpoint `04a8a508` connects named bodies with plain assignment and finite while loops to the same public proof family. The actual argument bundle, global slots and retained frame determine the compiler's native input prefix. The proof restricts the canonical view to those used slots while preserving the complete runtime environment, heap and owned pool. Existing input metadata extension receipts supply the required registry condition throughout public dispatch.
+
+The closed `choose(flag, value, stop)` example executes one iteration on the first call and none on the following call, returning `11 / 22`. Both independent Source traces, exact reached heaps and reusable histories come from actual initialization and the successive returned sessions. Source success provides sufficient execution and output fuel at both original checkpoints. Static support is extracted from genuine compiler acceptance, including its assignment policy and native typing; no body execution law is supplied by the fixture.
+
+Validation: full build (6331 jobs), all registered tests and kernel policy pass. Twenty-two audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Scoped blocks are the next connection under verification. Broader expression/control-flow coverage and final composition across every compiler pass remain incomplete.
+
 ## Finite while bodies and retained closure captures (2026-10-13)
 
 `494ac11a` adds finite staged while traces, their numeric grades, ordinary Source erasure and fault-heap preservation. `b658957a` connects them through authentic compiler receipts, closure application and public sessions. Each iteration restores its outer lexical bindings and retains its actual reached heap. The proof handles finite iteration counts, early return, condition failure and body failure; this fragment does not yet include `break` or `continue`.
@@ -148,11 +156,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `b658957a`: finite while bodies connect actual compiler output, retained closure captures, Source histories and public fuel bounds. |
-| Latest completed verification | Full build (6318 jobs), all registered tests, kernel policy and twenty-one endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `04a8a508`: named imperative bodies derive their entry conditions from real calls and connect finite while execution to first/following public sessions. |
+| Latest completed verification | Full build (6331 jobs), all registered tests, kernel policy and twenty-two endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional and finite while closure bodies retain separate mutable captures across intervening calls. |
-| Latest proof scope | The six-call while example proves distinct handles, results `11 / 20 / 12` and histories at the exact successive sessions/heaps. Its direct calls perform one, zero and one iterations. Static body conditions come from accepted compiler receipts. |
-| Current implementation priority | Connect named while bodies through initial/following public calls, then widen remaining control-flow/expression coverage and compose all compiler passes. |
+| Latest proof scope | The named while example proves results `11 / 22`, exact successive Source heaps/histories and sufficient public fuel at both original checkpoints. Separate closure captures retain the preceding six-call `11 / 20 / 12` guarantee. |
+| Current implementation priority | Connect scoped blocks and their heap effects to public execution, then add primitive/conditional expressions to the recursive caller certificates and widen remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
