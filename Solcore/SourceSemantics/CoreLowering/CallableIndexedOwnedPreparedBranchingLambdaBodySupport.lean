@@ -29,6 +29,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 independent Source syntax at the real parameter context. -/
 theorem of_branching
     (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+    (sameCompilation : code.compilation = context compiled.indexed named)
     (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
     (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     (sameLedger : function.context.solvedRequirements = code.compilation.solvedRequirements)
@@ -38,6 +39,8 @@ theorem of_branching
     (active : code.active = [])
     (onError : code.allocationError = fun error => .sourceAllocation (reprStr error))
     (signatures : inputs.context.signatures = compiled.compatible.checked.signatures)
+    (hidden : GenericImperativeMatch.MatchHiddenFresh function.source)
+    (catalog : SignatureCatalogWellFormed compiled.compatible.checked.signatures)
     (declarations : CompatibleExpressionReads.ScopeDeclarations function.source
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) inputs.context)
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
@@ -92,25 +95,44 @@ theorem of_branching
     apply congrArg some
     funext expression fuel source scope site assignment operator rhs output next reasonAt
     cases operator <;> rfl
-  let full : GenericImperativeMatch.Tree compiled.indexed.layouts code.compilation.owner code.active
+  let baseMatch : SourceCoreCompatibleDataMatches.Context :=
+    ⟨.initial compiled.compatible.checked, (context compiled.indexed named).solvedRequirements,
+      some (allocator compiled.indexed named), none⟩
+  have matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy
+      (CompatibleMatchAmbientLowering.withDefinitions baseMatch compiled.indexed.layouts.definitions) := by
+    apply CompatibleMatchAmbientLowering.PolicySuccess.extend (show policy.lowerMatch = some
+      (SourceCoreCompatibleDataMatches.lowerWithReasons baseMatch) from rfl)
+    exact ⟨_, CallableIndexedAmbient.definitions_exact compiled.indexed⟩
+  have matchAllocator : (CompatibleMatchAmbientLowering.withDefinitions baseMatch
+      compiled.indexed.layouts.definitions).sourceCells = some
+      (SourceCoreCallableIndexedAllocationFrames.allocator compiled.indexed.ancestry.layout.frame
+        compiled.indexed.base.globals.length
+        (compiled.indexed.layouts.allocatorAt code.compilation.owner code.active code.allocationError)) := by
+    rw [owner, active, onError]
+    rfl
+  have matchLedger : inputs.context.solvedRequirements = baseMatch.solvedRequirements := by
+    exact (Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended).solvedRequirements.trans
+      (sameLedger.trans (by rw [sameCompilation]))
+  let collected : CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) function.source (Syntax function.source) (Child 0 function.source)
       compiled.indexed.layouts.definitions administrative inputs.context
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
       (.statements true function.body) function.resultType code.receipt.resultCore flow :=
-    CallableIndexedOwnedPreparedNativeBranchingCollectors.tree
+    CallableIndexedOwnedPreparedNativeBranchingCollectors.collected
       (CallableLambdaViewEdits.LocalView.refl function.source)
       (by intro id member; cases member)
       frame.code.graph.nodeOccurrencesUnique
       (show policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked from rfl)
       binderPolicy allocationPolicy assignments
+      matchPolicy rfl rfl matchAllocator hidden catalog matchLedger
       (certificates := fun _ _ _ _ => True)
       (by intros; exact True.intro)
       syntaxTree rfl shape (Dynamic.RuntimeContextFields.refl _)
       runtime.variables_closed runtime.residual_variables_open signatures declarations
       (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩)) projection generatedSource native
-  have sites : full.CatalogSites .reachable registry faults :=
-    CallableIndexedOwnedPreparedBranchingCatalogSites.sites full rfl shape
+  let full := collected.tree
+  have sites : full.CatalogSites .reachable registry faults := collected.sites registry faults
   let actualTree : GenericImperativeMatch.Tree compiled.indexed.layouts code.compilation.owner code.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length code.allocationError
       (.initial compiled.compatible.checked) code.view (Syntax code.view) (Child 0 code.view)

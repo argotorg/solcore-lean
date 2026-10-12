@@ -4,6 +4,11 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeLe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalContextCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewBodyTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
+import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
 
 /-! The actual compiler flow and its native typing produce the original scoped
 branch and assignment tree. Only reached expression metadata is transported; allocations
@@ -19,6 +24,7 @@ open CallableLambdaViewEdits CallableLambdaBodyReachability
 open CallableIndexedOwnedPreparedStagedBranchingTree
 open CallableIndexedOwnedPreparedStagedLexicalTree (TypedCertificate)
 open CallableIndexedOwnedPreparedLexicalContextCertificates
+open CallableIndexedOwnedPreparedBranchingCatalogSites (Collected)
 
 private theorem statement_identity {source view : TypedSource} (metadata : LambdaMetadataViews.MetadataView source view) :
     GenericLexicalStatements.StatementSourceIdentity source view := by
@@ -88,6 +94,46 @@ private theorem while_condition {definitions : DataEnvironment} {context : Core.
               exact ⟨_, TypedLexicalWhile.Native.remove_front
                 (TypedLexicalWhile.Native.remove_front shifted)⟩
 
+private theorem binders_fields {owner : Resolved.DeclarationId}
+    {parent child : SourceSemantics.Context} {binders : List TypedBinder}
+    (extended : BindersExtend owner parent binders child) :
+    Dynamic.RuntimeContextFields parent child := by
+  induction extended with
+  | nil => exact .refl _
+  | cons head _ ih => exact (Dynamic.RuntimeContextFields.ofBinderExtends head).trans ih
+
+/-- Native typing of the actual hidden allocation retains the exact evaluated
+scrutinee callback, before any matcher or arm body executes. -/
+private theorem match_expression
+    {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
+    {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
+    (onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error)
+    {compilation : SourceCoreCompatibleDataMatches.Context}
+    (allocator : compilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    {definitions : DataEnvironment} {administrative : Core.Context}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : StatementId} {resolution : MatchResolution}
+    {result : Ty} {reason : Word} {before after : CompatibleMatchCertificates.ExpressionCertificate}
+    {bodyCertificate : CompatibleMatchCertificates.BodyCertificate} {code : Expr}
+    (receipt : CompatibleMatchCertificates.Certificate compilation source scope id resolution result reason before bodyCertificate code)
+    {type : Ty} (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code type definitions)
+    (convert : ∀ lowered, before scope resolution.scrutinee lowered →
+      (∃ nativeType, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+        lowered.expression nativeType definitions) → after scope resolution.scrutinee lowered) :
+    CompatibleMatchCertificates.Certificate compilation source scope id resolution result reason after bodyCertificate code := by
+  cases receipt with
+  | matchWith read allowed form requirements hiddenOwned hiddenFresh scrutineeOwned found projection expression sameType
+      arms fallback branches hiddenCompiled =>
+    apply CompatibleMatchCertificates.Certificate.matchWith read allowed form requirements hiddenOwned hiddenFresh
+      scrutineeOwned found projection _ sameType arms fallback branches hiddenCompiled
+    have native := hiddenCompiled
+    rw [allocator] at native
+    unfold SourceCoreSourceCells.letInitialized at native
+    obtain ⟨allocation, allocated, exactCode⟩ := bind_ok native
+    cases exactCode
+    cases typed with
+    | caseE initial failure next => exact convert _ expression ⟨_, initial⟩
+
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -104,7 +150,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
 
 /-- Genuine Source syntax and one native body witness suffice for every
 expression callback, including the RHS under the seven-slot assignment frame. -/
-theorem tree
+theorem collected
     (edited : LocalView source view changed) (avoids : Avoids source roots changed)
     (unique : NodeOccurrencesUnique source)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
@@ -113,6 +159,15 @@ theorem tree
     (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
       (layouts.allocatorAt owner active onError)))
     (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    {matchCompilation : SourceCoreCompatibleDataMatches.Context}
+    (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
+    (matchValues : matchCompilation.values = values)
+    (matchDefinitions : matchCompilation.definitions = definitions)
+    (matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (hidden : GenericImperativeMatch.MatchHiddenFresh source)
+    (catalog : SignatureCatalogWellFormed values.checked.signatures)
+    (ledger : initial.solvedRequirements = matchCompilation.solvedRequirements)
     (children : ∀ context, Dynamic.RuntimeContextFields initial context →
       ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations source scope context →
       expressionSyntax id → Reaches source roots (.expression id) →
@@ -134,7 +189,7 @@ theorem tree
     (projection : values.checked.catalog.project expected = .ok type)
     (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel view scope statements type reasonAt mode selfReason = .ok code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
-    GenericImperativeMatch.Tree layouts owner active frame globals onError values source expressionSyntax
+    Collected layouts owner active frame globals onError values source expressionSyntax
       (TypedCertificate source certificates) definitions administrative context scope
       (.statements mode statements) expected type code := by
   induction syntaxTree generalizing mode statements scope fuel code nativeType with
@@ -314,7 +369,7 @@ theorem tree
       exact .assign found form originalHead
         (ih rfl restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
-          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped)))
+          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) rfl bare
   | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH
   | @scopedBlock context mode id node statements rest expected found form inner remaining innerIH restIH =>
     cases atStatements
@@ -494,9 +549,151 @@ theorem tree
         loopTyped
         (restIH rfl restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
+  | @matchWith context mode id node resolution scrutineeNode rest expected control caseFacts
+      found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped
+      hiddenOrdinary armsOrdinary childrenSyntax remaining childIH restIH =>
+    cases atStatements
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      have ⟨lower, selected⟩ : ∃ lower, policy.lowerMatch = some lower := by
+        cases selected : policy.lowerMatch with
+        | none => simp [selected] at accepted
+        | some lower => exact ⟨lower, rfl⟩
+      simp only [selected] at accepted
+      obtain ⟨matched, generatedMatch, accepted⟩ := bind_ok accepted
+      have generatedMatch := matchPolicy selected generatedMatch
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, matchedTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨requests, rawReceipt, _, generatedChildren⟩ := CompatibleMatchNativeReceipts.finite_typed_of_lower
+        onError matchAllocator matchDefinitions
+        (expressionCertificate := fun scope id lowered => ∃ childFuel,
+          policy.lowerExpression childFuel view scope id reasonAt = .ok lowered)
+        (fun childFuel lowered generated => ⟨childFuel, generated⟩) generatedMatch matchedTyped
+      have refs : ∀ child ∈ resolution.references, Reaches source roots child :=
+        fun child member => .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member)
+      have scrutineeReached : Reaches source roots (.expression resolution.scrutinee) := refs _ (by simp [MatchResolution.references])
+      have certified := match_expression onError matchAllocator rawReceipt matchedTyped
+        (after := TypedCertificate source certificates context)
+        (fun lowered generated native => by
+          obtain ⟨childFuel, generated⟩ := generated
+          obtain ⟨nativeType, native⟩ := native
+          exact ⟨scrutineeNode, scrutineeFound, scrutineeTyped, children context fields declarations
+            scrutineeSyntax scrutineeReached scrutineeFound scrutineeTyped generated native⟩)
+      have reverse : LocalView view source changed := ⟨edited.metadata.symm, fun id fresh => (edited.unchanged id fresh).symm⟩
+      have receipt := CallableLambdaViewMatchRuntimeCertificates.match_certificate reverse
+        (avoids.view edited.metadata) matchAllocator (fun _ _ _ _ value => value) certified
+        (scrutineeReached.metadata edited.metadata)
+      apply Collected.matchWith found form scrutineeFound scrutineeTyped casesTyped defaultTyped
+        matchCompilation matchValues matchDefinitions matchAllocator requests receipt
+        (CompatibleMatchSelectionPrefix.ordinary_of_source_ids receipt hiddenOrdinary armsOrdinary)
+      · intro request member childContext related
+        obtain ⟨⟨childFuel, generated⟩, childTyped⟩ := generatedChildren request member
+        have childDeclarations := related.source_declarations found form (hidden found form) declarations
+        obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := related.closed_fields
+        have childFields : Dynamic.RuntimeContextFields context childContext := by
+          cases related with
+          | arm _ _ _ extended _ => exact binders_fields extended
+          | default _ _ => exact .refl _
+        apply childIH request childContext related.forget rfl (shape.match_request found form related.forget)
+          (fields.trans childFields) (sameVariables.trans closed) (sameResidual.trans residual)
+          (sameSignatures.trans sourceSignatures) childDeclarations
+        · intro statement present
+          apply refs
+          cases related with
+          | arm armMember sameBody _ _ _ =>
+            simp only [MatchResolution.references, List.mem_cons, reduceCtorEq, List.mem_append]
+            exact .inl (.inr (List.mem_flatMap.mpr ⟨_, armMember, List.mem_map.mpr ⟨statement, sameBody ▸ present, rfl⟩⟩))
+          | default sameBody _ =>
+            simp [MatchResolution.references, sameBody, present]
+        · exact projection
+        · exact generated
+        · exact childTyped
+      · exact restIH rfl (shape.match_children found form).2.2 fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped
+      · exact catalog
+      · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
+          fields.solvedRequirements.trans ledger⟩
+  | @terminalMatch context mode id node resolution scrutineeNode rest expected control caseFacts
+      exactUnique found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped
+      hiddenOrdinary armsOrdinary childrenSyntax stops childIH =>
+    cases atStatements
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      have ⟨lower, selected⟩ : ∃ lower, policy.lowerMatch = some lower := by
+        cases selected : policy.lowerMatch with
+        | none => simp [selected] at accepted
+        | some lower => exact ⟨lower, rfl⟩
+      simp only [selected] at accepted
+      obtain ⟨matched, generatedMatch, accepted⟩ := bind_ok accepted
+      have generatedMatch := matchPolicy selected generatedMatch
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, matchedTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨requests, rawReceipt, _, generatedChildren⟩ := CompatibleMatchNativeReceipts.finite_typed_of_lower
+        onError matchAllocator matchDefinitions
+        (expressionCertificate := fun scope id lowered => ∃ childFuel,
+          policy.lowerExpression childFuel view scope id reasonAt = .ok lowered)
+        (fun childFuel lowered generated => ⟨childFuel, generated⟩) generatedMatch matchedTyped
+      have refs : ∀ child ∈ resolution.references, Reaches source roots child :=
+        fun child member => .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member)
+      have scrutineeReached : Reaches source roots (.expression resolution.scrutinee) := refs _ (by simp [MatchResolution.references])
+      have certified := match_expression onError matchAllocator rawReceipt matchedTyped
+        (after := TypedCertificate source certificates context)
+        (fun lowered generated native => by
+          obtain ⟨childFuel, generated⟩ := generated
+          obtain ⟨nativeType, native⟩ := native
+          exact ⟨scrutineeNode, scrutineeFound, scrutineeTyped, children context fields declarations
+            scrutineeSyntax scrutineeReached scrutineeFound scrutineeTyped generated native⟩)
+      have reverse : LocalView view source changed := ⟨edited.metadata.symm, fun id fresh => (edited.unchanged id fresh).symm⟩
+      have receipt := CallableLambdaViewMatchRuntimeCertificates.match_certificate reverse
+        (avoids.view edited.metadata) matchAllocator (fun _ _ _ _ value => value) certified
+        (scrutineeReached.metadata edited.metadata)
+      apply Collected.terminalMatch exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped
+        matchCompilation matchValues matchDefinitions matchAllocator requests receipt
+        (CompatibleMatchSelectionPrefix.ordinary_of_source_ids receipt hiddenOrdinary armsOrdinary)
+      · intro request member childContext related
+        obtain ⟨⟨childFuel, generated⟩, childTyped⟩ := generatedChildren request member
+        have childDeclarations := related.source_declarations found form (hidden found form) declarations
+        obtain ⟨sameSignatures, sameVariables, sameResidual⟩ := related.closed_fields
+        have childFields : Dynamic.RuntimeContextFields context childContext := by
+          cases related with
+          | arm _ _ _ extended _ => exact binders_fields extended
+          | default _ _ => exact .refl _
+        apply childIH request childContext related.forget rfl (shape.match_request found form related.forget)
+          (fields.trans childFields) (sameVariables.trans closed) (sameResidual.trans residual)
+          (sameSignatures.trans sourceSignatures) childDeclarations
+        · intro statement present
+          apply refs
+          cases related with
+          | arm armMember sameBody _ _ _ =>
+            simp only [MatchResolution.references, List.mem_cons, reduceCtorEq, List.mem_append]
+            exact .inl (.inr (List.mem_flatMap.mpr ⟨_, armMember, List.mem_map.mpr ⟨statement, sameBody ▸ present, rfl⟩⟩))
+          | default sameBody _ =>
+            simp [MatchResolution.references, sameBody, present]
+        · exact projection
+        · exact generated
+        · exact childTyped
+      · exact stops
+      · exact (GenericLexicalStatements.IssuedSuffix.of_accepted generatedBody).transport
+          (statement_identity edited.metadata.symm)
+      · exact catalog
+      · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
+          fields.solvedRequirements.trans ledger⟩
   | forLoop found form _ _ _ _ _
-  | bitNot found form _ _ _ _ _ | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _
-  | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ =>
+  | bitNot found form _ _ _ _ _ =>
     cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no

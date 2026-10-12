@@ -1,10 +1,12 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
 import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertificates
 
 /-! Actual ordinary closure reads construct the expression Roots needed by
-conditional branches, bare assignments and lexical statements. The retained compiler chooses one
+conditional and match branches, bare assignments and lexical statements. The retained compiler chooses one
 branching packet; no Source execution or whole-body law is an input. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -50,11 +52,19 @@ def support_reads
         (values := .initial compiled.compatible.checked)
         (prepared := compiled.indexed.ancestry) support.caller).symm).trans
       (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := support.caller))
+  have ownership : LocalIdentityOwnership function.source := by
+    obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate support.caller wellFormed
+    rw [support.source]
+    change LocalIdentityOwnership support.caller.named.specialized.function.typedBody
+    rw [← support.caller.agreement.source, support.caller.frame.source]
+    exact certificate.local_identity_ownership
   refine ⟨support.body.frame, support.body.projection, ?_⟩
   intro child selected
-  have actual := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerSupport.tree
+  have actual := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerSupport.collected
     code support.body.toContext support.body.frame choice provenance.body_view provenance.scope_declarations
-    sourceSignatures support.body.projection syntaxTree
+    sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
+    (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
+    support.body.valid.ledger support.body.projection syntaxTree
     (certificates := fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered faults))
     (fun context fields current fuel id node lowered declarations read reached found typed accepted _nativeType _native => by
       obtain ⟨readNode, name, binder, readFound, form⟩ := read
@@ -66,9 +76,17 @@ def support_reads
   have weakened := CallableLambdaViewMatchRuntimeCertificates.transport_with
     (LocalView.refl function.source) (by intro id member; cases member)
     support.body.unique (fun _ _ _ => True.intro)
-    (fun _ _ _ _ _ value => value) actual
+    (fun _ _ _ _ _ value => value) actual.tree
     (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
-  simpa only [stages.source selected] using weakened
+  rw [stages.source selected]
+  refine ⟨weakened, ?_⟩
+  intro currentRegistry currentFaults
+  obtain ⟨tree, sites⟩ := CallableLambdaViewMatchRuntimeCertificates.transport_sites_with
+    (LocalView.refl function.source) (by intro id member; cases member)
+    support.body.unique (fun _ _ _ => True.intro)
+    (fun _ _ _ _ _ value => value) (actual.sites currentRegistry currentFaults)
+    (fun id member => Reaches.root (List.mem_map.mpr ⟨id, member, rfl⟩))
+  exact sites
 
 include provenance receiver wellFormed original in
 omit choice in
@@ -83,7 +101,7 @@ theorem of_reads
       CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Support
         code support.body.toContext stages packet faults) := by
   obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
-    code support.caller.named provenance.policy_recipe.body_recipe shape child selected
+    code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
   exact ⟨⟨.branching choice.packet,
     support_reads code support provenance receiver wellFormed original choice syntaxTree⟩⟩
 

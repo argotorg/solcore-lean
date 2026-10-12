@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaReadDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLambdaProducer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingLambdaBodySupport
@@ -9,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralReturnLam
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 
 /-! Actual named compilation retains the same lambda and its complete
-conditional assignment body. Original checked Source typing supplies the captured context;
+scoped imperative body. Original checked Source typing supplies the captured context;
 no child execution law or body certificate is supplied by callers. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -127,9 +128,10 @@ theorem of_terminal
       simpa only [function, closure, source, ← header.agreement.source] using bodyTyped
     simpa only [function, closure, source, ← header.agreement.source] using syntaxFor typed
   obtain ⟨body, _sameInputs, syntaxTree⟩ := CallableIndexedOwnedPreparedBranchingLambdaBodySupport.of_branching
-    produced.site.code produced.recipe inputs frame ledger profile actualView
+    produced.site.code produced.recipe produced.site.compilation inputs frame ledger profile actualView
     (by rw [produced.site.compilation]; rfl) produced.site.active produced.site.allocationError
-    signatures entryDeclarations (by simpa only [function, closure, source, ← header.agreement.source] using shape) syntaxTree
+    signatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
+    (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed) entryDeclarations (by simpa only [function, closure, source, ← header.agreement.source] using shape) syntaxTree
   exact ⟨CallableIndexedOwnedContextualLambdaFormationReceipts.ordinary_of_producer header produced
     CallableIndexedOwnedPreparedBranchingLambdaBodySupport.Syntax
     CallableIndexedOwnedPreparedBranchingLambdaBodySupport.Child body

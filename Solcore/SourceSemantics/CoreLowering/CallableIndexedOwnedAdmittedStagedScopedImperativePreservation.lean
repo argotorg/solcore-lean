@@ -1,3 +1,6 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedMatchTreeHeads
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedMatchSourceTyping
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeForMatchEmbedding
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBlockSequences
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileSequences
@@ -43,11 +46,11 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   (extension : SourceCoreRawMetadata.Extends (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry receiving)
   (definitions : layouts.definitions = (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
   (registered : frame.Registered (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions)
-  (producer : ProtectedStateTransition.OrdinaryAllocation.Producer callerProtocol layouts frame
+  (producer : ProtectedStateTransition.MarkedAllocation.Producer callerProtocol layouts frame
     (CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions))
   (condition : Location → NativeFrame → Prop)
   (acquire : ∀ location native, condition location native →
-    ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer location native)
+    ProtectedStateTransition.OrdinaryAllocation.ReadyAt producer.toOrdinary location native)
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
   {faults : RecursiveStageMeaning.FaultRep}
@@ -68,6 +71,9 @@ theorem preserves_at {budget : Nat}
     (tree : Tree layouts owner active frame globals onError (.initial compiled.compatible.checked)
       invocation.source expressionSyntax (TypedCertificate invocation.source certificates)
       (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions administrative context scope position expected type code)
+    {diagnosticPolicy : AssignmentDiagnosticPolicy} {catalogRegistry : SourceCoreRawMetadata.Registry}
+    {catalogFaults : FunctionCalls.FaultRep}
+    (catalogSites : Tree.CatalogSites diagnosticPolicy catalogRegistry catalogFaults tree)
     {mode : Bool} {statements : List StatementId}
     (atStatements : position = .statements mode statements)
     (shape : Shape invocation.source mode statements)
@@ -100,14 +106,14 @@ theorem preserves_at {budget : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ Post bridge context expected outcome reached := by
-  induction tree generalizing mode statements size mapping world actualContext environment canonical actual before
+  induction catalogSites generalizing mode statements size mapping world actualContext environment canonical actual before
       store ξ contextLocation native finalContext outcome after with
   | @body context scope mode statements expected type code syntaxTree body =>
       cases atStatements
-      exact CallableIndexedOwnedAdmittedStagedScopedLexicalPreservation.preserves bridge bindings functions definitions registered producer condition acquire children unique
+      exact CallableIndexedOwnedAdmittedStagedScopedLexicalPreservation.preserves bridge bindings functions definitions registered producer.toOrdinary condition acquire children unique
         body shape projection within environments heaps locals agrees actualTyped
         reference read unmapped initial conditioned admitted trace
-  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocation annotation same tail ih =>
+  | @uninitialized context nextContext scope mode id node binder rest expected type body payload found form mono extended ordinary projected allocation annotation same tail remainingErrors ih =>
       cases atStatements
       have tailShape := shape.tail_of_let found form
       obtain ⟨tailSize, location, bound, sameSize, allocated, remainingTrace⟩ :=
@@ -116,7 +122,7 @@ theorem preserves_at {budget : Nat}
         rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
       obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals,
           nextAgrees, nextTyped, nextReference, nextRead, preservation, reached, allocatedRelated, nextAdmitted⟩ :=
-        CallableIndexedOwnedAdmittedLexicalAllocation.allocate_absent bridge functions definitions registered producer
+        CallableIndexedOwnedAdmittedLexicalAllocation.allocate_absent bridge functions definitions registered producer.toOrdinary
           mono extended ordinary projected allocation annotation same environments heaps locals agrees actualTyped
           reference read allocated initial ((acquire _ _ conditioned) initial read) admitted
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
@@ -135,7 +141,7 @@ theorem preserves_at {budget : Nat}
             (id := binder.id) (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState)), ?_⟩
       exact restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
         (type := payload) (value := .cellRef (OptionalCell.cellType payload) (store.length + 2)) tailState post
-  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initialFound sourceType child allocation annotation same remaining ih =>
+  | @initialized context nextContext scope mode id node binder initializer initializerNode lowered body rest expected type found form mono extended ordinary initialFound sourceType child allocation annotation same remaining remainingErrors ih =>
       cases atStatements
       have tailShape := shape.tail_of_let found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
@@ -169,7 +175,7 @@ theorem preserves_at {budget : Nat}
             have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
             obtain ⟨captured, _captures, _capturedTyped, allocationEval, nextEnvironments, nextHeaps, nextLocals,
                 nextAgrees, nextTyped, nextReference, nextRead, allocationFrame, reached, allocationRelated, nextAdmitted⟩ :=
-              CallableIndexedOwnedAdmittedLexicalAllocation.allocate_initialized bridge functions definitions registered producer
+              CallableIndexedOwnedAdmittedLexicalAllocation.allocate_initialized bridge functions definitions registered producer.toOrdinary
                 mono extended ordinary allocation annotation same (sourceType ▸ initialPost.at_value.1) (sourceType ▸ payload)
                 (environments.extend maps worlds) middleHeaps (locals.mono metadata) agrees (actualTyped.weaken worlds)
                 reference frameRead allocated middleState ((acquire _ _ conditioned) middleState frameRead) initialPost.at_value.2
@@ -195,7 +201,7 @@ theorem preserves_at {budget : Nat}
                   (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState))), ?_⟩
             exact restore_post bindings extended (index := ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
               (type := lowered.type) (value := .cellRef (OptionalCell.cellType lowered.type) (middleStore.length + 2)) tailState post
-  | @discard context scope mode id node expression expressionNode semi rest expected lowered type body found form guard expressionFound child remaining ih =>
+  | @discard context scope mode id node expression expressionNode semi rest expected lowered type body found form guard expressionFound child remaining remainingErrors ih =>
       cases atStatements
       obtain ⟨continuing, tailShape⟩ := shape.discard_tail found form guard
       obtain ⟨typedNode, typedFound, typed, certified⟩ := child
@@ -239,7 +245,7 @@ theorem preserves_at {budget : Nat}
             exact ⟨value, finalStore, finalMap, finalWorld, LocalSequence.discard_success _ first second,
               related, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans preservation,
               firstMetadata.trans metadata, reached, callerProtocol.trans expressionRelated tailRelated, post⟩
-  | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining ih =>
+  | @assign context scope mode id node assignment operator rhs rest expected type body found form head remaining remainingErrors headErrors ih =>
       cases atStatements
       obtain ⟨rfl, bare, tailShape⟩ := shape.assign_tail found form
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.assignment unique
@@ -297,7 +303,7 @@ theorem preserves_at {budget : Nat}
         exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
           maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
           last, callerProtocol.trans related lastRelated, post⟩
-  | block found form inner remaining innerIH remainingIH =>
+  | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH remainingIH =>
       cases atStatements
       obtain ⟨innerShape, restShape⟩ := shape.block_children found form
       have innerTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.inner unique sourceTyped found form
@@ -306,7 +312,7 @@ theorem preserves_at {budget : Nat}
         (innerIH rfl innerShape innerTyped projection)
         unique found form (.inl (remainingIH rfl restShape restTyped projection)) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | ifThen found form conditionFound conditionType conditionTree thenTree elseTree remaining thenIH elseIH remainingIH =>
+  | @ifThen context scope mode id node conditionId conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode body found form conditionFound conditionType conditionTree thenTree elseTree remaining thenTreeErrors elseTreeErrors remainingErrors thenIH elseIH remainingIH =>
       cases atStatements
       obtain ⟨leftShape, rightShape, restShape⟩ := shape.branches found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree
@@ -321,7 +327,7 @@ theorem preserves_at {budget : Nat}
         (thenIH rfl leftShape leftTyped projection) (elseIH rfl rightShape rightTyped projection)
         unique found form (.inl (remainingIH rfl restShape (CallableIndexedOwnedPreparedStagedScopedBranchSourceTyping.suffix unique sourceTyped found form) projection)) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | terminalBlock exactUnique found form inner stops issued ih =>
+  | @terminalBlock context scope mode id node statements rest expected type innerCode suffix exactUnique found form inner stops issued innerErrors ih =>
       cases atStatements
       obtain ⟨innerShape, _restShape⟩ := shape.block_children found form
       have innerTyped := CallableIndexedOwnedPreparedStagedScopedBlockSourceTyping.inner unique sourceTyped found form
@@ -329,7 +335,7 @@ theorem preserves_at {budget : Nat}
         (ih rfl innerShape innerTyped projection)
         unique found form (.inr stops) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | terminalIf exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenIH elseIH =>
+  | @terminalIf context scope mode id node conditionId conditionNode thenBody elseBody rest expected type conditionCode thenCode elseCode suffix exactUnique found form conditionFound conditionType conditionTree thenTree elseTree thenStops elseStops issued thenErrors elseErrors thenIH elseIH =>
       cases atStatements
       obtain ⟨leftShape, rightShape, _restShape⟩ := shape.branches found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree
@@ -344,7 +350,7 @@ theorem preserves_at {budget : Nat}
         (thenIH rfl leftShape leftTyped projection) (elseIH rfl rightShape rightTyped projection)
         unique found form (.inr ⟨thenStops, elseStops⟩) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | whileLoop found form conditionFound conditionType conditionTree loopTree nativeTyped remaining loopIH remainingIH =>
+  | @whileLoop context scope mode id node conditionId conditionNode statements rest expected type conditionCode loopCode body selfReason found form conditionFound conditionType conditionTree loopTree nativeTyped remaining loopBodyErrors remainingErrors loopIH remainingIH =>
       cases atStatements
       obtain ⟨loopShape, restShape⟩ := shape.loop found form
       obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree
@@ -357,10 +363,64 @@ theorem preserves_at {budget : Nat}
         (loopIH rfl loopShape loopTyped projection)
         unique found form (remainingIH rfl restShape restTyped projection) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | breaking found form | continuing found form
-  | bitNot found form _ _ _ | forLoop found form _ _ _ _
-  | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-  | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @matchWith context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary matchChildren remaining catalog patternContext childErrors remainingErrors matchIH remainingIH =>
+      cases atStatements
+      cases compilation with
+      | mk values solved sourceCells ambientDefinitions =>
+        cases sameValues
+        have childMeaning : ∀ childSize, childSize < budget →
+            PreservesAt bridge context model stages invocation
+              (TypedCertificate invocation.source certificates context) faults childSize := by
+          intro childSize smaller actualScope actualId actualCode certified
+          obtain ⟨childNode, childFound, childTyped, actualCertificate⟩ := certified
+          exact children context childSize smaller actualCertificate
+        have selectedMeaning : CallableIndexedOwnedAdmittedStagedMatchSequences.MatchPreserves
+            (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
+            (stages := stages) (invocation := invocation) (faults := faults)
+            bridge functions condition context scope resolution expected type matched budget := by
+          intro matchSize
+          exact CallableIndexedOwnedAdmittedStagedMatchTreeHeads.preserves (size := matchSize)
+            bridge functions onError allocator definitions registered extension receipt ordinary
+            patternContext.signatures catalog scrutineeFound scrutineeTyped casesTyped defaultTyped
+            budget condition producer bindings acquire unique childMeaning
+            (fun request member childContext selectedContext bodyTyped =>
+              matchIH request member childContext selectedContext
+                rfl (shape.match_request found form selectedContext.forget) bodyTyped projection)
+        obtain ⟨_armShapes, _defaultShape, restShape⟩ := shape.match_children found form
+        exact CallableIndexedOwnedAdmittedStagedMatchSequences.preserves bridge functions condition
+          selectedMeaning unique found form (.inl (remainingIH rfl restShape (CallableIndexedOwnedPreparedStagedScopedMatchSourceTyping.suffix unique sourceTyped found form) projection)) within
+          environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
+  | @terminalMatch context scope mode id node resolution scrutineeNode rest expected type matched suffix selfReason control caseFacts exactUnique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary matchChildren stops issued catalog patternContext childErrors matchIH =>
+      cases atStatements
+      cases compilation with
+      | mk values solved sourceCells ambientDefinitions =>
+        cases sameValues
+        have childMeaning : ∀ childSize, childSize < budget →
+            PreservesAt bridge context model stages invocation
+              (TypedCertificate invocation.source certificates context) faults childSize := by
+          intro childSize smaller actualScope actualId actualCode certified
+          obtain ⟨childNode, childFound, childTyped, actualCertificate⟩ := certified
+          exact children context childSize smaller actualCertificate
+        have selectedMeaning : CallableIndexedOwnedAdmittedStagedMatchSequences.MatchPreserves
+            (administrative := administrative) (receiving := receiving) (frame := frame) (globals := globals)
+            (stages := stages) (invocation := invocation) (faults := faults)
+            bridge functions condition context scope resolution expected type matched budget := by
+          intro matchSize
+          exact CallableIndexedOwnedAdmittedStagedMatchTreeHeads.preserves (size := matchSize)
+            bridge functions onError allocator definitions registered extension receipt ordinary
+            patternContext.signatures catalog scrutineeFound scrutineeTyped casesTyped defaultTyped
+            budget condition producer bindings acquire unique childMeaning
+            (fun request member childContext selectedContext bodyTyped =>
+              matchIH request member childContext selectedContext
+                rfl (shape.match_request found form selectedContext.forget) bodyTyped projection)
+        obtain ⟨_armShapes, _defaultShape, restShape⟩ := shape.match_children found form
+        exact CallableIndexedOwnedAdmittedStagedMatchSequences.preserves bridge functions condition
+          selectedMeaning unique found form (.inr stops) within
+          environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
+  | @breaking _ _ _ _ _ _ _ _ found form | @continuing _ _ _ _ _ _ _ _ found form
+  | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _
+  | @forLoop _ _ _ _ _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _ _
+    =>
       cases atStatements
       have impossible := shape.head_allowed found
       simp only [form, CallableIndexedOwnedPreparedStagedBranchingTree.allowedForm, Bool.false_eq_true] at impossible

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
-import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalTree
@@ -271,14 +271,26 @@ structure BranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
     (semanticFaults : FunctionCalls.FaultRep) : Type where
   frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
   projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
-  tree : ∀ child, stages.Closure function child →
-    GenericImperativeMatch.Tree compiled.indexed.layouts packet.allocationOwner packet.active
+  collected : ∀ child, stages.Closure function child →
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
       (.initial compiled.compatible.checked) child.source (fun _ => True)
       (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
         (fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered semanticFaults)))
       compiled.indexed.layouts.definitions administrative
       inputs.context (parameterScope code) (.statements true function.body) function.resultType code.receipt.resultCore packet.flow
+
+abbrev BranchingSupport.tree {compiled function scope administrative code inputs stages packet semanticFaults}
+    (support : @BranchingSupport compiled function scope administrative code inputs stages packet semanticFaults)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :=
+  (support.collected child selected).tree
+
+ theorem BranchingSupport.sites {compiled function scope administrative code inputs stages packet semanticFaults}
+    (support : @BranchingSupport compiled function scope administrative code inputs stages packet semanticFaults)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
+    (support.tree child selected).CatalogSites .reachable registry faults :=
+  (support.collected child selected).sites registry faults
 
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/

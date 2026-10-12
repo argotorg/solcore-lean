@@ -8,6 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedSc
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativePreservation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
 
 /-! Static named branching support retains each child at its actual context
 and scope. A recursive expression or ordinary lambda producer is used through
@@ -46,7 +47,7 @@ structure Support
   wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
   tree : ∀ child, stages.Closure header.function child →
     ∃ expressionSyntax : ExpressionId → Prop,
-    GenericImperativeMatch.Tree header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) child.source expressionSyntax
       (TypedCertificate child.source (fun context => Certificate header bodyRegistry semanticFaults context child))
       compiled.indexed.layouts.definitions
@@ -177,8 +178,10 @@ theorem preserves
       ⟨parameterScope header, mapping, world, before, store, canonical⟩ := ⟨initial, packet⟩
   have nestedAdmitted : Admission (nestedBridge owner) header.context wrapped :=
     ⟨admitted.heap, admitted.rows⟩
-  obtain ⟨expressionSyntax, tree⟩ := support.tree invocation selected
-  rw [layouts] at tree
+  obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
+  rw [layouts] at collected
+  have tree := collected.tree
+  have catalogSites := collected.sites receiving semanticFaults
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -202,12 +205,12 @@ theorem preserves
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
       functions extension rfl header.registered
-      (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model).toOrdinary
+      (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => preserves_children support globals profile selected children owner context within)
       (by rw [stages.source selected]; exact header.unique)
-      tree rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
+      tree catalogSites rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented
@@ -257,8 +260,10 @@ theorem reflects
       ⟨parameterScope header, mapping, world, before, store, canonical⟩ := ⟨initial, packet⟩
   have nestedAdmitted : Admission (nestedBridge owner) header.context wrapped :=
     ⟨admitted.heap, admitted.rows⟩
-  obtain ⟨expressionSyntax, tree⟩ := support.tree invocation selected
-  rw [layouts] at tree
+  obtain ⟨expressionSyntax, collected⟩ := support.tree invocation selected
+  rw [layouts] at collected
+  have tree := collected.tree
+  have catalogSites := collected.sites receiving semanticFaults
   have shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape invocation.source true header.function.body := by
     rw [stages.source selected]
     exact receipt.shape
@@ -294,11 +299,11 @@ theorem reflects
       (nestedBridge owner) (CallableIndexedOwnedNestedCanonicalState.bindings owner header)
       (CallableIndexedOwnedNestedCanonicalState.administrativeTransport owner header)
       functions extension rfl header.registered
-      (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model).toOrdinary
+      (CallableIndexedOwnedNestedCanonicalState.markedProducer owner header model)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedNestedCanonicalState.readyAt_of_stableOwner owner header model stable)
       (fun context size within => reflects_children support globals profile selected children owner context within)
-      graph tree rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
+      graph tree catalogSites rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
   have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented

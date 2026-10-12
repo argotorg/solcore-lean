@@ -98,14 +98,15 @@ theorem source_body_at
       (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
       functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedMarkedAllocation.producer headers keys
-        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)).toOrdinary
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner
         (headers := headers) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions) stable)
       (fun context size smaller scope id lowered certified => by
         obtain ⟨root⟩ := certified
         exact children size smaller root ⟨rfl, rfl, rfl⟩)
-      unique tree rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
+      unique tree (support.sites child selected completion.result.context.registry
+        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) rfl shape originalTyping support.projection within entry.entry.environments entry.entry.heaps
       entry.entry.locals entry.entry.lookups entry.entry.actualTyped entry.entry.reference entry.entry.read
       entry.entry.unmapped reached conditioned admitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
@@ -179,14 +180,15 @@ theorem native_body_at
       (CallableIndexedOwnedFunctionState.administrativeTransport headers keys)
       functions completion.result.extension rfl (CallableIndexedAmbient.frame_registered compiled.indexed)
       (CallableIndexedOwnedMarkedAllocation.producer headers keys
-        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)).toOrdinary
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions))
       (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (fun _ _ stable => CallableIndexedOwnedAllocationProducer.readyAt_of_stableOwner
         (headers := headers) (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions) stable)
       (fun context size smaller scope id lowered certified => by
         obtain ⟨root⟩ := certified
         exact children size smaller root ⟨rfl, rfl, rfl⟩)
-      graph tree rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
+      graph tree (support.sites packet.child packet.selected completion.result.context.registry
+        (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) rfl shape originalTyping support.projection (Nat.le_of_lt strict) entry.environments entry.heaps
       entry.locals entry.lookups entry.actualTyped entry.reference entry.read entry.unmapped reached
       conditioned admitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post

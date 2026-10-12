@@ -583,7 +583,7 @@ private theorem branches {layouts : SourceCoreAllocationLayouts.Prepared}
   | cons allocation _ ih => exact .cons ((bind_arm edited allocator _ _ _ _).symm.trans allocation) ih
 
 include avoids in
-private theorem match_certificate {layouts : SourceCoreAllocationLayouts.Prepared}
+theorem match_certificate {layouts : SourceCoreAllocationLayouts.Prepared}
     {owner : SourceSpecialization.SpecializationKey} {active : TypeSystem.Substitution}
     {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
     {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -1079,7 +1079,7 @@ private def PositionReached (source : TypedSource) (roots : List NodeId) : Posit
       (items.flatMap ForItemForm.references ++ [.expression condition] ++
         post.flatMap ForItemForm.references ++ statements.map NodeId.statement)
 
-private theorem scoped_context {parent child : SourceSemantics.Context} {hiddenIds : List Resolved.LocalId}
+theorem scoped_context {parent child : SourceSemantics.Context} {hiddenIds : List Resolved.LocalId}
     {type : TypeSystem.Ty} {cases : List TypedMatchCase} {fallback : Option (List StatementId)}
     {request : GenericMatchChildren.Request}
     (related : GenericMatchChildren.ScopedContextFor view parent hiddenIds type cases fallback request child) :

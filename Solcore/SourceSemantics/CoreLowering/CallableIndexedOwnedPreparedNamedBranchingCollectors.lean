@@ -4,6 +4,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPublicProfileExtraction
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedDirectNamedProfileExtraction
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 
 /-! The original checked named body supplies native typing of every actual
 lexical child. Original Source syntax and binder context transport feed only
@@ -85,7 +87,7 @@ theorem tree
 include aligned in
 /-- Child factories receive only original syntax/typing, actual callback
 acceptance and native typing, at the context reached by real lexical binders. -/
-theorem tree_of_imperative
+theorem collected_of_imperative
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -105,7 +107,7 @@ theorem tree_of_imperative
         RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
         lowered.expression nativeType compiled.indexed.layouts.definitions →
       certificates context scope id lowered) :
-    GenericImperativeMatch.Tree header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected header.layouts header.owner header.active compiled.indexed.ancestry.layout.frame
       header.globals header.onError (.initial compiled.compatible.checked) header.function.source expressionSyntax
       (TypedCertificate header.function.source certificates) compiled.indexed.layouts.definitions
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) header)
@@ -130,13 +132,18 @@ theorem tree_of_imperative
       (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
     rw [aligned.policy]
     exact RecursiveNamedPreparedHeaderPolicies.Prepared.assignments prepared
-  exact CallableIndexedOwnedPreparedNativeBranchingCollectors.tree
+  exact CallableIndexedOwnedPreparedNativeBranchingCollectors.collected
     (expressionSyntax := expressionSyntax) (certificates := certificates) (LocalView.refl _)
     (by intro id member; cases member) header.unique
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_binder prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned)
     assignments
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned) rfl rfl
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.match_allocator prepared aligned)
+    (CallableIndexedOwnedPreparedDirectNamedProfileExtraction.hidden_fresh (header := header) wellFormed)
+    (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
+    (header.valid.ledger.trans aligned.solved)
     (fun context fields scope fuel id node lowered declarations approved _reached found typed accepted nativeType native =>
       children context fields (scope := scope) (fuel := fuel) (id := id) (node := node)
         (lowered := lowered) declarations approved found typed accepted (nativeType := nativeType) native)
@@ -183,7 +190,7 @@ def of_imperative_compiler
   refine ⟨complete, zero, wellFormed, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, tree_of_imperative prepared aligned ready wellFormed member receipt syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, collected_of_imperative prepared aligned ready wellFormed member receipt syntaxTree (children child selected)⟩
 
 
 include aligned in

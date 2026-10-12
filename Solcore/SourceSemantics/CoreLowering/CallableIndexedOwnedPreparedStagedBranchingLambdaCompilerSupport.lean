@@ -5,7 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaSc
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaBodyViewEdits
 
 /-! Original typed closure syntax and the retained compiler callback produce
-an branching packet for the same Code. Every child keeps the current lexical
+a branching packet for the same Code. Every child keeps the current lexical
 context, exact accepted callback and native typing. No execution law is stored. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -26,10 +26,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 include frame in
 /-- The complete native body supplies local typing; authentic metadata views
 and binder receipts recover the original Source tree without changing code. -/
-theorem tree
+theorem collected
     (view : CallableIndexedOwnedContextualLambdaProvenance.BodyView code)
     (captured : CompatibleExpressionReads.ScopeDeclarations function.source scope function.context)
     (sourceSignatures : inputs.context.signatures = compiled.compatible.checked.signatures)
+    (hidden : GenericImperativeMatch.MatchHiddenFresh function.source)
+    (catalog : SignatureCatalogWellFormed compiled.compatible.checked.signatures)
+    (ledger : inputs.context.solvedRequirements = code.compilation.solvedRequirements)
     (projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore)
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -43,7 +46,7 @@ theorem tree
       choice.packet.policy.lowerExpression fuel code.view scope id choice.packet.reasonAt = .ok lowered →
       ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
         lowered.expression nativeType compiled.indexed.layouts.definitions → certificates context scope id lowered) :
-    GenericImperativeMatch.Tree compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts choice.packet.allocationOwner choice.packet.active
       compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length choice.packet.onError
       (.initial compiled.compatible.checked) function.source expressionSyntax
       (TypedCertificate function.source certificates) compiled.indexed.layouts.definitions administrative
@@ -55,9 +58,11 @@ theorem tree
   obtain ⟨nativeType, native⟩ := TypedLexicalWhile.Native.finished_flow native
   have runtime := (CallableIndexedOwnedLambdaSourceAdmission.runtime_at_parameters frame inputs.extended).1
   have declarations := CallableIndexedOwnedPreparedLambdaScopeDeclarations.at_parameters (values := .initial compiled.compatible.checked) code inputs frame captured
-  exact CallableIndexedOwnedPreparedNativeBranchingCollectors.tree edited
+  exact CallableIndexedOwnedPreparedNativeBranchingCollectors.collected edited
     (CallableIndexedLambdaBodyViewEdits.avoids view) frame.code.graph.nodeOccurrencesUnique
-    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments children
+    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments
+    choice.matchPolicy choice.matchValues choice.matchDefinitions choice.matchAllocator hidden catalog
+    (ledger.trans choice.matchLedger.symm) children
     syntaxTree rfl choice.packet.shape (.refl _) runtime.variables_closed runtime.residual_variables_open sourceSignatures
     declarations (fun id member => .root (List.mem_map.mpr ⟨id, member, rfl⟩)) projection choice.packet.accepted native
 

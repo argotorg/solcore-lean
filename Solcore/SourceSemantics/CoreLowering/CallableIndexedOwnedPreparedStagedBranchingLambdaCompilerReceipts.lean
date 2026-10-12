@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyCompilerCallbacks
 import Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatementCertificates
+import Solcore.SourceSemantics.CoreLowering.CompatibleMatchAmbientLowering
 
 /-! The original body callback determines one branching flow, allocator and
 finish footer at the authentic closure Code. This contains only compiler facts. -/
@@ -34,10 +35,21 @@ structure Choice where
       compiled.indexed.base.globals.length
       (compiled.indexed.layouts.allocatorAt packet.allocationOwner packet.active packet.onError))
 
+  matchCompilation : SourceCoreCompatibleDataMatches.Context
+  matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess packet.policy matchCompilation
+  matchValues : matchCompilation.values = .initial compiled.compatible.checked
+  matchDefinitions : matchCompilation.definitions = compiled.indexed.layouts.definitions
+  matchAllocator : matchCompilation.sourceCells = some
+    (SourceCoreCallableIndexedAllocationFrames.allocator compiled.indexed.ancestry.layout.frame
+      compiled.indexed.base.globals.length
+      (compiled.indexed.layouts.allocatorAt packet.allocationOwner packet.active packet.onError))
+  matchLedger : matchCompilation.solvedRequirements = code.compilation.solvedRequirements
+
 /-- The actual retained lowerer supplies all allocator and binder callbacks;
 none is inferred from a native result type. -/
 theorem choose (named : Named)
     (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+    (sameCompilation : code.compilation = context compiled.indexed named)
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     Nonempty (Choice code (stages := stages)) := by
@@ -52,6 +64,14 @@ theorem choose (named : Named)
     (values := .initial compiled.compatible.checked) code policy callback
   unfold SourceCoreLoops.lowerStatementsWithPolicy at accepted
   obtain ⟨flow, generated, returned⟩ := bind_ok accepted
+  let baseMatch : SourceCoreCompatibleDataMatches.Context :=
+    ⟨.initial compiled.compatible.checked, (context compiled.indexed named).solvedRequirements,
+      some (allocator compiled.indexed named), none⟩
+  have matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy
+      (CompatibleMatchAmbientLowering.withDefinitions baseMatch compiled.indexed.layouts.definitions) := by
+    apply CompatibleMatchAmbientLowering.PolicySuccess.extend (show policy.lowerMatch = some
+      (SourceCoreCompatibleDataMatches.lowerWithReasons baseMatch) from rfl)
+    exact ⟨_, CallableIndexedAmbient.definitions_exact compiled.indexed⟩
   refine ⟨{
     invalidProjection := fun site root => diagnostics.placeReason named.signature.key site root none
     invalidOperand := fun site root operator => if operator = .equal then Word.zero else compilation.own.assignments.reasonAt site root (.value operator)
@@ -76,7 +96,13 @@ theorem choose (named : Named)
     assignments := ?_
     readPolicy := rfl
     binderPolicy := ?_
-    allocationPolicy := rfl }⟩
+    allocationPolicy := rfl
+    matchCompilation := CompatibleMatchAmbientLowering.withDefinitions baseMatch compiled.indexed.layouts.definitions
+    matchPolicy := matchPolicy
+    matchValues := rfl
+    matchDefinitions := rfl
+    matchAllocator := rfl
+    matchLedger := by rw [sameCompilation] }⟩
   · refine ⟨rfl, rfl, ?_⟩
     change some _ = some _
     apply congrArg some
