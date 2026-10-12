@@ -125,8 +125,33 @@ theorem completed_reflects
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
   history entry member entryType input started parameterView metadata in
-/-- The actual callable and encoded input derive native completion for every
-sufficient fuel from successful independent Source execution. -/
+/-- The actual callable, encoded input and genuine Source arity derive native
+completion for every sufficient fuel, including effects before a Source fault. -/
+theorem has_sufficient_fuel_at_arity {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
+    (packing : Dynamic.ValuesPack sources packedSource)
+    (arity : RecursivePublicCallableArity.Arity (Program.ofChecked recipe.compiled.sourceProgram) entry.source sources.length)
+    {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked recipe.compiled.sourceProgram) callStages sourceSize
+      invocation anchor.function.context before entry.source sources outcome after) :
+    ∃ value finalStore finalMap finalWorld required,
+      (∀ executionFuel, required ≤ executionFuel → checkpoint.NativeDone executionFuel value finalStore) ∧
+      ResultAt (registry := completion.result.context.registry) functions caller anchor.function.context result nativeResult
+        outcome after value finalStore finalMap finalWorld callFaults := by
+  obtain ⟨calleeRelated, calleeTyped, packedRelated, packedTyped⟩ :=
+    current_inputs profile history entry member entryType input started parameterView metadata
+  obtain ⟨_native, heaps, stable, heapTyped, _entries⟩ := history.current
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, resultAt⟩ :=
+    RecursiveNamedPublicDirectCallableApplicationBounds.preserves_packed receiver stagePrepared profile
+      observations extension semantic family namedTerminals namedSupport wellFormed caller stable
+      (anchor_runtime wellFormed) heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+      (tail := SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed) packing arity trace
+  obtain ⟨required, enough⟩ := evaluation_runStateful_complete_with_sufficient_fuel evaluated
+  exact ⟨value, finalStore, finalMap, finalWorld, required,
+    fun fuel bound => started.initial.native_done_iff.mpr (enough fuel bound), resultAt⟩
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport wellFormed
+  history entry member entryType input started parameterView metadata in
+/-- Source success supplies the arity without an additional boundary receipt. -/
 theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : List Dynamic.Value}
     (packing : Dynamic.ValuesPack sources packedSource)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
@@ -136,17 +161,9 @@ theorem has_sufficient_fuel {invocation : Staging.Recursive.Scope} {sources : Li
       (∀ executionFuel, required ≤ executionFuel → checkpoint.NativeDone executionFuel value finalStore) ∧
       ResultAt (registry := completion.result.context.registry) functions caller anchor.function.context result nativeResult
         (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
-  obtain ⟨calleeRelated, calleeTyped, packedRelated, packedTyped⟩ :=
-    current_inputs profile history entry member entryType input started parameterView metadata
-  obtain ⟨_native, heaps, stable, heapTyped, _entries⟩ := history.current
-  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, resultAt⟩ :=
-    RecursiveNamedPublicDirectCallableApplicationBounds.preserves_value_packed receiver stagePrepared profile
-      observations extension semantic family namedTerminals namedSupport wellFormed caller stable
-      (anchor_runtime wellFormed) heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
-      (tail := SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed) packing trace
-  obtain ⟨required, enough⟩ := evaluation_runStateful_complete_with_sufficient_fuel evaluated
-  exact ⟨value, finalStore, finalMap, finalWorld, required,
-    fun fuel bound => started.initial.native_done_iff.mpr (enough fuel bound), resultAt⟩
+  exact has_sufficient_fuel_at_arity receiver stagePrepared profile observations extension semantic family
+    namedTerminals namedSupport wellFormed history entry member entryType input started parameterView metadata
+    packing (.of_value trace) trace
 
 end Meaning
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableHistory

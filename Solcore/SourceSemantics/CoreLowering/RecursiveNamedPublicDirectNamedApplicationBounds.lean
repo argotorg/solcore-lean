@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursivePublicCallableArity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedApplicationBounds
@@ -167,17 +168,18 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
-/-- A successful independent named application supplies its authentic argument
-count and drives the original native payload, retaining the full caller post. -/
-theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+/-- An independent named application at the authentic declared arity drives
+the original native payload, retaining success or failure and the full caller post. -/
+theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
-    {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+    (arityAt : RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) (.global function) sources.length)
+    {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
-      invocation context before (.global function) sources (.value sourceResult) after) :
+      invocation context before (.global function) sources outcome after) :
     ∃ value finalStore finalMap finalWorld,
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
-        (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
+        outcome after value finalStore finalMap finalWorld callFaults := by
   classical
   obtain ⟨owner, header, rawD, identity, capture, descriptor, member, sourceAt, _installed,
     _number, _projection, _nativeTyped, _rawType, nativeEq, nativeType⟩ :=
@@ -210,12 +212,8 @@ theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : En
   have decodedArity : header.function.parameters.length = decodedSources.length := by
     simpa only [header.parameters, List.length_map] using represented.length.1
   have arity : header.function.parameters.length = sources.length := by
-    cases trace with
-    | global instantiates _ _ _ _ allocate _ _ =>
-      have same := BuiltinNamedCalls.instantiation_unique_of_wellFormed wellFormed
-        sourceAt.frame.instantiated instantiates
-      cases same
-      simpa only [sourceAt.frame.parameters] using allocate.length_eq
+    have actual := arityAt.global_count wellFormed sourceAt.frame.instantiated
+    simpa only [sourceAt.frame.parameters] using actual
   have sameSources : decodedSources = sources :=
     decodedPacking.injective_of_length_eq packing (decodedArity.symm.trans arity)
   subst decodedSources
@@ -259,6 +257,22 @@ theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : En
     rw [nativeEq, packedEq]
     exact RecursiveNamedPublicDirectClosureApplicationBounds.application_tail measured
   exact ⟨value, finalStore, finalMap, finalWorld, padded.sound, finalResult⟩
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
+/-- Successful Source execution supplies the genuine arity automatically. -/
+theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+    {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
+    {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+      invocation context before (.global function) sources (.value sourceResult) after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+        (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
+  exact preserves_packed receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+    wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+    packing (.of_value trace) trace
 
 end Packed
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectNamedApplicationBounds

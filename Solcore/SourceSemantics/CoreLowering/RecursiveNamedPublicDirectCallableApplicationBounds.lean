@@ -106,8 +106,39 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
 
 include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
   wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
-/-- A successful independent Source application chooses its genuine callable
-branch and supplies arity. The full result remains at the actual reached heap. -/
+/-- An independent Source application at the genuine callable arity preserves
+its complete outcome and reached heap. Packing alone does not fix arity. -/
+theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
+    {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
+    (arity : RecursivePublicCallableArity.Arity (Program.ofChecked compiled.sourceProgram) function sources.length)
+    {sourceSize : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
+    (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) callStages sourceSize
+      invocation context before function sources outcome after) :
+    ∃ value finalStore finalMap finalWorld,
+      Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
+      ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
+        outcome after value finalStore finalMap finalWorld callFaults := by
+  cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
+  | closure closure =>
+      exact RecursiveNamedPublicDirectClosureApplicationBounds.preserves_packed
+        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+        packing arity.closure_count.symm trace
+  | global global =>
+      exact RecursiveNamedPublicDirectNamedApplicationBounds.preserves_packed
+        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+        packing arity trace
+  | builtin builtin =>
+      cases builtin with
+      | mk id =>
+        exact RecursiveNamedPublicDirectBuiltinApplicationBounds.preserves_packed
+          (stagePrepared := stagePrepared) (profile := profile)
+          observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated packing arity trace
+
+include receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+  wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated in
+/-- Successful Source execution supplies the genuine callable arity. -/
 theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : Environment}
     {sources : List Dynamic.Value} (packing : Dynamic.ValuesPack sources packedSource)
     {sourceSize : Nat} {sourceResult : Dynamic.Value} {after : Dynamic.Heap}
@@ -117,26 +148,9 @@ theorem preserves_value_packed {invocation : Staging.Recursive.Scope} {tail : En
       Evaluates (native :: packedNative :: tail) store CallableIndexedLambdaCalls.applyPayload value finalStore ∧
       ResultAt (registry := completion.result.context.registry) functions caller context result resultCore
         (.value sourceResult) after value finalStore finalMap finalWorld callFaults := by
-  cases CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.callable_shape calleeTyped with
-  | closure closure =>
-      have arity : sources.length = closure.parameters.length := by
-        cases trace with
-        | closure _ _ _ allocate _ _ => exact allocate.length_eq.symm
-      exact RecursiveNamedPublicDirectClosureApplicationBounds.preserves_packed
-        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
-        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
-        packing arity trace
-  | global global =>
-      exact RecursiveNamedPublicDirectNamedApplicationBounds.preserves_value_packed
-        receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
-        wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
-        packing trace
-  | builtin builtin =>
-      cases builtin with
-      | mk id =>
-        exact RecursiveNamedPublicDirectBuiltinApplicationBounds.preserves_value_packed
-          (stagePrepared := stagePrepared) (profile := profile)
-          observations caller stable heapTyped calleeTyped calleeRelated heaps packedRelated packing trace
+  exact preserves_packed receiver stagePrepared profile observations extension semantic family namedTerminals namedSupport
+    wellFormed caller stable runtime heapTyped calleeTyped calleeRelated heaps packedTyped packedRelated
+    packing (.of_value trace) trace
 
 end Packed
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableApplicationBounds
