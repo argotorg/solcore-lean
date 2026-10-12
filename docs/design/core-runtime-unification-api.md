@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Direct named/builtin calls and failed histories (2026-10-13)
+
+Commit `cb736645` connects direct public invocation for named functions, builtins and closures through the same current History. The registered `SourceCoreDirectIssuedPublicExecution` fixture creates a capture of Word `10`, issues the named `read` handle, directly calls it with the captured closure, issues `wordFromInteger`, and directly calls it with integer `37`. The independent Source results are Word `10` and `37`, with exact singleton argument vectors and histories for all three retained functions at the actual returned sessions.
+
+Actual callable identity selects the relevant application proof. The named branch uses its original compiler payload, Source declaration and supported recursive children; the builtin branch uses the actual primitive identity. Genuine issuance derives each handle's exact raw type. Both use the real packed encoder and complete result/heap/caller postconditions.
+
+The failed direct-call endpoint also returns a reusable History for its actual failure session. Source fault preservation derives final heap typing from the current History, input typing and reflected fault trace. Existing captures retain effects performed before the failure. This generic failure endpoint is checked, but the new closed fixture exercises successful calls only.
+
+Validation: strict Lean, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass. Twelve audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Direct output collection, forward public execution/export fuel, wider static body coverage, suspended/export-error continuations, receiving-model changes and final all-pass composition remain open. Estimates remain unchanged.
+
+The new interfaces are `DirectCallableApplicationBounds.reflects_packed`, `DirectCallableHistory.completed_reflects`, and `DirectCallablePublicHistory.public_invoke_succeeded_function_tree` / `public_resume_succeeded`. They consume every supported callable kind without a closure-shape premise. `DirectCallableFailures.public_invoke_failed_function_tree` / `public_resume_failed` preserve histories on actual failure. `History.after_packed_failure` transports earlier entries using the original failed-result receipt. The existing closure API retains its explicit arity result and native sufficient-fuel direction.
+
 ## Packed direct closure input and returned History (2026-10-13)
 
 Commit `ac3a55b3` adds the semantic packed-input route without changing runtime API behavior.

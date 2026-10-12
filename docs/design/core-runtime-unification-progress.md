@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct named/builtin calls and failed histories (2026-10-13)
+
+Commit `cb736645` connects direct public invocation for named functions, builtins and closures through the same current History. The registered `SourceCoreDirectIssuedPublicExecution` fixture creates a capture of Word `10`, issues the named `read` handle, directly calls it with the captured closure, issues `wordFromInteger`, and directly calls it with integer `37`. The independent Source results are Word `10` and `37`, with exact singleton argument vectors and histories for all three retained functions at the actual returned sessions.
+
+Actual callable identity selects the relevant application proof. The named branch uses its original compiler payload, Source declaration and supported recursive children; the builtin branch uses the actual primitive identity. Genuine issuance derives each handle's exact raw type. Both use the real packed encoder and complete result/heap/caller postconditions.
+
+The failed direct-call endpoint also returns a reusable History for its actual failure session. Source fault preservation derives final heap typing from the current History, input typing and reflected fault trace. Existing captures retain effects performed before the failure. This generic failure endpoint is checked, but the new closed fixture exercises successful calls only.
+
+Validation: strict Lean, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass. Twelve audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Direct output collection, forward public execution/export fuel, wider static body coverage, suspended/export-error continuations, receiving-model changes and final all-pass composition remain open. Estimates remain unchanged.
+
 ## Packed arguments retain captures through public execution (2026-10-13)
 
 Commit `ac3a55b3` connects the actual sequence `make(10)`, `invokePacked(handle, 99)`, `invokePacked(handle, 123)` to three independent Source applications and their returned histories. Both direct calls return the captured Word `10`; the theorem also identifies the Source argument lists exactly as `[99]` and `[123]`.
@@ -49,7 +59,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Actual public calls now also pass nonempty arguments to retained closures, proving exact Source argument vectors, captured results and continuous returned histories. Strict Lean, the runtime fixture, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Direct named/builtin/closure calls now share Source reflection and retained public histories; actual named/builtin issuance and calls have a closed fixture. Failed direct calls derive reusable histories at their actual heaps. Strict Lean, the runtime fixture, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass; twelve audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.

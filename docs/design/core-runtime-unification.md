@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct named/builtin calls and failed histories (2026-10-13)
+
+Commit `cb736645` connects direct public invocation for named functions, builtins and closures through the same current History. The registered `SourceCoreDirectIssuedPublicExecution` fixture creates a capture of Word `10`, issues the named `read` handle, directly calls it with the captured closure, issues `wordFromInteger`, and directly calls it with integer `37`. The independent Source results are Word `10` and `37`, with exact singleton argument vectors and histories for all three retained functions at the actual returned sessions.
+
+Actual callable identity selects the relevant application proof. The named branch uses its original compiler payload, Source declaration and supported recursive children; the builtin branch uses the actual primitive identity. Genuine issuance derives each handle's exact raw type. Both use the real packed encoder and complete result/heap/caller postconditions.
+
+The failed direct-call endpoint also returns a reusable History for its actual failure session. Source fault preservation derives final heap typing from the current History, input typing and reflected fault trace. Existing captures retain effects performed before the failure. This generic failure endpoint is checked, but the new closed fixture exercises successful calls only.
+
+Validation: strict Lean, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass. Twelve audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Direct output collection, forward public execution/export fuel, wider static body coverage, suspended/export-error continuations, receiving-model changes and final all-pass composition remain open. Estimates remain unchanged.
+
 ## Packed closure arguments through actual public execution (2026-10-13)
 
 Commit `ac3a55b3` connects direct closure calls with packed arguments to independent Source applications and returned histories. The registered `SourceCoreCapturedPackedPublicExecution` fixture compiles `make(seed: Word)`, whose result is `lam(x: Word) { return seed; }`, then performs `make(10)`, `invokePacked(handle, 99)` and `invokePacked(handle, 123)`. It proves the exact Source argument lists `[99]` and `[123]`, results `10` and `10`, and continuity of the actual sessions and captured heap.
@@ -36,8 +46,8 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `ac3a55b3`: packed closure arguments now connect actual public invocation to exact Source argument vectors, captured results and continuous returned histories; nonempty lambda parameter contexts come from the compiler. |
-| Latest completed verification | Strict Lean, the packed closure runtime fixture, full build (6054 jobs), all registered tests, kernel policy and independent reviews pass. Eleven audited endpoints use only the standard three axioms. |
+| Latest verified implementation | `cb736645`: direct named, builtin and closure calls share the public semantic connection. Genuine named/builtin issuance and successful direct execution have a closed Source fixture; direct failures retain earlier histories at their actual returned heaps. |
+| Latest completed verification | Strict Lean, the direct issued-call runtime fixture, full build (6065 jobs), all registered tests, kernel policy and independent reviews pass. Twelve audited endpoints use only the standard three axioms. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
 | Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
 | Current implementation priority | Connect packed arguments and nonzero lambda parameters through direct public execution, then broaden genuine compiler/body coverage. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
