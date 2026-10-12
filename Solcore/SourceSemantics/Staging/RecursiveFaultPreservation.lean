@@ -81,6 +81,12 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
       | tuple elementsTyped =>
           exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap elementsTyped children
+  | @constructorFault childrenSize scope context environment before after id instantiation arguments failure occurrence children =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | constructor _valid argumentsTyped =>
+          exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap argumentsTyped children
   | @unaryOperandFault childSize scope context environment before after id operator operand failure occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

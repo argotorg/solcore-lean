@@ -151,6 +151,9 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
     have same := ExpressionForm.tuple.inj (form.symm.trans (occurrence_form unique metadata.found owned))
     subst ids
     exact ⟨_, children, .fault _⟩
+  | constructorValue owned _ _ | constructorFault owned _ =>
+    have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
+    cases impossible
   | group owned child =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible

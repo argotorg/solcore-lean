@@ -60,7 +60,7 @@ private theorem no_stage
     exact sameForm.symm.trans form
   cases trace with
   | group occurrence _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
-  | tupleFault occurrence _ | unaryOperandFault occurrence _
+  | constructorFault occurrence _ | tupleFault occurrence _ | unaryOperandFault occurrence _
   | binaryLeftFault occurrence _ | binaryRightFault occurrence _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
   | calleeFault occurrence _ | rejected occurrence _ _

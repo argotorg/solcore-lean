@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Staging.RecursiveBareTarget
 uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
-The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
+The initial profile covers atomic forms, groups, ordered tuples of every arity, nominal constructor payloads, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while and for loops, ordered match arms, and returns.
 Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
@@ -86,6 +86,15 @@ mutual
     | tupleFault {scope context environment before after id elements failure}
         (occurrence : Occurrence scope id (.tuple elements))
         (children : Expressions program registry scope context environment before elements (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | constructorValue {scope context environment before after id instantiation arguments values}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (valid : DataConstructorInstantiation.Valid context instantiation)
+        (children : Expressions program registry scope context environment before arguments (.values values) after) :
+        Expression program registry scope context environment before id (.value (.constructed instantiation values)) after
+    | constructorFault {scope context environment before after id instantiation arguments failure}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
     | unary {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))

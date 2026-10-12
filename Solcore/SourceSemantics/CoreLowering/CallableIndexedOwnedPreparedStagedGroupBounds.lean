@@ -99,7 +99,7 @@ private theorem source_group_inv
       cases ExpressionForm.group.inj (occurrence_form occurrence)
       exact ⟨_, rfl, child⟩
   | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
-  | tupleValue occurrence _ _ | tupleFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
   | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _

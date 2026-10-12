@@ -685,6 +685,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
   induction free generalizing before after with
   | atomic found atomic =>
     cases trace with
+    | constructorFault owned _ =>
+      have same := occurrence_form unique found owned
+      rw [same] at atomic
+      cases atomic
     | tupleFault owned children =>
       have same := occurrence_form unique found owned
       rw [same] at atomic
@@ -740,6 +744,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases atomic
   | group found form child ih =>
     cases trace with
+    | constructorFault owned _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | tupleFault owned children =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -795,6 +803,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | pair found form first second firstIH secondIH =>
     cases trace with
+    | constructorFault owned _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | tupleFault owned children =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -857,6 +869,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | unary found form child ih =>
     cases trace with
+    | constructorFault owned _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | tupleFault owned children =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -912,6 +928,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | binary found form first second firstIH secondIH =>
     cases trace with
+    | constructorFault owned _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | tupleFault owned children =>
       have same := occurrence_form unique found owned
       rw [form] at same

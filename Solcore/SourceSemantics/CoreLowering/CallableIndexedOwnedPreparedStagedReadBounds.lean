@@ -37,7 +37,7 @@ private theorem no_stage
   cases trace with
   | group occurrence _
   | pairLeftFault occurrence _ | pairRightFault occurrence _ _
-  | tupleFault occurrence _
+  | constructorFault occurrence _ | tupleFault occurrence _
   | unaryOperandFault occurrence _
   | binaryLeftFault occurrence _ | binaryRightFault occurrence _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _

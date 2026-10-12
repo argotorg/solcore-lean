@@ -73,6 +73,15 @@ mutual
         (occurrence : Occurrence scope id (.tuple elements))
         (children : Expressions program registry childrenSize scope context environment before elements (.fault failure) after) :
         Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | constructorValue {childrenSize : Nat} {scope context environment before after id instantiation arguments values}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (valid : DataConstructorInstantiation.Valid context instantiation)
+        (children : Expressions program registry childrenSize scope context environment before arguments (.values values) after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id (.value (.constructed instantiation values)) after
+    | constructorFault {childrenSize : Nat} {scope context environment before after id instantiation arguments failure}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (children : Expressions program registry childrenSize scope context environment before arguments (.fault failure) after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
     | unary {childSize : Nat} {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
         (child : Expression program registry childSize scope context environment before operand (.value input) after)
@@ -571,6 +580,8 @@ local macro "erase_stage_grade" : tactic =>
     case pairRightFault => apply Recursive.Expression.pairRightFault <;> assumption
     case tupleValue => apply Recursive.Expression.tupleValue <;> assumption
     case tupleFault => apply Recursive.Expression.tupleFault <;> assumption
+    case constructorValue => apply Recursive.Expression.constructorValue <;> assumption
+    case constructorFault => apply Recursive.Expression.constructorFault <;> assumption
     case unary => apply Recursive.Expression.unary <;> assumption
     case unaryOperandFault => apply Recursive.Expression.unaryOperandFault <;> assumption
     case unaryInvalid => apply Recursive.Expression.unaryInvalid <;> assumption
@@ -685,6 +696,12 @@ local macro "construct_stage_grade" : tactic =>
     case tupleFault occurrence children ih_children =>
       obtain ⟨childrenSize, graded_children⟩ := ih_children
       exact ⟨_, .tupleFault occurrence graded_children⟩
+    case constructorValue occurrence valid children ih_children =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      exact ⟨_, .constructorValue occurrence valid graded_children⟩
+    case constructorFault occurrence children ih_children =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      exact ⟨_, .constructorFault occurrence graded_children⟩
     case unary occurrence child applies ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .unary occurrence graded_child applies⟩

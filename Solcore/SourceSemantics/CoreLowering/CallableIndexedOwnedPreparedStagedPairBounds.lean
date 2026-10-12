@@ -143,6 +143,7 @@ private theorem source_children
               exact .rightFault (by simp [Staging.Recursive.Size.stepSize]; omega)
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
+  | constructorValue occurrence _ _ | constructorFault occurrence _
   | group occurrence _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
