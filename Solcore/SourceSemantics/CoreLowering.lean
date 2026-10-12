@@ -1533,6 +1533,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLexicalL
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalBodyLambdaFormation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableWordPreservation
 
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedFailurePreservation
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
