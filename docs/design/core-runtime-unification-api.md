@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Conditional closure bodies connected to public execution (2026-10-13)
+
+Checkpoint `b5b60f45` connects conditional statements through the actual compiler, recursive Source semantics, closure application and public sessions. Branch arms execute in scoped mode. Falling through restores the surrounding lexical context while retaining the reached heap; returning or failing stops the suffix. Compiler receipts retain the actual accepted flow, selected branch code and native typing.
+
+The closed six-call example creates two distinct closures capturing `10` and `20`. The first call takes an assignment branch and returns `11`. After an intervening `make(30)`, the second closure takes a branch with a local copy and returns `20`; another call to the first returns its retained `11`. All calls use the preceding actual session and heap. The proof also derives sufficient public execution and output fuel from independent Source success for each of the three direct calls.
+
+Validation: full build (6284 jobs), all registered tests and kernel policy pass. Twenty-seven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The actual named conditional-body example is being connected next. Loops, match, wider compiler alternatives and final composition across every compiler pass remain incomplete.
+
+The new production route uses `PreparedStagedBranchingTree.Shape`, `PreparedStagedBranchingLambdaCompilerReceipts`, `PreparedBranchingLambdaBodySupport.of_branching` and `PreparedStagedBranchingLambdaApplicationBounds.application_preserves` / `application_reflects`. `PreparedStagedMixedBodyStaticSupport.Packet.branching` selects it in the existing recursive family. Scoped statement ports use `Staging.Recursive.StatementsIn`; the existing `Statements` interface remains the function-body mode.
+
+The registered endpoint is `Tests.SourceCoreCapturedBranch.sequence_forward_meaning`; `runForward` constructs and checks its actual compiler and execution receipts. Core instructions and the public runtime API are unchanged.
+
 ## Named export-error continuations (2026-10-13)
 
 At `e32c742b`, `InitializedExportErrors.public_run_export_error_seeds` creates the first History from actual bootstrap and a completed named call whose output export fails. `ActualRegistryNamedExportErrors.public_run_export_error_retains` extends a following named call at the actual receiving registry. Both expose independent Source success and retain the exact returned session/heap; failed export adds no new handle.

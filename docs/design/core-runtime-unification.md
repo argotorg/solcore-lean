@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Conditional closure bodies connected to public execution (2026-10-13)
+
+Checkpoint `b5b60f45` connects conditional statements through the actual compiler, recursive Source semantics, closure application and public sessions. Branch arms execute in scoped mode. Falling through restores the surrounding lexical context while retaining the reached heap; returning or failing stops the suffix. Compiler receipts retain the actual accepted flow, selected branch code and native typing.
+
+The closed six-call example creates two distinct closures capturing `10` and `20`. The first call takes an assignment branch and returns `11`. After an intervening `make(30)`, the second closure takes a branch with a local copy and returns `20`; another call to the first returns its retained `11`. All calls use the preceding actual session and heap. The proof also derives sufficient public execution and output fuel from independent Source success for each of the three direct calls.
+
+Validation: full build (6284 jobs), all registered tests and kernel policy pass. Twenty-seven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The actual named conditional-body example is being connected next. Loops, match, wider compiler alternatives and final composition across every compiler pass remain incomplete.
+
 ## Initial and following named export errors (2026-10-13)
 
 Checkpoint `e32c742b` connects successful Source execution to the state returned when a named call's output cannot be exported. Actual bootstrap derives the first empty-entry History; following calls retain earlier handles at the actual encoded registry. Both routes derive final heap typing from the full result and preserve authentic encodings and export authority.
@@ -125,12 +133,12 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Item | Status |
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
-| Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `a20e0891`, following `8537c3c2` and `a0cd0dba`: lexical named bodies reach public execution; an actual locally allocated capture is exported and reused with exact Source results and continuous histories. |
-| Latest completed verification | Strict Lean, full build (6108 jobs), all registered tests and kernel policy pass. Production review and fifteen endpoint audits pass with only the standard three axioms. |
-| Working implementation | Supported successful and failed public calls return reusable histories at their actual reached states. Named lexical bodies can allocate locals and form closures over them. Product outputs can add selected function leaves. |
-| Latest proof scope | Actual captured closures, including a captured named-body local, are created, exported and called through later public executions with exact Word results and continuous histories. Static conditions come from authentic compiler receipts. The generic model and registries stay fixed. |
-| Current implementation priority | Connect lexical closure bodies and closed failure continuations, then widen forward public preservation and actual compiler/body coverage. Imperative statements, suspended/export-error continuations, non-product output collection, model changes and all-pass composition remain open. |
+| Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
+| Latest verified implementation | `b5b60f45`: conditional closure bodies reach independent Source traces, exact returned histories and sufficient public fuel. |
+| Latest completed verification | Full build (6284 jobs), all registered tests, kernel policy and twenty-seven endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional closure bodies preserve distinct mutable captures across intervening calls. |
+| Latest proof scope | The actual six-call conditional example proves distinct handles, results `11 / 20 / 11` and histories at the exact successive sessions/heaps. Static body conditions come from accepted compiler receipts. |
+| Current implementation priority | Close named conditional bodies, then extend staged loop and other body coverage through the same public endpoints. Wider expression/evidence/coercion coverage and all-pass composition remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

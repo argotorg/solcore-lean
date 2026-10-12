@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Conditional closure bodies connected to public execution (2026-10-13)
+
+Checkpoint `b5b60f45` connects conditional statements through the actual compiler, recursive Source semantics, closure application and public sessions. Branch arms execute in scoped mode. Falling through restores the surrounding lexical context while retaining the reached heap; returning or failing stops the suffix. Compiler receipts retain the actual accepted flow, selected branch code and native typing.
+
+The closed six-call example creates two distinct closures capturing `10` and `20`. The first call takes an assignment branch and returns `11`. After an intervening `make(30)`, the second closure takes a branch with a local copy and returns `20`; another call to the first returns its retained `11`. All calls use the preceding actual session and heap. The proof also derives sufficient public execution and output fuel from independent Source success for each of the three direct calls.
+
+Validation: full build (6284 jobs), all registered tests and kernel policy pass. Twenty-seven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The actual named conditional-body example is being connected next. Loops, match, wider compiler alternatives and final composition across every compiler pass remain incomplete.
+
 ## Initial and following named export errors (2026-10-13)
 
 Checkpoint `e32c742b` connects successful Source execution to the state returned when a named call's output cannot be exported. Actual bootstrap derives the first empty-entry History; following calls retain earlier handles at the actual encoded registry. Both routes derive final heap typing from the full result and preserve authentic encodings and export authority.
@@ -146,7 +154,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Actual receiving registries, general output, ordered nested handle collection, finite execution resumptions and direct export-error continuations reach the public proof family. Initial/following named export errors also retain exact histories. Full build (6247 jobs), registered tests, kernel policy and endpoint audits pass. Broader staged control flow and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Actual registries, general output, ordered nested handle collection, resumptions and initial/following/direct export errors reach the public proof family. Conditional closure bodies also preserve distinct mutable captures. Full build (6284 jobs), tests, kernel policy and endpoint audits pass. Broader staged control flow and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
