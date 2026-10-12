@@ -47,6 +47,32 @@ theorem StartAt.imported_function
 
 /-- A real named issuance is consumed by the exact later startup. Its whole
 cached factory remains attached to the selected native argument. -/
+theorem StartAt.named_argument_after
+    {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
+    {name : Key} {issuanceFuel : Nat}
+    (issuance : before.NamedIssuedAt name issuanceFuel issued)
+    {session : Session artifact}
+    (continued : issued.session.IssuanceChain session)
+    {key : Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {root : Root recipe.compiled}
+    {world : StoreTyping} {store : Store} {native : Environment}
+    {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt session key arguments fuel checkpoint recipe root world store native encodedValues)
+    {handle : Handle} (handleValue : issued.value = .function handle)
+    {index : Nat} (found : arguments[index]? = some (.function handle)) :
+    ∃ expected callable, before.SameRuntime issued.session ∧ issued.sourceType = expected ∧
+      issued.boundaryFuel = issuanceFuel ∧ recipe.NamedCallableAt name expected callable ∧
+      native[index]? = some callable := by
+  obtain ⟨expected, callable, same, sourceType, budget, encoded, factory⟩ := issuance.receipt
+  rw [handleValue] at encoded
+  have argument := StartAt.imported_function started (continued.encodes_function encoded) found
+  cases artifact
+  rename_i authority actualRecipe
+  have sameRecipe : actualRecipe = recipe := started.recipe_eq
+  subst recipe
+  exact ⟨expected, callable, same, sourceType, budget, factory, argument⟩
+
+/-- The original one-issuance entry is the empty continuation case. -/
 theorem StartAt.named_argument
     {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
     {name : Key} {issuanceFuel : Nat}
@@ -61,17 +87,36 @@ theorem StartAt.named_argument
     ∃ expected callable, before.SameRuntime issued.session ∧ issued.sourceType = expected ∧
       issued.boundaryFuel = issuanceFuel ∧ recipe.NamedCallableAt name expected callable ∧
       native[index]? = some callable := by
+  exact StartAt.named_argument_after issuance (.refl _) started handleValue found
+
+/-- Builtin issuance reaches the same original argument encoder and literal
+cached closed builtin factory, while the initialized native state is retained. -/
+theorem StartAt.builtin_argument_after
+    {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
+    {function : BuiltinFunctionId} {issuanceFuel : Nat}
+    (issuance : before.BuiltinIssuedAt function issuanceFuel issued)
+    {session : Session artifact}
+    (continued : issued.session.IssuanceChain session)
+    {key : Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {root : Root recipe.compiled}
+    {world : StoreTyping} {store : Store} {native : Environment}
+    {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt session key arguments fuel checkpoint recipe root world store native encodedValues)
+    {handle : Handle} (handleValue : issued.value = .function handle)
+    {index : Nat} (found : arguments[index]? = some (.function handle)) :
+    ∃ expected callable, before.SameRuntime issued.session ∧ issued.sourceType = expected ∧
+      issued.boundaryFuel = issuanceFuel ∧ recipe.BuiltinCallableAt function expected callable ∧
+      native[index]? = some callable := by
   obtain ⟨expected, callable, same, sourceType, budget, encoded, factory⟩ := issuance.receipt
   rw [handleValue] at encoded
-  have argument := StartAt.imported_function started encoded found
+  have argument := StartAt.imported_function started (continued.encodes_function encoded) found
   cases artifact
   rename_i authority actualRecipe
   have sameRecipe : actualRecipe = recipe := started.recipe_eq
   subst recipe
   exact ⟨expected, callable, same, sourceType, budget, factory, argument⟩
 
-/-- Builtin issuance reaches the same original argument encoder and literal
-cached closed builtin factory, while the initialized native state is retained. -/
+/-- The original one-issuance entry is the empty continuation case. -/
 theorem StartAt.builtin_argument
     {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
     {function : BuiltinFunctionId} {issuanceFuel : Nat}
@@ -86,13 +131,6 @@ theorem StartAt.builtin_argument
     ∃ expected callable, before.SameRuntime issued.session ∧ issued.sourceType = expected ∧
       issued.boundaryFuel = issuanceFuel ∧ recipe.BuiltinCallableAt function expected callable ∧
       native[index]? = some callable := by
-  obtain ⟨expected, callable, same, sourceType, budget, encoded, factory⟩ := issuance.receipt
-  rw [handleValue] at encoded
-  have argument := StartAt.imported_function started encoded found
-  cases artifact
-  rename_i authority actualRecipe
-  have sameRecipe : actualRecipe = recipe := started.recipe_eq
-  subst recipe
-  exact ⟨expected, callable, same, sourceType, budget, factory, argument⟩
+  exact StartAt.builtin_argument_after issuance (.refl _) started handleValue found
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicIssuedFunctionInputs

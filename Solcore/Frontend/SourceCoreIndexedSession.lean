@@ -3226,3 +3226,268 @@ theorem Recipe.native_global_location (recipe : Recipe)
           omega
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem issuance_encoded_function_view {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {handle : Handle}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected (.function handle) = .ok encoded) :
+    ∃ parameter result, SourceCoreRawMetadata.runtimeType expected = .function parameter result := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin => cases builtin <;> cases accepted
+      case function parameter result => exact ⟨parameter, result, rfl⟩
+
+private theorem issuance_register_append {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration}
+    {slots returned : Registry artifact world} {expected : Ty} {value : Core.Value} {handle : Handle}
+    (accepted : register authority generation slots expected value = .ok (handle, returned)) :
+    ∃ suffix, returned = slots ++ suffix := by
+  unfold register at accepted
+  split at accepted
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · split at accepted
+    · cases accepted
+    · obtain ⟨checked, _checked, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨_, rfl⟩
+
+private theorem issuance_export_function_append {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected : Ty} {core : Core.Value}
+    {exported : Exported (artifact := artifact) world authority fuel values expected core}
+    (accepted : exportValue authority generation fuel values slots expected core = .ok exported)
+    {handle : Handle} (publicValue : exported.value = .function handle) :
+    ∃ suffix, exported.slots = slots ++ suffix := by
+  obtain ⟨decoded, encoded, _recovered⟩ := exportValue_success_receipt accepted
+  rw [publicValue] at decoded encoded
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view encoded
+  cases fuel with
+  | zero => cases decoded
+  | succ fuel =>
+      unfold decodeRaw at decoded
+      rw [view] at decoded
+      obtain ⟨⟨actualHandle, returned⟩, registered, decoded⟩ := root_factory_bind_ok decoded
+      have same := Prod.mk.inj (Except.ok.inj decoded)
+      have slotsEq : returned = exported.slots := same.2
+      exact slotsEq ▸ issuance_register_append registered
+
+private theorem issuance_resolve_append {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    {expected : Ty} {handle : Handle} {native : Core.Value}
+    (accepted : resolve authority slots expected handle = .ok native)
+    (suffix : Registry artifact world) :
+    resolve authority (slots ++ suffix) expected handle = .ok native := by
+  obtain ⟨slot, found, _value⟩ := resolved_slot accepted
+  simpa only [resolve, List.find?_append, found, Option.or] using accepted
+
+private theorem issuance_encode_function_append {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {handle : Handle}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected (.function handle) = .ok encoded)
+    (suffix : Registry artifact world) :
+    encodeRaw authority (slots ++ suffix) fuel registry expected (.function handle) = .ok encoded := by
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view accepted
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold encodeRaw at accepted ⊢
+      rw [view] at accepted ⊢
+      obtain ⟨native, resolved, accepted⟩ := root_factory_bind_ok accepted
+      dsimp only
+      rw [issuance_resolve_append resolved suffix]
+      exact accepted
+
+private theorem issuance_callable_preserves_function
+    {artifact : Artifact} {session : Session artifact}
+    {factory : CallableFactory artifact.recipe.compiled} {generation : ExportGeneration}
+    {fuel : Nat} {completion : Completion artifact}
+    (issued : issueCallable session factory generation fuel = .ok completion)
+    {issuedHandle : Handle} (publicValue : completion.value = .function issuedHandle)
+    {inputFuel : Nat} {expected : Ty} {handle : Handle} {native : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) native) :
+    completion.session.EncodesAt inputFuel expected (.function handle) native := by
+  unfold issueCallable at issued
+  obtain ⟨_globals, _checked, issued⟩ := root_factory_bind_ok issued
+  cases slot : factory.slot with
+  | none =>
+      simp only [slot] at issued
+      obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+      obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+      cases issued
+      obtain ⟨suffix, returned⟩ := issuance_export_function_append exportedAt publicValue
+      obtain ⟨encoded, encodedAt, recovered⟩ := imported
+      refine ⟨encoded, ?_, recovered⟩
+      change encodeRaw session.authority exported.slots inputFuel session.values.registry expected (.function handle) = .ok encoded
+      rw [returned]
+      exact issuance_encode_function_append encodedAt suffix
+  | some pair =>
+      rcases pair with ⟨location, value⟩
+      simp only [slot] at issued
+      split at issued
+      · obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+        obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+        cases issued
+        obtain ⟨suffix, returned⟩ := issuance_export_function_append exportedAt publicValue
+        obtain ⟨encoded, encodedAt, recovered⟩ := imported
+        refine ⟨encoded, ?_, recovered⟩
+        change encodeRaw session.authority exported.slots inputFuel session.values.registry expected (.function handle) = .ok encoded
+        rw [returned]
+        exact issuance_encode_function_append encodedAt suffix
+      · simp [bind, Except.bind, throw, throwThe] at issued
+
+/-- A finite sequence of actual successful named/builtin handle issuances.
+Each step retains its observed handle result; no operation is replayed. -/
+inductive Session.IssuanceChain {artifact : Artifact} : Session artifact → Session artifact → Prop where
+  | refl (session : Session artifact) : IssuanceChain session session
+  | named {first before : Session artifact} {completion : Completion artifact}
+      {key : Key} {fuel : Nat} {handle : Handle}
+      (prior : IssuanceChain first before)
+      (issued : before.NamedIssuedAt key fuel completion)
+      (publicValue : completion.value = .function handle) :
+      IssuanceChain first completion.session
+  | builtin {first before : Session artifact} {completion : Completion artifact}
+      {function : BuiltinFunctionId} {fuel : Nat} {handle : Handle}
+      (prior : IssuanceChain first before)
+      (issued : before.BuiltinIssuedAt function fuel completion)
+      (publicValue : completion.value = .function handle) :
+      IssuanceChain first completion.session
+
+/-- Concatenating actual issuance sequences retains all their receipts. -/
+theorem Session.IssuanceChain.trans {artifact : Artifact} {first second third : Session artifact}
+    (left : first.IssuanceChain second) (right : second.IssuanceChain third) :
+    first.IssuanceChain third := by
+  induction right with
+  | refl => exact left
+  | named _prior issued publicValue ih => exact .named ih issued publicValue
+  | builtin _prior issued publicValue ih => exact .builtin ih issued publicValue
+
+/-- Issuance leaves the actual native heap, metadata, authority and Source
+prefix unchanged across the entire retained sequence. -/
+theorem Session.IssuanceChain.same_runtime {artifact : Artifact} {before after : Session artifact}
+    (chain : before.IssuanceChain after) : before.SameRuntime after := by
+  induction chain with
+  | refl => exact .refl _
+  | named _prior issued _publicValue ih => exact ih.trans issued.same_runtime
+  | builtin _prior issued _publicValue ih => exact ih.trans issued.same_runtime
+
+/-- Every previously encoded handle still denotes the same native callable
+in the last Session. Actual append-only physical registry growth proves this;
+metadata equality or handle authentication alone would not suffice. -/
+theorem Session.IssuanceChain.encodes_function
+    {artifact : Artifact} {before after : Session artifact}
+    (chain : before.IssuanceChain after)
+    {fuel : Nat} {expected : Ty} {handle : Handle} {native : Core.Value}
+    (imported : before.EncodesAt fuel expected (.function handle) native) :
+    after.EncodesAt fuel expected (.function handle) native := by
+  induction chain with
+  | refl => exact imported
+  | named _prior issued publicValue ih =>
+      obtain ⟨_row, _generation, _selected, issued⟩ := issued
+      exact issuance_callable_preserves_function issued publicValue ih
+  | builtin _prior issued publicValue ih =>
+      obtain ⟨_row, _generation, _selected, issued⟩ := issued
+      exact issuance_callable_preserves_function issued publicValue ih
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- Successful mixed argument encoding extends metadata through every original
+input. A selected data argument retains its own original codec equation even
+when other positions contain opaque handles. -/
+private theorem arguments_data_at {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List Ty} {types : List Core.Ty} {arguments : List Value}
+    {encoded : Arguments artifact world types}
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
+    SourceCoreRawMetadata.Extends values.registry encoded.values.registry ∧
+      ∀ {index : Nat} {expected : Ty} {value : Value},
+        sourceTypes[index]? = some expected → arguments[index]? = some value → DataPublic value →
+        ∃ native type, encoded.native[index]? = some native ∧ types[index]? = some type ∧
+          artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type ∧
+          EncodedDataInput artifact.recipe.compiled.compatible.checked encoded.values.registry expected value native := by
+  induction sourceTypes generalizing types arguments values encoded with
+  | nil =>
+      cases types <;> cases arguments <;> try (solve | cases accepted)
+      cases accepted
+      refine ⟨.refl _, ?_⟩
+      intro index expected value found
+      simp at found
+  | cons expected rest ih =>
+      cases types with
+      | nil => cases accepted
+      | cons type types =>
+          cases arguments with
+          | nil => cases accepted
+          | cons argument arguments =>
+              simp only [encodeArguments] at accepted
+              cases projected : artifact.recipe.compiled.compatible.checked.catalog.project expected with
+              | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+              | ok actual =>
+                  simp only [projected, bind, Except.bind] at accepted
+                  split at accepted
+                  · rename_i same
+                    subst actual
+                    obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨validated, _validated, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+                    cases accepted
+                    obtain ⟨extended, atIndex⟩ := ih tailEq
+                    refine ⟨raw.preserves.trans extended, ?_⟩
+                    intro index selectedType selectedValue foundType foundValue data
+                    cases index with
+                    | zero =>
+                        have sameType := Option.some.inj foundType
+                        have sameValue := Option.some.inj foundValue
+                        subst selectedType
+                        subst selectedValue
+                        obtain ⟨carrier, image⟩ := data
+                        have correspondence := (data_correspondence fuel).1 authority slots values.registry expected carrier raw
+                          (by rw [← image]; exact rawEq)
+                        have beforeOwner : values.registry.signatures = artifact.recipe.compiled.compatible.checked.signatures :=
+                          values.registryOwner.trans (congrArg SourceCoreCompatibleCatalog.Checked.signatures owner)
+                        exact ⟨raw.value, type, rfl, rfl, projected, carrier, fuel, values.registry, raw,
+                          image, beforeOwner, correspondence, rfl, extended⟩
+                    | succ index => exact atIndex foundType foundValue data
+                  · simp [throw, throwThe] at accepted
+
+/-- One selected data position in the actual mixed input prefix. Other inputs
+need no data-carrier certificate and keep their original order and metadata. -/
+def Checkpoint.DataInputAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (index : Nat) (value : Value) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ (root : Root artifact.recipe.compiled) (native : Core.Environment),
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    (∀ expected, root.inputs[index]? = some expected →
+      ∃ payload type, native[index]? = some payload ∧ root.types[index]? = some type ∧
+        artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type ∧
+        EncodedDataInput artifact.recipe.compiled.compatible.checked checkpoint.values.registry expected value payload) ∧
+    checkpoint.state = .initial root.body (native.reverse ++ environment artifact) session.store
+
+theorem Checkpoint.RootStart.data_input {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.RootStart session key arguments fuel)
+    {index : Nat} {value : Value} (found : arguments[index]? = some value) (data : DataPublic value) :
+    checkpoint.DataInputAt session key index value := by
+  obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, sameValues⟩ := started
+  obtain ⟨_extended, atIndex⟩ := arguments_data_at accepted
+  refine ⟨root, encoded.native, selected, ?_, initial⟩
+  intro expected foundType
+  obtain ⟨payload, type, actual, typeAt, projected, encodedAt⟩ := atIndex foundType found data
+  rw [← sameValues] at encodedAt
+  exact ⟨payload, type, actual, typeAt, projected, encodedAt⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
