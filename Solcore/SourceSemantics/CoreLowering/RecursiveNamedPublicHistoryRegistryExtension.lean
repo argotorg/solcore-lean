@@ -84,6 +84,10 @@ theorem extend_history {artifact : Artifact} {session : Session artifact} {entri
       exact .first sameCompiled started selected succeeded (named_result result extension) reached post addition
   | next prior sameCompiled started selected succeeded result reached post addition ih =>
       exact .next ih sameCompiled started selected succeeded (named_result result extension) reached post addition
+  | first_export_error sameCompiled started selected exported result reached post =>
+      exact .first_export_error sameCompiled started selected exported (named_result result extension) reached post
+  | next_export_error prior sameCompiled started selected exported result reached post ih =>
+      exact .next_export_error ih sameCompiled started selected exported (named_result result extension) reached post
   | first_failed sameCompiled started selected failed result reached post heapTyped =>
       exact .first_failed sameCompiled started selected failed (named_result result extension) reached post heapTyped
   | failed prior sameCompiled started selected failed result reached post heapTyped ih =>
@@ -107,6 +111,10 @@ theorem indexed_entry {artifact : Artifact} {session : Session artifact} {entrie
   | first _ _ selected _ _ _ _ _ =>
       obtain ⟨_, entry, member, _⟩ := selected
       exact ⟨entry, member⟩
+  | first_export_error _ _ selected _ _ _ _ =>
+      obtain ⟨_, entry, member, _⟩ := selected
+      exact ⟨entry, member⟩
+  | next_export_error _ _ _ _ _ _ _ _ ih => exact ih
   | first_failed _ _ selected _ _ _ _ _ =>
       obtain ⟨_, entry, member, _⟩ := selected
       exact ⟨entry, member⟩
@@ -126,6 +134,8 @@ theorem named_header {artifact : Artifact} {session : Session artifact} {entries
     ∃ header, header ∈ headers := by
   induction history with
   | first _ _ selected _ _ _ _ _ => exact ⟨_, selected.1⟩
+  | first_export_error _ _ selected _ _ _ _ => exact ⟨_, selected.1⟩
+  | next_export_error _ _ _ _ _ _ _ _ ih => exact ih
   | first_failed _ _ selected _ _ _ _ _ => exact ⟨_, selected.1⟩
   | next _ _ _ _ _ _ _ _ _ ih => exact ih
   | failed _ _ _ _ _ _ _ _ _ ih => exact ih

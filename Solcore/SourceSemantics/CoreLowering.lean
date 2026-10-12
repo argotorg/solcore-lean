@@ -1589,6 +1589,9 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryOu
 
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryExportErrors
 
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedExportErrors
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNamedExportErrors
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

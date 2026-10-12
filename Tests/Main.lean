@@ -1518,6 +1518,7 @@ import Solcore.Test.SourceCoreCapturedAssignmentPublicExecution
 import Solcore.Test.SourceCoreCapturedMappingInitialForward
 import Solcore.Test.SourceCoreDirectFailurePublicExecution
 import Solcore.Test.SourceCoreCapturedMappingExportError
+import Solcore.Test.SourceCoreCapturedMappingNamedExportErrors
 import Solcore.Test.SourceCoreCapturedMappingResumptionPublicExecution
 import Solcore.Test.SourceCoreCapturedNestedCollectionForward
 import Solcore.Test.SourceCoreHeapSnapshot
@@ -3110,6 +3111,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreCapturedMapping.runInitialForward
   SourceCoreDirectFailure.run
   SourceCoreCapturedMapping.runExportError
+  SourceCoreCapturedMapping.runNamedExportErrors
   SourceCoreCapturedMappingResumption.run
   SourceCoreCapturedNested.runComplete
 
