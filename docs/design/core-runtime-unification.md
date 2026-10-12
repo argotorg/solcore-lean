@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct public calls preserve distinct captures (2026-10-13)
+
+Commit `dbfcaf47` connects direct `invokePacked(handle, unit)` calls to independent Source applications and the actual returned histories. The registered `SourceCoreCapturedDirectPublicExecution` fixture performs `make(10)`, `make(20)`, direct invocation of the first handle, `make(30)`, direct invocation of the second handle, and direct invocation of the first handle again. It proves Word results `10`, `20` and `10`, using the exact previous session and Source heap at every step.
+
+The native startup receipt retains the actual selected callable, descriptor gate, packed input, captured payload, store and metadata. Existing recursive body proofs construct the application meaning. Successful export preserves earlier handles through native slot extension and the corresponding Source heap extension. The fixture derives each closure and its raw handle type from its original factory execution and export.
+
+Validation: strict Lean, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This completed public connection covers successful calls to zero-parameter closures in the supported static body family. Direct calls with arguments, direct failure/history continuations, output collection from direct calls and the forward public fuel theorem remain open, alongside broader body coverage and the final compiler theorem. Estimates remain unchanged.
+
 ## Named body support across actual scope selections (2026-10-13)
 
 The named terminal connection now derives its canonical sidecar from the actual compiler hook and its Source origin from the prepared specialization. Shared scope coherence proves the selected guard frame for both named and anonymous selections, including different specialization keys. The connection no longer requires a lambda-free body or a unique specialization key per Source owner. It retains the existing Source typing, metadata, policy and supported body grammar requirements.
@@ -16,11 +26,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `c187ce09`: the actual two-function captured-read program now has six connected public Source executions and returned histories, including reuse of distinct closures after an intervening factory call. |
-| Latest completed verification | Strict Lean, the six-call runtime fixture, full build (6035 jobs), all registered tests, kernel policy and independent review pass. Eleven audited endpoints use only the standard three axioms. |
+| Latest verified implementation | `dbfcaf47`: six actual public calls connect factory creation and direct handle invocation to Source applications and returned histories, preserving distinct captures through an intervening factory call. |
+| Latest completed verification | Strict Lean, the direct six-call runtime fixture, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. Eleven audited endpoints use only the standard three axioms. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
 | Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
-| Current implementation priority | Broaden genuine compiler/body coverage beyond the closed captured-read program. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
+| Current implementation priority | Connect packed arguments and nonzero lambda parameters through direct public execution, then broaden genuine compiler/body coverage. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

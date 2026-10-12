@@ -4,6 +4,21 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Direct retained-closure invocation (2026-10-13)
+
+Commit `dbfcaf47` adds proof receipts to direct public invocation. `invokePacked` retains its existing result and performs one startup and one resume. `invokePackedWithReceipt` additionally returns `Session.InvokeAt`, tying that same execution to its startup and completion.
+
+- `Checkpoint.HandleStart` and `Session.HandleSelectionAt` expose the actual callable selection, descriptor gate, packed encoder, initial native state and raw requested signature.
+- `InitialRegistryFrom` supports preservation of earlier authenticated handles through success and failure. `SucceededResultAt.function_source_type` derives an exported handle's exact raw type from the actual exporter.
+- `RecursiveNamedPublicDirectHandleMeaning.public_invoke_succeeded_reflects_unit` reflects one successful public call of a zero-parameter closure to Source application and the complete returned caller/heap postcondition. Recursive body laws are constructed internally.
+- `History.after_packed_success` retains the existing ordered entries at that actual returned session and heap.
+
+The registered `SourceCoreCapturedDirectPublicExecution.sequence_meaning` joins three factory executions and three direct invocations, including distinct captures and an intervening allocation. Source Word results are exactly `10`, `20` and `10`. It supplies no callable representation or body execution premise.
+
+Validation: strict Lean, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The semantic public endpoint currently requires zero Source parameters and packed Unit. Generic frontend receipts cover other signatures, but direct semantic arguments, failure continuations, output collection and the forward public fuel connection are still being implemented.
+
 ## Named terminal scope conditions (2026-10-13)
 
 `CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport.of_actual` no longer takes `NoLambda` or specialization-key uniqueness arguments. `CallableIndexedActualNamedSourceReceipts.hook_sidecar` recovers the genuine canonical sidecar. `RecursiveNamedPreparedScopeCoherence.selected_frame` derives guard-frame equality from the actual preparation and Source well-formedness, for named or anonymous registry selections. It preserves the selected scope and substitution; it does not identify distinct sidecars or keys.

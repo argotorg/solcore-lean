@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct public handle execution (2026-10-13)
+
+Commit `dbfcaf47` adds the closed `SourceCoreCapturedDirect.sequence_meaning` theorem. Three genuine factory calls and three direct public invocations preserve separate captures through an intervening allocation, with Source Word results `10`, `20` and `10` and six linked actual session/heap states.
+
+Independent review checked startup, exact selected callable and packed Unit, current captured heap, native evaluation size, recursive body support, original public completion and returned History. The frontend still performs one startup and one resume. The Source closure and raw handle type come from the actual preceding factory trace/export, not an additional semantic observation. Generic old-handle preservation covers successful and failed exports, while the new direct semantic History branch currently covers success only.
+
+Validation: strict Lean, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Scope remains successful direct invocation of zero-parameter closures in the admitted body family. This does not establish arbitrary packed arguments, direct semantic failure continuations, direct output collection, the forward public fuel theorem or full compiler preservation.
+
 ## Named scope generalization (2026-10-13)
 
 The named terminal producer now obtains its canonical sidecar from the genuine hook and Source owner from the accepted ordinary specialization. The shared coherence theorem covers named and anonymous selections and differing specialization keys; its conclusion is guard-frame equality only. No Source execution law, body meaning law or replacement metadata premise has been added. Lambda-free Source and owner-key uniqueness restrictions, including the fixture's runtime uniqueness check, have been removed.

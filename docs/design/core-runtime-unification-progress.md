@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct invocation through the actual returned histories (2026-10-13)
+
+Commit `dbfcaf47` closes the direct `invokePacked` route for the captured-read program. The actual sequence is `make(10)`, `make(20)`, `invokePacked(first, unit)`, `make(30)`, `invokePacked(second, unit)`, `invokePacked(first, unit)`. The independent Source outcomes of the direct calls are Word `10`, `20` and `10`.
+
+Every call uses its predecessor's public session and Source heap. Factory traces identify the exact closures and their captures; actual export identifies their raw handle types. Current histories supply native encodings, Source typing and representations. Actual startup and completion receipts then construct the direct Source application and retain all earlier entries. Static support comes from the same compiler producers used by the named-call fixture.
+
+Validation: strict Lean, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The endpoint covers successful zero-parameter closure calls. Next work connects arbitrary packed inputs and actual lambda parameter contexts. Direct failure continuations, output collection, the forward public fuel theorem, broader body grammar and all-pass composition remain open. Estimates are unchanged.
+
 ## Named terminal support without lambda and key restrictions (2026-10-13)
 
 The actual named compiler hook now supplies its canonical sidecar. Source preparation and annotation coherence establish the same guard frame for every authentic named or anonymous selection, even when specialization keys differ. The public static producer drops both its lambda-free Source premise and its owner-key uniqueness premise. The captured-reuse fixture also drops the obsolete owner-key observation.
@@ -31,7 +41,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Six actual public calls now create and reuse distinct captured closures, proving exact Source Word results and continuous returned histories. Strict Lean, the runtime fixture, full build (6035 jobs), all registered tests, kernel policy and independent review pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Six actual public calls now create and directly invoke distinct captured closures, proving exact Source Word results and continuous returned histories. Strict Lean, the runtime fixture, full build (6042 jobs), all registered tests, kernel policy and independent reviews pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
@@ -51,7 +61,7 @@ Commit `c187ce09` adds `SourceCoreCapturedReusePublicExecution.sequence_meaning`
 
 `first_meaning` derives the initial history from actual bootstrap and the first public call. `RetainedState.make` uses the current history and accepted public startup to append a new export. `RetainedState.read` passes the exact retained Source value, derives the exact Word result from the full semantic result and public decoding, then retains every entry at the returned session. The final theorem joins the six heaps in execution order; no call repeats bootstrap or substitutes a fresh state.
 
-The two genuine compiler headers supply complete inventory and named body support. The read body has no lambda occurrence, so actual selected-scope provenance identifies its named sidecar. The family for captured closures is derived from the only authentic lambda source in the two-row catalog. Actual handle encoding and successful return establish the metadata identities required by the next call.
+The two genuine compiler headers supply complete inventory and named body support. Actual compiler preparation and Source typing now derive the read body's selected guard frame without a lambda-free restriction. The family for captured closures is derived from the only authentic lambda source in the two-row catalog. Actual handle encoding and successful return establish the metadata identities required by the next call.
 
 Validation: strict Lean, the actual six-call runtime fixture, full build (6035 jobs), all registered tests and kernel policy pass. Independent review found no issues in the exact input, session, heap and history connections. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
