@@ -82,6 +82,21 @@ mutual
         (occurrence : Occurrence scope id (.constructor instantiation arguments))
         (children : Expressions program registry childrenSize scope context environment before arguments (.fault failure) after) :
         Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | indexBaseFault {firstSize : Nat} {scope context environment before after id base key failure}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry firstSize scope context environment before base (.fault failure) after) :
+        Expression program registry (stepSize [firstSize]) scope context environment before id (.fault failure) after
+    | indexKeyFault {firstSize secondSize : Nat} {scope context environment before middle after id base key value failure}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry firstSize scope context environment before base (.value value) middle)
+        (second : Expression program registry secondSize scope context environment middle key (.fault failure) after) :
+        Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id (.fault failure) after
+    | indexResult {firstSize secondSize : Nat} {scope context environment before middle after id base key baseValue keyValue outcome}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry firstSize scope context environment before base (.value baseValue) middle)
+        (second : Expression program registry secondSize scope context environment middle key (.value keyValue) after)
+        (result : IndexOutcome baseValue keyValue outcome) :
+        Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id outcome after
     | unary {childSize : Nat} {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
         (child : Expression program registry childSize scope context environment before operand (.value input) after)
@@ -604,6 +619,9 @@ local macro "erase_stage_grade" : tactic =>
     case tupleFault => apply Recursive.Expression.tupleFault <;> assumption
     case constructorValue => apply Recursive.Expression.constructorValue <;> assumption
     case constructorFault => apply Recursive.Expression.constructorFault <;> assumption
+    case indexBaseFault => apply Recursive.Expression.indexBaseFault <;> assumption
+    case indexKeyFault => apply Recursive.Expression.indexKeyFault <;> assumption
+    case indexResult => apply Recursive.Expression.indexResult <;> assumption
     case unary => apply Recursive.Expression.unary <;> assumption
     case unaryOperandFault => apply Recursive.Expression.unaryOperandFault <;> assumption
     case unaryInvalid => apply Recursive.Expression.unaryInvalid <;> assumption
@@ -728,6 +746,17 @@ local macro "construct_stage_grade" : tactic =>
     case constructorFault occurrence children ih_children =>
       obtain ⟨_, graded_children⟩ := ih_children
       exact ⟨_, .constructorFault occurrence graded_children⟩
+    case indexBaseFault occurrence first ih_first =>
+      obtain ⟨_, first⟩ := ih_first
+      exact ⟨_, .indexBaseFault occurrence first⟩
+    case indexKeyFault occurrence first second ih_first ih_second =>
+      obtain ⟨_, first⟩ := ih_first
+      obtain ⟨_, second⟩ := ih_second
+      exact ⟨_, .indexKeyFault occurrence first second⟩
+    case indexResult occurrence first second result ih_first ih_second =>
+      obtain ⟨_, first⟩ := ih_first
+      obtain ⟨_, second⟩ := ih_second
+      exact ⟨_, .indexResult occurrence first second result⟩
     case unary occurrence child applies ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .unary occurrence graded_child applies⟩

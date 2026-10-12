@@ -453,6 +453,23 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact fault_occurrence occurrence (.constructorArgument rfl ih)
+  case indexBaseFault occurrence first a =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.indexBase rfl a)
+  case indexKeyFault occurrence first second a b =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_occurrence occurrence (.indexKey rfl a b)
+  case indexResult occurrence first second result a b =>
+    cases result with
+    | found shape located => cases shape; exact value_occurrence occurrence (.indexFound rfl a b located)
+    | default shape absent defaulted => cases shape; exact value_occurrence occurrence (.indexDefault rfl a b absent defaulted)
+    | shape invalid => exact fault_occurrence occurrence (.indexShape rfl a b invalid)
+    | keyType shape typed mismatch => cases shape; exact fault_occurrence occurrence (.indexKeyType rfl a b typed mismatch)
+    | unavailable shape typed absent missing => cases shape; exact fault_occurrence occurrence (.indexDefaultUnavailable rfl a b typed absent missing)
   case unary occurrence child applies ih =>
     exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
   case unaryOperandFault occurrence child ih =>

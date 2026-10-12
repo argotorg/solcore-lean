@@ -76,6 +76,8 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case indexResult occurrence first second result ih_first ih_second =>
+      cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
@@ -116,6 +118,8 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case indexResult occurrence first second result ih_first ih_second =>
+      cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
@@ -156,6 +160,8 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case indexResult occurrence first second result ih_first ih_second =>
+      cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
@@ -197,6 +203,8 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case indexResult occurrence first second result ih_first ih_second =>
+      cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 

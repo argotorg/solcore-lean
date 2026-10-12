@@ -87,6 +87,27 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
       | constructor _valid argumentsTyped =>
           exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap argumentsTyped children
+  | @indexBaseFault firstSize scope context environment before after id base key failure occurrence first =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | index baseTyped _ =>
+          exact expressionIH firstSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap baseTyped first
+  | @indexKeyFault firstSize secondSize scope context environment before middle after id base key value failure occurrence first second =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | index baseTyped keyTyped =>
+          obtain ⟨_valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed runtime covers locals heap baseTyped first
+          obtain ⟨afterTyped, secondExtends⟩ := expressionIH secondSize (Size.child_lt_stepSize (by simp))
+            runtime covers (locals.mono firstExtends) middleTyped keyTyped second
+          exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @indexResult firstSize secondSize scope context environment before middle after id base key baseValue keyValue outcome occurrence first second _result =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | index baseTyped keyTyped =>
+          obtain ⟨_baseTyped, middleTyped, firstExtends⟩ := expression_value wellFormed runtime covers locals heap baseTyped first
+          obtain ⟨_keyTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
+            runtime covers (locals.mono firstExtends) middleTyped keyTyped second
+          exact ⟨afterTyped, firstExtends.trans secondExtends⟩
   | @unaryOperandFault childSize scope context environment before after id operator operand failure occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

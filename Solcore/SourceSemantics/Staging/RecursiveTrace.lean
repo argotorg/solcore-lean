@@ -4,7 +4,7 @@ import Solcore.SourceSemantics.Staging.RecursiveBareTarget
 uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
-The initial profile covers atomic forms, groups, ordered tuples of every arity, nominal constructor payloads, uncoerced primitive unary/binary operators, conditionals,
+The initial profile covers atomic forms, groups, ordered tuples of every arity, nominal constructor payloads, ordered mapping index children, uncoerced primitive unary/binary operators, conditionals,
 direct declaration calls and indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while and for loops, ordered match arms, and returns.
 Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
@@ -44,6 +44,28 @@ def globalView (body : BodyInstance) (evidence : EvidenceEnvironment) (roots : L
   captured := []
   context := body.context
   evidence := evidence
+
+/-- Mapping lookup decides only after both children have finished. This
+independent Source relation keeps the original key and value types. -/
+inductive IndexOutcome (base key : Dynamic.Value) : Outcome → Prop where
+  | found {keyType valueType entries value}
+      (shape : base = .mapping keyType valueType entries)
+      (located : MappingLookup key entries value) : IndexOutcome base key (.value value)
+  | default {keyType valueType entries value}
+      (shape : base = .mapping keyType valueType entries)
+      (absent : MappingAbsent key entries) (defaulted : DefaultValue valueType value) :
+      IndexOutcome base key (.value value)
+  | shape (invalid : ¬ MappingValue base) :
+      IndexOutcome base key (.fault (.semantic .invalidProjection))
+  | keyType {keyType valueType entries actual}
+      (shape : base = .mapping keyType valueType entries)
+      (typed : ValueRuntimeType key actual) (mismatch : runtimeType actual ≠ runtimeType keyType) :
+      IndexOutcome base key (.fault (.semantic (.typeMismatch keyType (runtimeType actual))))
+  | unavailable {keyType valueType entries}
+      (shape : base = .mapping keyType valueType entries)
+      (typed : ValueRuntimeTypeMatches key keyType) (absent : MappingAbsent key entries)
+      (missing : ¬ Defaultable valueType) :
+      IndexOutcome base key (.fault (.semantic (.missingMappingDefault valueType)))
 
 mutual
   inductive Expression (program : Program) (registry : Registry) :
@@ -96,6 +118,21 @@ mutual
         (occurrence : Occurrence scope id (.constructor instantiation arguments))
         (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
+    | indexBaseFault {scope context environment before after id base key failure}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry scope context environment before base (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | indexKeyFault {scope context environment before middle after id base key value failure}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry scope context environment before base (.value value) middle)
+        (second : Expression program registry scope context environment middle key (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | indexResult {scope context environment before middle after id base key baseValue keyValue outcome}
+        (occurrence : Occurrence scope id (.index base key))
+        (first : Expression program registry scope context environment before base (.value baseValue) middle)
+        (second : Expression program registry scope context environment middle key (.value keyValue) after)
+        (result : IndexOutcome baseValue keyValue outcome) :
+        Expression program registry scope context environment before id outcome after
     | unary {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
         (child : Expression program registry scope context environment before operand (.value input) after)

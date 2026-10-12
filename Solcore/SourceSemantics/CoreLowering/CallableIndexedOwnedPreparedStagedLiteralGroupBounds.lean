@@ -204,7 +204,7 @@ private theorem no_stage
     rw [← sameForm]
     exact (literal_atomic literal)
   cases trace with
-  | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
+  | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | constructorFault occurrence _ =>
       have atomic := occurrence_atomic occurrence
       cases atomic
