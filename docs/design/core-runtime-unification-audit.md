@@ -8,6 +8,14 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Recursive constructor children and public handle reuse (2026-10-13)
+
+`624b8d0e` adds independent staged Source traces for constructor payloads, including ordered child execution and failure propagation. `5bf2f084` connects the actual compiler receipts to preservation and reflection through the recursive caller family. The original constructor metadata and every payload value remain represented. Validity uses the actual closed substitution range, including unused entries; a native type projection alone does not establish this condition.
+
+`9c7b952e` connects construction, export, nested handle collection and later calls through the exact returned public sessions. The example builds `Hold(factory(20), prior, factory, builtin)`, where `prior` captures `10`. The child call creates a separate closure capturing `20`. The collected closure returns `20`; an intervening factory call creates a capture of `30`; the older closure then returns `10`, and the retained builtin converts `37`. Each step retains its independent Source trace, reached heap and complete reusable handle history. Source success also gives sufficient execution and output fuel for constructor export and any requested selection from that output.
+
+Validation: all 2,102 affected modules pass coherent checks. The full build (6,467 jobs), all registered tests (12,804 build jobs and the final pass marker), kernel policy and 34 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The Core representation and runtime are unchanged. Direct declaration calls are the next public connection under development. Broader compiler alternatives and composition across every pass remain incomplete.
+
 ## For headers, finite loops and retained captures (2026-10-13)
 
 `fd2b9008` adds independent staged Source traces for `for` initialization, finite iterations and post-header items. `181fa159` connects them through genuine compiler receipts to both directions of the public execution proof. Header items include monomorphic declarations, discarded expressions and plain assignment. Normal body completion executes the post header; return and failure preserve the reached heap and bypass it. Leaving the loop restores the outer lexical scope. This fragment does not yet include `break` or `continue`.
