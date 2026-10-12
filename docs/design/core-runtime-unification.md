@@ -10,13 +10,28 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `be545d01` and `f7c07bf1`. Named factory provenance and singleton named handles connect to public semantics. |
-| Latest completed normal verification | Strict Lean, full build (5959 jobs), all registered tests, kernel policy and independent review pass. The seven checked named endpoints use only the standard three axioms. |
+| Latest normally verified implementation commits | `91a42c32` and `8964ff88`. Ordered mixed function and data inputs connect to public semantics. |
+| Latest completed normal verification | Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
 | Working implementation | Public success/failure reflection and Word preservation derive the initial owned state, stable rows, global references, heap relations and argument typing/representation internally. |
-| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving handle issuance. Scalar/product inputs, raw-typed data with a receiving registry extension, and one builtin or named input at its exact raw type are connected. |
-| Current implementation priority | Connect closure inputs, mixed lists and nested handle carriers; extend the initial-state connection to restored or previously executed sessions; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
+| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving issuance. Arbitrary-length flat lists may mix named/builtin handles and handle-free data at the exact raw signature, retaining argument order, duplicates and the genuine receiving registry extension. |
+| Current implementation priority | Connect closure inputs and handles nested inside data carriers; extend the initial-state connection to restored or previously executed sessions; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+### Mixed function and data inputs (2026-10-12)
+
+Code commits: `91a42c32` and `8964ff88`.
+
+Public success/failure reflection and Word preservation now accept an arbitrary-length flat list of named handles, builtin handles and handle-free data. Each position is checked against the selected root's exact raw Source signature. Data may contain constructors, proxies, products and ordered mappings; repeated arguments and duplicate mapping keys retain their original order.
+
+`Session.IssuanceChain` records actual successful named and builtin issuance steps. Its proofs preserve earlier handles through both slot reuse and append, so a handle issued before a later handle can still be passed to the final session. The data producer obtains each payload from that same accepted mixed startup. `RecursiveNamedPublicMixedArgumentReceipts.Inputs` retains structural data typing and the original function issuance and inventory receipts. Its fold constructs complete argument representation and deep Source typing internally. The initialized public endpoints also derive the caller, globals and heap conditions from the actual bootstrap, including any finite sequence of resumptions.
+
+The receiving registry must still extend the actual encoded registry: `Extends encodedValues.registry receiving`. Raw data typing and exact function types remain explicit. An arbitrary shared registry ancestor or erased native type does not supply these conditions.
+
+The runtime regression uses five arguments in this order: an earlier named handle, Word `3`, a `mapping Word Word` with rows `(3, 7)` and `(3, 99)`, a later `wordToInteger` handle, and the earlier named handle again. It checks result `72` and rejection when the function handles occupy incompatible positions.
+
+Validation: Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The remaining input boundaries are handles nested inside data carriers and closure inputs. Restored or previously executed sessions, complete static body coverage, broader compiler grammar and composition across all compiler passes remain unfinished. Progress estimates are unchanged. The dated entries below retain the scope and validation of their original commits.
 
 ### Singleton named input connection (2026-10-12)
 

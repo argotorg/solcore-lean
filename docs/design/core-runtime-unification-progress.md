@@ -25,10 +25,28 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product arguments derived from actual fresh startup. Raw metadata inputs and singleton builtin/named handles have conditional public connections. Closure inputs, mixed/nested handles, restored/used sessions, broader compiler grammar and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state derived from actual fresh bootstrap and finite resumption. Arbitrary-length flat lists mix named/builtin handles and handle-free data under exact raw typing and the genuine receiving metadata extension. Nested handles, closure inputs, restored/used sessions, complete static coverage, broader grammar and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Mixed function and data input connection (2026-10-12)
+
+Code commits: `91a42c32` and `8964ff88`.
+
+The initialized public success/failure reflection and Word preservation endpoints now consume arbitrary-length flat mixed argument lists. Named handles, builtin handles and handle-free data may appear in any order permitted by the exact raw Source signature. Duplicate arguments remain separate ordered positions. Data includes constructors, proxies, nested products and ordered mappings with duplicate keys.
+
+`Session.IssuanceChain` retains the actual successful issuance steps and transports an earlier handle's exact encoding through later slot reuse or append. The data input producer recovers one actual payload from mixed startup without requiring every other argument to be data. `RecursiveNamedPublicMixedArgumentReceipts.Inputs` combines raw structural data typing with genuine builtin issuance or an issued named inventory packet. `StartAt.mixed_arguments_receiving` constructs the complete argument relation and deep Source typing from those receipts and the real startup encoding.
+
+`CallableIndexedOwnedPreparedStagedInitializedMixedPublicBounds` connects this fold to all three public semantic endpoints. Initial caller, stable rows, globals and heap conditions still come from the actual fresh bootstrap and its finite resumption chain. The conclusions retain staged Source outcomes, native results and stores, the actual returned session and full caller relation. No argument representation or Source typing judgment is supplied as a replacement for the input producer.
+
+The exact raw signature and `Extends encodedValues.registry receiving` remain explicit conditions. In particular, receiving metadata must preserve the IDs allocated by the original encoder. The structural data certificate also preserves raw proxy annotations that native projection erases.
+
+The runtime regression supplies five arguments: an earlier named handle, Word `3`, an ordered `mapping Word Word` with rows `(3, 7)` and `(3, 99)`, a later `wordToInteger` handle, and the same earlier named handle again. It checks result `72`, preserved duplicate-key order and rejection of incompatible handle order.
+
+Validation: Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Handles nested inside data carriers, closure inputs, restored or previously executed sessions, complete static body coverage, broader grammar and all-pass composition remain open. Estimates remain 100% / about 70% / about 85%. The dated entries below retain their original scope and validation.
 
 ### Singleton named input and public semantics (2026-10-12)
 

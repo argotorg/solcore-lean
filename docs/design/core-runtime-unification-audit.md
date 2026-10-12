@@ -8,6 +8,28 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Mixed function and data input connection (2026-10-12)
+
+Code commits: `91a42c32` and `8964ff88`.
+
+The new boundary is an arbitrary-length flat argument list containing named handles, builtin handles and handle-free data. Exact raw Source parameter types and argument positions are retained. Data may contain constructors, proxies, products and ordered mappings. Repeated values and duplicate mapping keys are preserved.
+
+The issuance proof follows actual successful named/builtin operations. It covers both reuse of an existing physical slot and append of a fresh slot, and retains the native callable of an earlier handle through later issuance. This authentication transport is separate from the unchanged native state supplied by `SameRuntime`.
+
+The mixed data producer selects the original encoded payload at its actual startup index. It permits neighboring handle arguments and uses the encoder's real final metadata. The ordered structural `Inputs` certificate then assembles complete `Arguments` and deep Source typing. Named entries retain their actual finite inventory packet and complete captured closure; builtin entries retain the actual closed factory code. No supplied function representation, argument relation or body execution law replaces these producers.
+
+The initialized public consumer connects those facts to success/failure reflection and Word preservation, deriving the original caller, global references and heap conditions from fresh bootstrap completion with finite resumption. The result retains actual native and Source outcomes, complete returned state and the public returned session.
+
+The receiving registry extension remains a genuine premise from the actual encoded registry to the body's receiving registry. Raw structural typing is also required for data. Neither a common registry ancestor nor erased native type equality discharges these obligations.
+
+The runtime regression passes an earlier named handle, Word `3`, a `mapping Word Word` with rows `(3, 7)` and `(3, 99)`, a later `wordToInteger` handle and the earlier named handle again. The expected result is `72`; incompatible function-handle order is rejected. The duplicate mapping keys and repeated handle make argument order and earlier-handle retention observable.
+
+Before execution, the test issues the same named handle again after builtin issuance and checks that it reuses the original handle without changing the heap or increasing the handle count. The subsequent call still uses the original issued values.
+
+Validation: Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The boundary remains flat for handles. Nested handles inside data carriers, closure inputs, restored or previously executed sessions, complete static body coverage, broader compiler grammar and the theorem across all compiler passes remain unfinished. The progress estimates are unchanged.
+
 ## Singleton named input connection (2026-10-12)
 
 Committed in `be545d01` and `f7c07bf1`.

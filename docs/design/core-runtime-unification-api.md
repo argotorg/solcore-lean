@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest connections are `1ebb4c6a`, `b6c24d8f`, `54bc83a5` and `83bf7430`: repeated bootstrap resumption, raw data inputs, state-preserving handle issuance and singleton builtin inputs reach the public semantic endpoints. They consume the public execution endpoints from `6199f27d` and `a3d8877f`. Static family support remains explicit.
+The latest mixed-input connection, `91a42c32` and `8964ff88`, extends repeated bootstrap resumption, raw data inputs and singleton function inputs to arbitrary-length flat lists of named handles, builtin handles and handle-free data. It consumes the public execution endpoints from `6199f27d` and `a3d8877f`. Exact raw input types, the actual receiving metadata extension and supported static body facts remain explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,30 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Mixed function and data inputs (2026-10-12)
+
+Code commits: `91a42c32` and `8964ff88`.
+
+`SourceCoreIndexedSession.Session.IssuanceChain` records a finite sequence of actual successful named/builtin issuances. Its `same_runtime` theorem retains the initialized native state; `encodes_function` separately preserves an earlier handle's exact native callable through slot reuse and append. `SameRuntime` alone does not establish this authentication transport.
+
+`Checkpoint.RootStart.data_input` and `RecursiveNamedPublicMixedDataArgumentReceipts.StartAt.data_argument_represents` recover a data value at its actual index in a mixed startup. The other positions may contain handles. The result retains the actual encoded payload, native type projection and metadata, and supplies Source representation and typing from `PublicDataTyped` and its independent data interpretation.
+
+`RecursiveNamedPublicMixedArgumentReceipts.Input` has three constructors:
+
+- `data` retains structural raw data typing and its independent Source interpretation. Constructors, proxies, products and mappings may be nested, provided they contain no handles.
+- `named` retains the exact issued inventory packet, `Inventory.HasRow`, actual named issuance, the returned handle, and its issuance chain to the receiving session. Its Source value retains the imported specialization and dictionary.
+- `builtin` retains the actual builtin issuance, returned handle and issuance chain to the receiving session. Its Source value is that exact builtin.
+
+`Inputs` aligns those certificates with the selected Header's raw parameter types, public values and Source values as ordered lists. `StartAt.mixed_arguments_receiving` folds them into `CallableIndexedParameterMeaning.Arguments` and `Dynamic.ValuesHaveTypes`. There is no singleton restriction; positions and repeated values are retained. The producer uses the actual startup argument vector and derives each represented payload at the corresponding index.
+
+`CallableIndexedOwnedPreparedStagedInitializedMixedPublicBounds` exposes `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. These endpoints derive the initial owned caller, globals, heap and argument conditions from the actual fresh bootstrap, finite resumption and state-preserving issuance. Results retain the staged Source outcome, native value and store, actual public returned session and complete caller relation.
+
+Callers still provide exact raw input certificates, genuine named inventory membership, actual preparation/issuance/startup receipts, supported static body facts, and `Extends encodedValues.registry receiving`. This last condition preserves the IDs allocated by the actual encoder. Two registries extending a common ancestor do not establish it. Runtime type projection also does not establish every raw data annotation.
+
+Handles nested inside carriers, closure inputs, restored or previously executed sessions, complete static/compiler coverage and the final all-pass theorem remain open. Validation: Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The dated interface entries below retain their original scope and validation; this section supersedes their singleton input boundary.
 
 ## Initialized public entry (2026-10-12)
 
