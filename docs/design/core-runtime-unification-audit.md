@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Closed compiler-to-public lambda factory (2026-10-12)
+
+Commit `6b22e7b5` adds `SourceCoreClosedLambdaPublicExecution`, a registered test of `function make() returns (function() returns ()) { return lam() {}; }`. Its actual checker, compiler, initialization, input encoder and public execution receipts instantiate `public_run_succeeded_remembers`. The theorem concludes an independent Source application and a singleton History for the same handle and returned public session. Source typing, complete nonempty inventory, compiler body support, the closure family and initial metadata relation are constructed inside the fixture.
+
+`OrdinarySequenceFor.empty` admits genuine empty unit bodies. The static producer derives the emitted footer from the same retained compiler callback. Its execution bounds use the heap and store after actual parameter allocation and retain caller restoration. `NamedEmptyLambdaFormation.of_terminal` derives the native child type from the accepted terminal compiler receipt and constructs the original empty-body certificate. `StartAt.empty_registry` derives metadata identity for an actual empty input vector.
+
+This concrete case proves first formation, export and History construction. It does not yet call the returned closure or capture a variable. The diagnostic receiver comes from a separate genuine indexed execution of the same artifact, with its receiving metadata extension proved from actual initialization. The mutable assignment/match regression remains runtime coverage beyond the admitted static body grammar. Captured-body fixtures, broader body coverage, suspended/export-error continuations and final all-pass composition remain open.
+
+Validation: strict Lean, full build (6008 jobs), all registered tests, kernel policy and independent review pass. Eleven checked endpoints, including the closed public theorem, use only `propext`, `Classical.choice` and `Quot.sound`. The work estimates remain unchanged.
+
 ## Histories after failed public calls (2026-10-12)
 
 Commit `aba75ce5` connects a supported failed public call to a reusable history at its actual failure heap. `CallableIndexedOwnedPreparedStagedHistoryPublicFailures.public_run_failed_retains` derives the initial Source runtime, callable type and packed argument typing from the existing history, real input encoding and selected declaration frame. `RecursiveNamedPublicHistoryFrontdoor.public_run_failed_retains` also recovers startup and Source selection from the accepted public start. Neither endpoint requires a separate assumption that the final heap is well typed.
@@ -32,7 +42,7 @@ The terminal lambda branch was reviewed through actual parameter installation an
 
 Complete inventory, authentic compiler/body certificates, exact raw structural inputs, the actual encoder-to-receiving metadata extension and one fixed function model and registries remain explicit. The new lambda branch requires an ordinary terminal lambda and zero capture prefixes. Output collection currently traverses products; constructor, mapping and raw comptime-wrapped product outputs remain separate work. Reusable failed continuations, suspended snapshots, model/registry changes, full statement grammar and all-pass composition remain open.
 
-The mutable runtime fixture still uses assignment and match outside the admitted body grammar; its results do not instantiate these public semantic theorems. A closed unit-lambda Source certificate and `ProgramWellFormed` proof have been checked, but the exact Header/body support and complete public fixture remain unfinished. Estimates stay at 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+The mutable runtime fixture still uses assignment and match outside the admitted body grammar; its results do not instantiate these public semantic theorems. The closed empty unit-lambda fixture is now complete through first export and History construction; captured bodies and returned-closure invocation remain open. Estimates stay at 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
 
 ## Used-session issuance and ready restoration (2026-10-12)
 
