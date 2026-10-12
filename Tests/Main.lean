@@ -1515,6 +1515,7 @@ import Solcore.Test.SourceCoreInitialLexicalFailurePublicExecution
 import Solcore.Test.SourceCoreInitialLexicalFailureForward
 import Solcore.Test.SourceCoreCapturedCopyPublicExecution
 import Solcore.Test.SourceCoreCapturedAssignmentPublicExecution
+import Solcore.Test.SourceCoreCapturedMappingInitialForward
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3102,6 +3103,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreCapturedLocal.run
   SourceCoreCapturedCopy.run
   SourceCoreCapturedAssignment.run
+  SourceCoreCapturedMapping.runInitialForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
