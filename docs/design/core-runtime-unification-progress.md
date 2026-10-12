@@ -25,10 +25,20 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches cached roots and actual public outcomes. Complete initialization, compiler-grammar coverage and composition across all passes remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product argument conditions derived from actual fresh startup. Broader inputs, resumed initialization, compiler-grammar coverage and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Initial conditions derived from actual execution (2026-10-12)
+
+`9b6cb2c7` retains fresh public bootstrap receipts and derives the initial owned state from its actual completion. The same public ready session identifies startup's exact world/store. A fixed singleton owner uses the real global locations and frame zero; the initialization constructor supplies stable history, global reads and the empty Source heap relation.
+
+`6976ab8c` connects that producer and actual scalar/product encoding to `CallableIndexedOwnedPreparedStagedInitializedPublicBounds`. Its public success/failure and Word endpoints construct the caller, stable rows, global reference, heap representation, heap typing, argument representation and argument typing internally. Reflection also recovers Source arguments and their public interpretation internally. The conclusions retain the complete staged execution, native result/store, returned session and caller state.
+
+Validation passes: strict Lean checks, full build (5952 jobs), all registered tests, kernel policy and independent review. The nine checked facade/initialization/input/public semantic endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Existing public bootstrap tests exercise the receipt operation; suspended bootstrap and other public runtime tests still pass.
+
+Scope: fresh bootstrap completed in one resume, `SimplePublic` inputs, and the supported static body family. Multiple bootstrap resumes, restored/used sessions, handles and metadata-bearing inputs remain outside this new entry theorem. Static compiler coverage and all-pass composition remain open. Further helpers should discharge a condition in these connected consumers; no percentage increase is inferred from this unit's proof count.
 
 ### Connected cached roots and public outcomes (2026-10-12)
 
@@ -38,7 +48,7 @@ The new endpoints cover both directions at the cached root, reflection of actual
 
 Validation passes: strict Lean checks, full build (5948 jobs), all registered tests, repository kernel policy and independent review. The checked facade, root and public semantic endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
 
-Next, derive the initial owned pool/global slots, represented inputs/heaps and static family support from actual initialization and compilation. These conditions are still premises of the connected theorems. Broader grammar, unrestricted method/generalized-local bodies and the final theorem across specialization, evidence and comptime remain incomplete. Helper work is driven by these consumers; the percentage estimates remain unchanged.
+These lower-level theorems retain initial owned-pool/global-slot and represented input/heap premises. The initialized consumer above discharges them for fresh scalar/product entry. Static family coverage, broader grammar, unrestricted method/generalized-local bodies and the final theorem across specialization, evidence and comptime remain incomplete. Helper work is driven by these consumers; the percentage estimates remain unchanged.
 
 ### Connected ordinary sequence callers (2026-10-12)
 

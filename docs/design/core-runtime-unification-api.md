@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest connections are `6199f27d` and `a3d8877f`: actual public execution receipts now consume cached-root preservation/reflection for the supported ordinary family. The preceding caller connection is `80a41cf5`. Initialization and static family support remain explicit.
+The latest connections are `9b6cb2c7` and `6976ab8c`: actual fresh bootstrap and scalar/product encoding construct the state and argument conditions for public semantics. They consume the public execution endpoints from `6199f27d` and `a3d8877f`. Static family support remains explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,18 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Initialized public entry (2026-10-12)
+
+`SourceCompiler.Artifact.bootstrapWithReceipt` returns the original public bootstrap with `Bootstrap.FreshAt`. Existing `bootstrap` delegates to it. `Bootstrap.ready_indexed` uses an actual ready equation to retain the original indexed fresh checkpoint and exact returned session.
+
+`CallableIndexedOwnedPublicBootstrapInitialization.at_started` identifies the same session in bootstrap and startup, returning the actual native completion and exact initialized store/world. `CallableIndexedOwnedPreparedBootstrapRootState.of_completed` consumes this completion and genuine finite inventory to construct the owned caller, stable rows, global references and empty Source heap correspondence.
+
+`RecursiveNamedPublicSimpleArgumentReceipts.simple_arguments_receiving` obtains Source arguments, their interpretation, raw typing and native representation from the original successful scalar/product encoder. It works directly at the receiving body's registry. `simple_arguments_at_receiving` matches the independently interpreted arguments of a supplied Source trace.
+
+`CallableIndexedOwnedPreparedStagedInitializedPublicBounds` consumes these producers in `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. Their inputs no longer include an initial caller, stable rows, global reference, heap representation/typing or argument representation/typing. Reflection recovers its Source arguments existentially. Exact startup/checkpoint/bootstrap receipts and static compiler/body support remain inputs; full staged results and returned state remain conclusions.
+
+This entry covers a fresh bootstrap completed in one resume and `SimplePublic` values (unit, Boolean, Word, integer and nested products). Multiple bootstrap resumes, restored/used sessions, handles and metadata-bearing inputs need separate extensions. Committed in `9b6cb2c7` and `6976ab8c`; strict checks, full build, tests, kernel policy, standard-axiom checks and independent review pass.
 
 ## Public execution receipts and semantic consumers (2026-10-12)
 

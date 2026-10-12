@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Verified initialization-to-public connection (2026-10-12)
+
+Commits `9b6cb2c7` and `6976ab8c` derive the initial conditions used by the supported public consumer. Review followed one fresh bootstrap receipt through its actual ready session and the same startup session. Native completion fixes the full store; store typing fixes the world. The genuine initialization constructor supplies the fixed singleton owner, stable empty history, installed global references and empty Source heap relation.
+
+The original accepted scalar/product encoder supplies argument representation at the body's receiving metadata and deep Source typing, including nested comptime wrappers. Reflection obtains its Source arguments internally. Forward Word preservation matches the independently supplied arguments using the existing interpretation's functionality. No equality between encoding and receiving metadata is assumed.
+
+The three final public endpoints consume these producers and retain staged outcomes, exact native result/store, export session and full `ResultAt`. No supplied initial State, heap law, argument typing/representation or body execution law replaces the connection. Strict Lean checks, full build (5952 jobs), registered tests, kernel policy and independent review pass; all nine checked endpoints use only the standard three axioms.
+
+The new theorem covers a fresh initial bootstrap completed in one resume and `SimplePublic` inputs. It does not yet cover multiple bootstrap resumes, restored/used sessions, handles or metadata-bearing inputs. The latter need a raw Source typing argument beyond accepted runtime projection: retaining an actual proxy's raw inner type can differ from the expected type after comptime erasure. Static family coverage and all-pass composition also remain open. Percentage estimates are unchanged.
+
 ## Verified cached-root and public outcome connection (2026-10-12)
 
 Commits `6199f27d` and `a3d8877f` connect real public execution receipts to cached-root proofs. The supported ordinary sequence family constructs its strict recursive body laws internally and reaches the actual named root selected by public startup. Public success/failure reflection retains the native result/store, staged Source application, complete returned heap/caller relation and exact export session. Word preservation reaches successful public export with sufficient native fuel and a positive output budget.

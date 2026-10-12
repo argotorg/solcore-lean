@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `6199f27d` and `a3d8877f`. Public execution receipts connect recursive body proofs to cached roots and actual public outcomes. |
-| Latest completed normal verification | Strict Lean, full build (5948 jobs), registered tests, kernel policy and independent review pass. The checked endpoints use only the standard three axioms. |
-| Working implementation | Supported ordinary sequence packets and caller/child readiness feed cached-root preservation/reflection, public success/failure reflection, and public Word preservation. |
-| Latest proof scope | Supported ordinary callers and recursive sequence bodies, actual named roots, and their public outcomes. Initial owned state, represented inputs and static family support remain prerequisites. |
-| Current implementation priority | Derive these prerequisites from actual initialization and compiler output, then extend the same connected family. Add helpers when a concrete consumer needs them. |
+| Latest normally verified implementation commits | `9b6cb2c7` and `6976ab8c`. Actual fresh bootstrap and input encoding now construct the initial state and argument conditions consumed by public semantics. |
+| Latest completed normal verification | Strict Lean, full build (5952 jobs), registered tests, kernel policy and independent review pass. The checked endpoints use only the standard three axioms. |
+| Working implementation | Public success/failure reflection and Word preservation derive the initial owned state, stable rows, global references, heap relations and argument typing/representation internally. |
+| Latest proof scope | Supported ordinary bodies, a fresh bootstrap completed in one resume, and scalar/product public inputs. Authentic static family support and startup receipts remain explicit. |
+| Current implementation priority | Extend this connected boundary to resumed initialization and further input families, and derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Actual initialization and encoded inputs (2026-10-12)
+
+Commits `9b6cb2c7` and `6976ab8c` remove the supplied initial-state and argument conditions from the supported fresh public entry. `Artifact.bootstrapWithReceipt` retains the original fresh checkpoint. Its ready result identifies the same indexed session used by startup, so the actual completed bootstrap fixes the entire initial store and world.
+
+The existing initialization constructor supplies the owned pool, stable rows, real global references and empty Source heap correspondence. Successful scalar/product encoding supplies both Source argument typing and representation at the body's receiving registry. Public success/failure reflection recovers the Source arguments existentially; Word preservation matches the arguments in its supplied Source trace. These facts are consumed immediately by the existing public execution endpoints, retaining the full staged result and returned state.
+
+This connection covers a fresh initial bootstrap completed at one supplied fuel and `SimplePublic` inputs: unit, Boolean, Word, integer and nested products. Multiple bootstrap resumes, restored or previously used sessions, handles and metadata-bearing inputs need further connections. Accepted runtime projection alone does not establish exact raw Source typing for every metadata-bearing value. Static inventory, supported body grammar, compiler policy, diagnostics and genuine startup receipts remain explicit. The final theorem across all compiler passes remains unfinished; the percentage estimates are unchanged.
 
 ### Cached roots and public execution outcomes (2026-10-12)
 
@@ -24,7 +32,7 @@ Commits `6199f27d` and `a3d8877f` extend the ordinary caller connection to the a
 
 `preserves_root` and `reflects_root` consume the mixed recursive body proof internally. `public_run_succeeded_reflects` and `public_run_failed_reflects` connect the actual public result to that same body, staged Source application, native result/store, full returned heap/caller relation and exact indexed export session. `public_word_preserved` proves that a Source Word result exports successfully with sufficient execution fuel and a positive output budget. Input and output budgets remain independent. Stage rejection retains its staged outcome.
 
-The final staged endpoints do not assume a body execution law. They still require genuine initialized owned-pool/global-slot receipts, represented arguments and heaps, named/principal static support, compiler policy and diagnostics. Constructing these conditions from complete initialization and compiler output is the next integration task. Broader grammar, unrestricted methods/generalized-local bodies and composition across specialization, evidence and comptime remain unfinished. The progress estimates are unchanged.
+The final staged endpoints do not assume a body execution law. This lower-level API requires genuine initialized owned-pool/global-slot receipts, represented arguments and heaps, named/principal static support, compiler policy and diagnostics. The initialized consumer above now constructs its state and argument conditions for the fresh scalar/product boundary. Broader grammar, unrestricted methods/generalized-local bodies and composition across specialization, evidence and comptime remain unfinished. The progress estimates are unchanged.
 
 ### Connected ordinary sequence callers (2026-10-12)
 
