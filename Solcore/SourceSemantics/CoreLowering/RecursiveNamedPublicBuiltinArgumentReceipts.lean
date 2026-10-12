@@ -18,6 +18,43 @@ open CallableIndexedOwnedFunctionValues (Header Key)
 /-- A builtin argument at its actual startup index has the complete receiving
 function representation and deep Source typing, for any Source heap/context.
 The caller still selects its actual raw parameter type independently. -/
+theorem StartAt.builtin_argument_represents_after
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (prepared : Recipe.prepare compiled = .ok recipe)
+    (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
+    (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (mapping : LocationMap) (context : SourceSemantics.Context) (heap : Dynamic.Heap)
+    {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
+    {function : BuiltinFunctionId} {issuanceFuel : Nat}
+    (issuance : before.BuiltinIssuedAt function issuanceFuel issued)
+    {session : Session artifact}
+    (continued : issued.session.IssuanceChain session)
+    {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} {root : Root recipe.compiled}
+    {world : StoreTyping} {store : Store} {native : Environment}
+    {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt session key arguments fuel checkpoint recipe root world store native encodedValues)
+    {handle : Handle} (handleValue : issued.value = .function handle)
+    {index : Nat} (found : arguments[index]? = some (.function handle)) :
+    ∃ callable, before.SameRuntime issued.session ∧ issued.sourceType = function.type ∧
+      native[index]? = some callable ∧
+      ValueRep compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)
+        mapping world function.type (.builtin ⟨function⟩) callable
+        (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) ∧
+      Dynamic.ValueHasType context heap (.builtin ⟨function⟩) function.type := by
+  obtain ⟨expected, callable, same, sourceType, _budget, factory, selected⟩ :=
+    RecursiveNamedPublicIssuedFunctionInputs.StartAt.builtin_argument_after issuance continued started handleValue found
+  obtain ⟨actualType, builtinIndex, identity, descriptor, inventory, number, literal⟩ :=
+    factory.prepared prepared
+  refine ⟨callable, same, sourceType.trans actualType, selected, ?_, .builtin ⟨function⟩⟩
+  rw [literal]
+  exact .function (.builtin (.prior (.prior (.builtin
+    (CallableIndexedBuiltinValues.Represents.builtin inventory number descriptor .nil)))))
+
+/-- The original single-issuance interface is the empty continuation case. -/
 theorem StartAt.builtin_argument_represents
     {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
     (prepared : Recipe.prepare compiled = .ok recipe)
@@ -43,14 +80,8 @@ theorem StartAt.builtin_argument_represents
         mapping world function.type (.builtin ⟨function⟩) callable
         (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) ∧
       Dynamic.ValueHasType context heap (.builtin ⟨function⟩) function.type := by
-  obtain ⟨expected, callable, same, sourceType, _budget, factory, selected⟩ :=
-    RecursiveNamedPublicIssuedFunctionInputs.StartAt.builtin_argument issuance started handleValue found
-  obtain ⟨actualType, builtinIndex, identity, descriptor, inventory, number, literal⟩ :=
-    factory.prepared prepared
-  refine ⟨callable, same, sourceType.trans actualType, selected, ?_, .builtin ⟨function⟩⟩
-  rw [literal]
-  exact .function (.builtin (.prior (.prior (.builtin
-    (CallableIndexedBuiltinValues.Represents.builtin inventory number descriptor .nil)))))
+  exact StartAt.builtin_argument_represents_after prepared headers keys bodyRegistry registry faults profile mapping
+    context heap issuance (.refl _) started handleValue found
 
 /-- The actual single builtin handle is passed through the root's complete raw
 parameter signature. The receiving argument relation and Source typing are

@@ -80,7 +80,7 @@ private theorem selected_slot {compiled : SourceCoreUnifiedCompilation.Compiled}
 /-- Actual named issuance, startup and the bootstrap-owned capture construct
 one complete receiving function representation. Raw Source typing is derived
 for the selected caller's declaration context. -/
-theorem StartAt.named_argument_represents
+theorem StartAt.named_argument_represents_after
     {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
     (prepared : Recipe.prepare compiled = .ok recipe)
     (inputs : List (Input compiled)) (rows : Inventory inputs)
@@ -94,10 +94,12 @@ theorem StartAt.named_argument_represents
     (callerHeader : Header compiled (Program.ofChecked compiled.sourceProgram))
     {artifact : Artifact} {before : Session artifact} {issued : Completion artifact} {issuanceFuel : Nat}
     (issuance : before.NamedIssuedAt packet.header.named.signature.key issuanceFuel issued)
+    {session : Session artifact}
+    (continued : issued.session.IssuanceChain session)
     {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat}
     {checkpoint : Checkpoint artifact} {root : Root recipe.compiled}
     {native : Environment} {encodedValues : SourceCoreCompatibleValues.Context}
-    (started : StartAt issued.session key arguments fuel checkpoint recipe root
+    (started : StartAt session key arguments fuel checkpoint recipe root
       ((RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type)
       (RecursiveNamedCatalogPreparedInitialization.store compiled) native encodedValues)
     {handle : Handle} (handleValue : issued.value = .function handle)
@@ -117,7 +119,7 @@ theorem StartAt.named_argument_represents
   have sameCompiled := Recipe.prepare_compiled prepared
   cases sameCompiled
   obtain ⟨expected, callable, _same, _sourceType, _budget, factory, argument⟩ :=
-    RecursiveNamedPublicIssuedFunctionInputs.StartAt.named_argument issuance started handleValue found
+    RecursiveNamedPublicIssuedFunctionInputs.StartAt.named_argument_after issuance continued started handleValue found
   obtain ⟨signature, slot, specialized, location, closure, identity, descriptor,
       signatureAt, keyAt, record, sourceType, slotAt, number, literal, projection⟩ :=
     factory.prepared prepared
@@ -181,6 +183,44 @@ theorem StartAt.named_argument_represents
         packet.header.named.specialized input.prepared.available)).instantiation.type := rfl
   rw [sourceTypeEq.trans certified.callable_type] at related ⊢
   exact .function related
+
+/-- The original single-issuance interface is the empty continuation case. -/
+theorem StartAt.named_argument_represents
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (prepared : Recipe.prepare compiled = .ok recipe)
+    (inputs : List (Input compiled)) (rows : Inventory inputs)
+    {input : Input compiled} (packet : Issued input) (member : Inventory.HasRow packet rows)
+    (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (caller : State (headers rows) (keys compiled)
+      ⟨[], [], (RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type,
+        ⟨[]⟩, RecursiveNamedCatalogPreparedInitialization.store compiled,
+        SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed⟩)
+    (callerHeader : Header compiled (Program.ofChecked compiled.sourceProgram))
+    {artifact : Artifact} {before : Session artifact} {issued : Completion artifact} {issuanceFuel : Nat}
+    (issuance : before.NamedIssuedAt packet.header.named.signature.key issuanceFuel issued)
+    {key : SourceCoreIndexedSession.Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} {root : Root recipe.compiled}
+    {native : Environment} {encodedValues : SourceCoreCompatibleValues.Context}
+    (started : StartAt issued.session key arguments fuel checkpoint recipe root
+      ((RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type)
+      (RecursiveNamedCatalogPreparedInitialization.store compiled) native encodedValues)
+    {handle : Handle} (handleValue : issued.value = .function handle)
+    {index : Nat} (found : arguments[index]? = some (.function handle))
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
+    ∃ callable, native[index]? = some callable ∧
+      ValueRep compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions (headers rows) (keys compiled) bodyRegistry faults profile)
+        [] ((RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type)
+        packet.header.named.specialized.function.type
+        (.global (CallableNamedReversal.global (CallableNamedMetadata.global
+          packet.header.named.specialized input.prepared.available))) callable
+        (CallableContract.functionType packet.header.named.signature.parameterType packet.header.named.signature.resultType) ∧
+      Dynamic.ValueHasType callerHeader.function.context ⟨[]⟩
+        (.global (CallableNamedReversal.global (CallableNamedMetadata.global
+          packet.header.named.specialized input.prepared.available))) packet.header.named.specialized.function.type := by
+  exact StartAt.named_argument_represents_after prepared inputs rows packet member bodyRegistry registry faults profile
+    caller callerHeader issuance (.refl _) started handleValue found wellFormed
 
 /-- The actual single named handle is passed through the root's complete raw
 parameter signature. The receiving argument relation and Source typing are
