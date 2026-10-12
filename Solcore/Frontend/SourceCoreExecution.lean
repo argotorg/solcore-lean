@@ -1137,3 +1137,34 @@ theorem Session.startHandlePacked_indexed {compiled : Compiled} {artifact : Arti
 
 
 end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+/-- A genuine public resume above the native Word bound exports the same Word
+at every positive output budget, including runtime-compatible raw types. -/
+theorem Checkpoint.ResumeAt.runtime_word_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    {expected : TypeSystem.Ty} {word : Core.Word} {store : Core.Store}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (completed : indexed.NativeDone fuel (.inRight .word (.word word)) store)
+    (requested : indexed.ResultTypeAt expected)
+    (wordResult : SourceCoreRawMetadata.runtimeType expected = .word)
+    (positive : 0 < boundaryFuel) :
+    ∃ completion : Completion artifact, outcome = .succeeded completion ∧
+      completion.value = .word word := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨actualOutcome, resumed, returned⟩ := receipt
+      obtain ⟨actual, succeeded, publicValue⟩ :=
+        resumed.runtime_word_succeeded completed requested wordResult positive
+      rw [succeeded] at returned
+      exact ⟨wrapCompletion actual, returned.symm, publicValue⟩
+
+end Solcore.Frontend.SourceCoreExecution

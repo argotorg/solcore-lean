@@ -66,6 +66,16 @@ inductive Addition {artifact : Artifact} (checkpoint : Checkpoint artifact)
       (selected : RecursiveNamedPublicOutputSelections.Selected selection source payload nativeType fuel entries) :
       Addition checkpoint completion fuel sourceType nativeType outcome native entries
 
+  | selectCompatible {source : Dynamic.Value} {payload : Core.Value} {entries : List Entry}
+      {expected : TypeSystem.Ty}
+      (requested : checkpoint.ResultTypeAt expected)
+      (compatible : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType expected)
+      (sourceValue : outcome = .value source)
+      (nativeValue : native = .inRight .word payload)
+      (selection : RecursiveNamedPublicOutputSelections.Selection sourceType completion.value)
+      (selected : RecursiveNamedPublicOutputSelections.Selected selection source payload nativeType fuel entries) :
+      Addition checkpoint completion fuel sourceType nativeType outcome native entries
+
 inductive History (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
     (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
     (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
@@ -168,7 +178,7 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
       {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
       {argument : SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
       {generation : SourceCorePublicValues.ExportGeneration} {completion : Completion artifact}
-      {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+      {sourceType : TypeSystem.Ty} {nativeType : Core.Ty} {added : List Entry}
       {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
       {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
       (started : checkpoint.HandleStart session handle argument inputFuel)
@@ -178,9 +188,10 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
       (reached : Caller headers keys finalMap finalWorld after finalStore)
       (post : Relates caller reached ∧
         CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
-          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context sourceType outcome reached) :
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context sourceType outcome reached)
+      (addition : Addition checkpoint completion outputFuel sourceType nativeType outcome native added) :
       History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
-        reached entries
+        reached (entries ++ added)
   | packed_failed {session : Session artifact} {mapping world heap store}
       {caller : Caller headers keys mapping world heap store} {entries : List Entry}
       (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
@@ -278,6 +289,60 @@ private theorem addition_entries {artifact : Artifact} {checkpoint : Checkpoint 
       obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
       exact RecursiveNamedPublicOutputSelections.Selected.current selection represented valueTyped encodedAt rfl payloadAt selected
 
+
+  | @selectCompatible source payload entries expected requested compatible sourceValue nativeValue selection selected =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursiveNamedPublicReturnedValues.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
+      exact RecursiveNamedPublicOutputSelections.Selected.current selection represented valueTyped encodedAt compatible payloadAt selected
+
+private theorem packed_addition_entries {artifact : Artifact} {checkpoint : Checkpoint artifact}
+    {executionFuel outputFuel : Nat} {generation : SourceCorePublicValues.ExportGeneration}
+    {completion : Completion artifact} {added : List Entry}
+    {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+      anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults)
+    (addition : Addition checkpoint completion outputFuel sourceType nativeType outcome native added) :
+    EntriesAt (functions := functions) (receiving := receiving) (anchor := anchor)
+      completion.session finalMap finalWorld after added := by
+  cases addition with
+  | skip => intro entry member; cases member
+  | @remember source payload handle requested sourceValue nativeValue handleValue =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      rw [handleValue] at imported
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursivePublicApplicationResult.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      intro entry member
+      have sameEntry := List.mem_singleton.mp member
+      subst entry
+      exact ⟨imported, represented, valueTyped⟩
+  | @select source payload entries requested sourceValue nativeValue selection selected =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursivePublicApplicationResult.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
+      exact RecursiveNamedPublicOutputSelections.Selected.current selection represented valueTyped encodedAt rfl payloadAt selected
+  | @selectCompatible source payload entries expected requested compatible sourceValue nativeValue selection selected =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursivePublicApplicationResult.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
+      exact RecursiveNamedPublicOutputSelections.Selected.current selection represented valueTyped encodedAt compatible payloadAt selected
+
 /-- Every retained handle is represented at the current actual caller. This
 projection derives all entry laws by induction over genuine successful calls. -/
 theorem History.current {artifact : Artifact} {session : Session artifact} {entries : List Entry}
@@ -309,16 +374,18 @@ theorem History.current {artifact : Artifact} {session : Session artifact} {entr
       exact ⟨failed.encodes_function started.original imported,
         represented.extend (.refl _) result.2.2.2.1 result.2.2.2.2.1,
         typed.mono result.2.2.2.2.2.2.1⟩
-  | packed_next prior started succeeded result reached post ih =>
+  | packed_next prior started succeeded result reached post addition ih =>
       obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
       obtain ⟨_source, _outcome, _represented, heaps, worldEq, _returned, _related, _stable, typed, _valueTyped⟩ :=
         RecursivePublicApplicationResult.returned_value result decoded
       refine ⟨worldEq.symm ▸ succeeded.native_at.2, heaps, post.2.rows, typed, ?_⟩
       intro entry member
-      obtain ⟨imported, represented, valueTyped⟩ := ih.2.2.2.2 entry member
-      exact ⟨succeeded.encodes_function_from started.initial_registry imported,
-        represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
-        valueTyped.mono result.2.2.2.2.2.1⟩
+      rcases List.mem_append.mp member with old | added
+      · obtain ⟨imported, represented, valueTyped⟩ := ih.2.2.2.2 entry old
+        exact ⟨succeeded.encodes_function_from started.initial_registry imported,
+          represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
+          valueTyped.mono result.2.2.2.2.2.1⟩
+      · exact packed_addition_entries succeeded result addition entry added
   | packed_failed prior started failed result reached post heapTyped ih =>
       have heaps := result.2.1
       have nativeAt : _ := heaps.runtime_hasTypes.world_eq.symm ▸ failed.native_at
@@ -367,7 +434,50 @@ theorem History.after_packed_success
       History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
         reached entries := by
   obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
-  exact ⟨reached, related, .packed_next history started succeeded result reached ⟨related, post⟩⟩
+  refine ⟨reached, related, ?_⟩
+  simpa only [List.append_nil] using History.packed_next history started succeeded result reached ⟨related, post⟩ Addition.skip
+
+/-- Selected direct output functions join the existing history at the same
+returned caller. The public request may erase annotations from the semantic
+result; the real reimport is related by runtime type compatibility. -/
+theorem History.collect_packed_success
+    {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
+    {argument : SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
+    {generation : SourceCorePublicValues.ExportGeneration} {completion : Completion artifact}
+    {sourceType expected : TypeSystem.Ty} {nativeType : Core.Ty}
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (started : checkpoint.HandleStart session handle argument inputFuel)
+    (requested : checkpoint.ResultTypeAt expected)
+    (compatible : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType expected)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+      anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults)
+    (selection : RecursiveNamedPublicOutputSelections.Selection sourceType completion.value) :
+    ∃ (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (source : Dynamic.Value) (payload : Core.Value) (added : List Entry),
+      outcome = .value source ∧ native = .inRight .word payload ∧
+      RecursiveNamedPublicOutputSelections.Selected selection source payload nativeType outputFuel added ∧
+      added.map Entry.handle = selection.handles ∧ Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached (entries ++ added) := by
+  obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
+  have nativeValue : native = .inRight .word payload := by
+    have represented := result.1
+    cases represented with
+    | value represented =>
+        simp only [LanguageResult.decode?, Option.some.injEq, LanguageResult.Outcome.succeeded.injEq] at decoded
+        subst payload
+        rfl
+    | fault represented => cases decoded
+  obtain ⟨source, sourceValue, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+    RecursivePublicApplicationResult.returned_value result decoded
+  obtain ⟨_sourceType, encoded, encodedAt, payloadAt⟩ := succeeded.reimports_payload requested decoded
+  obtain ⟨added, selected, handles, _meanings⟩ := selection.collect represented valueTyped encodedAt compatible payloadAt
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
+  exact ⟨reached, source, payload, added, sourceValue, nativeValue, selected, handles, related,
+    .packed_next history started succeeded result reached ⟨related, post⟩
+      (.selectCompatible requested compatible sourceValue nativeValue selection selected)⟩
 
 /-- A failed direct invocation keeps all earlier handles at its returned heap.
 The public semantic consumer derives heap typing from the Source fault trace. -/

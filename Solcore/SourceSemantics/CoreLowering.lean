@@ -1496,6 +1496,10 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallablePu
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableHistory
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableFailures
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableOutputHistory
+
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectWordPreservation
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

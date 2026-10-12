@@ -4946,3 +4946,95 @@ theorem Session.BuiltinIssuedAt.function_source_type {artifact : Artifact} {sess
   exact issue_callable_function_source_type accepted functionValue
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- Word export succeeds at a genuinely positive boundary budget. The
+original decoder and encoder retain exactly the supplied callable slots. -/
+theorem exportValue_runtime_word_success {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected : TypeSystem.Ty}
+    (positive : 0 < fuel) (wordResult : SourceCoreRawMetadata.runtimeType expected = .word) (value : Core.Word) :
+    ∃ exported : Exported (artifact := artifact) world authority fuel values expected (.word value),
+      exportValue authority generation fuel values slots expected (.word value) = .ok exported ∧
+      exported.value = .word value := by
+  cases fuel with
+  | zero => omega
+  | succ rest =>
+    let exported : Exported (artifact := artifact) world authority (rest + 1) values expected (.word value) :=
+      ⟨.word value, slots, .pure values.registry (.word value), by
+        simp [encodeRaw, wordResult, TypeSystem.Ty.word], rfl⟩
+    refine ⟨exported, ?_, rfl⟩
+    have encoded := exported.reencoded
+    simp only [exported] at encoded
+    unfold exportValue
+    simp only [decodeRaw, wordResult, TypeSystem.Ty.word, pure, Except.pure, bind, Except.bind]
+    split
+    · rename_i error failed
+      rw [encoded] at failed
+      cases failed
+    · rename_i actual accepted
+      have same := Except.ok.inj (accepted.symm.trans encoded)
+      subst actual
+      split
+      · rfl
+      · rename_i impossible
+        exact False.elim (impossible rfl)
+
+/-- An actual native Word completion and actual requested Word type close
+this finite export branch; generic native completion is not enough. -/
+theorem Checkpoint.native_runtime_word_succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {value : Core.Word} {store : Core.Store} {expected : TypeSystem.Ty}
+    (completed : checkpoint.NativeDone fuel (.inRight .word (.word value)) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (wordResult : SourceCoreRawMetadata.runtimeType expected = .word) (positive : 0 < boundaryFuel) :
+    ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word (.word value)) store completed =
+        .succeeded completion ∧
+      checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word (.word value)) store completion ∧
+      completion.value = .word value := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word (.word value)) store at completed
+  have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+    obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+    obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+    simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+  let registry := checkpoint.registry.weaken extension
+  obtain ⟨exported, exportedEq, publicEq⟩ := exportValue_runtime_word_success
+    (authority := checkpoint.origin.authority) (generation := generation)
+    (values := checkpoint.values) (slots := registry) (expected := checkpoint.request.result) positive (by rw [requested]; exact wordResult) value
+  have actual : ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word (.word value)) store completed =
+        .succeeded completion ∧ completion.value = .word value := by
+    unfold complete
+    simp only [Core.LanguageResult.decode?]
+    rw [exportedEq]
+    exact ⟨_, rfl, publicEq⟩
+  obtain ⟨completion, succeeded, publicEq⟩ := actual
+  exact ⟨completion, succeeded, checkpoint.complete_succeeded_receipt completed succeeded, publicEq⟩
+
+
+/-- A retained resume action whose same native execution returns a Word
+successfully exports that Word at the actual positive boundary budget. -/
+theorem Checkpoint.ResumeAt.runtime_word_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {value : Core.Word} {store : Core.Store} {expected : TypeSystem.Ty}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (completed : checkpoint.NativeDone fuel (.inRight .word (.word value)) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (wordResult : SourceCoreRawMetadata.runtimeType expected = .word) (positive : 0 < boundaryFuel) :
+    ∃ completion : Completion artifact, outcome = .succeeded completion ∧
+      completion.value = .word value := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word (.word value)) store at completed
+  rcases receipt with ⟨generation, native, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨completion, succeeded, exported, publicValue⟩ :=
+      checkpoint.native_runtime_word_succeeded_receipt completed requested wordResult positive (generation := generation)
+    exact ⟨completion, same.symm.trans succeeded, publicValue⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+
+end Solcore.Frontend.SourceCoreIndexedSession
