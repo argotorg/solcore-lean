@@ -1,10 +1,11 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedBodyPorts
 
-/-! Actual named compiler packets select terminal or lexical static support.
-Both alternatives supply the same body ports from strict expression children;
+/-! Actual named compiler packets select terminal, lexical or branching static support.
+All alternatives supply the same body ports from strict expression children;
 no execution law belongs to the static support. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -32,6 +33,9 @@ def Support
           expression, receipt, certificate, certifies⟩ semanticFaults
   | .lexical receipt =>
       CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Support
+        headers keys bodyRegistry header stages receipt semanticFaults
+  | .branching receipt =>
+      CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
         headers keys bodyRegistry header stages receipt semanticFaults
 
 variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -78,6 +82,9 @@ theorem Support.preserves {budget : Nat}
     | lexical receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.preserves
         static aligned.globals profile selected layouts children
+    | branching receipt =>
+      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves
+        static aligned.globals profile selected layouts children
 
 include static wellFormed selected in
 theorem Support.reflects {budget : Nat}
@@ -106,6 +113,9 @@ theorem Support.reflects {budget : Nat}
           (profile := profile) (faults := faults) support selected budget
     | lexical receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.reflects
+        static aligned.globals profile selected layouts children
+    | branching receipt =>
+      exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects
         static aligned.globals profile selected layouts children
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport

@@ -1,8 +1,9 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 
 /-! A named body's static coverage retains the actual prepared Header and its
-accepted compiler action. Terminal and lexical statement receipts share named
+accepted compiler action. Terminal, lexical and branching statement receipts share named
 entry, application and caller restoration. Neither alternative stores body
 meaning or an expected execution result. -/
 set_option autoImplicit false
@@ -25,6 +26,7 @@ inductive Compilation (header : Header compiled (Program.ofChecked compiled.sour
           (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) expression header.reasonAt = .ok child →
         certificate (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) expression child)
   | lexical (receipt : CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.Receipt header)
+  | branching (receipt : CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.Receipt header)
 
 structure Body (header : Header compiled (Program.ofChecked compiled.sourceProgram)) where
   row : SourceSpecialization.SpecializedFunction
