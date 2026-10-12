@@ -895,6 +895,47 @@ def validateBuiltinFunctionCall (source : TypedSource) (node : ExpressionNode)
     Except Error Unit :=
   validateBuiltinFunctionCallWith id source node callee arguments function
 
+private theorem builtin_argument_validation_congr {error : Type}
+    (lift : Error → error) {source target : TypedSource}
+    (owner : source.owner = target.owner) (function : BuiltinFunctionId)
+    (index : Nat) (types : List Ty) (arguments : List ExpressionId)
+    (lookups : ∀ argument, argument ∈ arguments →
+      source.lookupNode? argument.occurrence = target.lookupNode? argument.occurrence) :
+    validateBuiltinFunctionArgumentTypesWith lift source function index types arguments =
+      validateBuiltinFunctionArgumentTypesWith lift target function index types arguments := by
+  induction types generalizing index arguments with
+  | nil => cases arguments <;> simp [validateBuiltinFunctionArgumentTypesWith, owner]
+  | cons type types ih =>
+      cases arguments with
+      | nil => simp [validateBuiltinFunctionArgumentTypesWith, owner]
+      | cons argument arguments =>
+          have head := lookups argument (by simp)
+          have tail : ∀ next, next ∈ arguments →
+              source.lookupNode? next.occurrence = target.lookupNode? next.occurrence :=
+            fun next member => lookups next (by simp [member])
+          have lookup : lookupExpression source argument = lookupExpression target argument := by
+            simp only [lookupExpression, head]
+          simp only [validateBuiltinFunctionArgumentTypesWith, lookup]
+          cases found : lookupExpression target argument with
+          | error reason => rfl
+          | ok node => simp only [Except.mapError, bind, Except.bind, ih (index + 1) arguments tail]
+
+/-- Validation depends only on the owner and the actual used node lookups.
+Missing nodes and statement nodes retain their distinct diagnostics. -/
+theorem validateBuiltinFunctionCall_congr {source target : TypedSource}
+    (owner : source.owner = target.owner) (node : ExpressionNode)
+    (callee : ExpressionId) (arguments : List ExpressionId) (function : BuiltinFunctionId)
+    (calleeLookup : source.lookupNode? callee.occurrence = target.lookupNode? callee.occurrence)
+    (argumentLookups : ∀ argument, argument ∈ arguments →
+      source.lookupNode? argument.occurrence = target.lookupNode? argument.occurrence) :
+    validateBuiltinFunctionCall source node callee arguments function =
+      validateBuiltinFunctionCall target node callee arguments function := by
+  have lookup : lookupExpression source callee = lookupExpression target callee := by
+    simp only [lookupExpression, calleeLookup]
+  have argumentsEqual := builtin_argument_validation_congr id owner function 0
+    function.parameterTypes arguments argumentLookups
+  simp only [validateBuiltinFunctionCall, validateBuiltinFunctionCallWith, lookup, argumentsEqual]
+
 mutual
 
 private def evaluateStagedIntegerFuelWith {error : Type}

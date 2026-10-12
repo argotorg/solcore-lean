@@ -115,6 +115,11 @@ theorem preserves_parent_or_global (budget : Nat)
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
       invocation context environment before id outcome after)
@@ -140,7 +145,7 @@ theorem preserves_parent_or_global (budget : Nat)
     · rcases CallableIndexedOwnedPreparedStagedMixedClosureUserDispatch.preserves_closure_or_global
           bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
           wellFormed runtime covers locals sourceEq tree unique parentTyped found guardFrame actualFunctionType
-          packets supported budget bodyChildren user.1 calleeTrace accepted argumentsTrace called (Nat.le_of_lt strict)
+          packets supported budget bodyChildren canonicalChildren user.1 calleeTrace accepted argumentsTrace called (Nat.le_of_lt strict)
           user.2 with closureParent | global
       · exact .inl closureParent
       · exact .inr ⟨calleeSize, argumentsSize, applicationSize, sourceValue, calleeHeap,
@@ -166,6 +171,11 @@ theorem reflects_parent_or_global (budget : Nat)
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
@@ -192,7 +202,7 @@ theorem reflects_parent_or_global (budget : Nat)
     · exact CallableIndexedOwnedPreparedStagedMixedClosureUserDispatch.reflects_closure_or_global
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         wellFormed runtime covers locals sourceEq tree unique parentTyped found actualFunctionType
-        packets supported bodyChildren completed user
+        packets supported bodyChildren canonicalChildren completed user
     · exact .inl parent
 
 end PositiveModel

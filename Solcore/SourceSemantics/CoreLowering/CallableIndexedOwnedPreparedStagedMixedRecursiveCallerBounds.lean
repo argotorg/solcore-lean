@@ -109,6 +109,11 @@ theorem preserves_reached
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
@@ -343,7 +348,7 @@ theorem preserves_reached
         bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
         actualFunctionType observations closurePackets closureSupport namedTerminals
         compiler port calleeCertified sequence size childMeaning
-        budget bodyChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
+        budget bodyChildren canonicalChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
@@ -356,6 +361,11 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
@@ -591,7 +601,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         bridge receiver stagePrepared rfl profile wellFormed runtime covers unique
         actualFunctionType observations closurePackets closureSupport namedTerminals
         stageEq compiler port calleeCertified sequence size childMeaning
-        budget bodyChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
+        budget bodyChildren canonicalChildren (namedChildren size within) within ⟨rfl, rfl, rfl⟩
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
@@ -605,6 +615,11 @@ theorem preserves
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
@@ -621,7 +636,7 @@ theorem preserves
     wellFormed runtime covers unique actualFunctionType observations extension semantic
     closurePackets closureSupport namedTerminals sameLedger runtimeLedger
     (fun current child code receipt _reached => uninitialized current child code receipt)
-    budget bodyChildren namedChildren root (.root (by simp))
+    budget bodyChildren canonicalChildren namedChildren root (.root (by simp))
 
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
@@ -635,6 +650,11 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
@@ -652,6 +672,6 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
     wellFormed runtime covers unique actualFunctionType observations extension semantic
     closurePackets closureSupport namedTerminals sameLedger runtimeLedger
     (fun current child code receipt _reached => uninitialized current child code receipt)
-    stageEq budget bodyChildren namedChildren root (.root (by simp))
+    stageEq budget bodyChildren canonicalChildren namedChildren root (.root (by simp))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds

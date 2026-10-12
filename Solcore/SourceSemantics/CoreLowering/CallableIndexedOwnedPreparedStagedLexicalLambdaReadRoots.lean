@@ -282,13 +282,14 @@ omit choice in
 /-- A packet and its static support are chosen together inside Prop from the
 retained lowerer. No classical selector or independently assumed Tree is used. -/
 theorem of_reads
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     (shape : CallableIndexedOwnedPreparedStagedLexicalTree.Shape function.source function.body)
     (syntaxTree : GenericLexicalStatements.Syntax function.source (Read function.source)
       support.body.context true function.body function.resultType)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Packet code stages,
       CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Support
-        code support.body.toContext stages packet faults) := by
+        headers code support.body.toContext stages packet faults) := by
   obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedLexicalLambdaCompilerReceipts.choose
     code support.caller.named provenance.policy_recipe.body_recipe shape child selected
   exact ⟨⟨.lexical choice.packet,

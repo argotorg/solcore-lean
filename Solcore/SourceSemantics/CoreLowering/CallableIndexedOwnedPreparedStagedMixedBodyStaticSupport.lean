@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
@@ -159,6 +160,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {administrative : Core.Context}
     (code : Code compiled.indexed function scope administrative)
     (stages : Staging.Recursive.Registry) where
+  | canonicalTerminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | discard (packet : Discard code stages)
   | sequence (packet : Sequence code stages)
@@ -297,12 +299,16 @@ context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
     {administrative : Core.Context}
+    (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)))
     (code : Code compiled.indexed function scope administrative)
     (inputs : CallableIndexedLambdaEntryPrefix.Context
       (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
     (stages : Staging.Recursive.Registry) (packet : Packet code stages)
     (semanticFaults : FunctionCalls.FaultRep) : Type :=
   match packet with
+  | .canonicalTerminal terminal =>
+      CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.SelectedCanonicalBody
+        (headers := headers) code inputs stages terminal semanticFaults
   | .terminal terminal => SelectedBody code inputs stages terminal semanticFaults
   | .discard discard => DiscardSupport code inputs stages discard semanticFaults
   | .sequence sequence => SequenceSupport code inputs stages sequence semanticFaults
@@ -340,9 +346,9 @@ def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     (packet : PacketFor association stages) : Type :=
   match association, packet with
   | .ordinary _ _ code _ support _ _ _ _ _ _, packet =>
-      Support code support.body.toContext stages packet semanticFaults
+      Support headers code support.body.toContext stages packet semanticFaults
   | .principal _ _ code _ support _ _ _ _ _ _, packet =>
-      Support code support.body.toContext stages packet semanticFaults
+      Support headers code support.body.toContext stages packet semanticFaults
 
 section NumericProjections
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}

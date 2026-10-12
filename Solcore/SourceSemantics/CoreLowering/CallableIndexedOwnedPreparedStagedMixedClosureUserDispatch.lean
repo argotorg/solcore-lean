@@ -93,6 +93,11 @@ theorem preserves_closure_or_global
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {calleeSize argumentsSize applicationSize : Nat}
     {sourceValue : Dynamic.Value} {calleeHeap argumentsHeap after : Dynamic.Heap}
     {sources : List Dynamic.Value} {outcome : Staging.Recursive.Outcome}
@@ -158,7 +163,7 @@ theorem preserves_closure_or_global
           bridge profile compiler prepared sourceParent occurrence initial reached related admitted
           heaps maps worlds frame heapMetadata dispatch selected count accepted wellFormed runtime covers
           (locals.mono calleeMetadata) calleeHeapTyped typing rawCallee actualFunctionType relatedCallee
-          represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace called within
+          represented bundle originalResult packets supported budget bodyChildren canonicalChildren calleeTrace argumentsTrace called within
           calleeNative firstGate argumentsNative)
       · have physical := CallableIndexedOwnedStoredClosureArityBoundary.parameter_count dispatch selected
         have valuesCount := CallableIndexedOwnedPreparedSecondCallGateRejection.values_count argumentsTrace
@@ -223,6 +228,11 @@ theorem reflects_closure_or_global
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (user : UserApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
@@ -278,7 +288,7 @@ theorem reflects_closure_or_global
             bridge profile compiler prepared sourceParent occurrence initial reached related admitted
             heaps maps worlds frame heapMetadata dispatch selected same accepted wellFormed runtime covers
             (locals.mono calleeMetadata) calleeHeapTyped typing rawCallee actualFunctionType relatedCallee
-            represented bundle originalResult packets supported budget bodyChildren calleeTrace argumentsTrace suffix
+            represented bundle originalResult packets supported budget bodyChildren canonicalChildren calleeTrace argumentsTrace suffix
             (Nat.le_of_lt strict)
         exact .inl ⟨sourceSize, outcome, after, returnedMap, returnedWorld, trace, completed.sound,
           resultRep, returnedHeaps, returnedMaps, returnedWorlds, returnedFrame, returnedMetadata,

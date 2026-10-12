@@ -93,13 +93,14 @@ omit choice in
 /-- The real lowerer and typed original syntax produce the same-model packet
 and all static support together, without selecting a proof as runtime data. -/
 theorem of_reads
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (Read function.source)
       support.body.context (.statements true function.body) function.resultType)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Packet code stages,
       CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Support
-        code support.body.toContext stages packet faults) := by
+        headers code support.body.toContext stages packet faults) := by
   obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
     code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
   exact ⟨⟨.branching choice.packet,

@@ -79,6 +79,7 @@ theorem preserves_both (size : Nat) :
         extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
         root.support.runtimeLedger root.support.uninitialized size
         (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
           CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
             (namedSupport named member) profile root.support.wellFormed selected extension
@@ -93,6 +94,7 @@ theorem preserves_both (size : Nat) :
         extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
         root.support.runtimeLedger root.support.uninitialized size
         (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
           CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
             (namedSupport named member) profile root.support.wellFormed selected extension
@@ -129,6 +131,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
         extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
         root.support.runtimeLedger root.support.uninitialized stageEq size
         (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
           CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
             (namedSupport named member) profile root.support.wellFormed selected extension
@@ -143,6 +146,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
         extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
         root.support.runtimeLedger root.support.uninitialized stageEq size
         (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize smaller => (ih childSize smaller).2)
         (fun childSize within named member {_child} selected =>
           CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
             (namedSupport named member) profile root.support.wellFormed selected extension

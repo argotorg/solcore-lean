@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds
@@ -66,6 +68,11 @@ theorem application_preserves (budget : Nat)
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {invocation : Staging.Recursive.Scope} {size : Nat}
     {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages size
@@ -88,6 +95,7 @@ theorem application_preserves (budget : Nat)
           context function.resultType outcome returned := by
   cases association with
   | ordinary owner captured code history support _origin _prefix globals referenceIndex _typed _provenance =>
+    rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
     obtain ⟨_metadata, carried⟩ := stable owner.position
@@ -96,6 +104,33 @@ theorem application_preserves (budget : Nat)
       rw [referenceIndex]
       exact globals.reference
     cases packet with
+    | canonicalTerminal terminal =>
+      have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+          (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+          headers owner.key.locations code.compilation.administrativePrefix capturedScope captured.canonical owner.key.frameLocation := by
+        rw [supported.prefix]
+        exact globals
+      have below : ∀ child, stages.Closure function child →
+          CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages child terminal.certificate callFaults budget := by
+        intro child selected
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact canonicalChildren childSize smaller (supported.rootAt child selected) owner
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix) point
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds.application_preserves
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          budget below trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | terminal terminal =>
       have below := CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.selected_body_preserves_below
         supported children (Nat.le_refl budget)
@@ -200,6 +235,7 @@ theorem application_preserves (budget : Nat)
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
+    rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
     obtain ⟨_metadata, carried⟩ := stable owner.position
@@ -208,6 +244,33 @@ theorem application_preserves (budget : Nat)
       rw [referenceIndex]
       exact globals.reference
     cases packet with
+    | canonicalTerminal terminal =>
+      have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+          (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+          headers owner.key.locations code.compilation.administrativePrefix capturedScope captured.canonical owner.key.frameLocation := by
+        rw [supported.prefix]
+        exact globals
+      have below : ∀ child, stages.Closure function child →
+          CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages child terminal.certificate callFaults budget := by
+        intro child selected
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact canonicalChildren childSize smaller (supported.rootAt child selected) owner
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix) point
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds.application_preserves
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          budget below trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | terminal terminal =>
       have below := CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.selected_body_preserves_below
         supported children (Nat.le_refl budget)
@@ -322,6 +385,11 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {invocation : Staging.Recursive.Scope} {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size [native, DataPatternValues.packValues values] store
       CallableIndexedLambdaCalls.applyPayload value finalStore) (within : size ≤ budget) :
@@ -343,6 +411,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
           context function.resultType outcome returned := by
   cases association with
   | ordinary owner captured code history support _origin _prefix globals referenceIndex _typed _provenance =>
+    rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
     obtain ⟨_metadata, carried⟩ := stable owner.position
@@ -351,6 +420,31 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
       rw [referenceIndex]
       exact globals.reference
     cases packet with
+    | canonicalTerminal terminal =>
+      have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+          (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+          headers owner.key.locations code.compilation.administrativePrefix capturedScope captured.canonical owner.key.frameLocation := by
+        rw [supported.prefix]
+        exact globals
+      have below : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages terminal.child terminal.certificate callFaults budget := by
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact canonicalChildren childSize smaller (supported.rootAt terminal.child terminal.selected) owner
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix) point
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds.application_reflects
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          terminal.child terminal.selected valid budget below completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | terminal terminal =>
       have below := CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.selected_body_reflects_below
         supported children (Nat.le_refl budget)
@@ -455,6 +549,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   | principal owner captured code history support _origin globals _leading referenceIndex _typed _provenance =>
+    rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
     obtain ⟨_metadata, carried⟩ := stable owner.position
@@ -463,6 +558,31 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
       rw [referenceIndex]
       exact globals.reference
     cases packet with
+    | canonicalTerminal terminal =>
+      have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
+          (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
+          headers owner.key.locations code.compilation.administrativePrefix capturedScope captured.canonical owner.key.frameLocation := by
+        rw [supported.prefix]
+        exact globals
+      have below : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix).forgetSlots
+          support.body.toContext.context
+          (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+          stages terminal.child terminal.certificate callFaults budget := by
+        intro childSize smaller current id lowered point
+        rw [supported.point] at point
+        exact canonicalChildren childSize smaller (supported.rootAt terminal.child terminal.selected) owner
+          (CallableIndexedOwnedExpressionHeads.canonicalCaller (headers := headers) owner code.compilation.administrativePrefix) point
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds.application_reflects
+          captured code history support.body.toContext functions owner caller code.compilation.administrativePrefix observed
+          stable raw.heaps typed terminal.receipt terminal.certifies represented heaps raw.captures reference carried
+          (CallableIndexedLambdaTemplatePermission.lambda_allowed code history) runtime
+          terminal.child terminal.selected valid budget below completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | terminal terminal =>
       have below := CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.selected_body_reflects_below
         supported children (Nat.le_refl budget)

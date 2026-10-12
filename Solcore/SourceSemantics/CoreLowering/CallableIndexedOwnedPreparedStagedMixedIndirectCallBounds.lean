@@ -114,6 +114,11 @@ theorem reflects_parent
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedTerminals : ∀ header, header ∈ headers → Body header)
     (namedChildren : ∀ header, ∀ _member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope},
@@ -131,7 +136,7 @@ theorem reflects_parent
       bridge receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations
-      budget children closurePackets closureSupport bodyChildren completed within with parent | global
+      budget children closurePackets closureSupport bodyChildren canonicalChildren completed within with parent | global
   · exact parent
   · exact CallableIndexedOwnedPreparedStagedSelectedNamedGlobalDispatch.reflects_global
       bridge profile compiler prepared initial sourceParent occurrence stagePrepared stageEq caller receiver
@@ -157,6 +162,11 @@ theorem preserves_parent (budget : Nat)
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedTerminals : ∀ header, header ∈ headers → Body header)
     (namedChildren : ∀ header, ∀ _member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
@@ -173,7 +183,7 @@ theorem preserves_parent (budget : Nat)
       bridge receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations
-      budget children closurePackets closureSupport bodyChildren trace within with parent | global
+      budget children closurePackets closureSupport bodyChildren canonicalChildren trace within with parent | global
   · exact parent
   · obtain ⟨calleeSize, argumentsSize, applicationSize, sourceValue, calleeHeap, argumentsHeap,
       sources, sizeEq, strict, globalPrefix⟩ := global

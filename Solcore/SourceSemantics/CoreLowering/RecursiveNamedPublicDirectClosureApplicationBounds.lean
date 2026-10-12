@@ -125,6 +125,17 @@ theorem reflects_unit {invocation : Staging.Recursive.Scope}
       (namedTerminals := namedTerminals) (namedSupport := namedSupport)
       (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
       (extension := extension) (semantic := semantic) rfl
+  have canonicalBodies : ∀ childSize,
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        callStages semanticFaults callFaults childSize :=
+    CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects_canonical
+      (profile := profile) (closurePackets := fun association => (chosen association).1)
+      (closureSupport := fun association => (chosen association).2)
+      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+      (extension := extension) (semantic := semantic) rfl
   obtain ⟨bindings, parameterCore, actualResult, ⟨association⟩, nativeType⟩ :=
     CallableIndexedOwnedContextualCellOrigins.PayloadOrigins.closure_member profile calleeRelated function rfl
   have nativeTypes := CallableIndexedOwnedStoredNativePackReceipts.callable_parameters nativeType
@@ -148,7 +159,7 @@ theorem reflects_unit {invocation : Staging.Recursive.Scope}
     maps, worlds, frame, metadata, returned, related, post⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects
       profile association (chosen association).1 (chosen association).2 caller raw represented heaps stable runtime
-      valid size (fun childSize _ => bodies childSize) evaluation (Nat.le_refl _)
+      valid size (fun childSize _ => bodies childSize) (fun childSize _ => canonicalBodies childSize) evaluation (Nat.le_refl _)
   rw [← resultEq, ← nativeTypes.2] at representedResult
   rw [← resultEq] at post
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace,

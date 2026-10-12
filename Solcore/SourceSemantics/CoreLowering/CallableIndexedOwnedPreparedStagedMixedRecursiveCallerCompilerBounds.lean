@@ -125,6 +125,12 @@ theorem preserves_compiled
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
       sameLedger runtimeLedger uninitialized size (fun childSize _ => bodies childSize)
+      (fun childSize _ =>
+        CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves_canonical
+          (profile := profile) (closurePackets := closurePackets) (closureSupport := closureSupport)
+          (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+          (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+          (extension := extension) (semantic := semantic) childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
           (namedSupport named member) profile wellFormed selected extension
@@ -179,6 +185,12 @@ theorem reflects_compiled
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
       sameLedger runtimeLedger uninitialized stageEq size (fun childSize _ => bodies childSize)
+      (fun childSize _ =>
+        CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects_canonical
+          (profile := profile) (closurePackets := closurePackets) (closureSupport := closureSupport)
+          (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+          (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+          (extension := extension) (semantic := semantic) stageEq childSize)
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
           (namedSupport named member) profile wellFormed selected extension

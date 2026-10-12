@@ -85,6 +85,11 @@ theorem preserves
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
@@ -115,6 +120,7 @@ theorem preserves
     wellFormed runtime covers actualFunctionType observations
     size children closurePackets closureSupport
     (fun childSize smaller => bodyChildren childSize (Nat.lt_of_lt_of_le smaller within))
+    (fun childSize smaller => canonicalChildren childSize (Nat.lt_of_lt_of_le smaller within))
     namedTerminals namedChildren trace (Nat.le_refl _)).2
 
 include bridge receiver stagePrepared sourceEq profile wellFormed runtime covers unique
@@ -137,6 +143,11 @@ theorem reflects
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     (namedChildren : ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
       CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
@@ -177,6 +188,7 @@ theorem reflects
       wellFormed runtime covers actualFunctionType observations
       stageEq size children closurePackets closureSupport
       (fun childSize smaller => bodyChildren childSize (Nat.lt_of_lt_of_le smaller within))
+    (fun childSize smaller => canonicalChildren childSize (Nat.lt_of_lt_of_le smaller within))
       namedTerminals actualNamedChildren completed (Nat.le_refl _)
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
     maps, worlds, frame, metadataExtended, reached, related, post⟩

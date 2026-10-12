@@ -104,6 +104,11 @@ theorem preserves_parent
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {calleeSize argumentsSize applicationSize : Nat}
     (calleeTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages calleeSize
       invocation context environment before callee (.value (.closure function)) calleeHeap)
@@ -148,7 +153,7 @@ theorem preserves_parent
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_preserves
       profile association (packets association) (supported association) (bridge.pool reached)
-      raw parameters heaps admitted.rows runtime budget children called within
+      raw parameters heaps admitted.rows runtime budget children canonicalChildren called within
   have suffix := CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix.preserves_suffix
     (actual := actual) (result := compiler.resultType)
     (unknown := compiled.indexed.ancestry.graph.inputs.callable.diagnostics.unknown)
@@ -213,6 +218,11 @@ theorem reflects_suffix
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
+    (canonicalChildren : ∀ childSize, childSize < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys)
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
+        stages semanticFaults callFaults childSize)
     {calleeSize argumentsSize : Nat}
     (calleeTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages calleeSize
       invocation context environment before callee (.value (.closure function)) calleeHeap)
@@ -251,7 +261,7 @@ theorem reflects_suffix
     applicationMaps, applicationWorlds, applicationFrame, applicationMetadata, ownedReturned, ownedRelated, ownedPost⟩ :=
     CallableIndexedOwnedPreparedStagedMixedClosureApplicationBounds.application_reflects
       profile association (packets association) (supported association) (bridge.pool reached)
-      raw parameters heaps admitted.rows runtime valid budget children application (Nat.le_of_lt strict)
+      raw parameters heaps admitted.rows runtime valid budget children canonicalChildren application (Nat.le_of_lt strict)
   obtain ⟨returned, samePool, callerRelated⟩ := bridge.restore reached ownedReturned
     applicationMaps applicationWorlds applicationFrame applicationMetadata ownedRelated
   have sameSource : compiler.original.type = function.resultType := by
