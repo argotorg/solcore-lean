@@ -8,6 +8,14 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Captured-cell assignment connection audit (2026-10-13)
+
+Checkpoint `b1e23802` completes the compiler/body/public connection for staged bare plain assignment. Target resolution precedes RHS evaluation, the write uses the actual post-RHS heap, and failure retains preceding effects. Static packets derive compiler shape and reachable diagnostic/read conditions. `818d4435` restricts projection-read obligations to nonempty paths, preserving existing stronger adapters.
+
+The closed public example connects six actual sessions to six independent Source applications and reached histories. The first closure changes from `10` to `11`, the second still returns `20`, and another factory allocation occurs between their direct calls. The final call through the original first handle returns `11`. Validation includes the full 6182-job build, all registered tests, independent production/fixture review and kernel policy. Eight audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next identified gap is registry direction: a representation at an arbitrary larger receiving registry does not justify decoding at the actual checkpoint's smaller registry. The implementation in progress moves History through the actual encoder's forward extension, constructs an authentic diagnostic receiver at that exact context and derives output codec shape there. Reverse registry extension or an unrelated successful execution must not become caller assumptions. General output collection, wider control flow, suspended/export-error continuations and full compiler composition remain open.
+
 ## Public function export from Source success (2026-10-13)
 
 Checkpoint `f7cbbfd8` passes the full build (6152 jobs), all registered tests and kernel policy. The ten preceding production/Source endpoint audits and two new initial-function endpoint audits use only `propext`, `Classical.choice` and `Quot.sound`.

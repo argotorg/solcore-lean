@@ -4,6 +4,12 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Captured-cell assignment connected to public execution (2026-10-13)
+
+Checkpoint `b1e23802` connects bare plain assignment in closure bodies through genuine compiler receipts, both staged semantic directions and the public execution family. The closed factory saves `previous = seed`, writes `seed = next` and returns `previous`. Its six actual calls are `make(10)`, `make(20)`, `first(11)`, `make(30)`, `second(21)`, `first(12)`. The direct results are `10 / 20 / 11`; each proof uses the preceding returned session and Source heap. Thus separate captures survive intervening allocation, and a later call sees the earlier write.
+
+The full build (6182 jobs), all registered tests and kernel policy pass. Eight audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. General output export and collection, metadata growth across calls, wider imperative control flow, suspended/export-error continuations and composition across all compiler passes remain unfinished. Work continues on actual input metadata and output export; earlier sections retain their historical scope.
+
 ## Public function export from Source success (2026-10-13)
 
 Checkpoint `f7cbbfd8` passes the full build (6152 jobs), all registered tests and kernel policy. The ten preceding production/Source endpoint audits and two new initial-function endpoint audits use only `propext`, `Classical.choice` and `Quot.sound`.

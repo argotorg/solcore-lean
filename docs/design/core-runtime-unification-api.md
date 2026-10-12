@@ -4,6 +4,12 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Captured-cell assignment proof support (2026-10-13)
+
+At `b1e23802`, the static mixed-body packet also supports imperative closure bodies containing bare plain assignment. `CallableIndexedOwnedPreparedStagedImperativeLambdaCompilerReceipts` and `CallableIndexedOwnedPreparedStagedImperativeLambdaReadRoots.of_reads` retain actual compiler and reachable-read receipts. `CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds.application_preserves` and `application_reflects` feed the existing recursive public family. The public runtime API is unchanged.
+
+`Tests.SourceCoreCapturedAssignment.sequence_meaning` proves the six-call factory/direct-invocation sequence with captured results `10 / 20 / 11`, including an intervening factory allocation and repeated mutation of the first capture. Full build (6182 jobs), all registered tests and kernel policy pass; eight audited endpoints use only the standard three axioms. These endpoints do not yet establish arbitrary imperative bodies or general metadata-bearing public output export.
+
 ## Public function export from Source success (2026-10-13)
 
 Checkpoint `f7cbbfd8` passes the full build (6152 jobs), all registered tests and kernel policy. The ten preceding production/Source endpoint audits and two new initial-function endpoint audits use only `propext`, `Classical.choice` and `Quot.sound`.

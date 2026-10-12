@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Captured-cell assignment and six linked calls (2026-10-13)
+
+`b1e23802` connects the assignment rules introduced in `c0a118be` to actual compiler output, closure body preservation/reflection and public execution. `818d4435` first narrows uninitialized-projection diagnostics to nonempty projection paths; bare assignment no longer requires an unreachable diagnostic. The assignment proof keeps the target snapshot from before the RHS, uses the RHS's reached heap for the write and retains effects before a failure. Static body support supplies original Source typing, accepted compiler receipts and only reachable read conditions.
+
+The registered `Tests.SourceCoreCapturedAssignment.sequence_meaning` closes six actual calls: `make(10)`, `make(20)`, `first(11)`, `make(30)`, `second(21)`, `first(12)`. The closure returns the old captured value and then retains the new value. Direct results are exactly `10 / 20 / 11`. All six Source traces and histories refer to the successive actual sessions/heaps. The fixture supplies no body execution or value-representation premise.
+
+Validation: full build (6182 jobs), all registered tests, kernel policy and independent review pass. Eight audited endpoints use only the standard three axioms. The test runner groups captured-closure session cases to keep its top-level sequence below Lean's recursion limit.
+
+The next connection uses the metadata registry produced by the actual input encoder. History must move forward to that registry, and the diagnostic receiver must be constructible there without an independent native execution. Structural output decoding/export then uses exactly the same registry. This work is in progress, along with general output selection, broader control flow, suspended/export-error continuations and final all-pass composition. Historical percentage estimates remain unchanged.
+
 ## Public function export from Source success (2026-10-13)
 
 Checkpoint `f7cbbfd8` passes the full build (6152 jobs), all registered tests and kernel policy. The ten preceding production/Source endpoint audits and two new initial-function endpoint audits use only `propext`, `Classical.choice` and `Quot.sound`.
