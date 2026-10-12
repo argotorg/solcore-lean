@@ -1536,6 +1536,7 @@ import Solcore.Test.SourceCoreConstructorCallsForward
 import Solcore.Test.SourceCoreDirectCallsForward
 import Solcore.Test.SourceCoreBuiltinCallsForward
 import Solcore.Test.SourceCoreClosureDirectForward
+import Solcore.Test.SourceCoreRecursiveIndexForward
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3144,6 +3145,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreDirectCalls.runForward
   SourceCoreBuiltinCalls.runForward
   SourceCoreClosureDirect.runForward
+  SourceCoreRecursiveIndex.runForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
