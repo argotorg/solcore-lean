@@ -25,10 +25,30 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state derived from actual fresh bootstrap and finite resumption. Arbitrary-length flat lists mix named/builtin handles and handle-free data under exact raw typing and the genuine receiving metadata extension. Nested handles, closure inputs, restored/used sessions, complete static coverage, broader grammar and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state derived from actual fresh bootstrap and finite resumption. Finite input lists support named/builtin handles inside products, constructor payloads and ordered mapping keys or values under exact raw typing and the genuine receiving metadata extension. Closure inputs, restored/used sessions, complete static coverage, broader grammar and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Nested named and builtin input connection (2026-10-12)
+
+Code commits: `9181cd2b` and `708e3f8b`.
+
+The initialized public success/failure reflection and Word preservation endpoints now consume nested structural inputs. Named and builtin handles may occur at arbitrary finite depth inside products, constructor payload vectors and ordered mapping keys or values. The fold covers empty, singleton and longer constructor packing, and preserves original argument positions, repeated handles and duplicate mapping keys. Raw typing retains comptime wrappers and exact proxy annotations.
+
+`RecursiveNamedPublicNestedInputs` combines independent Source descriptions with actual data or issued-function receipts. The selected raw-input producer recovers the original encoding and its metadata history. The leaf producer derives genuine named/builtin representation and deep Source typing from actual preparation, inventory, issuance and initialized capture. The container fold follows the same encoded payloads and composes the actual child registry extensions.
+
+`StartAt.nested_argument_represents` supplies each selected argument. `StartAt.nested_arguments_receiving` assembles complete `Arguments` and `ValuesHaveTypes` judgments with exact list lengths. `CallableIndexedOwnedPreparedStagedInitializedNestedPublicBounds` consumes these results in all three public endpoints, deriving the caller, stable rows, globals and heap conditions from actual fresh bootstrap completion, finite resumption and state-preserving issuance. The full staged outcomes, native results/stores, caller relation and returned public session remain in the conclusions.
+
+Exact raw input certificates, valid constructor metadata, genuine inventory and issuance histories, and `Extends encodedValues.registry receiving` remain explicit. The supported static body family is also required. The final selected consumer constructs leaf and container meaning internally; callers do not provide argument representation or Source value typing judgments.
+
+The public runtime regression combines products, constructor payloads and ordered mapping entries containing repeated earlier named and later builtin handles. Duplicate keys retain the first mapping row. It checks result `71` (`31 + 7 + 31 + 2`) and rejects an incompatible function handle in both a mapping payload and a constructor payload.
+
+Validation: Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Closure inputs, restored or previously executed sessions, complete static body coverage, broader grammar and all-pass composition remain open. Estimates remain 100% / about 70% / about 85%. The dated entries below retain their original scope and validation.
 
 ### Mixed function and data input connection (2026-10-12)
 

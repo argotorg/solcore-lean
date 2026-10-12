@@ -8,6 +8,26 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Nested function input connection (2026-10-12)
+
+Code commits: `9181cd2b` and `708e3f8b`.
+
+The input boundary includes named and builtin handles at arbitrary finite depth inside products, constructed payload vectors and ordered mapping keys or values. The structural certificates retain the independent Source value, exact raw type, original payload order and mapping duplicates. Empty, singleton and longer constructor payload vectors follow their actual native packing. Comptime wrappers and raw proxy annotations remain distinct in Source typing.
+
+Every function leaf retains a genuine issuance receipt and its actual issuance continuation to the receiving session. Named leaves retain the real inventory packet, full Source instantiation and resolved dictionary. The leaf producer derives the installed capture from the initialized owned state and the builtin callable from accepted preparation. The selected producer constructs leaf meaning internally from these receipts. The generic container fold then follows the original raw encoder through each child registry and composes genuine extensions to the receiving registry. Mapping defaults also follow the actual `encodeDefaultRaw` result, including both present and absent defaults.
+
+The whole argument producer derives representation and deep Source typing at every original index and retains exact Source/native list lengths. The initialized public consumer derives caller, globals and heap conditions from the same fresh bootstrap and finite resumption chain. All three public endpoints retain actual native and staged Source outcomes, complete returned state and the public returned session. The certificates do not supply an argument representation, Source value typing judgment or body execution law.
+
+`Extends encodedValues.registry receiving` remains explicit. Common registry ancestry is insufficient because the receiving metadata must preserve IDs allocated during the original nested encoding. Independent raw typing and valid constructor metadata remain necessary where runtime projection erases Source distinctions. The supported static body family remains an explicit prerequisite.
+
+The runtime fixture passes an outer product containing a constructor with named/builtin payloads and a mapping whose values pair the repeated named handle with a Word. It uses the original earlier named and later builtin handles after reissuance. Duplicate mapping keys select the first row. The result is `71`: `31 + 7 + 31 + 2`. Replacing the named handle with the incompatible builtin is rejected separately in the mapping payload and constructor payload. This fixture checks runtime behavior; instantiation of the semantic endpoints still requires their static body premises.
+
+Validation: Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Closure input provenance, restored or previously executed sessions, complete static body coverage, broader compiler grammar and the theorem across all compiler passes remain unfinished. Progress estimates are unchanged. Earlier dated audit sections retain the scope and validation of their original checkpoints.
+
 ## Mixed function and data input connection (2026-10-12)
 
 Code commits: `91a42c32` and `8964ff88`.

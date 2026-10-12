@@ -10,12 +10,32 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `91a42c32` and `8964ff88`. Ordered mixed function and data inputs connect to public semantics. |
-| Latest completed normal verification | Strict Lean, full build (5962 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: the ten checked issuance, data, mixed argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
+| Latest normally verified implementation commits | `9181cd2b` and `708e3f8b`. Nested named and builtin handles connect to public semantics. |
+| Latest completed normal verification | Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
 | Working implementation | Public success/failure reflection and Word preservation derive the initial owned state, stable rows, global references, heap relations and argument typing/representation internally. |
-| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving issuance. Arbitrary-length flat lists may mix named/builtin handles and handle-free data at the exact raw signature, retaining argument order, duplicates and the genuine receiving registry extension. |
-| Current implementation priority | Connect closure inputs and handles nested inside data carriers; extend the initial-state connection to restored or previously executed sessions; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
+| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving issuance. Arbitrary finite argument lists may contain named/builtin handles inside products, constructor payloads and ordered mapping keys or values. Exact raw types, original order, duplicates and the genuine receiving registry extension remain explicit. |
+| Current implementation priority | Connect closure inputs; extend the initial-state connection to restored or previously executed sessions; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Nested named and builtin inputs (2026-10-12)
+
+Code commits: `9181cd2b` and `708e3f8b`.
+
+Public success/failure reflection and Word preservation accept named and builtin handles inside arbitrary finite products, constructor payload vectors and ordered mapping keys or values. Constructor packing covers empty, singleton and longer payload vectors. Repeated handles, duplicate mapping keys and original argument order are retained. Raw typing keeps comptime wrappers and exact proxy annotations.
+
+`RecursiveNamedPublicNestedInputs` describes each public value and its independent Source value structurally. Function leaves retain genuine issuance chains; named leaves also retain the exact finite inventory packet, imported specialization and dictionary. The initialized owned state supplies the capture. The selected startup producer follows the actual nested encoder, constructs leaf meaning from those receipts, and derives representation and Source typing for the complete value. The argument fold preserves every original Source and native position.
+
+`CallableIndexedOwnedPreparedStagedInitializedNestedPublicBounds` consumes this result in all three public endpoints. The initial caller, stable rows, global references and heap conditions still come from the actual fresh bootstrap, any finite sequence of resumptions and state-preserving issuance. Conclusions retain the staged Source outcome, native result and store, actual public returned session and complete caller relation.
+
+The receiving registry must extend the actual encoded registry: `Extends encodedValues.registry receiving`. Exact raw input certificates, valid constructor metadata and supported static body facts remain explicit. Runtime type projection cannot recover all raw annotations; two registries extending a common ancestor do not establish the required metadata relation.
+
+The public runtime regression nests a constructor and an ordered mapping inside products, reuses earlier named and later builtin handles, and retains duplicate mapping keys. It checks result `71` and rejects an incompatible handle separately inside a mapping payload and inside a constructor payload.
+
+Validation: Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Closure inputs, restored or previously executed sessions, complete static body coverage, broader compiler grammar and composition across all compiler passes remain unfinished. Progress estimates are unchanged. The dated entries below retain their original scope and validation.
 
 ### Mixed function and data inputs (2026-10-12)
 

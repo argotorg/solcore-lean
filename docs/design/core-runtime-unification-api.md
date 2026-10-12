@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest mixed-input connection, `91a42c32` and `8964ff88`, extends repeated bootstrap resumption, raw data inputs and singleton function inputs to arbitrary-length flat lists of named handles, builtin handles and handle-free data. It consumes the public execution endpoints from `6199f27d` and `a3d8877f`. Exact raw input types, the actual receiving metadata extension and supported static body facts remain explicit.
+The latest nested-input connection, `9181cd2b` and `708e3f8b`, extends mixed input lists to named and builtin handles inside arbitrary finite products, constructor payload vectors and ordered mapping keys or values. It consumes the same public success/failure and Word endpoints as the mixed-input connection. Exact raw input types, actual issuance provenance, the genuine receiving metadata extension and supported static body facts remain explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,30 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Nested function inputs (2026-10-12)
+
+Code commits: `9181cd2b` and `708e3f8b`.
+
+`RecursiveNamedPublicNestedInputs.Input` extends the mixed leaf certificate with products, constructed payloads, mappings and comptime wrappers. Its mutually defined `Inputs` and `Entries` retain ordered payloads and key/value rows. A leaf carries independent raw data typing and interpretation, or an actual named/builtin issuance receipt and continuation to the receiving session. Named leaves also require the exact issued inventory packet and `Inventory.HasRow`. No input certificate contains a native representation or execution law.
+
+`RecursiveNamedPublicNestedRawInputs.StartAt.raw_input` recovers the selected argument's original encoding, starting registry, projected type and extension to the final encoded registry. `RecursiveNamedPublicNestedEncoding.Input.represents` follows that encoding structurally, including empty/singleton/list constructor packing and ordered mapping keys and values. Child registry extensions are composed in the actual encoding order.
+
+The generic fold exposes a leaf-meaning port. `RecursiveNamedPublicNestedLeafMeaning.leaf_meaning` fills it from genuine data or function issuance receipts, accepted preparation and the initialized owned state. The named case keeps the retained Source instantiation, complete dictionary and actual captured closure; the builtin case keeps its exact closed callable. `RecursiveNamedPublicNestedArgumentReceipts.StartAt.nested_argument_represents` combines this leaf producer with the original startup encoding to derive the selected native payload's representation and deep Source typing.
+
+`RecursiveNamedPublicNestedArgumentsReceiving.StartAt.nested_arguments_receiving` constructs the complete `CallableIndexedParameterMeaning.Arguments` and `Dynamic.ValuesHaveTypes` judgments. It aligns the selected Header's exact raw parameter list with the public values, Source values and original native argument vector. Exact lengths prevent dropped suffixes; repeated handles retain their original positions.
+
+`CallableIndexedOwnedPreparedStagedInitializedNestedPublicBounds` exposes `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. These derive the initial owned caller, stable rows, globals, heap conditions and complete argument relation from actual fresh bootstrap completion, finite resumption and state-preserving issuance. Their conclusions retain the same full staged Source result, native value/store, caller relation and actual public returned session as the mixed-input endpoints.
+
+Callers still provide structural input certificates at the exact raw signature, genuine named inventory membership, actual preparation/issuance/startup receipts, valid constructor metadata, supported static body facts and `Extends encodedValues.registry receiving`. Comptime erasure and proxy projection do not replace raw typing. The receiving registry must preserve IDs from the actual encoder; a shared registry ancestor is insufficient.
+
+The runtime regression checks result `71` for a product containing constructor and mapping payloads with repeated earlier named and later builtin handles and duplicate mapping keys. It checks incompatible nested handle rejection in both mapping and constructor payloads.
+
+Validation: Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Closure inputs, restored or previously executed sessions, complete static/compiler coverage and the final all-pass theorem remain open. Progress estimates are unchanged. The dated interface entries below retain their original scope and validation.
 
 ## Mixed function and data inputs (2026-10-12)
 
