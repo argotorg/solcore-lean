@@ -181,6 +181,26 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
           CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context sourceType outcome reached) :
       History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
         reached entries
+  | packed_failed {session : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
+      {argument : SourceCorePublicValues.Value} {inputFuel executionFuel : Nat}
+      {returned : Session artifact} {reason : Core.Word}
+      {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+      {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+      {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+      (started : checkpoint.HandleStart session handle argument inputFuel)
+      (failed : checkpoint.FailedResultAt executionFuel native finalStore reason returned)
+      (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+        anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults)
+      (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (post : Relates caller reached ∧
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context sourceType outcome reached)
+      (heapTyped : Dynamic.HeapWellTyped anchor.function.context after) :
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached entries
   | issued {session next : Session artifact} {mapping world heap store}
       {caller : Caller headers keys mapping world heap store} {entries : List Entry}
       (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
@@ -299,6 +319,15 @@ theorem History.current {artifact : Artifact} {session : Session artifact} {entr
       exact ⟨succeeded.encodes_function_from started.initial_registry imported,
         represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
         valueTyped.mono result.2.2.2.2.2.1⟩
+  | packed_failed prior started failed result reached post heapTyped ih =>
+      have heaps := result.2.1
+      have nativeAt : _ := heaps.runtime_hasTypes.world_eq.symm ▸ failed.native_at
+      refine ⟨nativeAt, heaps, post.2.rows, heapTyped, ?_⟩
+      intro entry member
+      obtain ⟨imported, represented, typed⟩ := ih.2.2.2.2 entry member
+      exact ⟨failed.encodes_function_from started.initial_registry imported,
+        represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
+        typed.mono result.2.2.2.2.2.1⟩
   | issued prior continued ih =>
       refine ⟨continued.same_runtime.native_at ih.1, ih.2.1, ih.2.2.1, ih.2.2.2.1, ?_⟩
       intro entry member
@@ -339,6 +368,27 @@ theorem History.after_packed_success
         reached entries := by
   obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
   exact ⟨reached, related, .packed_next history started succeeded result reached ⟨related, post⟩⟩
+
+/-- A failed direct invocation keeps all earlier handles at its returned heap.
+The public semantic consumer derives heap typing from the Source fault trace. -/
+theorem History.after_packed_failure
+    {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
+    {argument : SourceCorePublicValues.Value} {inputFuel executionFuel : Nat}
+    {returned : Session artifact} {reason : Core.Word}
+    {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (started : checkpoint.HandleStart session handle argument inputFuel)
+    (failed : checkpoint.FailedResultAt executionFuel native finalStore reason returned)
+    (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+      anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults)
+    (heapTyped : Dynamic.HeapWellTyped anchor.function.context after) :
+    ∃ reached : Caller headers keys finalMap finalWorld after finalStore,
+      Relates caller reached ∧
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached entries := by
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
+  exact ⟨reached, related, .packed_failed history started failed result reached ⟨related, post⟩ heapTyped⟩
 
 private theorem success_shape {payload : Core.Value}
     (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)

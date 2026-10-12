@@ -4882,3 +4882,67 @@ theorem Session.EncodesAt.function_type {artifact : Artifact} {session : Session
     · simp [resolve, artifactOwner, bind, Except.bind, throw, throwThe] at resolved
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+private theorem issued_export_function_source_type {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected : TypeSystem.Ty} {native : Core.Value}
+    {exported : Exported (artifact := artifact) world authority fuel values expected native}
+    {handle : Handle}
+    (accepted : exportValue authority generation fuel values slots expected native = .ok exported)
+    (functionValue : exported.value = .function handle) : handle.sourceType = expected := by
+  obtain ⟨decode, encode, _recovered⟩ := exportValue_success_receipt accepted
+  rw [functionValue] at decode encode
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view encode
+  cases fuel with
+  | zero => cases decode
+  | succ remaining =>
+      unfold decodeRaw at decode
+      rw [view] at decode
+      obtain ⟨⟨actual, returned⟩, registered, decode⟩ := root_factory_bind_ok decode
+      cases decode
+      exact registered_source_type registered
+
+private theorem issue_callable_function_source_type {artifact : Artifact} {session : Session artifact}
+    {factory : CallableFactory artifact.recipe.compiled} {generation : ExportGeneration}
+    {fuel : Nat} {completion : Completion artifact} {handle : Handle}
+    (issued : issueCallable session factory generation fuel = .ok completion)
+    (functionValue : completion.value = .function handle) : handle.sourceType = completion.sourceType := by
+  unfold issueCallable at issued
+  obtain ⟨_globals, _checked, issued⟩ := root_factory_bind_ok issued
+  cases slot : factory.slot with
+  | none =>
+      simp only [slot] at issued
+      obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+      obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+      cases issued
+      exact issued_export_function_source_type exportedAt functionValue
+  | some pair =>
+      rcases pair with ⟨location, expected⟩
+      simp only [slot] at issued
+      split at issued
+      · obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+        obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+        cases issued
+        exact issued_export_function_source_type exportedAt functionValue
+      · simp [bind, Except.bind, throw, throwThe] at issued
+
+/-- The real named factory exporter retains its exact requested raw type,
+including when it reuses a previously registered handle. -/
+theorem Session.NamedIssuedAt.function_source_type {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact} {handle : Handle}
+    (issued : session.NamedIssuedAt key fuel completion)
+    (functionValue : completion.value = .function handle) : handle.sourceType = completion.sourceType := by
+  obtain ⟨_row, _generation, _selected, accepted⟩ := issued
+  exact issue_callable_function_source_type accepted functionValue
+
+/-- Builtin handle issuance uses the same exact raw export type check. -/
+theorem Session.BuiltinIssuedAt.function_source_type {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact} {handle : Handle}
+    (issued : session.BuiltinIssuedAt function fuel completion)
+    (functionValue : completion.value = .function handle) : handle.sourceType = completion.sourceType := by
+  obtain ⟨_row, _generation, _selected, accepted⟩ := issued
+  exact issue_callable_function_source_type accepted functionValue
+
+end Solcore.Frontend.SourceCoreIndexedSession

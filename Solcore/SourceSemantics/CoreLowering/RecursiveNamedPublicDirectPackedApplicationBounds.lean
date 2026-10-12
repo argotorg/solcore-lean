@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectClosureApplicationBounds
-import Solcore.SourceSemantics.CoreLowering.CompatiblePatternValues
+import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
 
 /-! Direct packed inputs are split using the real retained Source binder row.
 The zero, singleton and longer cases retain exact grouping and argument order,
@@ -16,46 +16,6 @@ open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
 
-private theorem packed_arguments
-    {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
-    {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
-    {mapping : LocationMap} {world : StoreTyping}
-    (bindings : List CallableIndexedParameterCertificates.Binding)
-    (projected : ∀ binding ∈ bindings, checked.catalog.project binding.1.scheme.body = .ok binding.2)
-    {source : Dynamic.Value} {native : Value} {type : Core.Ty}
-    (represented : ValueRep checked registry functions mapping world
-      (TypeSystem.Ty.productMany (bindings.map (fun binding => binding.1.scheme.body))) source native type) :
-    ∃ sources values,
-      Dynamic.ValuesPack sources source ∧ native = DataPatternValues.packValues values ∧
-      CallableIndexedParameterMeaning.Arguments
-        (CompatibleAmbientHeap.payloadModel checked registry functions) mapping world bindings sources values := by
-  induction bindings generalizing source native type with
-  | nil =>
-    obtain ⟨rfl, rfl, _type⟩ := CompatiblePatternValues.unit_fields represented rfl
-    exact ⟨[], [], .nil, rfl, .nil⟩
-  | cons binding rest ih =>
-    have headProjection := projected binding (by simp)
-    cases rest with
-    | nil =>
-      have sameType : type = binding.2 := Except.ok.inj (represented.projection.symm.trans headProjection)
-      subst type
-      exact ⟨[source], [native], .singleton _, rfl, .cons represented .nil⟩
-    | cons next tail =>
-      obtain ⟨first, second, a, b, aType, bType, rfl, rfl, _wholeType, head, rest⟩ :=
-        CompatiblePatternValues.product_fields represented
-      have sameType : aType = binding.2 := Except.ok.inj (head.projection.symm.trans headProjection)
-      subst aType
-      obtain ⟨sources, values, packing, valueEq, arguments⟩ :=
-        ih (fun item member => projected item (List.mem_cons_of_mem _ member)) rest
-      have length := arguments.length
-      cases sources with
-      | nil => simp at length
-      | cons source sources =>
-        cases values with
-        | nil => simp at length
-        | cons value values =>
-          exact ⟨first :: source :: sources, a :: value :: values, .cons packing,
-            by simp only [DataPatternValues.packValues]; rw [valueEq], .cons head arguments⟩
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -158,7 +118,7 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
   have packed := packedRelated
   rw [sourceBundle] at packed
   obtain ⟨sources, values, packing, nativeEq, represented⟩ :=
-    packed_arguments bindings association.projected_bindings packed
+    RecursivePublicPackedArguments.arguments bindings association.projected_bindings packed
   have binderLength : bindings.length = function.parameters.length := by
     simpa only [List.length_map] using congrArg List.length association.source_binders
   have arity : sources.length = function.parameters.length := represented.length.1.symm.trans binderLength
@@ -228,7 +188,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
   rw [sourceBundle] at packed
 
   obtain ⟨decodedSources, values, decodedPacking, nativeEq, represented⟩ :=
-    packed_arguments bindings association.projected_bindings packed
+    RecursivePublicPackedArguments.arguments bindings association.projected_bindings packed
   have binderLength : bindings.length = function.parameters.length := by
     simpa only [List.length_map] using congrArg List.length association.source_binders
   have decodedArity : decodedSources.length = function.parameters.length :=

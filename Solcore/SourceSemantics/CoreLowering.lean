@@ -1488,6 +1488,14 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedInpu
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedPublicHistory
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedHistory
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectBuiltinApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectNamedApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallablePublicHistory
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableHistory
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableFailures
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

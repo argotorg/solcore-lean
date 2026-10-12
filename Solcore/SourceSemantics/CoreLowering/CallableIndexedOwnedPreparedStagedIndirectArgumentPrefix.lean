@@ -353,4 +353,10 @@ theorem reflects_arguments (budget : Nat)
                   _, remaining, remainingStrict⟩
 
 end Calls
+/-- Source function typing excludes data-valued callees before direct dispatch. -/
+theorem callable_shape {context : SourceSemantics.Context} {heap : Dynamic.Heap}
+    {value : Dynamic.Value} {parameter result : TypeSystem.Ty}
+    (typed : Dynamic.ValueHasType context heap value (.function parameter result)) : IsFunction value :=
+  value_is_function typed
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
