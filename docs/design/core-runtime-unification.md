@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Finite while bodies and retained closure captures (2026-10-13)
+
+`494ac11a` adds finite staged while traces, their numeric grades, ordinary Source erasure and fault-heap preservation. `b658957a` connects them through authentic compiler receipts, closure application and public sessions. Each iteration restores its outer lexical bindings and retains its actual reached heap. The proof handles finite iteration counts, early return, condition failure and body failure; this fragment does not yet include `break` or `continue`.
+
+The closed six-call example creates separate closures capturing `10` and `20`, invokes the first, performs an intervening `make(30)`, then invokes the second and the first again. Direct results are `11 / 20 / 12`, with one, zero and one loop iterations respectively. Every Source trace uses the preceding actual session and heap. Source success derives sufficient execution and output fuel at each original direct-call checkpoint. The initial diagnostic receiver is constructed from its registry.
+
+Validation: full build (6318 jobs), all registered tests and kernel policy pass. Twenty-one audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Named while bodies are the next public connection under verification. Wider control flow, expression coverage and composition across every compiler pass remain incomplete.
+
 ## Named conditional calls at their actual checkpoints (2026-10-13)
 
 Checkpoint `00067020` connects named conditional bodies to actual initialization, the first call and a following call on its returned session. The closed `choose` example takes both branches and proves Source results `11 / 22`, exact successive heaps and reusable histories. The first branch allocates a local copy. Independent Source success also supplies sufficient execution and output fuel for every resume above the bounds at each original checkpoint.
@@ -140,11 +148,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `00067020`: named conditional bodies reach first and following public calls, exact Source histories and sufficient fuel at their original checkpoints. |
-| Latest completed verification | Full build (6299 jobs), all registered tests, kernel policy and twelve endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional closure bodies preserve distinct mutable captures across intervening calls. |
-| Latest proof scope | The actual six-call conditional example proves distinct handles, results `11 / 20 / 11` and histories at the exact successive sessions/heaps. Static body conditions come from accepted compiler receipts. |
-| Current implementation priority | Connect finite staged loops through actual compiler bodies and public sessions, then widen remaining body/expression coverage and compose all compiler passes. |
+| Latest verified implementation | `b658957a`: finite while bodies connect actual compiler output, retained closure captures, Source histories and public fuel bounds. |
+| Latest completed verification | Full build (6318 jobs), all registered tests, kernel policy and twenty-one endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional and finite while closure bodies retain separate mutable captures across intervening calls. |
+| Latest proof scope | The six-call while example proves distinct handles, results `11 / 20 / 12` and histories at the exact successive sessions/heaps. Its direct calls perform one, zero and one iterations. Static body conditions come from accepted compiler receipts. |
+| Current implementation priority | Connect named while bodies through initial/following public calls, then widen remaining control-flow/expression coverage and compose all compiler passes. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Finite while bodies and retained closure captures (2026-10-13)
+
+`494ac11a` adds finite staged while traces, their numeric grades, ordinary Source erasure and fault-heap preservation. `b658957a` connects them through authentic compiler receipts, closure application and public sessions. Each iteration restores its outer lexical bindings and retains its actual reached heap. The proof handles finite iteration counts, early return, condition failure and body failure; this fragment does not yet include `break` or `continue`.
+
+The closed six-call example creates separate closures capturing `10` and `20`, invokes the first, performs an intervening `make(30)`, then invokes the second and the first again. Direct results are `11 / 20 / 12`, with one, zero and one loop iterations respectively. Every Source trace uses the preceding actual session and heap. Source success derives sufficient execution and output fuel at each original direct-call checkpoint. The initial diagnostic receiver is constructed from its registry.
+
+Validation: full build (6318 jobs), all registered tests and kernel policy pass. Twenty-one audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Named while bodies are the next public connection under verification. Wider control flow, expression coverage and composition across every compiler pass remain incomplete.
+
+`Staging.Recursive.While` and `Size.While` retain the original condition/body selections and iteration heaps. `PreparedStagedBranchingTree.Shape.whileLoop` and `PreparedNativeBranchingCollectors.tree` authenticate the accepted loop code. `AdmittedStagedWhileHeads` and `AdmittedStagedWhileSequences` feed the scoped imperative body proofs. The closed endpoint is `Tests.SourceCoreCapturedWhile.closed_sequence_forward_meaning`; `runForward` is registered in the test runner.
+
 ## Named conditional calls at their actual checkpoints (2026-10-13)
 
 Checkpoint `00067020` connects named conditional bodies to actual initialization, the first call and a following call on its returned session. The closed `choose` example takes both branches and proves Source results `11 / 22`, exact successive heaps and reusable histories. The first branch allocates a local copy. Independent Source success also supplies sufficient execution and output fuel for every resume above the bounds at each original checkpoint.
