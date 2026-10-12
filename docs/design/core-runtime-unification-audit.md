@@ -8,13 +8,27 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Singleton named input connection (2026-10-12)
+
+Committed in `be545d01` and `f7c07bf1`.
+
+The named input proof follows the actual issued handle through startup into the initialized owned pool. Accepted factory preparation fixes the signature, specialization, identity, descriptor and cache slot. The finite inventory supplies the actual `Issued` packet and `HasRow` witness. The actual second-pass cache and bootstrap store read identify the installed code and complete captured environment.
+
+Source typing uses that packet's retained instantiation and complete resolved dictionary in the receiving caller's context. Exact raw parameter equality remains a condition; erased native type equality cannot substitute for it. Public success/failure reflection and Word preservation construct the initial caller, heap and argument relations internally and retain the full returned state.
+
+The added runtime regression issues the recursive `recurse` handle after two bootstrap suspensions and passes that exact handle to a singleton `namedUse` root. It checks result `31`, unchanged storage during issuance, and rejection at a root expecting a different function result type.
+
+Validation passes: strict Lean, full build (5959 jobs), all registered tests, kernel policy and independent review. The seven checked named factory, input and public endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
+
+This boundary covers a single named handle issued into the fresh initialized runtime. Closure inputs, mixed lists, nested carriers, restored or previously executed sessions, broader static grammar and the final theorem across all compiler passes remain unfinished.
+
 ## Issued function and builtin input audit (2026-10-12)
 
 `54bc83a5` preserves the original single issuance operation and binds its cached factory to the actual startup argument index. Review checked deterministic handle resolution and exact state-preservation transport. It does not equate physical handle registries or infer Source function meaning from authentication.
 
 `83bf7430` adds the missing Source meaning for singleton builtin inputs. Preparation supplies literal closed code with empty captures, a nonwrapping identity and the real contract descriptor. The Header supplies exact raw parameter agreement and native projection; actual startup supplies the same issued value. The proof constructs function representation, argument representation and Source typing internally before calling all three public semantic endpoints. Native and Source execution results retain their full state relations.
 
-Strict Lean, full build (5957 jobs), all registered tests, kernel policy and independent review pass. The six selected builtin endpoints use only the standard three axioms. A public runtime regression passes the freshly issued builtin handle into a cached root after two bootstrap suspensions. Named/closure Source provenance, mixed lists, nested handles and all-pass composition remain unfinished.
+Strict Lean, full build (5957 jobs), all registered tests, kernel policy and independent review pass. The six selected builtin endpoints use only the standard three axioms. A public runtime regression passes the freshly issued builtin handle into a cached root after two bootstrap suspensions. At this checkpoint, named/closure Source provenance, mixed lists, nested handles and all-pass composition remained unfinished. The newer named connection is recorded above.
 
 ## Resumed initialization and data input audit (2026-10-12)
 

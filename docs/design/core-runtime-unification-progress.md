@@ -25,10 +25,24 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product argument conditions derived from actual fresh startup. Raw metadata inputs now have a conditional public connection. Named/closure function inputs, broader compiler grammar and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state and scalar/product arguments derived from actual fresh startup. Raw metadata inputs and singleton builtin/named handles have conditional public connections. Closure inputs, mixed/nested handles, restored/used sessions, broader compiler grammar and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Singleton named input and public semantics (2026-10-12)
+
+Committed in `be545d01` and `f7c07bf1`.
+
+Accepted named factory preparation now exposes its complete carrier, exact specialization, physical global slot, nonwrapping identity and descriptor. The actual bootstrap-owned capture and second-pass cache identify the same installed closure, including its captured environment. The imported Source function comes from the exact finite inventory packet selected by `Inventory.HasRow` and retains its ordered instantiation and full resolved dictionary.
+
+`RecursiveNamedPublicNamedArgumentReceipts` consumes actual issuance and startup to construct function representation, deep Source typing and the complete singleton argument relation. `CallableIndexedOwnedPreparedStagedInitializedNamedPublicBounds` feeds those facts into public success/failure reflection and Word preservation. Each endpoint derives the initial caller, stable rows, globals and heap conditions from the actual fresh bootstrap, including finite resumption and state-preserving issuance, and retains complete returned state.
+
+The new runtime regression issues the recursive `recurse` handle from the twice-resumed initial session and passes the exact value through `namedUse`. It checks result `31`, unchanged storage during issuance and rejection at a root with an incompatible function return type.
+
+Validation passes: strict Lean, full build (5959 jobs), all registered tests, kernel policy and independent review. The seven checked named factory, input and public endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
+
+The imported function must be an actual issued inventory packet; the receiving root must have one raw parameter with the exact specialization type. Static body support remains explicit. Closure inputs, mixed lists, nested carriers, restored or previously executed sessions, wider compiler grammar and all-pass composition remain open. The work estimates remain unchanged.
 
 ### Issued functions and singleton builtin input (2026-10-12)
 
@@ -38,7 +52,7 @@ The percentages retain the 2026-10-05 estimate. They are not proportions of file
 
 The public regression starts from a twice-resumed bootstrap, issues `wordToInteger`, passes its opaque handle as the only argument to a cached root, and obtains integer 9. Existing shared-capture, named handle, data metadata, fault and suspension tests also pass. Final validation: strict Lean, full build (5957 jobs), all registered tests, kernel policy, standard-axiom checks and independent review. The six selected builtin endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
-Current function-input scope is one builtin at its exact raw parameter type, used in the session returned by issuance. Named and closure input Source provenance, mixed argument lists, nested handle carriers, restored/previously executed sessions and broader compiler coverage remain open. The full compiler theorem is incomplete; estimates remain unchanged.
+Scope at these commits was one builtin at its exact raw parameter type, used in the session returned by issuance. The newer named connection above extends that scope. Closure input Source provenance, mixed argument lists, nested handle carriers, restored/previously executed sessions and broader compiler coverage remain open. The full compiler theorem is incomplete; estimates remain unchanged.
 
 ### Resumable initialization and metadata-bearing inputs (2026-10-12)
 
@@ -58,7 +72,7 @@ Targeted strict builds, the public execution regression, kernel policy, standard
 
 Validation passes: strict Lean checks, full build (5952 jobs), all registered tests, kernel policy and independent review. The nine checked facade/initialization/input/public semantic endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Existing public bootstrap tests exercise the receipt operation; suspended bootstrap and other public runtime tests still pass.
 
-Original scope at those two commits: fresh bootstrap completed in one resume, `SimplePublic` inputs, and the supported static body family. The newer connections above extend resumption and data inputs. Restored/used sessions and Source meaning for named/closure handle inputs remain separate work. Static compiler coverage and all-pass composition remain open. Further helpers should discharge a condition in these connected consumers; no percentage increase is inferred from this unit's proof count.
+Original scope at those two commits: fresh bootstrap completed in one resume, `SimplePublic` inputs, and the supported static body family. The newer connections above extend resumption, data inputs and singleton builtin/named handles. Restored/used sessions and Source meaning for closure inputs remain separate work. Static compiler coverage and all-pass composition remain open. Further helpers should discharge a condition in these connected consumers; no percentage increase is inferred from this unit's proof count.
 
 ### Connected cached roots and public outcomes (2026-10-12)
 

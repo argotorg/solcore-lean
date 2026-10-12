@@ -53,7 +53,7 @@ These ports keep genuine compiler policy/read conditions, original typing and ca
 
 The original scalar entry was committed in `9b6cb2c7` and `6976ab8c`. `1ebb4c6a` generalizes its bootstrap premise to `Bootstrap.ReadyAt`: `.single ready` records completion and `.suspend exhausted continued` adds an actual suspended step. `ReadyAt.indexed` recovers the exact native initial completion at the sum of the budgets and the same returned session.
 
-`b6c24d8f` adds `RecursiveNamedPublicDataArgumentReceipts` and `CallableIndexedOwnedPreparedStagedInitializedDataPublicBounds`. The three public endpoints also accept metadata-bearing data under `PublicDataTypes` at the selected raw Source signature and an actual `Extends encodedValues.registry receiving` relation. The latter preserves the encoded tag IDs. It cannot be replaced by two independent extensions of the static registry. Singleton builtin handles have the additional connection below; named and closure handles require further Source provenance. Restored or previously executed sessions and complete compiler coverage remain open.
+`b6c24d8f` adds `RecursiveNamedPublicDataArgumentReceipts` and `CallableIndexedOwnedPreparedStagedInitializedDataPublicBounds`. The three public endpoints also accept metadata-bearing data under `PublicDataTypes` at the selected raw Source signature and an actual `Extends encodedValues.registry receiving` relation. The latter preserves the encoded tag IDs. It cannot be replaced by two independent extensions of the static registry. Singleton builtin and named handles have the additional connections below; closure handles require further Source provenance. Restored or previously executed sessions and complete compiler coverage remain open.
 
 ## Issued function inputs (2026-10-12)
 
@@ -65,7 +65,21 @@ Initialized public endpoints now accept `ready : bootstrap.ReadyAt fuel bootstra
 
 `CallableIndexedOwnedPreparedStagedInitializedBuiltinPublicBounds` consumes that result in `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. These endpoints retain the same static body support and full staged result/state as the scalar and data endpoints. The user-supplied conditions describe actual preparation, issuance, startup and raw parameter agreement; no Source function representation or argument typing is assumed.
 
-Committed in `54bc83a5` and `83bf7430`. Named/closure Source input interpretation, mixed lists and nested handle carriers remain outside this singleton builtin boundary.
+Committed in `54bc83a5` and `83bf7430`. The named input connection below extends this boundary. Closure Source input interpretation, mixed lists and nested handle carriers remain open.
+
+## Singleton named input semantics (2026-10-12)
+
+Committed in `be545d01` and `f7c07bf1`.
+
+`SourceCoreIndexedSession.Recipe.NamedCallableAt.prepared` recovers the actual signature, specialization, global slot, closure, nonwrapping identity and contract descriptor from accepted preparation. `Recipe.native_global_location` fixes the selected cache entry's physical location. Comparison with the bootstrap store and owned capture identifies the complete closure payload.
+
+`RecursiveNamedPublicNamedArgumentReceipts.StartAt.named_argument_represents` combines the issuance and startup receipts with an actual `Inventory.HasRow` packet. It constructs the receiving function representation and deep Source typing for that packet's retained global function, including its full ordered instantiation and resolved dictionary. `StartAt.named_arguments_receiving` constructs the complete argument relation for a singleton input whose raw parameter type equals the imported specialization's function type.
+
+`CallableIndexedOwnedPreparedStagedInitializedNamedPublicBounds` exposes `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. These consumers derive the initial owned caller, stable rows, globals, heap relations and named argument conditions from actual fresh bootstrap completion, allowing finite resumption and state-preserving issuance. Their conclusions retain staged outcomes, native results and stores, the actual public returned session and full caller relation.
+
+The imported packet and its inventory membership, exact singleton raw type and supported static body family remain explicit. Closure inputs, mixed lists, nested carriers, restored or previously executed sessions, broader grammar and full compiler composition remain open.
+
+Validation passes: strict Lean, full build (5959 jobs), all registered tests, kernel policy and independent review. The seven checked named factory, input and public endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
 
 ## Public execution receipts and semantic consumers (2026-10-12)
 
