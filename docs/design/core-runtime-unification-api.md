@@ -4,9 +4,9 @@ Last updated: 2026-10-12.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
-## Latest verified proof interfaces (2026-10-12)
+## Current proof interfaces (2026-10-12)
 
-The function-history connection (`1bf7248d`, `b5be3856`) extends `62001b99` and `f950c96c` to several retained exported functions across supported successful calls, including intervening data results and capture mutation. Exact startup provenance, current heap/caller evidence and nested input certificates feed all three public endpoints. Successful continuations return reusable histories for the actual returned session. The earlier fresh-session connection (`9181cd2b`, `708e3f8b`) continues to admit nested named/builtin inputs; exact raw types, metadata extensions and supported static body facts remain explicit.
+The current connection adds used-session named/builtin issuance and ready snapshot restoration to function histories. Public success/failure reflection and Word preservation consume the resulting histories. The current adapters also derive executable-plan preparation from compiled records. Strict Lean, full build (5991 jobs), all registered tests and kernel policy pass. The preceding fully verified history checkpoint is `1bf7248d` / `b5be3856`. Exact raw types, metadata extensions and supported static body facts remain explicit; the mutable runtime fixture has assignment/match statements outside that body grammar.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,22 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Issuance and restoration in retained histories (2026-10-12)
+
+`RecursiveNamedPublicHistoryIssuance.named_remembered` and `builtin_remembered` consume actual public issuance receipts and return the indexed completion plus an extended history. `History.remember_named` derives the exact Source global, full instantiation/dictionary and native capture from an accepted inventory packet and the current owned pool. `History.remember_builtin` derives the builtin's closed callable. Earlier exported closures keep their entries and current captured state. The existing `Input.retained` leaf can select the added entries inside arbitrary finite argument lists and containers; no separate representation or Source-typing premise is added.
+
+The public and indexed `Session.snapshotWithReceipt` operations return a snapshot with `Session.SnapshotAt`. Existing `snapshot` delegates to this operation and discards the proof receipt. Indexed `Session.RestoredAt` records the genuine ready capture and actual restoration equation. Its `same_runtime` and `encodes_function` theorems preserve the captured store, world, authority, metadata and earlier function payloads while allowing heap observation to append handle slots.
+
+Public `Session.SnapshotAt.restored_indexed` identifies the actual restored indexed session. `RecursiveNamedPublicRestoredHistory.restored_history` consumes that connection and the saved branch's history; `restore_snapshot_history` also accepts the ownership-checked `Session.restoreSnapshot` result. `CallableIndexedOwnedPreparedStagedRestoredHistoryPublicBounds` exposes `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. They invoke the existing history endpoints with the produced history, retaining full Source applications, native results/stores, public sessions and caller `ResultAt`.
+
+Restoration resumes the captured ready branch. It does not carry later allocations, mutations or later-issued handles from another branch into that saved history. This proof does not cover suspended snapshots or automatically add handles first exposed by heap observation. Direct function outputs can be remembered by the existing continuation adapters; collecting functions nested in output containers remains open.
+
+`SourceCoreUnifiedPreparationCertificates.compiled_planPrepared` recovers the executable-plan preparation equation from the compiled object's original records. History bounds, successful continuations, the initialized seed and restored bounds use it internally, so their callers no longer supply `acceptedPlan`.
+
+The fixed function model, body/receiving registries, exact structural inputs and `Extends encodedValues.registry receiving` remain required. So do `OrdinarySequenceFor`, named `Terminal` and `NamedSupport` certificates. Assignment and match statements in the mutable regression are outside the current supported body grammar; that fixture does not instantiate these semantic endpoints.
+
+Focused verification passes the strict public regression and its complete runtime fixture. The combined issued/retained input returns integer `233`, then `47`/`117`; ready restoration returns `39`/`110` from saved captures `38`/`109`, despite the original branch reaching `47`. Incorrect nested handles are rejected. Duplicate-row swaps leave the `176` and `233` aggregates unchanged; the differing follow-ups (`38`/`109` versus `39`/`108`, and `47`/`117` versus `48`/`116`) detect row order. Strict Lean, full build (5991 jobs), all registered tests and kernel policy pass. Independent snapshot review found no issues. The eighteen checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Estimates are unchanged.
 
 ## Retained functions across successful calls (2026-10-12)
 
