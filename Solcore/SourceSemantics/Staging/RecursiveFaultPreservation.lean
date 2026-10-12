@@ -207,7 +207,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
 
 private theorem all (wellFormed : ProgramWellFormed program) (size : Nat) :
     ExpressionAt program registry size ∧ ExpressionsAt program registry size ∧
-    AppliesAt program registry size ∧ StatementsAt program registry size ∧ WhileAt program registry size := by
+    AppliesAt program registry size ∧ StatementsAt program registry size ∧ WhileAt program registry size ∧ MatchAt program registry size := by
   induction size using Nat.strongRecOn with
   | ind size ih =>
       exact ⟨expression_step wellFormed size (fun smaller below => (ih smaller below).1)
@@ -217,10 +217,13 @@ private theorem all (wellFormed : ProgramWellFormed program) (size : Nat) :
         applies_step wellFormed size (fun smaller below => (ih smaller below).2.2.2.1),
         statements_step wellFormed size (fun smaller below => (ih smaller below).1)
           (fun smaller below => (ih smaller below).2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2),
+          (fun smaller below => (ih smaller below).2.2.2.2.1)
+          (fun smaller below => (ih smaller below).2.2.2.2.2),
         while_step wellFormed size (fun smaller below => (ih smaller below).1)
           (fun smaller below => (ih smaller below).2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2)⟩
+          (fun smaller below => (ih smaller below).2.2.2.2.1),
+        match_step wellFormed size (fun smaller below => (ih smaller below).1)
+          (fun smaller below => (ih smaller below).2.2.2.1)⟩
 
 /-- Any supported staged expression fault retains a deeply typed heap and all
 heap type identities from its initial state. -/

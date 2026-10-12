@@ -46,6 +46,57 @@ def StatementsPlain (program : Program) (mode : Bool) (scope : Scope) (context :
   | .fault (.stage ..) => True
 
 
+/-- Pattern selection itself contains no staged evaluation; only its actual
+scrutinee and chosen body are erased, retaining the original allocations. -/
+def MatchPlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (resolution : MatchResolution)
+    (outcome : BodyOutcome) (after : Heap) : Prop :=
+  ∀ id node, ContainsStatement scope.source id node → node.form = .matchWith resolution →
+  match outcome with
+  | .fallthrough finalEnvironment => StatementExecutes program context scope.evidence scope.source environment before id
+      context (.fallthrough finalEnvironment) after
+  | .returned value => StatementExecutes program context scope.evidence scope.source environment before id context (.returned value) after
+  | .fault (.semantic reason) => StatementFaults program context scope.evidence scope.source environment before id reason after
+  | .fault (.stage ..) => True
+
+theorem MatchPlain.arm {program : Program} {scope : Scope} {context armContext finalContext : Context}
+    {environment armEnvironment : Environment} {before middle hidden bound after : Heap}
+    {resolution : MatchResolution} {node : ExpressionNode} {value : Value} {location : Location}
+    {statements : List StatementId} {bindings : List (TypedBinder × Value)} {outcome : BodyOutcome}
+    (contains : ContainsExpression scope.source resolution.scrutinee node)
+    (scrutinee : ExpressionEvaluates program context scope.evidence scope.source environment before resolution.scrutinee value middle)
+    (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+    (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.arm statements bindings))
+    (extended : BindersExtend scope.source.owner context (bindings.map Prod.fst) armContext)
+    (allocated : BindersAllocate environment hidden (bindings.map Prod.fst) (bindings.map Prod.snd) armEnvironment bound)
+    (body : StatementsPlain program false scope armContext armEnvironment bound statements finalContext outcome after) :
+    MatchPlain program scope context environment before resolution (outcome.restore environment) after := by
+  intro id statement found form
+  cases outcome with
+  | fallthrough => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
+  | returned => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .matchArmBody found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
+
+theorem MatchPlain.default {program : Program} {scope : Scope} {context finalContext : Context}
+    {environment : Environment} {before middle hidden after : Heap}
+    {resolution : MatchResolution} {node : ExpressionNode} {value : Value} {location : Location}
+    {statements : List StatementId} {outcome : BodyOutcome}
+    (contains : ContainsExpression scope.source resolution.scrutinee node)
+    (scrutinee : ExpressionEvaluates program context scope.evidence scope.source environment before resolution.scrutinee value middle)
+    (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+    (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.default statements))
+    (body : StatementsPlain program false scope context environment hidden statements finalContext outcome after) :
+    MatchPlain program scope context environment before resolution (outcome.restore environment) after := by
+  intro id statement found form
+  cases outcome with
+  | fallthrough => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
+  | returned => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .matchDefaultBody found form contains scrutinee hiddenAllocated selected body
+
 /-- Ordinary loop outcomes retain their finite independent iterations. -/
 def WhilePlain (program : Program) (scope : Scope) (context : Context)
     (environment : Environment) (before : Heap) (condition : ExpressionId)
@@ -264,6 +315,7 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
     (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
   case atomicValue contains _ uncoerced valueRule =>
     exact .intro contains (by simpa only [uncoerced] using valueRule) (by simpa only [uncoerced] using CoercionPathExecutes.nil)
   case atomicFault contains _ uncoerced faultRule =>
@@ -469,6 +521,32 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     | stage => trivial
     | semantic => exact .body testIH bodyIH
   case next test body next testIH bodyIH nextIH => exact WhilePlain.next testIH bodyIH nextIH
+
+  case matchReturned contains form matched ih =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
+  case matchFault contains form matched ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (ih _ _ contains form)
+  case matchFallthrough contains form matched next matchIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form]) (matchIH _ _ contains form) nextIH
+  case scrutineeFault scrutinee ih =>
+    rename_i failure
+    intro id node contains form
+    cases failure with
+    | stage => trivial
+    | semantic => exact .matchScrutinee contains form ih
+  case patternFault contains scrutinee allocated invalid ih =>
+    intro id node found form
+    exact .matchPattern found form contains ih allocated invalid
+  case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+    exact MatchPlain.arm contains scrutineeIH hidden selected extended allocated bodyIH
+  case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+    exact MatchPlain.default contains scrutineeIH hidden selected bodyIH
+  case noBranch contains scrutinee hidden selected ih =>
+    intro id node found form
+    exact .matchNoBranch found form contains ih hidden selected
 
 /-- Successful recursively staged expressions retain their ordinary source
 meaning, including all nested closure-body computations. -/

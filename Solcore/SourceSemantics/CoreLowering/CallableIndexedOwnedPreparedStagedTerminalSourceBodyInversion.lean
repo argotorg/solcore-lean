@@ -39,6 +39,7 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | returning rest contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
     | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
     | whileReturned actual form _ | whileFault actual form _ | whileFallthrough actual form _ _
     | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _
@@ -103,6 +104,7 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | tail contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
     | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
     | whileReturned actual form _ | whileFault actual form _ | whileFallthrough actual form _ _
     | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _

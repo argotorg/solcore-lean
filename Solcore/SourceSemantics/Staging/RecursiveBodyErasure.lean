@@ -17,6 +17,7 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     (motive_2 := fun _ _ _ _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ _ => True)
     (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
   all_goals try exact True.intro
   case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
@@ -114,6 +115,32 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | semantic => exact .body test.value_plain bodyIH
   case next test body next _testIH bodyIH nextIH => exact WhilePlain.next test.value_plain bodyIH nextIH
 
+  case matchReturned contains form matched ih =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
+  case matchFault contains form matched ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (ih _ _ contains form)
+  case matchFallthrough contains form matched next matchIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form]) (matchIH _ _ contains form) nextIH
+  case scrutineeFault scrutinee ih =>
+    rename_i failure
+    intro id node contains form
+    cases failure with
+    | stage => trivial
+    | semantic => exact .matchScrutinee contains form scrutinee.semanticFault_plain
+  case patternFault contains scrutinee allocated invalid ih =>
+    intro id node found form
+    exact .matchPattern found form contains scrutinee.value_plain allocated invalid
+  case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+    exact MatchPlain.arm contains scrutinee.value_plain hidden selected extended allocated bodyIH
+  case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+    exact MatchPlain.default contains scrutinee.value_plain hidden selected bodyIH
+  case noBranch contains scrutinee hidden selected ih =>
+    intro id node found form
+    exact .matchNoBranch found form contains scrutinee.value_plain hidden selected
+
 /-- Loops retain their actual finite ordinary iterations, including nested calls. -/
 theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap}
@@ -125,6 +152,7 @@ theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_2 := fun _ _ _ _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ _ => True)
     (motive_4 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_6 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case done test _ih => exact .done test.value_plain
   case conditionFault test _ih =>
@@ -139,6 +167,30 @@ theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     | stage => trivial
     | semantic => exact .body test.value_plain body.body_plain
   case next test body next _testIH _bodyIH nextIH => exact WhilePlain.next test.value_plain body.body_plain nextIH
+
+/-- Match erasure retains its actual selected arm and allocation prefix. -/
+theorem Match.plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap}
+    {resolution : MatchResolution} {outcome : BodyOutcome}
+    (trace : Match program registry scope context environment before resolution outcome after) :
+    MatchPlain program scope context environment before resolution outcome after := by
+  cases trace with
+  | scrutineeFault scrutinee =>
+      rename_i failure
+      intro id node contains form
+      cases failure with
+      | stage => trivial
+      | semantic => exact .matchScrutinee contains form scrutinee.semanticFault_plain
+  | patternFault contains scrutinee allocated invalid =>
+      intro id node found form
+      exact .matchPattern found form contains scrutinee.value_plain allocated invalid
+  | arm contains scrutinee hidden selected extended allocated body =>
+      exact MatchPlain.arm contains scrutinee.value_plain hidden selected extended allocated body.body_plain
+  | default contains scrutinee hidden selected body =>
+      exact MatchPlain.default contains scrutinee.value_plain hidden selected body.body_plain
+  | noBranch contains scrutinee hidden selected =>
+      intro id node found form
+      exact .matchNoBranch found form contains scrutinee.value_plain hidden selected
 
 /-- A scoped arm retains the independent ordinary sequence and its actual heap. -/
 theorem StatementsIn.returned_scoped {program : Program} {registry : Registry} {scope : Scope}

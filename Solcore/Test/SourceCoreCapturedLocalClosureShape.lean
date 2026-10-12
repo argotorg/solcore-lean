@@ -38,6 +38,7 @@ private theorem returned_expression
   have same {other : StatementNode} (contains : ContainsStatement scope.source id other) : other = node :=
     Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
   cases trace with
+  | matchReturned contains otherForm _ | matchFallthrough contains otherForm _ _
   | blockReturned contains otherForm _ | blockFallthrough contains otherForm _ _
   | whileReturned contains otherForm _ | whileFallthrough contains otherForm _ _
   | ifReturned contains otherForm _ _ | ifFallthrough contains otherForm _ _ _ =>
@@ -211,6 +212,7 @@ theorem ActualHeader.returned_capture
         other = observed.shape.initialized :=
       Option.some.inj ((lookupStatement?_complete unique contains).symm.trans initializedFound)
     cases body with
+    | matchReturned contains otherForm _ | matchFallthrough contains otherForm _ _
     | blockReturned contains otherForm _ | blockFallthrough contains otherForm _ _
     | whileReturned contains otherForm _ | whileFallthrough contains otherForm _ _
     | ifReturned contains otherForm _ _ | ifFallthrough contains otherForm _ _ _ =>

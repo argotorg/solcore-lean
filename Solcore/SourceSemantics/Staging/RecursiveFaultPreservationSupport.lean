@@ -63,6 +63,20 @@ def WhileAt (size : Nat) : Prop :=
     Size.While program registry size scope context environment before condition statements (.fault failure) after →
     HeapWellTyped context after ∧ HeapTypesExtend before after
 
+/-- Match faults retain the actual hidden and pattern-binder allocations. -/
+def MatchAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context : Context} {environment : Environment}
+    {before after : Heap} {resolution : MatchResolution} {outcome : BodyOutcome}
+    {failure : Failure} {control : ControlContext} {type : TypeSystem.Ty} {caseFacts : List BodyFacts},
+    SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
+    EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+    ExpressionHasType scope.source context resolution.scrutinee type →
+    MatchCasesHaveType scope.source control context type resolution.cases caseFacts →
+    (∀ statements, resolution.defaultBody = some statements →
+      ∃ final facts, StatementsHaveType scope.source control context statements final facts) →
+    Size.Match program registry size scope context environment before resolution outcome after →
+    outcome = .fault failure → HeapWellTyped context after ∧ HeapTypesExtend before after
+
 variable {program registry}
 
 /-- A typed successful prefix uses its actual erasure; no completion is added

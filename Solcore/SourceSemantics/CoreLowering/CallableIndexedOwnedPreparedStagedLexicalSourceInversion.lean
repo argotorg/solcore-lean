@@ -50,6 +50,7 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
@@ -94,6 +95,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
@@ -132,6 +134,7 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | returnUnit actual same => exact ⟨rfl, rfl, rfl⟩
   | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _

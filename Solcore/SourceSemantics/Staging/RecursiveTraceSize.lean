@@ -303,6 +303,19 @@ mutual
         (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.fallthrough innerEnvironment) middle)
         (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [innerSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | matchReturned {matchSize : Nat} {mode scope context environment before after id rest node resolution value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry matchSize scope context environment before resolution (.returned value) after) :
+        StatementsIn program registry mode (stepSize [matchSize]) scope context environment before (id :: rest) context (.returned value) after
+    | matchFault {matchSize : Nat} {mode scope context environment before after id rest node resolution failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry matchSize scope context environment before resolution (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [matchSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | matchFallthrough {matchSize nextSize : Nat} {mode scope context finalContext environment before middle after id rest node resolution outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry matchSize scope context environment before resolution (.fallthrough environment) middle)
+        (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [matchSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     | whileReturned {loopSize : Nat} {mode scope context environment before after id rest node condition statements value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
         (loop : While program registry loopSize scope context environment before condition statements (.returned value) after) :
@@ -394,13 +407,50 @@ mutual
         (next : While program registry nextSize scope context environment bodyHeap condition statements outcome after) :
         While program registry (stepSize [testSize, bodySize, nextSize]) scope context environment before condition statements outcome after
 
+  /-- The original source's ordered pattern decision and real allocations are
+  independent of the compiler. Selected bodies keep the same staged registry. -/
+  inductive Match (program : Program) (registry : Registry) :
+      Nat → Scope → Context → Environment → Heap → MatchResolution → BodyOutcome → Heap → Prop where
+    | scrutineeFault {scrutineeSize : Nat} {scope context environment before after resolution failure}
+        (scrutinee : Expression program registry scrutineeSize scope context environment before resolution.scrutinee (.fault failure) after) :
+        Match program registry (stepSize [scrutineeSize]) scope context environment before resolution (.fault failure) after
+    | patternFault {scrutineeSize : Nat} {scope context environment before middle hidden resolution node value location}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scrutineeSize scope context environment before resolution.scrutinee (.value value) middle)
+        (allocated : Heap.Allocates middle node.type (some value) location hidden)
+        (invalid : MatchCasesPatternFault context value resolution.cases) :
+        Match program registry (stepSize [scrutineeSize]) scope context environment before resolution (.fault (.semantic .invalidPattern)) hidden
+    | arm {scrutineeSize bodySize : Nat} {scope context armContext finalContext environment armEnvironment before middle hidden bound after
+          resolution node value location statements bindings outcome}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scrutineeSize scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.arm statements bindings))
+        (extended : BindersExtend scope.source.owner context (bindings.map Prod.fst) armContext)
+        (allocated : BindersAllocate environment hidden (bindings.map Prod.fst) (bindings.map Prod.snd) armEnvironment bound)
+        (body : StatementsIn program registry false bodySize scope armContext armEnvironment bound statements finalContext outcome after) :
+        Match program registry (stepSize [scrutineeSize, bodySize]) scope context environment before resolution (outcome.restore environment) after
+    | default {scrutineeSize bodySize : Nat} {scope context finalContext environment before middle hidden after resolution node value location statements outcome}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scrutineeSize scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.default statements))
+        (body : StatementsIn program registry false bodySize scope context environment hidden statements finalContext outcome after) :
+        Match program registry (stepSize [scrutineeSize, bodySize]) scope context environment before resolution (outcome.restore environment) after
+    | noBranch {scrutineeSize : Nat} {scope context environment before middle hidden resolution node value location}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scrutineeSize scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody .noBranch) :
+        Match program registry (stepSize [scrutineeSize]) scope context environment before resolution (.fallthrough environment) hidden
+
 end
 
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough)
 end Statements
 
 
@@ -473,6 +523,14 @@ local macro "erase_stage_grade" : tactic =>
     case returned => apply Recursive.While.returned <;> assumption
     case bodyFault => apply Recursive.While.bodyFault <;> assumption
     case next => apply Recursive.While.next <;> assumption
+    case matchReturned => apply Recursive.StatementsIn.matchReturned <;> assumption
+    case matchFault => apply Recursive.StatementsIn.matchFault <;> assumption
+    case matchFallthrough => apply Recursive.StatementsIn.matchFallthrough <;> assumption
+    case scrutineeFault => apply Recursive.Match.scrutineeFault <;> assumption
+    case patternFault => apply Recursive.Match.patternFault <;> assumption
+    case arm => apply Recursive.Match.arm <;> assumption
+    case default => apply Recursive.Match.default <;> assumption
+    case noBranch => apply Recursive.Match.noBranch <;> assumption
   ))
 
 local macro "construct_stage_grade" : tactic =>
@@ -683,6 +741,30 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨bodySize, gradedBody⟩ := bodyIH
       obtain ⟨nextSize, gradedNext⟩ := nextIH
       exact ⟨_, .next gradedTest gradedBody gradedNext⟩
+    case matchReturned contains form matched ih | matchFault contains form matched ih =>
+      obtain ⟨matchSize, graded⟩ := ih
+      first | exact ⟨_, .matchReturned contains form graded⟩ | exact ⟨_, .matchFault contains form graded⟩
+    case matchFallthrough contains form matched next matchIH nextIH =>
+      obtain ⟨matchSize, gradedMatch⟩ := matchIH
+      obtain ⟨nextSize, gradedNext⟩ := nextIH
+      exact ⟨_, .matchFallthrough contains form gradedMatch gradedNext⟩
+    case scrutineeFault scrutinee ih =>
+      obtain ⟨scrutineeSize, graded⟩ := ih
+      exact ⟨_, .scrutineeFault graded⟩
+    case patternFault contains scrutinee allocated invalid ih =>
+      obtain ⟨scrutineeSize, graded⟩ := ih
+      exact ⟨_, .patternFault contains graded allocated invalid⟩
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      obtain ⟨scrutineeSize, gradedScrutinee⟩ := scrutineeIH
+      obtain ⟨bodySize, gradedBody⟩ := bodyIH
+      exact ⟨_, .arm contains gradedScrutinee hidden selected extended allocated gradedBody⟩
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      obtain ⟨scrutineeSize, gradedScrutinee⟩ := scrutineeIH
+      obtain ⟨bodySize, gradedBody⟩ := bodyIH
+      exact ⟨_, .default contains gradedScrutinee hidden selected gradedBody⟩
+    case noBranch contains scrutinee hidden selected ih =>
+      obtain ⟨scrutineeSize, graded⟩ := ih
+      exact ⟨_, .noBranch contains graded hidden selected⟩
   ))
 
 theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
@@ -695,6 +777,7 @@ theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
     (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
     (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
   erase_stage_grade
 
 theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
@@ -707,6 +790,7 @@ theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
     (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
     (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
   erase_stage_grade
 
 theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
@@ -719,6 +803,7 @@ theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
     (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
     (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
   erase_stage_grade
 
 theorem StatementsIn.sound {mode : Bool} {program : Program} {registry : Registry} {size : Nat}
@@ -731,6 +816,7 @@ theorem StatementsIn.sound {mode : Bool} {program : Program} {registry : Registr
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
     (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
   erase_stage_grade
 
 theorem Expression.of_trace {program : Program} {registry : Registry}
@@ -743,6 +829,7 @@ theorem Expression.of_trace {program : Program} {registry : Registry}
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
     (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
   construct_stage_grade
 
 theorem Expressions.of_trace {program : Program} {registry : Registry}
@@ -755,6 +842,7 @@ theorem Expressions.of_trace {program : Program} {registry : Registry}
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
     (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
   construct_stage_grade
 
 theorem Applies.of_trace {program : Program} {registry : Registry}
@@ -767,6 +855,7 @@ theorem Applies.of_trace {program : Program} {registry : Registry}
     (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
     (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
   construct_stage_grade
 
 theorem StatementsIn.of_trace {mode : Bool} {program : Program} {registry : Registry}
@@ -779,6 +868,7 @@ theorem StatementsIn.of_trace {mode : Bool} {program : Program} {registry : Regi
     (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
   construct_stage_grade
 
 theorem While.sound {program : Program} {registry : Registry} {size : Nat}
@@ -791,6 +881,7 @@ theorem While.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
     (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
   erase_stage_grade
 
 theorem While.of_trace {program : Program} {registry : Registry}
@@ -803,6 +894,7 @@ theorem While.of_trace {program : Program} {registry : Registry}
     (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
     (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
   construct_stage_grade
 
 /-- Preserve the original true-mode field-notation API. -/
@@ -819,5 +911,31 @@ theorem Statements.of_trace {program : Program} {registry : Registry}
     (trace : Recursive.Statements program registry scope context environment before roots finalContext outcome after) :
     ∃ size, Statements program registry size scope context environment before roots finalContext outcome after :=
   StatementsIn.of_trace trace
+
+theorem Match.sound {program : Program} {registry : Registry} {size : Nat}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {resolution : MatchResolution} {outcome : BodyOutcome}
+    (trace : Match program registry size scope context environment before resolution outcome after) :
+    Recursive.Match program registry scope context environment before resolution outcome after := by
+  induction trace using Match.rec
+    (motive_1 := fun _ scope context environment before id outcome after _ => Recursive.Expression program registry scope context environment before id outcome after)
+    (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
+    (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
+    (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
+    (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+  erase_stage_grade
+
+theorem Match.of_trace {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {resolution : MatchResolution} {outcome : BodyOutcome}
+    (trace : Recursive.Match program registry scope context environment before resolution outcome after) :
+    ∃ size, Match program registry size scope context environment before resolution outcome after := by
+  induction trace using Recursive.Match.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
+    (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
+    (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+  construct_stage_grade
 
 end Solcore.SourceSemantics.Staging.Recursive.Size

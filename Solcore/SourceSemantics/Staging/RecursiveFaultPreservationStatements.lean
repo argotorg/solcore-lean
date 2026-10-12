@@ -41,7 +41,8 @@ and binder allocation, and the strictly smaller faulting child exactly once. -/
 theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
-    (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller) :
+    (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller)
+    (matchIH : ∀ smaller, smaller < size → MatchAt program registry smaller) :
     StatementsAt program registry size := by
   intro mode scope context staticFinal runtimeFinal environment before after statements failure control facts
     runtime covers locals heap typed trace
@@ -187,6 +188,39 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
       exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | @matchFault matchSize mode scope context environment before after id rest node resolution failure
+      contains form matched =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      have common : ∃ type caseFacts,
+          ExpressionHasType scope.source context resolution.scrutinee type ∧
+          MatchCasesHaveType scope.source control context type resolution.cases caseFacts ∧
+          (∀ statements, resolution.defaultBody = some statements →
+            ∃ final facts, StatementsHaveType scope.source control context statements final facts) := by
+        cases formTyped with
+        | matchWithoutDefault absent scrutineeTyped casesTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by simp_all⟩
+        | matchWithDefault present scrutineeTyped casesTyped defaultTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by
+            cases Option.some.inj (present.symm.trans found)
+            exact ⟨_, _, defaultTyped⟩⟩
+      obtain ⟨type, caseFacts, scrutineeTyped, casesTyped, defaults⟩ := common
+      exact matchIH matchSize (Size.child_lt_stepSize (by simp))
+        runtime covers locals heap scrutineeTyped casesTyped defaults matched rfl
+  | @matchFallthrough matchSize nextSize mode scope context finalContext environment before middle after
+      id rest node resolution outcome contains form matched next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) middle := matched.sound.plain _ _ contains form
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before middle [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
   | @whileFault loopSize mode scope context environment before after id rest node condition statements failure
       contains form loop =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
@@ -290,5 +324,88 @@ theorem while_step (wellFormed : ProgramWellFormed program) (size : Nat)
         runtime covers ((locals.mono testExtends).mono preserved.heap_extends) preserved.heap_typed
         conditionTyped bodyTyped next
       exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans nextExtends)⟩
+
+/-- Only the selected arm runs; its real binder frame is restored after a fault. -/
+theorem match_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
+    MatchAt program registry size := by
+  intro scope context environment before after resolution outcome failure control type caseFacts
+    runtime covers locals heap scrutineeTyped casesTyped defaultTyped trace failed
+  cases trace with
+  | @scrutineeFault childSize scope context environment before after resolution actualFailure scrutinee =>
+      cases BodyOutcome.fault.inj failed
+      exact expressionIH childSize (Size.child_lt_stepSize (by simp))
+        runtime covers locals heap scrutineeTyped scrutinee
+  | @patternFault childSize scope context environment before middle hidden resolution node value location
+      contains scrutinee allocated invalid =>
+      obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
+        runtime covers locals heap scrutineeTyped scrutinee
+      obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
+      have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+          (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+      subst typedNode
+      exact ⟨middleTyped.allocate (.some (sameType ▸ valueTyped)) allocated,
+        firstExtends.trans (HeapTypesExtend.of_allocation allocated)⟩
+  | @arm childSize bodySize scope context armContext finalContext environment armEnvironment
+      before middle hidden bound after resolution node value location statements bindings outcome
+      contains scrutinee hiddenAllocated selected extended allocated body =>
+      cases outcome with
+      | fallthrough => cases failed
+      | returned => cases failed
+      | fault actualFailure =>
+        cases BodyOutcome.fault.inj failed
+        obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
+          runtime covers locals heap scrutineeTyped scrutinee
+        obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
+        have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+          (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+        subst typedNode
+        have hiddenTyped := middleTyped.allocate (.some (sameType ▸ valueTyped)) hiddenAllocated
+        have hiddenExtends := HeapTypesExtend.of_allocation hiddenAllocated
+        obtain ⟨staticBinders, staticArmContext, staticFinal, armFacts,
+          bindingsTyped, bindersEq, staticExtended, armTyped, monomorphic⟩ :=
+          selected.armPreserves casesTyped (valueTyped.mono hiddenExtends)
+        have exactExtended : BindersExtend scope.source.owner context (bindings.map Prod.fst) staticArmContext :=
+          bindersEq.symm ▸ staticExtended
+        have sameContext := Solcore.SourceSemantics.Dynamic.BindersExtend.functional extended exactExtended
+        subst staticArmContext
+        have valuesTyped : ValuesHaveTypes context hidden (bindings.map Prod.snd)
+            ((bindings.map Prod.fst).map fun binder => binder.scheme.body) := by
+          simpa only [List.map_map, Function.comp_def] using bindingsTyped.unzip
+        have boundTyped := allocated.preservesHeapTyping hiddenTyped valuesTyped
+        have boundExtends := allocated.extendsHeapTypes
+        have armLocals := allocated.preservesEnvironmentAgreement exactExtended
+          (fun binder member => monomorphic binder (bindersEq ▸ member))
+          (locals.mono (firstExtends.trans hiddenExtends))
+        have fields := Solcore.SourceSemantics.Dynamic.BindersExtend.runtimeContextFields extended
+        have armClosed := fields.targetClosed runtime.closed
+        have boundAtArm := boundTyped.transportClosed fields.signatures runtime.closed armClosed
+          runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+        obtain ⟨afterTyped, bodyExtends⟩ := statementsIH bodySize (Size.child_lt_stepSize (by simp))
+          (runtime.transport fields) (fields.covers covers) armLocals boundAtArm armTyped body
+        exact ⟨afterTyped.transportClosed fields.signatures.symm armClosed runtime.closed
+          (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+          firstExtends.trans (hiddenExtends.trans (boundExtends.trans bodyExtends))⟩
+  | @default childSize bodySize scope context finalContext environment before middle hidden after
+      resolution node value location statements outcome contains scrutinee hiddenAllocated selected body =>
+      cases outcome with
+      | fallthrough => cases failed
+      | returned => cases failed
+      | fault actualFailure =>
+        cases BodyOutcome.fault.inj failed
+        obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
+          runtime covers locals heap scrutineeTyped scrutinee
+        obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
+        have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+          (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+        subst typedNode
+        have hiddenTyped := middleTyped.allocate (.some (sameType ▸ valueTyped)) hiddenAllocated
+        have hiddenExtends := HeapTypesExtend.of_allocation hiddenAllocated
+        obtain ⟨staticFinal, facts, bodyTyped⟩ := defaultTyped statements selected.defaultBody_eq
+        obtain ⟨afterTyped, bodyExtends⟩ := statementsIH bodySize (Size.child_lt_stepSize (by simp))
+          runtime covers (locals.mono (firstExtends.trans hiddenExtends)) hiddenTyped bodyTyped body
+        exact ⟨afterTyped, firstExtends.trans (hiddenExtends.trans bodyExtends)⟩
+  | noBranch => cases failed
 
 end Solcore.SourceSemantics.Staging.Recursive.FaultPreservation

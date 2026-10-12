@@ -47,6 +47,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -61,6 +62,12 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
@@ -76,6 +83,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -90,6 +98,12 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
@@ -105,6 +119,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -119,6 +134,12 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
@@ -135,6 +156,7 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -149,6 +171,12 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      rename_i outcome
+      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 

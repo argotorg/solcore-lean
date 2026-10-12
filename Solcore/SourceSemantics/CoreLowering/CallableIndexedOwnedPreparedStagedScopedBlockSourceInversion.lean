@@ -36,6 +36,7 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     subst other
     exact form
   cases trace with
+  | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _

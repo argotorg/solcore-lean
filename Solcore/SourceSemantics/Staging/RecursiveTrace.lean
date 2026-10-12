@@ -6,7 +6,7 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while loops, and returns.
+containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while loops, ordered match arms, and returns.
 Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
 heap changes remain visible to the following statements. The profile has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
@@ -16,6 +16,12 @@ judgments do not assert coverage of the full current compiler. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
 open Frontend Frontend.SourceInference Solcore.SourceSemantics.Dynamic
+
+/-- Leaving a match arm restores lexical bindings, while its heap is retained. -/
+def BodyOutcome.restore (environment : Environment) : BodyOutcome → BodyOutcome
+  | .fallthrough _ => .fallthrough environment
+  | .returned value => .returned value
+  | .fault failure => .fault failure
 
 inductive BodyResult : TypeSystem.Ty → BodyOutcome → Outcome → Prop where
   | returned {type value} : BodyResult type (.returned value) (.value value)
@@ -306,6 +312,19 @@ mutual
         (inner : StatementsIn program registry false scope context environment before statements innerContext (.fallthrough innerEnvironment) middle)
         (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | matchReturned {mode scope context environment before after id rest node resolution value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry scope context environment before resolution (.returned value) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | matchFault {mode scope context environment before after id rest node resolution failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry scope context environment before resolution (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | matchFallthrough {mode scope context finalContext environment before middle after id rest node resolution outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry scope context environment before resolution (.fallthrough environment) middle)
+        (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     | whileReturned {mode scope context environment before after id rest node condition statements value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
         (loop : While program registry scope context environment before condition statements (.returned value) after) :
@@ -399,6 +418,44 @@ mutual
         While program registry scope context environment before condition statements outcome after
 
 
+  /-- The original source's ordered pattern decision and real allocations are
+  independent of the compiler. Selected bodies keep the same staged registry. -/
+  inductive Match (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → MatchResolution → BodyOutcome → Heap → Prop where
+    | scrutineeFault {scope context environment before after resolution failure}
+        (scrutinee : Expression program registry scope context environment before resolution.scrutinee (.fault failure) after) :
+        Match program registry scope context environment before resolution (.fault failure) after
+    | patternFault {scope context environment before middle hidden resolution node value location}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scope context environment before resolution.scrutinee (.value value) middle)
+        (allocated : Heap.Allocates middle node.type (some value) location hidden)
+        (invalid : MatchCasesPatternFault context value resolution.cases) :
+        Match program registry scope context environment before resolution (.fault (.semantic .invalidPattern)) hidden
+    | arm {scope context armContext finalContext environment armEnvironment before middle hidden bound after
+          resolution node value location statements bindings outcome}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.arm statements bindings))
+        (extended : BindersExtend scope.source.owner context (bindings.map Prod.fst) armContext)
+        (allocated : BindersAllocate environment hidden (bindings.map Prod.fst) (bindings.map Prod.snd) armEnvironment bound)
+        (body : StatementsIn program registry false scope armContext armEnvironment bound statements finalContext outcome after) :
+        Match program registry scope context environment before resolution (outcome.restore environment) after
+    | default {scope context finalContext environment before middle hidden after resolution node value location statements outcome}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody (.default statements))
+        (body : StatementsIn program registry false scope context environment hidden statements finalContext outcome after) :
+        Match program registry scope context environment before resolution (outcome.restore environment) after
+    | noBranch {scope context environment before middle hidden resolution node value location}
+        (contains : ContainsExpression scope.source resolution.scrutinee node)
+        (scrutinee : Expression program registry scope context environment before resolution.scrutinee (.value value) middle)
+        (hiddenAllocated : Heap.Allocates middle node.type (some value) location hidden)
+        (selected : MatchCasesSelect context value resolution.cases resolution.defaultBody .noBranch) :
+        Match program registry scope context environment before resolution (.fallthrough environment) hidden
+
+
 end
 
 /-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
@@ -406,7 +463,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough)
 end Statements
 
 end Solcore.SourceSemantics.Staging.Recursive
