@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct calls inside retained closure bodies (2026-10-13)
+
+Commits `2b9fbd92` and `8d5bb1e6` connect retained closure captures, canonical body roots, the shared recursive proof and the actual public sequence. The body producer derives its packet, original Source typing, ledger coverage, read diagnostics and complete direct-call authority from the retained compiler record. The parameter-entry spine identifies the actual frame after installation; the proof retains the exact reached caller and its full record lists when restoring the outer call.
+
+The fixture uses two actual named compiler rows, `identity` and `make`. Its closure body contains the original direct `identity(seed)` call. Reflection follows all six public sessions and Source heaps. Forward theorems quantify every sufficient execution and output fuel at the six original checkpoints. Separate handles keep their respective captures through the intervening factory call and later reuse.
+
+Validation: all 3,026 affected modules pass coherent checks. The full build (6,539 jobs), all registered tests (12,948 build jobs and the final pass marker), kernel policy and 76 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is recursive mapping index children, including callable payloads and the current receiving registry for missing-default diagnostics. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct builtin calls through public sessions (2026-10-13)
 
 Commits `23740f15`, `cab7e4b0` and `4aeff59b` connect staged builtin evaluation, the accepted compiler action and public retained sessions. The Source rule evaluates the argument vector and applies the selected builtin. Its synthetic callee is authenticated statically. Compiler validation, original raw parameter types and physical native arguments agree before the actual contracted wrapper executes.

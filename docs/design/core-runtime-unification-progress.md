@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct calls inside retained closure bodies (2026-10-13)
+
+`2b9fbd92` connects direct declaration calls inside retained ordinary closure bodies to the shared numeric expression/body proof. The actual parameter entry supplies its binding spine and captured global slots. Original body typing, compiler-view equality, read diagnostics and the complete named Header inventory produce canonical roots internally.
+
+`8d5bb1e6` proves the six public calls `make(10); make(20); A(); make(30); B(); A()` for `make(seed) = lam() { return identity(seed); }`. Each invocation executes the retained direct `identity` call against its own captured environment. The observed results are `10 / 20 / 10`, with exact successive Source heaps, returned sessions and reusable handle history. All six calls have independent Source-to-public sufficient execution and output fuel bounds.
+
+Validation: all 3,026 affected modules pass coherent checks. The full build (6,539 jobs), all registered tests (12,948 build jobs and the final pass marker), kernel policy and 76 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is recursive mapping index children, including callable payloads and the current receiving registry for missing-default diagnostics. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct builtin calls through public sessions (2026-10-13)
 
 `23740f15` adds independent staged Source rules for direct builtin calls. `cab7e4b0` connects their actual compiler receipts, ordered arguments and literal callable wrapper to preservation and reflection. The native metadata producer retains the real evidence for integer literals.

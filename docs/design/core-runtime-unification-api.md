@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Direct calls inside retained closure bodies (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedClosureInvocationSpineBounds` retains the actual parameter binding spine. `CanonicalTerminalLambdaBodyBounds` and `CanonicalTerminalLambdaApplicationBounds` use the reached capture, globals and caller restoration. `MixedBodyStaticSupport.Packet.canonicalTerminal` connects these bodies to the shared recursive family.
+
+`CallableIndexedOwnedPreparedStagedOrdinaryCanonicalTerminalSupport.of_actual` derives the actual terminal packet and each canonical root. `GeneralBodyViewTransport` preserves the real compiler action, including direct and builtin validation of their synthetic callee nodes. `SourceCoreElaboration.validateBuiltinFunctionCall_congr` compares exact node lookups and owner metadata.
+
+The public endpoints are `Tests.SourceCoreClosureDirect.closed_sequence_meaning` and `closed_forward_meaning`. The latter combines `SequenceWitness.forward` for all three factory executions with `SequenceWitness.invocations_forward` for all three closure invocations. `runForward` checks the actual accepted source and six consecutive calls.
+
+Validation: all 3,026 affected modules pass coherent checks. The full build (6,539 jobs), all registered tests (12,948 build jobs and the final pass marker), kernel policy and 76 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is recursive mapping index children, including callable payloads and the current receiving registry for missing-default diagnostics. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct builtin calls through public sessions (2026-10-13)
 
 `CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt` records the authentic builtin compiler action. `CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.preserves` and `reflects` compose ordered child execution with the selected builtin and retain the reached heap and full result. The four recursive caller folds consume this receipt.

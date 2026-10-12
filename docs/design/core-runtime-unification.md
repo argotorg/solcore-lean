@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct calls inside retained closure bodies (2026-10-13)
+
+Ordinary terminal closure support now derives canonical compiler roots from the actual retained Code and parameter context. Named calls in a closure body use captured global slots after real parameter installation. The numeric expression/body family constructs both pool and canonical child laws together.
+
+The public fixture retains separate captures across two closures, an intervening factory execution and repeated calls of the older handle. Every creation and invocation has a Source-to-public sufficient-fuel theorem, including the direct call inside each invoked body.
+
+Validation: all 3,026 affected modules pass coherent checks. The full build (6,539 jobs), all registered tests (12,948 build jobs and the final pass marker), kernel policy and 76 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is recursive mapping index children, including callable payloads and the current receiving registry for missing-default diagnostics. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct builtin calls through public sessions (2026-10-13)
 
 Direct builtin calls now pass through the same recursive proof family as named and indirect calls. The certificate records genuine compiler validation, the original parameter types, ordered child actions, selected builtin identity and literal contracted call. The proof evaluates arguments once and then uses the existing builtin application semantics.
@@ -219,10 +229,10 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
 | Latest verified implementation | `fd2b9008` / `181fa159` / `bb21dcc0`: finite for initialization, body and post-header execution connect through actual compiler receipts to successive public sessions. |
-| Latest completed verification | Full build (6512 jobs), all registered tests, kernel policy and 52 endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive constructors, operators, direct named calls and direct builtin calls share the proof family. |
-| Latest proof scope | Six public sessions combine direct named and builtin calls with closure creation; retained captures return `10 / 20 / 10`. The proof keeps exact successive Source heaps and histories and derives sufficient fuel at the three creation checkpoints. |
-| Current implementation priority | Connect direct calls inside retained closure bodies, then recursive mapping index children and remaining compiler coverage. |
+| Latest completed verification | Full build (6539 jobs), all registered tests, kernel policy and 76 endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive constructors, operators, direct named and builtin calls, including named calls in retained closure bodies, share the proof family. |
+| Latest proof scope | Six consecutive factory/closure calls retain distinct captures across an intervening execution and reuse; all six have Source-to-public sufficient execution and output fuel bounds. |
+| Current implementation priority | Connect recursive mapping index children and their current receiving diagnostics, then remaining expression/control and compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
