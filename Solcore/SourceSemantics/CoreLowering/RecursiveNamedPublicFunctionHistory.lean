@@ -1,0 +1,328 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistoryEntries
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
+
+/-! Finite histories retain function exports through later successful calls.
+Every new state is the returned pool of an actual semantic result, and every
+new function is the corresponding public export. Captured references keep their
+identity while later calls supply the current heap contents and native world. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistory
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
+open SourceCoreIndexedSession CallableIndexedOwnedFunctionState
+open CallableIndexedOwnedFunctionValues (Header NamedCapture OwnedKey)
+open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+  (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  (receiving : SourceCoreRawMetadata.Registry)
+  (anchor : Header compiled (Program.ofChecked compiled.sourceProgram))
+
+abbrev Caller (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (store : Store) :=
+  State headers keys ⟨[], mapping, world, heap, store,
+    SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed⟩
+
+variable {headers keys functions receiving anchor}
+
+abbrev Result {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    (owner : OwnedKey keys) (caller : Caller headers keys mapping world heap store)
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (capture : NamedCapture headers owner.key header mapping world) (arguments : List Core.Value)
+    (outcome : Staging.Recursive.Outcome) (after : Dynamic.Heap) (native : Core.Value) (finalStore : Store)
+    (finalMap : LocationMap) (finalWorld : StoreTyping) (faults : RecursiveStageMeaning.FaultRep) :=
+  CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds.ResultAt
+    (registry := receiving) (payloads := arguments) functions owner caller header capture
+    anchor.function.context outcome after native finalStore finalMap finalWorld faults
+
+variable {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+  {owner : OwnedKey keys} {caller : Caller headers keys mapping world heap store}
+  {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+  {capture : NamedCapture headers owner.key header mapping world} {arguments : List Core.Value}
+  {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+  {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+
+/-- Remembering a result is an observation of this actual export, not a
+representation premise. Successful calls may also retain the history only. -/
+inductive Addition {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (completion : Completion artifact) (fuel : Nat) (sourceType : TypeSystem.Ty) (nativeType : Core.Ty)
+    (outcome : Staging.Recursive.Outcome) (native : Core.Value) : List Entry → Prop where
+  | skip : Addition checkpoint completion fuel sourceType nativeType outcome native []
+  | remember {source : Dynamic.Value} {payload : Core.Value} {handle : SourceCorePublicValues.Handle}
+      (requested : checkpoint.ResultTypeAt sourceType)
+      (sourceValue : outcome = .value source)
+      (nativeValue : native = .inRight .word payload)
+      (handleValue : completion.value = .function handle) :
+      Addition checkpoint completion fuel sourceType nativeType outcome native
+        [⟨sourceType, source, handle, payload, nativeType, fuel⟩]
+
+inductive History (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
+    (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+    (receiving : SourceCoreRawMetadata.Registry)
+    (anchor : Header compiled (Program.ofChecked compiled.sourceProgram)) {artifact : Artifact} :
+    (session : Session artifact) → (mapping : LocationMap) → (world : StoreTyping) →
+    (heap : Dynamic.Heap) → (store : Store) → Caller headers keys mapping world heap store → List Entry → Prop where
+  | first {session : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store}
+      {owner : OwnedKey keys} {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+      {capture : NamedCapture headers owner.key header mapping world} {arguments : List Core.Value}
+      {checkpoint : Checkpoint artifact} {key : SourceCoreIndexedSession.Key}
+      {publicArguments : List SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
+      {generation : SourceCorePublicValues.ExportGeneration} {completion : Completion artifact}
+      {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+      {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+      {added : List Entry} {recipe : Recipe} {root : Root compiled}
+      {encodedValues : SourceCoreCompatibleValues.Context}
+      (sameCompiled : recipe.compiled = compiled)
+      (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+        recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+      (selected : RecursiveNamedPublicRootMeaning.RootSelection
+        (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (program := Program.ofChecked compiled.sourceProgram) headers root header)
+      (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+      (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+        owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+      (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (post : Relates caller reached ∧
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context
+          header.function.resultType outcome reached)
+      (addition : Addition checkpoint completion outputFuel header.function.resultType header.output outcome native added) :
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached added
+  | next {session : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      {owner : OwnedKey keys} {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+      {capture : NamedCapture headers owner.key header mapping world} {arguments : List Core.Value}
+      {checkpoint : Checkpoint artifact} {key : SourceCoreIndexedSession.Key}
+      {publicArguments : List SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
+      {generation : SourceCorePublicValues.ExportGeneration} {completion : Completion artifact}
+      {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+      {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+      {added : List Entry} {recipe : Recipe} {root : Root compiled}
+      {encodedValues : SourceCoreCompatibleValues.Context}
+      (sameCompiled : recipe.compiled = compiled)
+      (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+        recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+      (selected : RecursiveNamedPublicRootMeaning.RootSelection
+        (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (program := Program.ofChecked compiled.sourceProgram) headers root header)
+      (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+      (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+        owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+      (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (post : Relates caller reached ∧
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context
+          header.function.resultType outcome reached)
+      (addition : Addition checkpoint completion outputFuel header.function.resultType header.output outcome native added) :
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached (entries ++ added)
+  | issued {session next : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      (continued : session.IssuanceChain next) :
+      History headers keys functions receiving anchor next mapping world heap store caller entries
+
+def EntriesAt {artifact : Artifact} (session : Session artifact)
+    (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (entries : List Entry) : Prop :=
+  ∀ entry ∈ entries,
+    session.EncodesAt entry.fuel entry.sourceType (.function entry.handle) entry.native ∧
+    ValueRep compiled.compatible.checked receiving functions mapping world
+      entry.sourceType entry.source entry.native entry.nativeType ∧
+    Dynamic.ValueHasType anchor.function.context heap entry.source entry.sourceType
+
+private theorem current_result {artifact : Artifact} {checkpoint : Checkpoint artifact}
+    {executionFuel outputFuel : Nat} {generation : SourceCorePublicValues.ExportGeneration}
+    {completion : Completion artifact}
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (reached : Caller headers keys finalMap finalWorld after finalStore)
+    (post : Relates caller reached ∧
+      CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+        CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context
+        header.function.resultType outcome reached) :
+    completion.session.NativeAt finalWorld finalStore ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions finalMap finalWorld after finalStore ∧
+    StableRows reached ∧ Dynamic.HeapWellTyped anchor.function.context after := by
+  obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
+  obtain ⟨_source, _outcome, _represented, heaps, worldEq, _returned, _related, _stable, typed, _valueTyped⟩ :=
+    RecursiveNamedPublicReturnedValues.returned_value result decoded
+  exact ⟨worldEq.symm ▸ succeeded.native_at.2, heaps, post.2.rows, typed⟩
+
+private theorem addition_entries {artifact : Artifact} {checkpoint : Checkpoint artifact}
+    {executionFuel outputFuel : Nat} {generation : SourceCorePublicValues.ExportGeneration}
+    {completion : Completion artifact} {added : List Entry}
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (addition : Addition checkpoint completion outputFuel header.function.resultType header.output outcome native added) :
+    EntriesAt (functions := functions) (receiving := receiving) (anchor := anchor)
+      completion.session finalMap finalWorld after added := by
+  cases addition with
+  | skip => intro entry member; cases member
+  | @remember source payload handle requested sourceValue nativeValue handleValue =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      rw [handleValue] at imported
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursiveNamedPublicReturnedValues.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      intro entry member
+      have sameEntry := List.mem_singleton.mp member
+      subst entry
+      exact ⟨imported, represented, valueTyped⟩
+
+/-- Every retained handle is represented at the current actual caller. This
+projection derives all entry laws by induction over genuine successful calls. -/
+theorem History.current {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries) :
+    session.NativeAt world store ∧
+    CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions mapping world heap store ∧
+    StableRows caller ∧ Dynamic.HeapWellTyped anchor.function.context heap ∧
+    EntriesAt (functions := functions) (receiving := receiving) (anchor := anchor) session mapping world heap entries := by
+  induction history with
+  | first sameCompiled started selected succeeded result reached post addition =>
+      have actual := current_result succeeded result reached post
+      exact ⟨actual.1, actual.2.1, actual.2.2.1, actual.2.2.2, addition_entries succeeded result addition⟩
+  | next prior sameCompiled started selected succeeded result reached post addition ih =>
+      have actual := current_result succeeded result reached post
+      refine ⟨actual.1, actual.2.1, actual.2.2.1, actual.2.2.2, ?_⟩
+      intro entry member
+      rcases List.mem_append.mp member with old | added
+      · obtain ⟨imported, represented, typed⟩ := ih.2.2.2.2 entry old
+        exact ⟨succeeded.encodes_function started.original imported,
+          represented.extend (.refl _) result.2.2.2.1 result.2.2.2.2.1,
+          typed.mono result.2.2.2.2.2.2.1⟩
+      · exact addition_entries succeeded result addition entry added
+  | issued prior continued ih =>
+      refine ⟨continued.same_runtime.native_at ih.1, ih.2.1, ih.2.2.1, ih.2.2.2.1, ?_⟩
+      intro entry member
+      obtain ⟨imported, represented, typed⟩ := ih.2.2.2.2 entry member
+      exact ⟨continued.encodes_function imported, represented, typed⟩
+
+private theorem success_shape {payload : Core.Value}
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (decoded : LanguageResult.decode? native = some (.succeeded payload)) :
+    ∃ source, outcome = .value source ∧ native = .inRight .word payload := by
+  cases result.2.1 with
+  | value represented =>
+      simp only [LanguageResult.decode?, Option.some.injEq, LanguageResult.Outcome.succeeded.injEq] at decoded
+      subst payload
+      exact ⟨_, rfl, rfl⟩
+  | fault represented => cases decoded
+
+section Success
+variable {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+  {checkpoint : Checkpoint artifact} {key : SourceCoreIndexedSession.Key}
+  {publicArguments : List SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
+  {generation : SourceCorePublicValues.ExportGeneration} {completion : Completion artifact}
+  {recipe : Recipe} {root : Root compiled} {encodedValues : SourceCoreCompatibleValues.Context}
+
+/-- The first actual success establishes the current state before any exports
+have been retained for later input. -/
+theorem first_success
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults) :
+    ∃ reached : Caller headers keys finalMap finalWorld after finalStore,
+      Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached [] := by
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, related, .first sameCompiled started selected succeeded result reached ⟨related, post⟩ .skip⟩
+
+/-- An intervening success retains all earlier handles, including when its
+own public result is ordinary data. -/
+theorem History.after_success
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults) :
+    ∃ reached : Caller headers keys finalMap finalWorld after finalStore,
+      Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached entries := by
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  refine ⟨reached, related, ?_⟩
+  simpa only [List.append_nil] using History.next history sameCompiled started selected succeeded result
+    reached ⟨related, post⟩ Addition.skip
+
+/-- The first retained function is selected from the actual successful Source
+outcome and exported native payload. -/
+theorem first_remembered
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (requested : checkpoint.ResultTypeAt header.function.resultType)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    {handle : SourceCorePublicValues.Handle} (handleValue : completion.value = .function handle) :
+    ∃ (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (source : Dynamic.Value) (payload : Core.Value),
+      outcome = .value source ∧ native = .inRight .word payload ∧ Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached [⟨header.function.resultType, source, handle, payload, header.output, outputFuel⟩] := by
+  obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
+  obtain ⟨source, sourceValue, nativeValue⟩ := success_shape result decoded
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, source, payload, sourceValue, nativeValue, related,
+    .first sameCompiled started selected succeeded result reached ⟨related, post⟩
+      (.remember requested sourceValue nativeValue handleValue)⟩
+
+/-- Each later export appends its exact Source/native pair to the complete
+ordered collection. No earlier entry is dropped or replaced. -/
+theorem History.remember_success
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (requested : checkpoint.ResultTypeAt header.function.resultType)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    {handle : SourceCorePublicValues.Handle} (handleValue : completion.value = .function handle) :
+    ∃ (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (source : Dynamic.Value) (payload : Core.Value),
+      outcome = .value source ∧ native = .inRight .word payload ∧ Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached (entries ++ [⟨header.function.resultType, source, handle, payload, header.output, outputFuel⟩]) := by
+  obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
+  obtain ⟨source, sourceValue, nativeValue⟩ := success_shape result decoded
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, source, payload, sourceValue, nativeValue, related,
+    .next history sameCompiled started selected succeeded result reached ⟨related, post⟩
+      (.remember requested sourceValue nativeValue handleValue)⟩
+end Success
+
+end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistory

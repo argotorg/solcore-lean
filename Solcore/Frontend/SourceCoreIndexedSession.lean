@@ -3857,3 +3857,230 @@ theorem Checkpoint.SucceededResultAt.reimports_function_after {artifact : Artifa
     continued.encodes_function encoded⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private def DecodedSlotsAppend (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (expected : Ty) (native : Core.Value) (value : Value) (returned : Registry artifact world),
+    decodeRaw authority generation values fuel slots expected native = .ok (value, returned) →
+    ∃ suffix, returned = slots ++ suffix
+
+private def DecodedPayloadSlotsAppend (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (types : List Ty) (native : Core.Value) (output : List Value) (returned : Registry artifact world),
+    decodePayloads authority generation values fuel slots types native = .ok (output, returned) →
+    ∃ suffix, returned = slots ++ suffix
+
+private def DecodedEntrySlotsAppend (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (keyType valueType : Ty) (layout : Core.OrderedMapping.Layout) (native : Core.Value)
+    (output : List (Value × Value)) (returned : Registry artifact world),
+    decodeEntries authority generation values fuel slots keyType valueType layout native = .ok (output, returned) →
+    ∃ suffix, returned = slots ++ suffix
+
+private theorem decode_raw_append_succ {fuel : Nat} (raw : DecodedSlotsAppend fuel)
+    (payloads : DecodedPayloadSlotsAppend fuel) (entries : DecodedEntrySlotsAppend fuel) :
+    DecodedSlotsAppend (fuel + 1) := by
+  intro artifact world authority generation values slots expected native value returned accepted
+  unfold decodeRaw at accepted
+  split at accepted
+  · obtain ⟨⟨handle, next⟩, registered, accepted⟩ := root_factory_bind_ok accepted
+    cases accepted
+    exact issuance_register_append registered
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+  · obtain ⟨⟨left, first⟩, leftAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨⟨right, second⟩, rightAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨a, firstEq⟩ := raw authority generation values slots _ _ left first (simple_mapError_ok leftAt)
+    obtain ⟨b, secondEq⟩ := raw authority generation values first _ _ right second (simple_mapError_ok rightAt)
+    have result : second = slots ++ (a ++ b) := by rw [secondEq, firstEq, List.append_assoc]
+    cases accepted
+    exact ⟨a ++ b, result⟩
+  · obtain ⟨data, _decoded, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+    · cases accepted
+  · obtain ⟨header, _headerAt, accepted⟩ := root_factory_bind_ok accepted
+    cases header <;> simp only [pure, Except.pure, bind, Except.bind, throw, throwThe] at accepted
+    case proxy => cases accepted
+    case constructor => cases accepted
+    rename_i keyType valueType
+    obtain ⟨layout, _layoutAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨⟨decoded, next⟩, decodedAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨fallback, _fallbackAt, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · have result := entries authority generation values slots keyType valueType layout _ decoded next decodedAt
+      cases accepted
+      exact result
+    · cases accepted
+  · obtain ⟨header, _headerAt, accepted⟩ := root_factory_bind_ok accepted
+    cases header <;> simp only [pure, Except.pure, bind, Except.bind, throw, throwThe] at accepted
+    case proxy => cases accepted
+    case mapping => cases accepted
+    rename_i instantiation
+    obtain ⟨tag, _tagAt, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · obtain ⟨⟨decoded, next⟩, decodedAt, accepted⟩ := root_factory_bind_ok accepted
+      have result := payloads authority generation values slots instantiation.payloadTypes _ decoded next decodedAt
+      cases accepted
+      exact result
+    · cases accepted
+  · obtain ⟨_projected, _projection, accepted⟩ := root_factory_bind_ok accepted
+    cases accepted
+
+private theorem decode_payloads_append_succ {fuel : Nat} (raw : DecodedSlotsAppend fuel)
+    (payloads : DecodedPayloadSlotsAppend fuel) : DecodedPayloadSlotsAppend (fuel + 1) := by
+  intro artifact world authority generation values slots types native output returned accepted
+  cases types with
+  | nil =>
+      cases native <;> simp only [decodePayloads] at accepted <;> cases accepted
+      exact ⟨[], (List.append_nil _).symm⟩
+  | cons type types =>
+      cases types with
+      | nil =>
+          simp only [decodePayloads] at accepted
+          obtain ⟨⟨value, next⟩, decoded, accepted⟩ := root_factory_bind_ok accepted
+          have result := raw authority generation values slots _ _ value next decoded
+          cases accepted
+          exact result
+      | cons type' types =>
+          cases native <;> simp only [decodePayloads] at accepted <;> try cases accepted
+          obtain ⟨⟨value, first⟩, firstAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨⟨rest, second⟩, restAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨a, firstEq⟩ := raw authority generation values slots _ _ value first firstAt
+          obtain ⟨b, secondEq⟩ := payloads authority generation values first _ _ rest second restAt
+          have result : second = slots ++ (a ++ b) := by rw [secondEq, firstEq, List.append_assoc]
+          cases accepted
+          exact ⟨a ++ b, result⟩
+
+private theorem decode_entries_append_succ {fuel : Nat} (raw : DecodedSlotsAppend fuel)
+    (entries : DecodedEntrySlotsAppend fuel) : DecodedEntrySlotsAppend (fuel + 1) := by
+  intro artifact world authority generation values slots keyType valueType layout native output returned accepted
+  unfold decodeEntries at accepted
+  split at accepted
+  · split at accepted
+    · cases accepted; exact ⟨[], (List.append_nil _).symm⟩
+    · cases accepted
+  · split at accepted
+    · obtain ⟨⟨key, first⟩, keyAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨⟨value, second⟩, valueAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨⟨rest, third⟩, restAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨a, firstEq⟩ := raw authority generation values slots keyType _ key first keyAt
+      obtain ⟨b, secondEq⟩ := raw authority generation values first valueType _ value second valueAt
+      obtain ⟨c, thirdEq⟩ := entries authority generation values second keyType valueType layout _ rest third restAt
+      have result : third = slots ++ (a ++ b ++ c) := by rw [thirdEq, secondEq, firstEq]; simp only [List.append_assoc]
+      cases accepted
+      exact ⟨a ++ b ++ c, result⟩
+    · cases accepted
+  · cases accepted
+
+private theorem decode_slots_append (fuel : Nat) :
+    DecodedSlotsAppend fuel ∧ DecodedPayloadSlotsAppend fuel ∧ DecodedEntrySlotsAppend fuel := by
+  induction fuel with
+  | zero =>
+      refine ⟨?_, ?_, ?_⟩
+      · intro artifact world authority generation values slots expected native value returned accepted
+        cases accepted
+      · intro artifact world authority generation values slots types native output returned accepted
+        cases types <;> cases native <;> simp only [decodePayloads] at accepted <;> cases accepted
+        exact ⟨[], (List.append_nil _).symm⟩
+      · intro artifact world authority generation values slots keyType valueType layout native output returned accepted
+        cases accepted
+  | succ fuel ih =>
+      exact ⟨decode_raw_append_succ ih.1 ih.2.1 ih.2.2,
+        decode_payloads_append_succ ih.1 ih.2.1, decode_entries_append_succ ih.1 ih.2.2⟩
+
+private theorem execution_resolve_weaken {artifact : Artifact} {world future : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    {expected : Ty} {handle : Handle} {native : Core.Value}
+    (accepted : resolve authority slots expected handle = .ok native)
+    (extension : Core.WorldExtends world future) :
+    resolve authority (slots.weaken extension) expected handle = .ok native := by
+  obtain ⟨slot, found, _value⟩ := resolved_slot accepted
+  simpa only [resolve, Registry.weaken, List.find?_map, Function.comp_def, found,
+    Option.map_some, pure, Except.pure, bind, Except.bind] using accepted
+
+private theorem execution_encode_function_at_registry
+    {artifact : Artifact} {world future : Core.StoreTyping}
+    {authority authority' : SessionAuthority}
+    {slots : Registry artifact world} {returned : Registry artifact future} {fuel : Nat}
+    {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {handle : Handle}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected (.function handle) = .ok encoded)
+    (resolved : resolve authority' returned expected handle = .ok encoded.value)
+    (receiving : SourceCoreRawMetadata.Registry) :
+    encodeRaw authority' returned fuel receiving expected (.function handle) =
+      .ok (.pure receiving encoded.value) := by
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view accepted
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold encodeRaw
+      rw [view]
+      dsimp only
+      rw [resolved]
+      rfl
+
+private theorem root_start_resolves_weaken
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {startupFuel : Nat}
+    (started : checkpoint.RootStart session key arguments startupFuel)
+    {expected : Ty} {handle : Handle} {native : Core.Value}
+    (resolved : resolve session.authority session.registry expected handle = .ok native)
+    {future : Core.StoreTyping} (extension : Core.WorldExtends checkpoint.world future) :
+    resolve checkpoint.origin.authority (checkpoint.registry.weaken extension) expected handle = .ok native := by
+  obtain ⟨root, _selected, _key, _arity, encoded, _encoded, origin, _request, world,
+    _initial, registry, _values⟩ := started
+  cases checkpoint
+  rename_i originSession request initialWorld state stored typed extension' initialRegistry values owner
+  change originSession = session at origin
+  subst originSession
+  change initialWorld = session.world at world
+  subst initialWorld
+  have registryEq : initialRegistry = session.registry := eq_of_heq registry
+  subst initialRegistry
+  exact execution_resolve_weaken resolved extension
+
+/-- An actual successful execution preserves every previously encoded function
+handle and its exact native payload, including captures. The new export may be
+arbitrarily nested; its decoder only reuses slots or appends fresh ones. -/
+theorem Checkpoint.SucceededResultAt.encodes_function
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {startupFuel executionFuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {completion : Completion artifact}
+    (succeeded : checkpoint.SucceededResultAt executionFuel boundaryFuel generation native store completion)
+    (started : checkpoint.RootStart session key arguments startupFuel)
+    {inputFuel : Nat} {expected : Ty} {handle : Handle} {payload : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) payload) :
+    completion.session.EncodesAt inputFuel expected (.function handle) payload := by
+  obtain ⟨oldEncoded, oldAt, oldValue⟩ := imported
+  obtain ⟨_completed, result, extension, slots, encoded, _decoded, decode, _encode, _recovered,
+    _sourceType, _boundary, _stored, world, authority, _sourcePrefix, values, _owner, registry,
+    _origin, _authenticated⟩ := succeeded
+  obtain ⟨suffix, slotsEq⟩ := (decode_slots_append boundaryFuel).1
+    checkpoint.origin.authority generation checkpoint.values _ _ _ _ slots decode
+  have resolved := root_start_resolves_weaken started (encoded_function_resolves oldAt) extension
+  have returnedResolved := issuance_resolve_append resolved suffix
+  rw [← slotsEq] at returnedResolved
+  have returnedEncoded := execution_encode_function_at_registry oldAt returnedResolved completion.session.values.registry
+  cases completion
+  rename_i value resultType returned outputFuel authenticated origin completionExtension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  change returnedWorld = store.map Core.Value.type at world
+  subst returnedWorld
+  have registryEq : returnedRegistry = slots := eq_of_heq registry
+  subst returnedRegistry
+  change returnedAuthority = checkpoint.origin.authority at authority
+  subst returnedAuthority
+  exact ⟨_, returnedEncoded, oldValue⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
