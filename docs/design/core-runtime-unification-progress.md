@@ -25,10 +25,31 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Actual public startup, reusable successful/failed histories, product outputs and terminal lambda formation are connected. The captured Word factory now derives Source execution and exported-handle History with its actual argument/capture state; strict Lean, full build (6019 jobs), all registered tests, kernel policy, the runtime fixture and six endpoint axiom checks pass. The later semantic handle invocation, broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Six actual public calls now create and reuse distinct captured closures, proving exact Source Word results and continuous returned histories. Strict Lean, the runtime fixture, full build (6035 jobs), all registered tests, kernel policy and independent review pass; eleven audited endpoints use only the standard three axioms. Broader static coverage, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Six public calls with distinct retained captures (2026-10-13)
+
+Commit `c187ce09` adds `SourceCoreCapturedReusePublicExecution.sequence_meaning`, which closes the sequential consumer for the actual checked `make`/`read` program. The registered test constructs every compiler, startup, execution and output observation used by the theorem.
+
+| Step | Actual public operation | Proved Source outcome | Retained entries afterward |
+| --- | --- | --- | --- |
+| 1 | `make(10)` | First captured closure | First |
+| 2 | `make(20)` | Second captured closure, with a distinct public handle | First, second |
+| 3 | `read(first)` | Word `10` | First, second |
+| 4 | `make(30)` | Third captured closure | First, second, third |
+| 5 | `read(second)` | Word `20` | First, second, third |
+| 6 | `read(first)` | Word `10` | First, second, third |
+
+`first_meaning` derives the initial history from actual bootstrap and the first public call. `RetainedState.make` uses the current history and accepted public startup to append a new export. `RetainedState.read` passes the exact retained Source value, derives the exact Word result from the full semantic result and public decoding, then retains every entry at the returned session. The final theorem joins the six heaps in execution order; no call repeats bootstrap or substitutes a fresh state.
+
+The two genuine compiler headers supply complete inventory and named body support. The read body has no lambda occurrence, so actual selected-scope provenance identifies its named sidecar. The family for captured closures is derived from the only authentic lambda source in the two-row catalog. Actual handle encoding and successful return establish the metadata identities required by the next call.
+
+Validation: strict Lean, the actual six-call runtime fixture, full build (6035 jobs), all registered tests and kernel policy pass. Independent review found no issues in the exact input, session, heap and history connections. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This is a closed instance of the public semantic connection, including returned-closure invocation. General static compiler coverage, mutable assignment/match bodies, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. The 100% / about 70% / about 85% estimates are unchanged.
 
 ### Captured-read factory: actual public Source result and History (2026-10-13)
 

@@ -10,12 +10,24 @@ Created: 2026-09-30. Updated: 2026-10-13.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `4c2dbe39`: the captured-read factory now derives Source execution and exported-handle History from actual public execution with Word `10`. The earlier empty factory and reusable failed histories remain supported. |
-| Latest completed verification | Strict Lean, full build (6019 jobs), all registered tests, kernel policy, the captured factory runtime and six endpoint axiom checks pass. |
+| Latest verified implementation | `c187ce09`: the actual two-function captured-read program now has six connected public Source executions and returned histories, including reuse of distinct closures after an intervening factory call. |
+| Latest completed verification | Strict Lean, the six-call runtime fixture, full build (6035 jobs), all registered tests, kernel policy and independent review pass. Eleven audited endpoints use only the standard three axioms. |
 | Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
-| Latest proof scope | The captured-reference return family and first public export are instantiated from actual compiler receipts. Retained functions support nested inputs, ready restoration and selected product outputs. The model and registries stay fixed. The subsequent handle invocation and mutable assignment/match fixtures remain runtime coverage. |
-| Current implementation priority | Connect a later public read of the exported captured closure through its returned History, then broaden body coverage. Suspended/export-error continuations, non-product output collection and model/registry changes remain open. |
+| Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
+| Current implementation priority | Broaden genuine compiler/body coverage beyond the closed captured-read program. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Returned captures reused through six public calls (2026-10-13)
+
+Commit `c187ce09` adds `SourceCoreCapturedReusePublicExecution`, which instantiates the public proof for a checked two-function program: `make(seed)` returns a closure that reads `seed`, and `read(f)` calls that closure. The actual public sequence creates captures for Word `10` and `20`, reads the first, creates a third capture for `30`, reads the second, then reads the first again. `sequence_meaning` derives six independent Source applications, with read results exactly Word `10`, `20` and `10`.
+
+Each call uses the preceding returned public session. Its Source trace starts at the preceding returned heap, and its History belongs to that same session, native store and owned caller. The first two exported handles are distinct. All earlier entries remain in order as the third export is appended and later reads retain the three-entry history. The fixture constructs both actual header packets, the complete inventory, named read support, captured-read closure family, Source typing and receiving diagnostics internally.
+
+The input and returned metadata conditions are also derived from actual execution. `recover_start` recovers the selected function and original encoded arguments; `StartAt.function_registry` and `StartAt.returned_registry` preserve the real registry across a handle input and successful return. Word result inversion uses the same full semantic result and actual public decoder. The fixture supplies no argument representation or execution/body law.
+
+This proves a public path for invoking returned closures through `read(f)`. The earlier direct `invokePacked` check remains separate runtime coverage. The closed proof covers this concrete captured-read program. Mutable assignment/match bodies, broader compiler alternatives, suspended/export-error continuations, non-product output collection, model/registry changes and the full public compiler theorem remain open. Work estimates stay at 100% / about 70% / about 85%.
+
+Validation: strict Lean, the actual six-call runtime fixture, full build (6035 jobs), all registered tests and kernel policy pass. Independent review found no issues in the exact input, session, heap and history connections. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
 ### Captured-read factory connected to public execution (2026-10-13)
 

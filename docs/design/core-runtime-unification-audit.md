@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Sequential captured-closure reuse audit (2026-10-13)
+
+Commit `c187ce09` adds `SourceCoreCapturedReusePublicExecution.sequence_meaning`, which connects the actual six-call public sequence to six independent Source applications and reusable returned histories. Independent review checked the exact public inputs, selected functions, exported handles, Source arguments, heap transitions and final results.
+
+The public sequence is `make(10)`, `make(20)`, `read(first)`, `make(30)`, `read(second)`, `read(first)`. Every call starts from the immediately preceding returned public session. The Source heaps are joined in the same order. Source arguments for the reads are the corresponding retained closure values, and the outcomes are exactly Word `10`, `20` and `10`. The first two handles are distinct. Histories retain both original entries, append the third export once, and preserve all three through the final reads.
+
+The read result follows from the same full `ResultAt` used to construct the returned History, together with actual successful decoding and the selected raw Word result type. The proof does not infer closure meaning from handle authentication. Entry membership supplies the retained Source value; the existing history derives its representation and typing at the current heap. The actual input encoder and successful completion derive the registry equalities needed by the next call.
+
+Static support is constructed from the genuine two-header inventory and complete source tables. Actual cached-slot selection identifies a closure's source. The no-lambda read row cannot supply a lambda origin; the make row supplies the captured-reference body. The original terminal compiler action and real named sidecar provide indirect-read support. The receiving diagnostic table comes from a genuine indexed execution of the same compiled artifact. No dynamic representation, child execution or arbitrary body law is introduced as a fixture premise.
+
+Validation: strict Lean, the actual six-call runtime fixture, full build (6035 jobs), all registered tests and kernel policy pass. Independent review found no issues in the exact input, session, heap and history connections. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This closes the earlier gap between exported captured functions and a subsequent supported public call. It does not extend the static body grammar to the separate mutable assignment/match regression or prove all compiler alternatives. The fixed model/registry boundary, other output containers, suspended/export-error continuation and all-pass composition remain open. Estimates remain 100% / about 70% / about 85%.
+
 ## Captured-reference factory audit (2026-10-13)
 
 Commit `4c2dbe39` adds the closed `SourceCoreCapturedLambdaPublicExecution` fixture, which proves Source factory execution and exported-handle History for an actual checked/compiled `make(seed: Word)` call with Word `10`. The body returns `lam() { return seed; }`. Its theorem constructs the Source program proof, nonempty inventory, body support, closure family and input metadata relation from original receipts; no dynamic representation or body execution premise is supplied.

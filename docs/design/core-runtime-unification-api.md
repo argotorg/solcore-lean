@@ -4,6 +4,23 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Public continuation for actual captured closures (2026-10-13)
+
+Commit `c187ce09` adds the registered `SourceCoreCapturedReusePublicExecution` test, which connects six actual public calls to Source execution and returned histories: `make(10)`, `make(20)`, `read(first)`, `make(30)`, `read(second)`, `read(first)`. The three read outcomes are proved to be Word `10`, `20` and `10`. Distinct exported handles and every earlier history entry remain attached to the real returned sessions.
+
+The runtime API is unchanged. The following proof interfaces close this concrete continuation:
+
+- `RecursiveNamedPublicHistoryFrontdoor.recover_start` is now public. It derives the selected startup and Source function from the accepted public start and current native state. Direct continuation consumers can then provide an exact Source argument list.
+- `StartAt.function_registry` derives metadata identity for an actual singleton function-handle input. `StartAt.returned_registry` retains the input encoding's registry in the actual successful returned session.
+- `RecursiveNamedPublicWordResultMeaning.result_word` identifies the Source Word outcome using the same full invocation result and genuine public result decoding.
+- `NamedRecursiveTerminalSupport` constructs the named indirect-read support from the accepted terminal compiler action, actual source nodes and selected sidecar. `RecursiveNamedLambdaFreeSelectedScopes` derives that sidecar from authentic selection and the finite no-lambda source facts.
+
+The fixture's `RetainedState` carries the real indexed/public session correspondence, current caller/heap/store, metadata identity and History. Its make/read steps produce the next state from the previous one. `sequence_meaning` constructs static support internally and preserves all six state transitions. It accepts no replacement argument representation, Source execution or body meaning hypothesis.
+
+Validation: strict Lean, the actual six-call runtime fixture, full build (6035 jobs), all registered tests and kernel policy pass. Independent review found no issues in the exact input, session, heap and history connections. All eleven audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The formal returned-closure read is now covered for this program; generic compiler/body coverage and the final all-pass theorem remain incomplete. Estimates are unchanged.
+
 ## Captured-read factory and retained static provenance (2026-10-13)
 
 Commit `4c2dbe39` leaves the public runtime API unchanged. `SourceCoreCapturedLambdaPublicExecution.public_factory_meaning` now instantiates the public seed theorem for the actual compiled `make(seed: Word)` factory, called with Word `10`, whose result is `lam() { return seed; }`. It returns an independent Source application and singleton History for the actual exported handle and returned session. The fixture derives Source typing, body support, inventory, family and metadata premises internally.
