@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## For headers, finite loops and retained captures (2026-10-13)
+
+`fd2b9008` adds independent staged Source traces for `for` initialization, finite iterations and post-header items. `181fa159` connects them through genuine compiler receipts to both directions of the public execution proof. Header items include monomorphic declarations, discarded expressions and plain assignment. Normal body completion executes the post header; return and failure preserve the reached heap and bypass it. Leaving the loop restores the outer lexical scope. This fragment does not yet include `break` or `continue`.
+
+The named `update` example executes one iteration and then zero iterations across successive sessions, returning `12 / 22`. `bb21dcc0` checks separate closures capturing `10` and `20`, an intervening `make(30)`, and one, zero and one loop iterations. Its direct results are `10 / 20 / 11`; the last result observes the first closure's previous update. Each public proof derives independent Source execution, exact heaps, retained histories and sufficient execution/output fuel at the original checkpoint.
+
+Validation: the coherent affected graph covers 656 modules (268 authenticated cached results and 388 fresh checks). Full build (6450 jobs), all registered tests (12770 build jobs and the final pass marker), kernel policy and 82 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The Core representation and runtime are unchanged. Recursive constructor payloads, including calls that produce new closures, are the next public connection under development. Broader compiler alternatives and final composition across every pass remain incomplete.
+
 ## Match bodies and retained capture updates (2026-10-13)
 
 `d36b6b1a` adds staged Source match traces, measured children, ordinary erasure and failure-state preservation. `d64b1b5a` connects them to actual compiler output and both directions of the public proof family. Compiler receipts retain the selected pattern bindings, hidden cells, catalog, allocator and typed literals. Leaving an arm restores the outer lexical context while retaining its heap effects.

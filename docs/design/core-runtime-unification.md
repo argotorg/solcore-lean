@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## For headers, finite loops and retained captures (2026-10-13)
+
+`fd2b9008` adds independent staged Source traces for `for` initialization, finite iterations and post-header items. `181fa159` connects them through genuine compiler receipts to both directions of the public execution proof. Header items include monomorphic declarations, discarded expressions and plain assignment. Normal body completion executes the post header; return and failure preserve the reached heap and bypass it. Leaving the loop restores the outer lexical scope. This fragment does not yet include `break` or `continue`.
+
+The named `update` example executes one iteration and then zero iterations across successive sessions, returning `12 / 22`. `bb21dcc0` checks separate closures capturing `10` and `20`, an intervening `make(30)`, and one, zero and one loop iterations. Its direct results are `10 / 20 / 11`; the last result observes the first closure's previous update. Each public proof derives independent Source execution, exact heaps, retained histories and sufficient execution/output fuel at the original checkpoint.
+
+Validation: the coherent affected graph covers 656 modules (268 authenticated cached results and 388 fresh checks). Full build (6450 jobs), all registered tests (12770 build jobs and the final pass marker), kernel policy and 82 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The Core representation and runtime are unchanged. Recursive constructor payloads, including calls that produce new closures, are the next public connection under development. Broader compiler alternatives and final composition across every pass remain incomplete.
+
 ## Match bodies and retained capture updates (2026-10-13)
 
 `d36b6b1a` adds staged Source match traces, measured children, ordinary erasure and failure-state preservation. `d64b1b5a` connects them to actual compiler output and both directions of the public proof family. Compiler receipts retain the selected pattern bindings, hidden cells, catalog, allocator and typed literals. Leaving an arm restores the outer lexical context while retaining its heap effects.
@@ -180,11 +188,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `d36b6b1a` / `d64b1b5a` / `106e24d6`: match traces, actual compiler receipts and retained capture updates connect to successive public sessions. |
-| Latest completed verification | Full build (6408 jobs), all registered tests, kernel policy and 56 endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional, finite while and match closure bodies retain separate mutable captures across intervening calls. |
-| Latest proof scope | Named match calls return `12 / 23`; captured match calls return `10 / 20 / 11` across intervening closure creation. Each derives exact successive Source heaps/histories and sufficient public fuel at its original checkpoints. Earlier operator, block and closure guarantees remain checked. |
-| Current implementation priority | Connect actual for-loop initialization, repeated body/post execution and restored outer scope to public execution, then widen remaining compiler coverage. |
+| Latest verified implementation | `fd2b9008` / `181fa159` / `bb21dcc0`: finite for initialization, body and post-header execution connect through actual compiler receipts to successive public sessions. |
+| Latest completed verification | Full build (6450 jobs), all registered tests, kernel policy and 82 endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional, finite while/for and match closure bodies retain separate mutable captures across intervening calls. |
+| Latest proof scope | Named for calls return `12 / 22`; captured for calls return `10 / 20 / 11` across intervening closure creation. Each derives exact successive Source heaps/histories and sufficient public fuel at its original checkpoints. Earlier operator, block, match and closure guarantees remain checked. |
+| Current implementation priority | Connect recursive constructor payloads and their actual output handle collection/reuse to public execution, then widen remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
