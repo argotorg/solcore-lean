@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicApplicationResult
@@ -47,7 +48,7 @@ theorem application_tail {size : Nat} {callable packed value : Value}
             exact .apply (.second (.first (.var rfl))) (.var rfl) body
 
 section Closure
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
     completion.result.context.registry completion.result.extension completion.result.diagnostics)

@@ -882,7 +882,8 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
       have found := code.sourceFound
       rw [sameSource] at found
       have bodyShape := (observed.lambda_shape found code.sourceForm).2.2
-      exact CallableIndexedOwnedPreparedStagedSingleReadSequence.sequence stagePrepared code support provenance
+      exact CallableIndexedOwnedPreparedStagedSingleReadSequence.sequence
+        (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion) stagePrepared code support provenance
         (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
         fixture.source_wellFormed
         (by rw [sameSource]; exact observed.nodes) observed.lambda bodyShape
@@ -931,6 +932,7 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
     CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
       (inputs := [input]) (rows := rows) (distinct := by simp)
       (stagePrepared := stagePrepared)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := registry) (semanticFaults := faults)
       (observations := observations) (extension := receiver.completion.result.extension)

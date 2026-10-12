@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingCallRejectionDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedCallBoundaryReceipts
 
@@ -95,7 +96,7 @@ theorem original_diagnostic
 include stages selected in
 /-- The same first-gate word is decoded in the actual public receiving table. -/
 theorem receiving_diagnostic
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     (rejected : Staging.CallBoundary.GuardRejects (CallableLedger.frame sidecar)
@@ -120,7 +121,7 @@ include stages selected in
 /-- The actual invocation and its reached callee state remain unchanged while
 the original first-gate diagnostic is observed in the receiving table. -/
 theorem receiving_staged_post
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {invocation : Staging.Recursive.Scope}

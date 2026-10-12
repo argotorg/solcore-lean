@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectFirstGateBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingFirstCallGateRejection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedStagedCallFaults
@@ -21,7 +22,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)
   {context : SourceSemantics.Context}

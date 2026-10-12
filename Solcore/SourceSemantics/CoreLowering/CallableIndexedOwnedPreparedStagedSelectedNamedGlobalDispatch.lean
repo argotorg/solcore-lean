@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 
 
@@ -32,7 +33,7 @@ universe u
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}

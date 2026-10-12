@@ -52,6 +52,7 @@ theorem invoke_factory {fixture : CompiledFixture} {observed : ObservedProgram f
       succeeded, actualAt, packing, trace, result, nativeValue, selected, _handles, _related,
       retained, _encodedRegistry, returnedRegistry⟩ :=
     RecursiveNamedPublicDirectCallableOutputHistory.public_invoke_succeeded_collects_function_tree
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)

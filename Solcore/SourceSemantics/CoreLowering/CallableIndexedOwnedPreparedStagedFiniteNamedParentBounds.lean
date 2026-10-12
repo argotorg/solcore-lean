@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCellOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedArgumentRows
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteNamedInvocationBounds
@@ -23,7 +24,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {stages : Staging.Recursive.Registry}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)

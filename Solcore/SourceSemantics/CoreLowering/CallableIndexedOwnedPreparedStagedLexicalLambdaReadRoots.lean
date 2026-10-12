@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaCompilerSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots
@@ -85,7 +86,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
   (code : Code compiled.indexed function scope administrative)
   {bodyRegistry : SourceCoreRawMetadata.Registry}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry
     (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics))
   (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)

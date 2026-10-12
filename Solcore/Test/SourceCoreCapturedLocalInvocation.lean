@@ -44,6 +44,7 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedFactory fixture}
       after, finalMap, finalWorld, reached, started, _parameterView, _resultView, succeeded,
       actualAt, packing, arity, trace, result, _related, retained, _encodedRegistry, returnedRegistry⟩ :=
     RecursiveNamedPublicDirectPackedPublicHistory.public_invoke_succeeded_function_tree
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)

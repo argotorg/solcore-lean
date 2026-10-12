@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteCallHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTupleHeadBounds
@@ -29,7 +30,7 @@ def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
   fun current child code => current = scope ∧ child = id ∧ code = lowered
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
   {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}

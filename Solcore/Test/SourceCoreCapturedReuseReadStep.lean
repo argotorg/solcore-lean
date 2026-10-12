@@ -52,6 +52,7 @@ theorem RetainedState.read {fixture : CompiledFixture} {observed : ObservedProgr
     CallableIndexedOwnedPreparedStagedHistoryPublicContinuations.public_run_succeeded_retains
       (inputs := [support.makeInput, support.readInput]) (rows := support.rows)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (observations := support.observations)
       (extension := receiver.completion.result.extension)

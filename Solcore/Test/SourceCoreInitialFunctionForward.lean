@@ -71,6 +71,7 @@ private theorem forward_initial {fixture : CompiledFixture} {observed : Observed
     CallableIndexedOwnedPreparedStagedInitializedFunctionPreservation.public_resume_has_sufficient_fuel
       (inputs := [support.makeInput, support.readInput]) (rows := support.rows) (distinct := support.distinct)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)

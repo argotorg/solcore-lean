@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedDiscardBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaParameterAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds
@@ -19,7 +20,7 @@ open CallableIndexedOwnedAdmittedStagedTerminalStatements (control)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (Discard DiscardSupport parameterScope)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {stages : Staging.Recursive.Registry}

@@ -51,6 +51,7 @@ theorem RetainedState.identity {fixture : CompiledFixture} {observed : ObservedP
     CallableIndexedOwnedPreparedStagedHistoryPublicContinuations.public_run_succeeded_retains
       (inputs := [support.failedInput, support.identityInput]) (rows := support.rows)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (observations := support.observations)
       (extension := receiver.completion.result.extension)

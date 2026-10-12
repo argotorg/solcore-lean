@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedCopyMetadata
 import Solcore.Test.SourceCoreCapturedCopySyntax
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaReadRoots
@@ -24,7 +25,7 @@ def ActualHeader.closure_family {fixture : CompiledFixture} {observed : Observed
     {keys : List (CallableIndexedOwnedFunctionValues.Key fixture.recipe.compiled
       (Program.ofChecked fixture.recipe.compiled.sourceProgram))}
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {mapping world function native bindings parameter result}

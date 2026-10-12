@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedSelectedDiagnosticIssuerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedAssignmentFaults
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
@@ -49,7 +50,7 @@ read and its actual current uninitialized cell. -/
 theorem reads {fuel : Nat} {values : SourceCoreCompatibleValues.Context}
     {context : SourceSemantics.Context}
     (unique : NodeOccurrencesUnique (source named))
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics) :
     ReachedLoweredReadOutcomePorts.ReadPolicies fuel values (source named) context
@@ -72,7 +73,7 @@ theorem missing {values : SourceCoreCompatibleValues.Context}
     (functions : FunctionModel values.checked.catalog ambient)
     (program : Program) (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment)
     (unique : NodeOccurrencesUnique (source named))
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics) :
     IndexFaultPostContracts.MissingPolicies values (source named) functions

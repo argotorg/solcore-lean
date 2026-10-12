@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicContextualDiagnosticObservations
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
@@ -20,7 +21,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {instantiation : DeclarationInstantiation}
   {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
   (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)
 

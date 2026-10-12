@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedNamedCompilerRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompilerPolicyProfiles
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles
@@ -96,7 +97,7 @@ private theorem original_unique {original actual : TypedSource}
     change (original.nodes.map Node.occurrenceId).Nodup
     simpa only [TypedSource.applySubstitution_nodeOccurrenceIds] using unique
 
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
     completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)

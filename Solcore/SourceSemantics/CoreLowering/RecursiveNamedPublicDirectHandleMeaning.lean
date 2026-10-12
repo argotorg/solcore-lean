@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectClosureApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
@@ -89,7 +90,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
 
 section Meaning
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
     completion.result.context.registry completion.result.extension completion.result.diagnostics)

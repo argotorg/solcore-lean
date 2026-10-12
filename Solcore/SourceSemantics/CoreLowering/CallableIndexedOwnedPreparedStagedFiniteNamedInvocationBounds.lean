@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationPreservation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteNamedBodyBounds
 
@@ -76,7 +77,7 @@ variable
   (terminal : Receipt header.policy header.fuel header.function.source
     (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
     expression header.function.body header.output header.reasonAt header.fellThrough header.escaped header.body)
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {row : SourceSpecialization.SpecializedFunction}
   (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)
   {instantiation : DeclarationInstantiation}

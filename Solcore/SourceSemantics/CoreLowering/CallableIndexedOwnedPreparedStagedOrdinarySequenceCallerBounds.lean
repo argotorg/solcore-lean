@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedInvocationPreservation
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedScopeCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedEmptyBodyCompilerReceipts
@@ -241,7 +242,7 @@ theorem sequence_coverage
         exact ⟨input⟩
 
 section Caller
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
@@ -362,7 +363,7 @@ theorem reflects_compiled (size : Nat) :
 end Caller
 
 section PublicRoot
-variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
     completion.result.context.registry completion.result.extension completion.result.diagnostics)
   (profile : compiled.compatible.checked.catalog.callableContracts = true)

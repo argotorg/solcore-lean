@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedReadDiagnostics
 
@@ -34,7 +35,7 @@ theorem uninitialized
     {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
     (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults)
     (reasons : BodyReasons code support.caller.named)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {fuel : Nat} {context : SourceSemantics.Context} {readScope : SourceCoreLocalCell.Scope}

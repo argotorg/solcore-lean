@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreInitialLexicalFailureBodies
 
 /-! Both authentic issuer packets produce complete static lexical support.
@@ -33,7 +34,7 @@ private def selectTwo {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (registry : SourceCoreRawMetadata.Registry)
-    (completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed) where
+    (completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed) where
   failedInput : Input fixture.recipe.compiled
   identityInput : Input fixture.recipe.compiled
   failedRow : failedInput.row = observed.failedRow.row
@@ -79,7 +80,7 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
     (failedStages : ObservedStages fixture observed.failedRow)
     (identityStages : ObservedStages fixture observed.identityRow)
     (registry : SourceCoreRawMetadata.Registry)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (StaticSupportPackage fixture observed registry completion) := by

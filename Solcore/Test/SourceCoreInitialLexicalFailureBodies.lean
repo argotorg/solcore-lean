@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreInitialLexicalFailureFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedLexicalCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots
@@ -129,7 +130,7 @@ theorem ActualHeader.failed_support {fixture : CompiledFixture} {observed : Obse
       (values := .initial fixture.recipe.compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions fixture.recipe.compiled.indexed) headers)
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Support headers
@@ -165,7 +166,7 @@ theorem ActualHeader.identity_support {fixture : CompiledFixture} {observed : Ob
       (values := .initial fixture.recipe.compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions fixture.recipe.compiled.indexed) headers)
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Support headers

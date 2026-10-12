@@ -100,6 +100,7 @@ structure Registry where private mk ::
   private authenticated : ∀ metadata, metadata ∈ metadataValues → metadata.authentic signatureValue = true
   private unique : metadataValues.Nodup
   private staticBound : staticCount ≤ metadataValues.length
+  private budgetBound : metadataValues.length ≤ limitValue.maxEntries
 
 namespace Registry
 
@@ -124,6 +125,10 @@ theorem entries_unique (registry : Registry) : registry.entries.Nodup := registr
 
 theorem staticLength_le_length (registry : Registry) : registry.staticLength ≤ registry.length :=
   registry.staticBound
+
+/-- Every registry is produced within its actual configured metadata budget. -/
+theorem length_le_limit (registry : Registry) : registry.length ≤ registry.limits.maxEntries :=
+  registry.budgetBound
 
 theorem lookup_authenticated {registry : Registry} {id : Core.Word} {metadata : Metadata}
     (found : registry.lookup id = some metadata) : metadata.authentic registry.signatures = true := by
@@ -273,33 +278,39 @@ def Registry.intern (registry : Registry) (expected : Ty) (metadata : Metadata) 
           | none => throw .wordSpaceExhausted
           | some word => pure (.mk registry word (lookup_at converted index.property) (.refl registry) compatible)
       | none =>
-          if registry.length ≥ registry.limits.maxEntries then
+          if exhausted : registry.length ≥ registry.limits.maxEntries then
             throw (.entryBudgetExhausted registry.limits.maxEntries)
-          match converted : Core.Word.ofNat? (registry.length + 1) with
-          | none => throw .wordSpaceExhausted
-          | some word =>
-              let next : Registry := .mk registry.signatures registry.limits (registry.entries ++ [metadata])
-                registry.staticLength
-                (by
-                  intro candidate member
-                  simp only [List.mem_append, List.mem_singleton] at member
-                  rcases member with old | fresh
-                  · exact registry.entries_authenticated candidate old
-                  · cases fresh; exact authenticated)
-                (by
-                  apply List.nodup_append.mpr
-                  exact ⟨registry.entries_unique, by simp, by
-                    intro candidate old fresh freshMember same
-                    simp only [List.mem_singleton] at freshMember
-                    cases freshMember
-                    cases same
-                    exact findIndex_none found old⟩)
-                (by
-                  simpa [Registry.length] using Nat.le_trans registry.staticLength_le_length (Nat.le_add_right registry.length 1))
-              have newFound : next.entries[registry.length]? = some metadata := by
-                simp [next, Registry.entries, Registry.length]
-              pure (.mk next word (lookup_at converted newFound)
-                ⟨rfl, rfl, rfl, ⟨[metadata], rfl⟩⟩ compatible)
+          else
+            match converted : Core.Word.ofNat? (registry.length + 1) with
+            | none => throw .wordSpaceExhausted
+            | some word =>
+                let next : Registry := .mk registry.signatures registry.limits (registry.entries ++ [metadata])
+                  registry.staticLength
+                  (by
+                    intro candidate member
+                    simp only [List.mem_append, List.mem_singleton] at member
+                    rcases member with old | fresh
+                    · exact registry.entries_authenticated candidate old
+                    · cases fresh; exact authenticated)
+                  (by
+                    apply List.nodup_append.mpr
+                    exact ⟨registry.entries_unique, by simp, by
+                      intro candidate old fresh freshMember same
+                      simp only [List.mem_singleton] at freshMember
+                      cases freshMember
+                      cases same
+                      exact findIndex_none found old⟩)
+                  (by
+                    simpa [Registry.length] using Nat.le_trans registry.staticLength_le_length (Nat.le_add_right registry.length 1))
+                  (by
+                    have room : registry.length < registry.limits.maxEntries := Nat.lt_of_not_ge exhausted
+                    simp only [List.length_append, List.length_singleton]
+                    change registry.entries.length < registry.limits.maxEntries at room
+                    omega)
+                have newFound : next.entries[registry.length]? = some metadata := by
+                  simp [next, Registry.entries, Registry.length]
+                pure (.mk next word (lookup_at converted newFound)
+                  ⟨rfl, rfl, rfl, ⟨[metadata], rfl⟩⟩ compatible)
     else
       by
         cases metadata with
@@ -310,7 +321,7 @@ def Registry.intern (registry : Registry) (expected : Ty) (metadata : Metadata) 
     throw (.runtimeTypeMismatch expected metadata.type)
 
 private def empty (signatures : ProgramSignatures) (limits : Limits) : Registry :=
-  .mk signatures limits [] 0 (by simp) (by simp) (by simp)
+  .mk signatures limits [] 0 (by simp) (by simp) (by simp) (by simp)
 
 private def addStatic : (registry : Registry) → List Metadata → Except Error Registry
   | registry, [] => pure registry
@@ -337,7 +348,7 @@ def prepare (signatures : ProgramSignatures) (staticMetadata : List Metadata)
     (limits : Limits := {}) : Except Error Registry := do
   let registry ← addStatic (empty signatures limits) staticMetadata
   pure (.mk registry.signatures registry.limits registry.entries registry.length
-    registry.authenticated registry.unique (Nat.le_refl _))
+    registry.authenticated registry.unique (Nat.le_refl _) registry.budgetBound)
 
 theorem prepare_signatures {signatures : ProgramSignatures} {metadata : List Metadata}
     {limits : Limits} {registry : Registry}
@@ -396,5 +407,53 @@ theorem Registry.word_equality_iff {registry : Registry} {left right : Core.Word
     (left == right) = decide (leftMetadata = rightMetadata) := by
   apply Bool.eq_iff_iff.mpr
   simpa using Registry.ids_equal_iff leftFound rightFound
+
+end Solcore.Frontend.SourceCoreRawMetadata
+
+namespace Solcore.Frontend.SourceCoreRawMetadata
+open TypeSystem SourceInference
+
+/-- An authenticated existing ID is reused without changing the registry or
+consuming a metadata budget slot. -/
+theorem Registry.intern_of_lookup {registry : Registry} {expected : Ty}
+    {metadata : Metadata} {id : Core.Word}
+    (found : registry.lookup id = some metadata)
+    (same : runtimeType expected = runtimeType metadata.type) :
+    ∃ inserted, registry.intern expected metadata = .ok inserted ∧
+      inserted.registry = registry ∧ inserted.id = id := by
+  have authentic := Registry.lookup_authenticated found
+  have positive : id.val ≠ 0 := by
+    intro zero
+    simp [Registry.lookup, zero] at found
+  have atIndex : registry.entries[id.val - 1]? = some metadata := by
+    simpa only [Registry.lookup, if_neg positive] using found
+  cases selected : findIndex registry.entries metadata with
+  | none => exact False.elim (findIndex_none selected (List.mem_of_getElem? atIndex))
+  | some index =>
+    have indexEq := lookup_same_metadata registry.entries_unique index.property atIndex
+    have valueEq : index.val + 1 = id.val := by omega
+    have converted : Core.Word.ofNat? (index.val + 1) = some id := by
+      rw [valueEq]
+      unfold Core.Word.ofNat?
+      split
+      · congr
+      · exact False.elim (by omega)
+    unfold Registry.intern
+    simp only [same, authentic, ↓reduceDIte]
+    split
+    · rename_i actual actualAt
+      have actualEq : actual = index := Option.some.inj (actualAt.symm.trans selected)
+      subst actual
+      split
+      · rename_i impossible
+        rw [converted] at impossible
+        cases impossible
+      · rename_i word wordAt
+        have wordEq := Option.some.inj (wordAt.symm.trans converted)
+        subst word
+        exact ⟨_, rfl, rfl, rfl⟩
+    · rename_i impossible
+      rw [selected] at impossible
+      cases impossible
 
 end Solcore.Frontend.SourceCoreRawMetadata

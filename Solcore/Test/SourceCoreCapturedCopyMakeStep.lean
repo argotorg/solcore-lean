@@ -59,6 +59,7 @@ theorem RetainedState.make_typed_handle
     CallableIndexedOwnedPreparedStagedHistoryPublicContinuations.public_run_succeeded_remembers
       (inputs := [support.input]) (rows := support.rows)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile)
       (bodyRegistry := receiver.completion.result.context.registry)

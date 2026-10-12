@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRestoredHistory
@@ -19,7 +20,7 @@ open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedPreparedStagedNamedBodiesSupport (Support)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (inputs : List (Input compiled)) (rows : Inventory inputs)
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled
     compiled.indexed.ancestry.graph.inputs.callable)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreInitialLexicalFailureSupports
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistoryFrontdoor
 
@@ -135,7 +136,7 @@ end StartedSelection
 
 theorem StaticSupportPackage.header_list {fixture : CompiledFixture}
     {observed : ObservedProgram fixture} {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (support : StaticSupportPackage fixture observed registry completion) :
     CallableIndexedOwnedPreparedFiniteNamedInventories.headers support.rows =
       [support.failedHeader.header, support.identityHeader.header] := by

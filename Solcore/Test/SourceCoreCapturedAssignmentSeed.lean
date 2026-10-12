@@ -50,6 +50,7 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
     CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
       (inputs := [support.input]) (rows := support.rows) (distinct := by simp)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)

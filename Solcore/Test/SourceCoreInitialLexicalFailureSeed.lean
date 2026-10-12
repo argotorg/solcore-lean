@@ -44,6 +44,7 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
     CallableIndexedOwnedPreparedStagedInitializedHistoryFailures.public_run_failed_seeds
       (inputs := [support.failedInput, support.identityInput]) (rows := support.rows) (distinct := support.distinct)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)

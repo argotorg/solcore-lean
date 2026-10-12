@@ -46,7 +46,8 @@ theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedFactory
     (makeStages : ObservedStages fixture observed)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     SequenceMeaning makeStages sequence receiver := by
-  obtain ⟨support⟩ := static_supports fixture observed makeStages
+  obtain ⟨support⟩ := static_supports
+    (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion) fixture observed makeStages
     receiver.completion.result.context.registry
     (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
   let scope := RecursiveStageRegistry.scope makeStages.sidecar [] support.actual.header.function

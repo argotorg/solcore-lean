@@ -806,6 +806,7 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
     CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
       (inputs := [input]) (rows := rows) (distinct := by simp)
       (stagePrepared := stagePrepared)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := registry) (semanticFaults := faults)
       (observations := observations) (extension := receiver.completion.result.extension)

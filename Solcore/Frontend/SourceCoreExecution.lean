@@ -1297,3 +1297,46 @@ theorem Checkpoint.ResumeAt.runtime_function_succeeded {artifact : Artifact}
       exact ⟨wrapCompletion actual, handle, returned.symm, publicValue, sourceType, exportedReady⟩
 
 end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+/-- A structural result at the actual checkpoint registry gives one output
+bound for every completed native execution and every future export generation.
+The public wrapper retains the original indexed success and returned session. -/
+theorem Checkpoint.output_succeeded_uniform {artifact : Artifact}
+    {checkpoint : Checkpoint artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    {recipe : SourceCoreIndexedSession.Recipe} {registry : SourceCoreRawMetadata.Registry}
+    {payload : Core.Value} {store : Core.Store} {expected : TypeSystem.Ty}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (atRecipe : native.RecipeAt recipe) (atRegistry : indexed.RegistryAt registry)
+    (ready : indexed.ExportsReady) (requested : indexed.ResultTypeAt expected)
+    (shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked registry
+      (store.map Core.Value.type) recipe.program.layouts.definitions expected payload) :
+    ∃ required, ∀ executionFuel,
+      indexed.NativeDone executionFuel (.inRight .word payload) store →
+      ∀ outputFuel, required ≤ outputFuel → ∀ outcome,
+        checkpoint.ResumeAt executionFuel outputFuel outcome →
+        ∃ (completion : Completion artifact) (actual : SourceCoreIndexedSession.Completion native)
+          (generation : SourceCorePublicValues.ExportGeneration),
+          outcome = .succeeded completion ∧
+          indexed.SucceededResultAt executionFuel outputFuel generation (.inRight .word payload) store actual ∧
+          completion.IndexedAt actual ∧ actual.session.ExportsReady := by
+  obtain ⟨required, exports⟩ := indexed.output_succeeded_uniform atRecipe atRegistry ready requested shape
+  refine ⟨required, ?_⟩
+  intro executionFuel completed outputFuel enough outcome receipt
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed actualRecipe selected actualNative actualRecipeAt =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨actualOutcome, resumed, returned⟩ := receipt
+      obtain ⟨generation, actual, succeeded, exported, returnedReady⟩ :=
+        exports executionFuel completed outputFuel enough actualOutcome resumed
+      rw [succeeded] at returned
+      exact ⟨wrapCompletion actual, actual, generation, returned.symm, exported,
+        ⟨rfl, rfl, rfl, rfl, HEq.rfl⟩, returnedReady⟩
+
+end Solcore.Frontend.SourceCoreExecution

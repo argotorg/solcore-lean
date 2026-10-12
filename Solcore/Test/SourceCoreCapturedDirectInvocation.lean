@@ -49,6 +49,7 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
       after, finalMap, finalWorld, started, succeeded, actualAt, projected, requested, _payloadType,
       trace, result⟩ :=
     RecursiveNamedPublicDirectHandleMeaning.public_invoke_succeeded_reflects_unit
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)

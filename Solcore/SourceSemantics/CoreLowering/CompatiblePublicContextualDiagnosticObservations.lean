@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CompatibleContextualDiagnosticIndexOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
 
@@ -16,7 +17,7 @@ abbrev Key := SourceSpecialization.SpecializationKey
 token. The sealed factory supplies contextual no-index priority and the actual
 receiving table supplies the same binder, occurrence and span. -/
 theorem receiver_local_read_diagnostic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}
@@ -65,7 +66,7 @@ theorem receiver_local_read_diagnostic (compiled : SourceCoreUnifiedCompilation.
 mapping metadata and decoding. The actual provider base equals the invoked
 reason; no decoded span or issuer raw type equality is inferred. -/
 theorem receiver_index_missing_diagnostic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualDiagnosticObservations
 
@@ -30,7 +31,7 @@ theorem ReadLeaf.contains (leaf : ReadLeaf) :
 span come from its certificate, rather than separate association assumptions. -/
 theorem ReadLeaf.public_diagnostic (leaf : ReadLeaf)
     (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

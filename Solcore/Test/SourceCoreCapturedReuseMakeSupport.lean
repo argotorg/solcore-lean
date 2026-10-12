@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedReuseFixture
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSingleReadSequence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedReturnLambdaFormation
@@ -147,7 +148,7 @@ def ObservedProgram.family {fixture : CompiledFixture} (observed : ObservedProgr
     (readHeader : ActualHeader fixture observed.readRow.row)
     (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared fixture.recipe.compiled
       fixture.recipe.compiled.indexed.ancestry.graph.inputs.callable)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {headers : List (CallableIndexedOwnedFunctionValues.Header fixture.recipe.compiled

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedImperativeLambdaBodyBounds
 
 /-! A chosen real imperative body fills the existing closure application ports.
@@ -16,7 +17,7 @@ open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (Imperative ImperativeSupport)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {stages : Staging.Recursive.Registry}

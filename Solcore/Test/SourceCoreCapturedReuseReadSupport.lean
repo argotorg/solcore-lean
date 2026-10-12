@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedReuseFixture
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport
 
@@ -74,7 +75,7 @@ theorem ActualHeader.read_support_at {fixture : CompiledFixture}
     (point : terminal.certificate = CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.Point
       (actual.header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared fixture.recipe.compiled
@@ -90,7 +91,7 @@ theorem ActualHeader.read_support_at {fixture : CompiledFixture}
 preparation packet before the concrete support producer is invoked. -/
 theorem ActualHeader.read_support {fixture : CompiledFixture}
     (observed : ObservedProgram fixture) (actual : ActualHeader fixture observed.readRow.row)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared fixture.recipe.compiled

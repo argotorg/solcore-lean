@@ -414,3 +414,82 @@ def encode (fuel : Nat) (context : Context) (expected : Ty) (value : Value) :
       else throw ⟨[], .nonCanonicalSourceValue⟩
 
 end Solcore.Frontend.SourceCoreCompatibleValues
+
+namespace Solcore.Frontend.SourceCoreCompatibleValues
+open TypeSystem SourceInference
+
+private theorem lookup_of_actual {context : Context} {expected : Ty} {id : Core.Word} {item : Metadata}
+    (found : context.registry.lookup id = some item)
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType item.type) :
+    lookup context expected id = .ok item := by
+  simp only [lookup, found, compatible, same, ↓reduceIte, pure, Except.pure, bind, Except.bind]
+  rfl
+
+/-- Proxy conversion uses the authenticated original metadata ID. -/
+theorem decode_proxy_at (context : Context) {expected inner : Ty} {owner : Core.DataTypeId} {id : Core.Word}
+    (found : context.registry.lookup id = some (.proxy inner))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType (.proxy inner))
+    (identityAt : context.checked.catalog.identity? expected = some owner) (fuel : Nat) :
+    decodeRaw (fuel + 1) context expected (.constructed ⟨owner, 0⟩ (.word id)) = .ok (.proxy inner) := by
+  have metadata := lookup_of_actual found same
+  unfold decodeRaw
+  rw [same]
+  simp only [SourceCoreRawMetadata.runtimeType, metadata, identity, identityAt,
+    pure, Except.pure, bind, Except.bind, ↓reduceIte]
+
+theorem encode_proxy_at (checked : Checked) {registry : Registry} {expected inner : Ty}
+    {owner : Core.DataTypeId} {id : Core.Word}
+    (found : registry.lookup id = some (.proxy inner))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType (.proxy inner))
+    (identityAt : checked.catalog.identity? expected = some owner) (fuel : Nat) :
+    encodeRaw (fuel + 1) checked registry expected (.proxy inner) =
+      .ok (.pure registry (.constructed ⟨owner, 0⟩ (.word id))) := by
+  obtain ⟨inserted, interned, registryEq, idEq⟩ := SourceCoreRawMetadata.Registry.intern_of_lookup found same
+  unfold encodeRaw
+  rw [same]
+  simp only [SourceCoreRawMetadata.runtimeType, interned, Except.mapError,
+    identity, identityAt, pure, Except.pure, bind, Except.bind]
+  simp only [registryEq, idEq]
+  rfl
+
+theorem decode_mapping_at (context : Context) {expected key value : Ty} {id : Core.Word}
+    {layout : Core.OrderedMapping.Layout} {stored fallback : Core.Value}
+    {entries : List (Value × Value)} {fuel : Nat}
+    (found : context.registry.lookup id = some (.mapping key value))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType (.mapping key value))
+    (layoutAt : context.checked.catalog.mappingLayout key value = .ok layout)
+    (rows : decodeEntriesRaw fuel context key value layout stored 0 = .ok entries)
+    (defaultAt : decodeDefaultRaw fuel context value layout.valueType fallback =
+      .ok (defaultValue? (value.size + 1) value)) :
+    decodeRaw (fuel + 1) context expected (.pair (.word id) (.pair fallback stored)) =
+      .ok (.mapping key value entries) := by
+  have metadata := lookup_of_actual found same
+  unfold decodeRaw
+  rw [same]
+  simp only [SourceCoreRawMetadata.runtimeType, metadata, layoutAt, rows, defaultAt,
+    pure, Except.pure, bind, Except.bind, Except.mapError, ↓reduceIte]
+
+theorem encode_mapping_at (checked : Checked) {registry : Registry} {expected key value : Ty}
+    {id : Core.Word} {layout : Core.OrderedMapping.Layout} {stored fallback : Core.Value}
+    {entries : List (Value × Value)} {fuel : Nat}
+    (found : registry.lookup id = some (.mapping key value))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType (.mapping key value))
+    (layoutAt : checked.catalog.mappingLayout (SourceCoreRawMetadata.runtimeType key)
+      (SourceCoreRawMetadata.runtimeType value) = .ok layout)
+    (rows : encodeEntriesRaw fuel checked registry key value layout entries 0 = .ok (.pure registry stored))
+    (defaultAt : encodeDefaultRaw fuel checked registry value layout.valueType = .ok (.pure registry fallback)) :
+    encodeRaw (fuel + 1) checked registry expected (.mapping key value entries) =
+      .ok (.pure registry (.pair (.word id) (.pair fallback stored))) := by
+  obtain ⟨inserted, interned, registryEq, idEq⟩ := SourceCoreRawMetadata.Registry.intern_of_lookup found same
+  unfold encodeRaw
+  rw [same]
+  simp only [SourceCoreRawMetadata.runtimeType, interned, Except.mapError,
+    layoutAt, pure, Except.pure, bind, Except.bind]
+  have rowsAt : encodeEntriesRaw fuel checked inserted.registry key value layout entries 0 =
+      .ok (.pure inserted.registry stored) := by rw [registryEq]; exact rows
+  have fallbackAt : encodeDefaultRaw fuel checked inserted.registry value layout.valueType =
+      .ok (.pure inserted.registry fallback) := by rw [registryEq]; exact defaultAt
+  simp only [rowsAt, Extended.pure, fallbackAt]
+  simp only [registryEq, idEq]
+
+end Solcore.Frontend.SourceCoreCompatibleValues

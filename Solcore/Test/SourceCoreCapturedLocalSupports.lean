@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedLocalBodyReceipt
 import Solcore.Test.SourceCoreCapturedLocalClosureFamily
 import Solcore.Test.SourceCoreCapturedLocalSyntax
@@ -23,7 +24,7 @@ theorem ActualHeader.lexical_support {fixture : CompiledFixture} {observed : Obs
     (stages : ObservedStages fixture observed) (actual : ActualHeader fixture observed.row)
     (receipt : CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.Receipt actual.header)
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Support
@@ -74,7 +75,7 @@ theorem ActualHeader.lexical_support {fixture : CompiledFixture} {observed : Obs
 
 structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (registry : SourceCoreRawMetadata.Registry)
-    (completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed) where
+    (completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed) where
   input : Input fixture.recipe.compiled
   packet : Issued input
   actual : ActualHeader fixture observed.row
@@ -100,14 +101,14 @@ structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedF
 
  theorem StaticSupportPackage.header_list {fixture : CompiledFixture} {observed : ObservedFactory fixture}
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (support : StaticSupportPackage fixture observed registry completion) : headers support.rows = [support.actual.header] := by
   rw [support.rowsEq, support.headerEq]
   rfl
 
 theorem static_supports (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (stages : ObservedStages fixture observed) (registry : SourceCoreRawMetadata.Registry)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (StaticSupportPackage fixture observed registry completion) := by

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.ReachedExpressionFaultOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatibleSessionContextualMissingDiagnosticObservations
 
@@ -65,7 +66,7 @@ theorem IndexLeaf.table_diagnostic (leaf : IndexLeaf)
 /-- Actual public rebuilding and callable append retain the same origin token. -/
 theorem IndexLeaf.public_diagnostic (leaf : IndexLeaf)
     (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

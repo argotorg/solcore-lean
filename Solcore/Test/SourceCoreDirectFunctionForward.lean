@@ -97,6 +97,7 @@ private theorem forward_function {fixture : CompiledFixture} {observed : Observe
       _succeeded, _actualAt, packing, trace, _result, _nativeValue, _selected, _handles, _related,
       _retained, _encodedRegistry, _returnedRegistry⟩ :=
     RecursiveNamedPublicDirectCallableOutputHistory.public_invoke_succeeded_collects_function_tree
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)
@@ -124,6 +125,7 @@ private theorem forward_function {fixture : CompiledFixture} {observed : Observe
   rw [← entryHandle] at started
   obtain ⟨required, payload, finalStore, finalMap, finalWorld, _nativeEnough, _fullResult, publicEnough⟩ :=
     RecursiveNamedPublicDirectCallableFunctionPreservation.public_resume_has_sufficient_fuel
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)

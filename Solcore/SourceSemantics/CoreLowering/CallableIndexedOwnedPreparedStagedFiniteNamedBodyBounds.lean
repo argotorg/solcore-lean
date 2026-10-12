@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedBodyBounds
@@ -35,7 +36,7 @@ variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProg
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (functions : FunctionModel compiled.compatible.checked.catalog
     (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
     completion.result.context.registry completion.result.extension completion.result.diagnostics)

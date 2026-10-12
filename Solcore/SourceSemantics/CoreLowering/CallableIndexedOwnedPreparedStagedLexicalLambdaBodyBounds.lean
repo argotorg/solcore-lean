@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedLexicalFooter
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMarkedAllocation
@@ -24,7 +25,7 @@ open CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds (Point)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (Lexical LexicalSupport parameterScope)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {stages : Staging.Recursive.Registry}

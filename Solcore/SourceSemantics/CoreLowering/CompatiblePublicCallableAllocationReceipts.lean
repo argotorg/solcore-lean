@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicDiagnosticPriority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
 
@@ -103,7 +104,7 @@ theorem AllocationAt.below {checked : SourceCoreCompatibleCatalog.Checked}
 /-- Actual sealed compilation discharges diagnostic and callable preparation;
 the member is still the genuine issued read selected by its Source adapter. -/
 theorem receiver_read_diagnostic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}
@@ -125,7 +126,7 @@ theorem receiver_read_diagnostic (compiled : SourceCoreUnifiedCompilation.Compil
 /-- The same factory receipts preserve the raw missing-default error. The
 actual selected MissingSite and receiving metadata remain required. -/
 theorem receiver_missing_diagnostic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

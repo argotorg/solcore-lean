@@ -46,7 +46,8 @@ theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram
     (identityStages : ObservedStages fixture observed.identityRow)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     SequenceMeaning failedStages identityStages sequence receiver := by
-  obtain ⟨support⟩ := static_supports fixture observed failedStages identityStages
+  obtain ⟨support⟩ := static_supports
+    (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion) fixture observed failedStages identityStages
     receiver.completion.result.context.registry
     (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
   let failedScope := RecursiveStageRegistry.scope failedStages.sidecar [] support.failedHeader.header.function

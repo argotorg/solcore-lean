@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRetainedSequenceConditions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSingleReadMetadata
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
@@ -24,7 +25,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     compiled.indexed.ancestry.graph.inputs.callable)
   {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
   {bodyRegistry : SourceCoreRawMetadata.Registry}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (code : Code compiled.indexed function scope administrative)
   (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry
     (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics))

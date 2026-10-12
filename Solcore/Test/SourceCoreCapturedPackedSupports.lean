@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedPackedFixture
 
 /-! A complete singleton inventory supplies formation and every authentic
@@ -79,7 +80,7 @@ theorem actualStagePrepared (fixture : CompiledFixture) :
 
 structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (registry : SourceCoreRawMetadata.Registry)
-    (completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed) where
+    (completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed) where
   input : Input fixture.recipe.compiled
   packet : Issued input
   actual : ActualHeader fixture observed.row
@@ -105,7 +106,7 @@ structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedF
 
  theorem StaticSupportPackage.header_list {fixture : CompiledFixture} {observed : ObservedFactory fixture}
     {registry : SourceCoreRawMetadata.Registry}
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (support : StaticSupportPackage fixture observed registry completion) : headers support.rows = [support.actual.header] := by
   rw [support.rowsEq, support.headerEq]
   rfl
@@ -117,7 +118,7 @@ theorem ActualHeader.result_type {fixture : CompiledFixture} {observed : Observe
 
 theorem static_supports (fixture : CompiledFixture) (observed : ObservedFactory fixture)
     (stages : ObservedStages fixture observed) (registry : SourceCoreRawMetadata.Registry)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (StaticSupportPackage fixture observed registry completion) := by

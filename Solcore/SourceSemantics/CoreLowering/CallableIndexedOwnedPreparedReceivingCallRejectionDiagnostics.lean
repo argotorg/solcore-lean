@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedSecondCallGateRejection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedReceivingPreparedShapeInterpretations
 
@@ -50,7 +51,7 @@ literal filter retains the same first matching callable row. -/
 theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
     {native : SourceCoreGeneralFunctions.CallableContext}
     (stages : RecursiveNamedPreparedStageContracts.Prepared compiled native)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {token : Word} {diagnostic : SourceCoreFaultSites.Diagnostic}
@@ -150,7 +151,7 @@ include stages selected in
 /-- The original row's concrete second-gate reason reaches the actual public
 receiving table through its genuine rebuild and filtered callable append. -/
 theorem receiving_diagnostic
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     (different : row.entry.parameterCount ≠ ids.length) :

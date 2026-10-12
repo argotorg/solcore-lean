@@ -1,3 +1,4 @@
+import Solcore.Frontend.SourceCorePublicDefaultOutputCodec
 import Solcore.Frontend.SourceCorePublicValues
 import Solcore.Core.FuelResumptionProperties
 import Solcore.Frontend.SourceCoreUnifiedCompilation
@@ -5622,6 +5623,675 @@ theorem Checkpoint.ResumeAt.runtime_function_succeeded {artifact : Artifact}
       checkpoint.native_runtime_function_succeeded_receipt ready completed requested functionResult positive
         (generation := generation)
     exact ⟨completion, handle, same.symm.trans succeeded, publicValue, sourceType, returnedReady⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Actual named startup retains every earlier metadata entry while encoding
+its ordered input vector. No property of the values is assumed. -/
+theorem Checkpoint.RootStart.metadata_extension {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List SourceCorePublicValues.Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.RootStart session key arguments fuel)
+    {registry : SourceCoreRawMetadata.Registry} (atRegistry : session.RegistryAt registry) :
+    SourceCoreRawMetadata.Extends registry checkpoint.values.registry := by
+  obtain ⟨_root, _selected, _key, _count, encoded, accepted, _origin, _request, _world, _initial, _slots, sameValues⟩ := started
+  have extension := (arguments_raw_at accepted).1
+  rw [← sameValues] at extension
+  exact atRegistry ▸ extension
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- An authentic rebuild at this pending checkpoint's actual metadata table
+is exactly its public diagnostic lookup, including the callable suffix. -/
+theorem Checkpoint.diagnostic_of_rebuilt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    {program : SourceCoreCompatibleDataPlaceFaultSites.Program
+      (SourceCoreCompatibleValues.Context.initial artifact.recipe.compiled.compatible.checked)}
+    (present : artifact.program.base.diagnostics = some program)
+    {extension : SourceCoreRawMetadata.Extends artifact.recipe.compiled.compatible.checked.staticRegistry
+      checkpoint.values.registry}
+    {base : SourceCoreFaultSites.Table}
+    (rebuilt : program.tableForRegistry checkpoint.values.registry extension = .ok base)
+    (token : Core.Word) :
+    checkpoint.diagnostic token = .ok ((match artifact.program.base.callableDiagnostics with
+      | none => base
+      | some diagnostics => {base with additional := base.additional ++
+          diagnostics.rootTable.additional.filter (fun (item : Core.Word × SourceCoreFaultSites.Diagnostic) => diagnostics.unknown.val ≤ item.1.val)}).diagnostic? token) := by
+  unfold Checkpoint.diagnostic diagnosticTable
+  simp only [present, rebuilt, Except.mapError, pure, Except.pure, bind, Except.bind]
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+private abbrev OutputShapes := SourceCorePublicOutputShapes.Output
+
+private def OutputComplete {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (values : Values)
+    (raw : Ty) (native : Core.Value) : Prop :=
+  ∃ bound, ∀ generation, ∀ fuel, bound ≤ fuel → ∀ expected,
+    SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType raw →
+    ∀ slots : Registry artifact world, Registry.Issued authority slots →
+    ∃ value returned,
+      decodeRaw authority generation values fuel slots expected native = .ok (value, returned) ∧
+      Registry.Issued authority returned ∧
+      (∃ suffix, returned = slots ++ suffix) ∧
+      ∀ encodingFuel, bound ≤ encodingFuel → ∀ suffix : Registry artifact world,
+        encodeRaw authority (returned ++ suffix) encodingFuel values.registry expected value =
+          .ok (.pure values.registry native)
+
+private def PayloadsComplete {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (values : Values)
+    (types : List Ty) (natives : List Core.Value) : Prop :=
+  ∃ bound, ∀ generation, ∀ fuel, bound ≤ fuel → ∀ slots : Registry artifact world, Registry.Issued authority slots →
+    ∃ output returned,
+      decodePayloads authority generation values fuel slots types (SourceCorePublicOutputShapes.pack natives) = .ok (output, returned) ∧
+      Registry.Issued authority returned ∧
+      (∃ suffix, returned = slots ++ suffix) ∧
+      ∀ encodingFuel, bound ≤ encodingFuel → ∀ suffix : Registry artifact world,
+        encodePayloads authority (returned ++ suffix) encodingFuel values.registry types output =
+          .ok (.pure values.registry (SourceCorePublicOutputShapes.pack natives))
+
+private def EntriesComplete {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (values : Values)
+    (key value : Ty) (entries : Core.OrderedMapping.Entries) : Prop :=
+  ∃ bound, ∀ generation, ∀ fuel, bound ≤ fuel → ∀ layout, ∀ slots : Registry artifact world, Registry.Issued authority slots →
+    ∃ output returned,
+      decodeEntries authority generation values fuel slots key value layout (Core.OrderedMapping.encode layout entries) = .ok (output, returned) ∧
+      Registry.Issued authority returned ∧
+      (∃ suffix, returned = slots ++ suffix) ∧
+      ∀ encodingFuel, bound ≤ encodingFuel → ∀ suffix : Registry artifact world,
+        encodeEntries authority (returned ++ suffix) encodingFuel values.registry key value layout output =
+          .ok (.pure values.registry (Core.OrderedMapping.encode layout entries))
+
+private theorem output_function_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} (owned : authority.IssuedFor artifact.authority)
+    (values : Values)
+    {parameter result : Ty} {native : Core.Value} {type : Core.Ty}
+    (projected : artifact.recipe.compiled.compatible.checked.catalog.project (.function parameter result) = .ok type)
+    (typed : Core.RuntimeValueHasType world native type artifact.program.layouts.definitions) :
+    OutputComplete (artifact := artifact) (world := world) authority values (.function parameter result) native := by
+  refine ⟨1, ?_⟩
+  intro generation fuel enough expected same slots issued
+  have generated : artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type := by
+    rw [← SourceCoreCompatibleCatalog.Catalog.project_runtimeType, same,
+      SourceCoreCompatibleCatalog.Catalog.project_runtimeType]
+    exact projected
+  obtain ⟨handle, returned, registered, returnedIssued, _source, resolved⟩ :=
+    register_complete owned issued generation generated typed
+  obtain ⟨suffix, appended⟩ := issuance_register_append registered
+  refine ⟨.function handle, returned, ?_, returnedIssued, ⟨suffix, appended⟩, ?_⟩
+  · cases fuel with
+    | zero => omega
+    | succ fuel =>
+      unfold decodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, registered, bind, Except.bind, pure, Except.pure]
+  · intro encodingFuel enough suffix
+    cases encodingFuel with
+    | zero => omega
+    | succ encodingFuel =>
+      unfold encodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, issuance_resolve_append resolved suffix,
+        bind, Except.bind, pure, Except.pure]
+
+private theorem output_product_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {leftType rightType : Ty} {left right : Core.Value}
+    (first : OutputComplete (artifact := artifact) (world := world) authority values leftType left)
+    (second : OutputComplete (artifact := artifact) (world := world) authority values rightType right) :
+    OutputComplete (artifact := artifact) (world := world) authority values
+      (.product leftType rightType) (.pair left right) := by
+  obtain ⟨leftBound, first⟩ := first
+  obtain ⟨rightBound, second⟩ := second
+  refine ⟨max leftBound rightBound + 1, ?_⟩
+  intro generation fuel enough expected same slots issued
+  cases fuel with
+  | zero => omega
+  | succ fuel =>
+    obtain ⟨a, middle, leftDecoded, middleIssued, ⟨leftSuffix, leftAppended⟩, leftEncoded⟩ :=
+      first generation fuel (by omega) (SourceCoreRawMetadata.runtimeType leftType)
+        (SourceCoreRawMetadata.runtimeType_idempotent _) slots issued
+    obtain ⟨b, returned, rightDecoded, returnedIssued, ⟨rightSuffix, rightAppended⟩, rightEncoded⟩ :=
+      second generation fuel (by omega) (SourceCoreRawMetadata.runtimeType rightType)
+        (SourceCoreRawMetadata.runtimeType_idempotent _) middle middleIssued
+    refine ⟨.product a b, returned, ?_, returnedIssued,
+      ⟨leftSuffix ++ rightSuffix, by simp only [rightAppended, leftAppended, List.append_assoc]⟩, ?_⟩
+    · unfold decodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, leftDecoded, rightDecoded, Except.mapError,
+        bind, Except.bind, pure, Except.pure]
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel =>
+        have leftAt := leftEncoded encodingFuel (by omega) (rightSuffix ++ suffix)
+        have rightAt := rightEncoded encodingFuel (by omega) suffix
+        have leftAt : encodeRaw authority (returned ++ suffix) encodingFuel values.registry
+            (SourceCoreRawMetadata.runtimeType leftType) a = .ok (.pure values.registry left) := by
+          simpa only [rightAppended, List.append_assoc] using leftAt
+        unfold encodeRaw
+        rw [same]
+        simp only [SourceCoreRawMetadata.runtimeType, leftAt, rightAt,
+          SourceCoreCompatibleValues.Extended.pure, Except.mapError, bind, Except.bind, pure, Except.pure]
+
+private theorem output_proxy_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {inner : Ty} {owner : Core.DataTypeId} {id : Core.Word}
+    (checkedEq : values.checked = artifact.recipe.compiled.compatible.checked)
+    (metadata : values.registry.lookup id = some (.proxy inner))
+    (identity : values.checked.catalog.identity? (.proxy inner) = some owner) :
+    OutputComplete (artifact := artifact) (world := world) authority values
+      (.proxy inner) (.constructed ⟨owner, 0⟩ (.word id)) := by
+  refine ⟨1, ?_⟩
+  intro generation fuel enough expected same slots issued
+  have actualIdentity := (SourceCorePublicOutputShapes.Codec.identity_eq same).trans identity
+  refine ⟨.proxy inner, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+  · cases fuel with
+    | zero => omega
+    | succ fuel =>
+      have decoded := SourceCoreCompatibleValues.decode_proxy_at values metadata same actualIdentity fuel
+      unfold decodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, decoded, Except.mapError, bind, Except.bind, pure, Except.pure]
+  · intro encodingFuel enough suffix
+    cases encodingFuel with
+    | zero => omega
+    | succ encodingFuel =>
+      have encoded := SourceCoreCompatibleValues.encode_proxy_at artifact.recipe.compiled.compatible.checked
+        metadata same (by rw [← checkedEq]; exact actualIdentity) encodingFuel
+      unfold encodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, encoded, Except.mapError]
+
+
+private theorem payloads_nil_complete {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (values : Values) :
+    PayloadsComplete (artifact := artifact) (world := world) authority values [] [] := by
+  refine ⟨0, ?_⟩
+  intro generation fuel _ slots issued
+  refine ⟨[], slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+  · simp [decodePayloads, SourceCorePublicOutputShapes.pack]
+  · intro encodingFuel _ suffix
+    simp [encodePayloads, SourceCorePublicOutputShapes.pack]
+
+private theorem payloads_cons_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {type : Ty} {native : Core.Value} {types : List Ty} {natives : List Core.Value}
+    (head : OutputComplete (artifact := artifact) (world := world) authority values type native)
+    (tail : PayloadsComplete (artifact := artifact) (world := world) authority values types natives)
+    (shape : SourceCorePublicOutputShapes.Payloads artifact.recipe.compiled.compatible.checked
+      values.registry world artifact.program.layouts.definitions types natives) :
+    PayloadsComplete (artifact := artifact) (world := world) authority values (type :: types) (native :: natives) := by
+  obtain ⟨headBound, head⟩ := head
+  cases shape with
+  | nil =>
+    refine ⟨headBound + 1, ?_⟩
+    intro generation fuel enough slots issued
+    cases fuel with
+    | zero => omega
+    | succ fuel =>
+      obtain ⟨value, returned, decoded, returnedIssued, appended, encoded⟩ := head generation fuel (by omega) type rfl slots issued
+      refine ⟨[value], returned, ?_, returnedIssued, appended, ?_⟩
+      · simp only [SourceCorePublicOutputShapes.pack, decodePayloads, decoded, bind, Except.bind, pure, Except.pure]
+      · intro encodingFuel enough suffix
+        cases encodingFuel with
+        | zero => omega
+        | succ encodingFuel =>
+          simp only [SourceCorePublicOutputShapes.pack, encodePayloads, encoded encodingFuel (by omega) suffix]
+  | @cons other otherNative types natives _ _ =>
+    obtain ⟨tailBound, tail⟩ := tail
+    refine ⟨max headBound tailBound + 1, ?_⟩
+    intro generation fuel enough slots issued
+    cases fuel with
+    | zero => omega
+    | succ fuel =>
+      obtain ⟨value, middle, decoded, middleIssued, ⟨headSuffix, headAppended⟩, encoded⟩ := head generation fuel (by omega) type rfl slots issued
+      obtain ⟨rest, returned, restDecoded, returnedIssued, ⟨tailSuffix, tailAppended⟩, restEncoded⟩ :=
+        tail generation fuel (by omega) middle middleIssued
+      refine ⟨value :: rest, returned, ?_, returnedIssued,
+        ⟨headSuffix ++ tailSuffix, by simp only [tailAppended, headAppended, List.append_assoc]⟩, ?_⟩
+      · simp only [SourceCorePublicOutputShapes.pack, decodePayloads, decoded, restDecoded, bind, Except.bind, pure, Except.pure]
+      · intro encodingFuel enough suffix
+        cases encodingFuel with
+        | zero => omega
+        | succ encodingFuel =>
+          have headAt : encodeRaw authority (returned ++ suffix) encodingFuel values.registry type value =
+              .ok (.pure values.registry native) := by
+            simpa only [tailAppended, List.append_assoc] using encoded encodingFuel (by omega) (tailSuffix ++ suffix)
+          have restAt := restEncoded encodingFuel (by omega) suffix
+          simp only [encodePayloads, headAt, restAt, SourceCoreCompatibleValues.Extended.pure,
+            SourceCorePublicOutputShapes.pack, bind, Except.bind, pure, Except.pure]
+
+private theorem entries_nil_complete {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (values : Values) (key value : Ty) :
+    EntriesComplete (artifact := artifact) (world := world) authority values key value [] := by
+  refine ⟨1, ?_⟩
+  intro generation fuel enough layout slots issued
+  refine ⟨[], slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+  · cases fuel with
+    | zero => omega
+    | succ fuel => simp [decodeEntries, Core.OrderedMapping.encode]
+  · intro encodingFuel _ suffix
+    simp [encodeEntries]
+
+private theorem entries_cons_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {key value : Ty} {a b : Core.Value} {rest : Core.OrderedMapping.Entries}
+    (first : OutputComplete (artifact := artifact) (world := world) authority values key a)
+    (second : OutputComplete (artifact := artifact) (world := world) authority values value b)
+    (tail : EntriesComplete (artifact := artifact) (world := world) authority values key value rest) :
+    EntriesComplete (artifact := artifact) (world := world) authority values key value ((a, b) :: rest) := by
+  obtain ⟨keyBound, first⟩ := first
+  obtain ⟨valueBound, second⟩ := second
+  obtain ⟨tailBound, tail⟩ := tail
+  refine ⟨max (max keyBound valueBound) tailBound + 1, ?_⟩
+  intro generation fuel enough layout slots issued
+  cases fuel with
+  | zero => omega
+  | succ fuel =>
+    obtain ⟨k, firstSlots, keyDecoded, firstIssued, ⟨keySuffix, keyAppended⟩, keyEncoded⟩ :=
+      first generation fuel (by omega) key rfl slots issued
+    obtain ⟨v, secondSlots, valueDecoded, secondIssued, ⟨valueSuffix, valueAppended⟩, valueEncoded⟩ :=
+      second generation fuel (by omega) value rfl firstSlots firstIssued
+    obtain ⟨rows, returned, rowsDecoded, returnedIssued, ⟨rowsSuffix, rowsAppended⟩, rowsEncoded⟩ :=
+      tail generation fuel (by omega) layout secondSlots secondIssued
+    refine ⟨(k, v) :: rows, returned, ?_, returnedIssued,
+      ⟨keySuffix ++ valueSuffix ++ rowsSuffix, by simp only [rowsAppended, valueAppended, keyAppended, List.append_assoc]⟩, ?_⟩
+    · simp only [Core.OrderedMapping.encode, decodeEntries, ↓reduceIte, keyDecoded, valueDecoded,
+        rowsDecoded, bind, Except.bind, pure, Except.pure]
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel =>
+        have keyAt : encodeRaw authority (returned ++ suffix) encodingFuel values.registry key k =
+            .ok (.pure values.registry a) := by
+          simpa only [rowsAppended, valueAppended, List.append_assoc] using
+            keyEncoded encodingFuel (by omega) (valueSuffix ++ rowsSuffix ++ suffix)
+        have valueAt : encodeRaw authority (returned ++ suffix) encodingFuel values.registry value v =
+            .ok (.pure values.registry b) := by
+          simpa only [rowsAppended, List.append_assoc] using valueEncoded encodingFuel (by omega) (rowsSuffix ++ suffix)
+        have rowsAt := rowsEncoded encodingFuel (by omega) suffix
+        simp only [encodeEntries, keyAt, valueAt, rowsAt, SourceCoreCompatibleValues.Extended.pure,
+          Core.OrderedMapping.encode, bind, Except.bind, pure, Except.pure]
+
+private theorem output_metadata_at {values : Values} {expected : Ty} {id : Core.Word}
+    {item : SourceCoreRawMetadata.Metadata}
+    (found : values.registry.lookup id = some item)
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType item.type) :
+    metadata values expected id = .ok item := by
+  simp only [metadata, found, same, ↓reduceIte, pure, Except.pure, bind, Except.bind]
+
+private theorem output_mapping_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {key value : Ty} {id : Core.Word} {layout : Core.OrderedMapping.Layout}
+    {rows : Core.OrderedMapping.Entries} {fallback : Core.Value}
+    (checkedEq : values.checked = artifact.recipe.compiled.compatible.checked)
+    (found : values.registry.lookup id = some (.mapping key value))
+    (layoutAt : values.checked.catalog.mappingLayout key value = .ok layout)
+    (entries : EntriesComplete (artifact := artifact) (world := world) authority values key value rows)
+    (defaultValue : SourceCorePublicOutputShapes.Default values.checked values.registry value layout.valueType fallback) :
+    OutputComplete (artifact := artifact) (world := world) authority values (.mapping key value)
+      (.pair (.word id) (.pair fallback (Core.OrderedMapping.encode layout rows))) := by
+  obtain ⟨rowsBound, entries⟩ := entries
+  obtain ⟨defaultBound, defaults⟩ := SourceCorePublicOutputShapes.Codec.default_complete values defaultValue
+  refine ⟨max rowsBound defaultBound + 1, ?_⟩
+  intro generation fuel enough expected same slots issued
+  cases fuel with
+  | zero => omega
+  | succ fuel =>
+    obtain ⟨decoded, returned, decodedAt, returnedIssued, appended, encoded⟩ :=
+      entries generation fuel (by omega) layout slots issued
+    have header := output_metadata_at found same
+    have fallbackDecoded := (defaults fuel (by omega)).1
+    refine ⟨.mapping key value decoded, returned, ?_, returnedIssued, appended, ?_⟩
+    · unfold decodeRaw
+      rw [same]
+      simp only [SourceCoreRawMetadata.runtimeType, header, layoutAt, decodedAt, fallbackDecoded,
+        Except.mapError, bind, Except.bind, pure, Except.pure, ↓reduceIte]
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel =>
+        obtain ⟨inserted, interned, registryEq, idEq⟩ := SourceCoreRawMetadata.Registry.intern_of_lookup found same
+        have encodedAt := encoded encodingFuel (by omega) suffix
+        have rowsAt : encodeEntries authority (returned ++ suffix) encodingFuel inserted.registry key value layout decoded =
+            .ok (.pure inserted.registry (Core.OrderedMapping.encode layout rows)) := by
+          rw [registryEq]
+          exact encodedAt
+        have fallbackAt : SourceCoreCompatibleValues.encodeDefaultRaw encodingFuel artifact.recipe.compiled.compatible.checked
+            inserted.registry value layout.valueType = .ok (.pure inserted.registry fallback) := by
+          rw [registryEq, ← checkedEq]
+          exact (defaults encodingFuel (by omega)).2
+        have nativeLayout : artifact.recipe.compiled.compatible.checked.catalog.mappingLayout
+            (SourceCoreRawMetadata.runtimeType key) (SourceCoreRawMetadata.runtimeType value) = .ok layout := by
+          rw [← checkedEq]
+          exact SourceCorePublicOutputShapes.Codec.mapping_layout_runtime layoutAt
+        unfold encodeRaw
+        rw [same]
+        simp only [SourceCoreRawMetadata.runtimeType, interned, nativeLayout, Except.mapError,
+          bind, Except.bind, pure, Except.pure]
+        simp only [rowsAt, SourceCoreCompatibleValues.Extended.pure, fallbackAt]
+        simp only [registryEq, idEq]
+
+private theorem output_applyMany_not_proxy (head : Ty) (arguments : List Ty)
+    (nonproxy : ∀ inner, SourceCoreRawMetadata.runtimeType head ≠ .proxy inner) :
+    ∀ inner, SourceCoreRawMetadata.runtimeType (Ty.applyMany head arguments) ≠ .proxy inner := by
+  induction arguments generalizing head with
+  | nil => exact nonproxy
+  | cons argument rest ih =>
+    exact ih (.application head argument) (by intro inner; simp [SourceCoreRawMetadata.runtimeType])
+
+private theorem output_constructed_decode {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {values : Values}
+    {slots returned : Registry artifact world} {expected : Ty} {instantiation : DataConstructorInstantiation}
+    {id : Core.Word} {tag : Core.ConstructorId} {payload : Core.Value} {payloads : List Value} {fuel : Nat}
+    (found : values.registry.lookup id = some (.constructor instantiation))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType instantiation.resultType)
+    (nominal : ∃ declaration arguments, instantiation.resultType = Ty.nominal declaration arguments)
+    (tagAt : values.checked.resolveConstructor instantiation = .ok tag)
+    (decoded : decodePayloads authority generation values fuel slots instantiation.payloadTypes payload = .ok (payloads, returned)) :
+    decodeRaw authority generation values (fuel + 1) slots expected (.constructed tag (.pair (.word id) payload)) =
+      .ok (.constructed instantiation payloads, returned) := by
+  have header := output_metadata_at found same
+  obtain ⟨declaration, arguments, nominal⟩ := nominal
+  have notFunction : ∀ a b, SourceCoreRawMetadata.runtimeType expected ≠ .function a b := by
+    rw [same, nominal]
+    exact data_applyMany_not_function _ arguments (by intro a b; simp [SourceCoreRawMetadata.runtimeType])
+  have notProxy : ∀ inner, SourceCoreRawMetadata.runtimeType expected ≠ .proxy inner := by
+    rw [same, nominal]
+    exact output_applyMany_not_proxy _ arguments (by intro inner; simp [SourceCoreRawMetadata.runtimeType])
+  unfold decodeRaw
+  cases view : SourceCoreRawMetadata.runtimeType expected
+  all_goals try {exact False.elim (notFunction _ _ view)}
+  all_goals try {exact False.elim (notProxy _ view)}
+  all_goals simp only [header, tagAt, decoded, Except.mapError, bind, Except.bind, pure, Except.pure, ↓reduceIte]
+
+private theorem output_constructed_encode {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values} {slots : Registry artifact world}
+    {expected : Ty} {instantiation : DataConstructorInstantiation}
+    {id : Core.Word} {tag : Core.ConstructorId} {payload : Core.Value} {payloads : List Value} {fuel : Nat}
+    (found : values.registry.lookup id = some (.constructor instantiation))
+    (same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType instantiation.resultType)
+    (tagAt : artifact.recipe.compiled.compatible.checked.resolveConstructor instantiation = .ok tag)
+    (encoded : encodePayloads authority slots fuel values.registry instantiation.payloadTypes payloads = .ok (.pure values.registry payload)) :
+    encodeRaw authority slots (fuel + 1) values.registry expected (.constructed instantiation payloads) =
+      .ok (.pure values.registry (.constructed tag (.pair (.word id) payload))) := by
+  obtain ⟨inserted, interned, registryEq, idEq⟩ := SourceCoreRawMetadata.Registry.intern_of_lookup found same
+  have payloadAt : encodePayloads authority slots fuel inserted.registry instantiation.payloadTypes payloads =
+      .ok (.pure inserted.registry payload) := by rw [registryEq]; exact encoded
+  unfold encodeRaw
+  cases view : SourceCoreRawMetadata.runtimeType expected
+  all_goals simp only [interned, tagAt, Except.mapError, bind, Except.bind, pure, Except.pure]
+  all_goals simp only [payloadAt, SourceCoreCompatibleValues.Extended.pure]
+  all_goals simp only [registryEq, idEq]
+
+private theorem output_constructed_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {values : Values}
+    {instantiation : DataConstructorInstantiation} {id : Core.Word} {tag : Core.ConstructorId} {payloads : List Core.Value}
+    (checkedEq : values.checked = artifact.recipe.compiled.compatible.checked)
+    (found : values.registry.lookup id = some (.constructor instantiation))
+    (tagAt : values.checked.resolveConstructor instantiation = .ok tag)
+    (nominal : ∃ declaration arguments, instantiation.resultType = Ty.nominal declaration arguments)
+    (payload : PayloadsComplete (artifact := artifact) (world := world) authority values instantiation.payloadTypes payloads) :
+    OutputComplete (artifact := artifact) (world := world) authority values instantiation.resultType
+      (.constructed tag (.pair (.word id) (SourceCorePublicOutputShapes.pack payloads))) := by
+  obtain ⟨bound, payload⟩ := payload
+  refine ⟨bound + 1, ?_⟩
+  intro generation fuel enough expected same slots issued
+  cases fuel with
+  | zero => omega
+  | succ fuel =>
+    obtain ⟨decoded, returned, payloadAt, returnedIssued, appended, encoded⟩ := payload generation fuel (by omega) slots issued
+    refine ⟨.constructed instantiation decoded, returned,
+      output_constructed_decode found same nominal tagAt payloadAt, returnedIssued, appended, ?_⟩
+    intro encodingFuel enough suffix
+    cases encodingFuel with
+    | zero => omega
+    | succ encodingFuel =>
+      exact output_constructed_encode found same (by rw [← checkedEq]; exact tagAt)
+        (encoded encodingFuel (by omega) suffix)
+
+private theorem output_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} (owned : authority.IssuedFor artifact.authority)
+    (values : Values) (checkedEq : values.checked = artifact.recipe.compiled.compatible.checked)
+    {raw : Ty} {native : Core.Value}
+    (shape : SourceCorePublicOutputShapes.Output artifact.recipe.compiled.compatible.checked values.registry
+      world artifact.program.layouts.definitions raw native) :
+    OutputComplete (artifact := artifact) (world := world) authority values raw native := by
+  induction shape using SourceCorePublicOutputShapes.Output.rec
+    (motive_2 := fun types natives _ => PayloadsComplete (artifact := artifact) (world := world) authority values types natives)
+    (motive_3 := fun key value entries _ => EntriesComplete (artifact := artifact) (world := world) authority values key value entries) with
+  | unit =>
+    refine ⟨1, ?_⟩
+    intro generation fuel enough expected same slots issued
+    refine ⟨.unit, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+    · cases fuel with
+      | zero => omega
+      | succ fuel => unfold decodeRaw; rw [same]; rfl
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel => unfold encodeRaw; rw [same]; rfl
+  | bool value =>
+    refine ⟨1, ?_⟩
+    intro generation fuel enough expected same slots issued
+    refine ⟨.bool value, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+    · cases fuel with
+      | zero => omega
+      | succ fuel => unfold decodeRaw; rw [same]; rfl
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel => unfold encodeRaw; rw [same]; rfl
+  | word value =>
+    refine ⟨1, ?_⟩
+    intro generation fuel enough expected same slots issued
+    refine ⟨.word value, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+    · cases fuel with
+      | zero => omega
+      | succ fuel => unfold decodeRaw; rw [same]; rfl
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel => unfold encodeRaw; rw [same]; rfl
+  | integer value =>
+    refine ⟨1, ?_⟩
+    intro generation fuel enough expected same slots issued
+    refine ⟨.integer value, slots, ?_, issued, ⟨[], (List.append_nil _).symm⟩, ?_⟩
+    · cases fuel with
+      | zero => omega
+      | succ fuel => unfold decodeRaw; rw [same]; rfl
+    · intro encodingFuel enough suffix
+      cases encodingFuel with
+      | zero => omega
+      | succ encodingFuel => unfold encodeRaw; rw [same]; rfl
+  | product _ _ first second => exact output_product_complete first second
+  | function generated typed => exact output_function_complete owned values generated typed
+  | proxy metadata identity =>
+    exact output_proxy_complete checkedEq metadata (by rw [checkedEq]; exact identity)
+  | constructed metadata resolved nominal _ payloads =>
+    exact output_constructed_complete checkedEq metadata (by rw [checkedEq]; exact resolved) nominal payloads
+  | mapping metadata layoutAt _ defaultValue entries =>
+    exact output_mapping_complete checkedEq metadata (by rw [checkedEq]; exact layoutAt) entries
+      (by rw [checkedEq]; exact defaultValue)
+  | compatible same _ ih =>
+    obtain ⟨bound, complete⟩ := ih
+    exact ⟨bound, fun generation fuel enough expected compatible =>
+      complete generation fuel enough expected (compatible.trans same)⟩
+  | nil => exact payloads_nil_complete authority values
+  | cons _ tail headIH tailIH => exact payloads_cons_complete headIH tailIH tail
+  | empty key value => exact entries_nil_complete authority values key value
+  | entry _ _ _ first second tail => exact entries_cons_complete first second tail
+
+private theorem exportValue_output_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} (owned : authority.IssuedFor artifact.authority)
+    (values : Values) (checkedEq : values.checked = artifact.recipe.compiled.compatible.checked)
+    {expected : Ty} {native : Core.Value}
+    (shape : SourceCorePublicOutputShapes.Output artifact.recipe.compiled.compatible.checked values.registry
+      world artifact.program.layouts.definitions expected native) :
+    ∃ bound, ∀ generation fuel, bound ≤ fuel → ∀ slots : Registry artifact world,
+      Registry.Issued authority slots → ∃ exported : Exported (artifact := artifact) world authority fuel values expected native,
+        exportValue authority generation fuel values slots expected native = .ok exported ∧
+        Registry.Issued authority exported.slots ∧ (∃ suffix, exported.slots = slots ++ suffix) := by
+  obtain ⟨bound, complete⟩ := output_complete owned values checkedEq shape
+  refine ⟨bound, ?_⟩
+  intro generation fuel enough slots issued
+  obtain ⟨value, returned, decoded, returnedIssued, appended, encoded⟩ :=
+    complete generation fuel enough expected rfl slots issued
+  have reencoded : encodeRaw authority returned fuel values.registry expected value = .ok (.pure values.registry native) := by
+    simpa only [List.append_nil] using encoded fuel enough []
+  let exported : Exported (artifact := artifact) world authority fuel values expected native :=
+    ⟨value, returned, .pure values.registry native, reencoded, rfl⟩
+  refine ⟨exported, ?_, returnedIssued, appended⟩
+  unfold exportValue
+  rw [decoded]
+  dsimp only [bind, Except.bind]
+  split
+  · rename_i error failed
+    rw [reencoded] at failed
+    cases failed
+  · rename_i actual accepted
+    have same := Except.ok.inj (accepted.symm.trans reencoded)
+    subst actual
+    split
+    · rfl
+    · rename_i impossible
+      exact False.elim (impossible rfl)
+
+/-- The exact raw metadata registry retained by an actual pending execution. -/
+def Checkpoint.RegistryAt {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (registry : SourceCoreRawMetadata.Registry) : Prop := checkpoint.values.registry = registry
+
+/-- A structural output certificate and the real issuer suffice for the
+actual decoder and re-encoder. The output bound is uniform over future export
+generations, and the returned receipt retains exact store, slots and metadata. -/
+theorem Checkpoint.native_output_succeeded_uniform {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {registry : SourceCoreRawMetadata.Registry}
+    {payload : Core.Value} {store : Core.Store} {expected : Ty}
+    (atRecipe : artifact.RecipeAt recipe) (atRegistry : checkpoint.RegistryAt registry)
+    (ready : checkpoint.ExportsReady)
+    (requested : checkpoint.ResultTypeAt expected)
+    (shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked registry
+      (store.map Core.Value.type) recipe.program.layouts.definitions expected payload) :
+    ∃ required, ∀ fuel (completed : checkpoint.NativeDone fuel (.inRight .word payload) store),
+      ∀ generation boundaryFuel, required ≤ boundaryFuel →
+      ∃ completion : Completion artifact,
+        complete checkpoint generation fuel boundaryFuel (.inRight .word payload) store completed = .succeeded completion ∧
+        checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word payload) store completion ∧
+        completion.session.ExportsReady := by
+  have actualShape : SourceCorePublicOutputShapes.Output artifact.recipe.compiled.compatible.checked
+      checkpoint.values.registry (store.map Core.Value.type) artifact.program.layouts.definitions
+      checkpoint.request.result payload := by
+    change SourceCorePublicOutputShapes.Output artifact.recipe.compiled.compatible.checked
+      checkpoint.values.registry (store.map Core.Value.type) artifact.recipe.program.layouts.definitions
+      checkpoint.request.result payload
+    change checkpoint.values.registry = registry at atRegistry
+    rw [requested, atRegistry, atRecipe]
+    exact shape
+  obtain ⟨required, exports⟩ := exportValue_output_complete ready.1 checkpoint.values checkpoint.owner actualShape
+  refine ⟨required, ?_⟩
+  intro fuel completed generation boundaryFuel enough
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word payload) store at completed
+  have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+    obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+    obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+    simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+  obtain ⟨exported, exportedAt, _issued, _appended⟩ := exports generation boundaryFuel enough
+    (checkpoint.registry.weaken extension) (ready.2.weaken extension)
+  have actual : ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word payload) store completed = .succeeded completion := by
+    unfold complete
+    simp only [Core.LanguageResult.decode?]
+    rw [exportedAt]
+    exact ⟨_, rfl⟩
+  obtain ⟨completion, succeeded⟩ := actual
+  have receipt := checkpoint.complete_succeeded_receipt completed succeeded
+  exact ⟨completion, succeeded, receipt, receipt.exportsReady ready⟩
+
+/-- Fixed-execution-fuel view of the uniform structural export theorem. -/
+theorem Checkpoint.native_output_succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {registry : SourceCoreRawMetadata.Registry}
+    {fuel : Nat} {payload : Core.Value} {store : Core.Store} {expected : Ty}
+    (atRecipe : artifact.RecipeAt recipe) (atRegistry : checkpoint.RegistryAt registry)
+    (ready : checkpoint.ExportsReady)
+    (completed : checkpoint.NativeDone fuel (.inRight .word payload) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked registry
+      (store.map Core.Value.type) recipe.program.layouts.definitions expected payload) :
+    ∃ required, ∀ generation boundaryFuel, required ≤ boundaryFuel →
+      ∃ completion : Completion artifact,
+        complete checkpoint generation fuel boundaryFuel (.inRight .word payload) store completed = .succeeded completion ∧
+        checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word payload) store completion ∧
+        completion.session.ExportsReady  := by
+  obtain ⟨required, exports⟩ := checkpoint.native_output_succeeded_uniform
+    atRecipe atRegistry ready requested shape
+  exact ⟨required, exports fuel completed⟩
+
+/-- Once native execution has completed, every sufficiently funded actual
+resume exports this represented payload successfully, including nested public
+handles, constructors, proxies and mappings. -/
+theorem Checkpoint.output_succeeded_bound {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {registry : SourceCoreRawMetadata.Registry}
+    {fuel : Nat} {payload : Core.Value} {store : Core.Store} {expected : Ty}
+    (atRecipe : artifact.RecipeAt recipe) (atRegistry : checkpoint.RegistryAt registry)
+    (ready : checkpoint.ExportsReady)
+    (completed : checkpoint.NativeDone fuel (.inRight .word payload) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked registry
+      (store.map Core.Value.type) recipe.program.layouts.definitions expected payload) :
+    ∃ required, ∀ boundaryFuel, required ≤ boundaryFuel → ∀ outcome,
+      checkpoint.ResumeAt fuel boundaryFuel outcome →
+      ∃ (generation : ExportGeneration) (completion : Completion artifact),
+        outcome = .succeeded completion ∧
+        checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word payload) store completion ∧
+        completion.session.ExportsReady := by
+  obtain ⟨required, exports⟩ := checkpoint.native_output_succeeded_receipt
+    atRecipe atRegistry ready completed requested shape
+  refine ⟨required, ?_⟩
+  intro boundaryFuel enough outcome resumed
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word payload) store at completed
+  rcases resumed with ⟨generation, native, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨completion, succeeded, receipt, returnedReady⟩ := exports generation boundaryFuel enough
+    exact ⟨generation, completion, same.symm.trans succeeded, receipt, returnedReady⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+/-- The structural output budget is independent of execution fuel and export
+generation. All actual resumes reaching this same represented result pass
+both public output conversions above that one budget. -/
+theorem Checkpoint.output_succeeded_uniform {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {recipe : Recipe} {registry : SourceCoreRawMetadata.Registry}
+    {payload : Core.Value} {store : Core.Store} {expected : Ty}
+    (atRecipe : artifact.RecipeAt recipe) (atRegistry : checkpoint.RegistryAt registry)
+    (ready : checkpoint.ExportsReady)
+    (requested : checkpoint.ResultTypeAt expected)
+    (shape : SourceCorePublicOutputShapes.Output recipe.compiled.compatible.checked registry
+      (store.map Core.Value.type) recipe.program.layouts.definitions expected payload) :
+    ∃ required, ∀ fuel, checkpoint.NativeDone fuel (.inRight .word payload) store →
+      ∀ boundaryFuel, required ≤ boundaryFuel → ∀ outcome,
+      checkpoint.ResumeAt fuel boundaryFuel outcome →
+      ∃ (generation : ExportGeneration) (completion : Completion artifact),
+        outcome = .succeeded completion ∧
+        checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word payload) store completion ∧
+        completion.session.ExportsReady := by
+  obtain ⟨required, exports⟩ := checkpoint.native_output_succeeded_uniform
+    atRecipe atRegistry ready requested shape
+  refine ⟨required, ?_⟩
+  intro fuel completed boundaryFuel enough outcome resumed
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word payload) store at completed
+  rcases resumed with ⟨generation, native, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨completion, succeeded, receipt, returnedReady⟩ := exports fuel completed generation boundaryFuel enough
+    exact ⟨generation, completion, same.symm.trans succeeded, receipt, returnedReady⟩
   · rw [completed] at exhausted
     cases exhausted
 

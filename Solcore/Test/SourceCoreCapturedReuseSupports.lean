@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedReuseMakeSupport
 import Solcore.Test.SourceCoreCapturedReuseReadSupport
 
@@ -40,7 +41,7 @@ private def selectTwo {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 structure StaticSupportPackage (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (registry : SourceCoreRawMetadata.Registry)
-    (completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed) where
+    (completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed) where
   makeInput : Input fixture.recipe.compiled
   readInput : Input fixture.recipe.compiled
   makeRow : makeInput.row = observed.makeRow.row
@@ -79,7 +80,7 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
     (makeStages : ObservedStages fixture observed.makeRow)
     (readStages : ObservedStages fixture observed.readRow)
     (registry : SourceCoreRawMetadata.Registry)
-    {completion : SourceCoreCallableIndexedPrograms.Completion fixture.recipe.compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics) :
     Nonempty (StaticSupportPackage fixture observed registry completion) := by

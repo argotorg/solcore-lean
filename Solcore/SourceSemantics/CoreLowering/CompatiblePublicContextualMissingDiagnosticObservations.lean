@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CompatibleContextualDiagnosticMissingOrigins
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
 
@@ -135,7 +136,7 @@ theorem FactoryAt.table_expression_missing_diagnostic
 /-- Sealed compilation supplies actual contextual preparation and callable
 allocation. The canonical row and its base are derived internally. -/
 theorem receiver_index_missing_diagnostic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

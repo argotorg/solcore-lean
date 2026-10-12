@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceMissingPreparationRanges
 import Solcore.SourceSemantics.CoreLowering.CompatibleCallableDiagnosticBounds
 
@@ -96,7 +97,7 @@ theorem missing_token_below {context : SourceCoreCompatibleDataPlaceFaultSites.C
 callable allocation at the preparation's final reason boundary. -/
 theorem receiver_read_diagnostic {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
-    {completion : SourceCoreCallableIndexedPrograms.Completion prepared}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver prepared}
     (receiver : IssuedAt prepared completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {plan : Plan} {root : Key} {sources : List (Key × TypedSource)}
@@ -125,7 +126,7 @@ theorem receiver_read_diagnostic {checked : SourceCoreCompatibleCatalog.Checked}
 same public receiver. Duplicate tokens keep the producer's selected span. -/
 theorem receiver_missing_diagnostic {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : SourceCoreCallableIndexedPrograms.Prepared checked}
-    {completion : SourceCoreCallableIndexedPrograms.Completion prepared}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver prepared}
     (receiver : IssuedAt prepared completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {plan : Plan} {root : Key} {sources : List (Key × TypedSource)}

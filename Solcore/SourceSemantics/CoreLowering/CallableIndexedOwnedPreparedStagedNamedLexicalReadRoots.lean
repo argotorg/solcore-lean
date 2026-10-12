@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport
 
 /-! Genuine named expression callbacks produce local-read roots at the actual
@@ -87,7 +88,7 @@ actual lexical field transport. No heap, execution or value representation is
 an input to this compiler-to-static-root producer. -/
 theorem of_accepted
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))

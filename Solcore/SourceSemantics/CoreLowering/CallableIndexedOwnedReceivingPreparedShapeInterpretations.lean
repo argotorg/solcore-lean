@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDecodedAssignmentFaults
 import Solcore.SourceSemantics.CoreLowering.CompatiblePublicCallableAllocationReceipts
 
@@ -95,7 +96,7 @@ theorem decoded_token_below
 The actual completion supplies the receiving rebuild and exact public append;
 the separately named preappend table is identified by that same successful action. -/
 theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}
@@ -120,7 +121,7 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
 preappend decoder and public receiver. The actual reached state, prepared place
 and runtime location are retained; no Source fault or execution is manufactured. -/
 theorem reached_interpretation (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
     (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
       completion.result.extension completion.result.diagnostics)
     {issued : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}

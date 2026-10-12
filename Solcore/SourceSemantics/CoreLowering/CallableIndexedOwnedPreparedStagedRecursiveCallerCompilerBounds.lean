@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerBounds
 
 /-! Successful compilation supplies the finite caller certificate internally.
@@ -21,7 +22,7 @@ universe u
 open CallableIndexedOwnedPreparedStagedRecursiveCallerBounds (Point CallsReady)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
   {compilation : SourceCoreFunctions.Context} {reasonAt : ExpressionId → Word}

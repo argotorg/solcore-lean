@@ -61,6 +61,7 @@ private theorem forward_word {fixture : CompiledFixture} {observed : ObservedPro
   rw [← entryHandle] at started
   obtain ⟨required, finalStore, finalMap, finalWorld, _nativeEnough, _fullResult, publicEnough⟩ :=
     RecursiveNamedPublicDirectCallableWordPreservation.public_resume_has_sufficient_fuel
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)

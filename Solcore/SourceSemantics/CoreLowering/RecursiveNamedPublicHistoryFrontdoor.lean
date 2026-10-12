@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicContinuations
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicFailures
@@ -113,7 +114,7 @@ theorem recover_start
         atCheckpoint, started, selectedRoot, sourceAt⟩⟩
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
-  {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (inputs : List (Input compiled)) (rows : Inventory inputs)
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled
     compiled.indexed.ancestry.graph.inputs.callable)

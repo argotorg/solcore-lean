@@ -61,6 +61,7 @@ theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : Obser
     CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
       (inputs := [support.makeInput, support.readInput]) (rows := support.rows) (distinct := support.distinct)
       (stagePrepared := actualStagePrepared fixture)
+      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
       (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
       (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)
