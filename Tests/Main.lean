@@ -1514,6 +1514,7 @@ import Solcore.Test.SourceCoreCapturedLocalPublicExecution
 import Solcore.Test.SourceCoreInitialLexicalFailurePublicExecution
 import Solcore.Test.SourceCoreInitialLexicalFailureForward
 import Solcore.Test.SourceCoreCapturedCopyPublicExecution
+import Solcore.Test.SourceCoreCapturedAssignmentPublicExecution
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3094,6 +3095,14 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreLambdaTemplates.run
   SourceCoreCompatibleHeapOutputs.run
 
+def capturedClosureSessionTests : IO Unit := do
+  SourceCoreCapturedReuse.run
+  SourceCoreCapturedDirect.run
+  SourceCoreCapturedPacked.runForward
+  SourceCoreCapturedLocal.run
+  SourceCoreCapturedCopy.run
+  SourceCoreCapturedAssignment.run
+
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
   SourceCoreChosenOrdinaryAcceptedPublicBootstrapReceipt.run
@@ -3436,14 +3445,10 @@ def run : IO Unit := do
   SourceCoreExecution.run
   SourceCoreClosedLambdaPublicExecution.run
   SourceCoreCapturedLambdaPublicExecution.run
-  SourceCoreCapturedReuse.run
-  SourceCoreCapturedDirect.run
-  SourceCoreCapturedPacked.runForward
+  capturedClosureSessionTests
   SourceCoreDirectIssued.runForward
   SourceCoreInitialFunctionForward.run
-  SourceCoreCapturedLocal.run
   SourceCoreInitialLexicalFailure.runForward
-  SourceCoreCapturedCopy.run
   SourceCoreHeapSnapshot.run
   SourceCoreExecutionSnapshots.run
   SourceCoreActiveHeapPrefix.run

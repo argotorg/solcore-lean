@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardTerminalCompilerReceipts
@@ -103,6 +105,29 @@ structure Lexical {compiled : SourceCoreUnifiedCompilation.Compiled}
   child : Staging.Recursive.Scope
   selected : stages.Closure function child
 
+/-- The imperative packet retains the actual compiled flow and footer at the
+same closure Code. Source shape excludes control statements outside this fragment. -/
+structure Imperative {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  policy : SourceCoreLoops.Policy
+  fuel : Nat
+  reasonAt : ExpressionId → Word
+  fellThrough : Word
+  escaped : Word
+  allocationOwner : SourceSpecialization.SpecializationKey
+  active : TypeSystem.Substitution
+  onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error
+  flow : Expr
+  accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel code.view
+    (parameterScope code) function.body code.receipt.resultCore reasonAt true escaped = .ok flow
+  emitted : code.receipt.body = CompatibleStatements.finish code.receipt.resultCore flow fellThrough escaped
+  shape : CallableIndexedOwnedPreparedStagedBareAssignmentTree.Shape function.source function.body
+  child : Staging.Recursive.Scope
+  selected : stages.Closure function child
+
 /-- Every constructor retains its authentic body shape at the same Code. -/
 inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
@@ -114,6 +139,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
   | sequence (packet : Sequence code stages)
   | empty (packet : Empty code stages)
   | lexical (packet : Lexical code stages)
+  | imperative (packet : Imperative code stages)
 
 /-- Original raw statement form and both original expression Roots remain
 explicit at all genuinely selected scopes. In particular, the first raw type
@@ -187,6 +213,27 @@ structure LexicalSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
         (fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered semanticFaults)))
       inputs.context (parameterScope code) true function.body function.resultType code.receipt.resultCore packet.flow
 
+/-- Every expression keeps its real lexical context and scope after local
+allocation. The compiler tree stores syntax and accepted allocations only. -/
+structure ImperativeSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Imperative code stages)
+    (semanticFaults : FunctionCalls.FaultRep) : Type where
+  frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
+  projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
+  tree : ∀ child, stages.Closure function child →
+    GenericImperativeMatch.Tree compiled.indexed.layouts packet.allocationOwner packet.active
+      compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
+      (.initial compiled.compatible.checked) child.source (fun _ => True)
+      (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
+        (fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered semanticFaults)))
+      compiled.indexed.layouts.definitions administrative
+      inputs.context (parameterScope code) (.statements true function.body) function.resultType code.receipt.resultCore packet.flow
+
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -203,6 +250,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
   | .sequence sequence => SequenceSupport code inputs stages sequence semanticFaults
   | .empty empty => EmptySupport code inputs stages empty semanticFaults
   | .lexical lexical => LexicalSupport code inputs stages lexical semanticFaults
+  | .imperative imperative => ImperativeSupport code inputs stages imperative semanticFaults
 
 /-- The Association is destructed only to retain its real Code and the actual
 BodyWith.toContext. Every branch retains that same parameter context. -/

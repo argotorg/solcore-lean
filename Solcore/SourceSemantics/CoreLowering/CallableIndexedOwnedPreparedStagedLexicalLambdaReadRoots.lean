@@ -100,7 +100,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include provenance receiver wellFormed original in
 /-- The Source lexical context is the exact context supplied by typed
 compiler traversal, and diagnostics are restricted to this body's real reads. -/
-theorem of_accepted
+theorem of_child
     {context : SourceSemantics.Context} {current : SourceCoreLocalCell.Scope}
     {invocation : Staging.Recursive.Scope} (selected : stages.Closure function invocation)
     (fields : Dynamic.RuntimeContextFields support.body.context context)
@@ -111,7 +111,8 @@ theorem of_accepted
     (form : node.form = .reference name (.local binder))
     (typed : ExpressionHasType function.source context id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
-    (accepted : choice.packet.policy.lowerExpression fuel code.view current id choice.packet.reasonAt = .ok lowered) :
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody fuel
+      code.compilation code.view current id code.reasonAt = .ok lowered) :
     Nonempty (RootAt compiled context invocation current id lowered faults) := by
   let edited := CallableIndexedLambdaBodyViewEdits.local_view code.viewOfSource
   have avoids := CallableIndexedLambdaBodyViewEdits.avoids provenance.body_view
@@ -123,11 +124,8 @@ theorem of_accepted
   have viewedFound : code.view.lookupExpression? id = some node :=
     (provenance.body_view id reached).symm.trans found
   have viewedTree : Syntax code.view id := .leaf (.read viewedFound form)
-  have actual : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody (min fuel code.fuel)
-      code.compilation code.view current id code.reasonAt = .ok lowered := by
-    simpa only [choice.callback, choice.reason, FunctionCode.children] using accepted
   have compiledChild := CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.accepted_original_on
-    edited avoids sourceProfile viewProfile code.callables (min fuel code.fuel) viewedTree reached actual
+    edited avoids sourceProfile viewProfile code.callables fuel viewedTree reached accepted
   have sameSource := stages.source selected
   have unique : NodeOccurrencesUnique invocation.source := by rw [sameSource]; exact support.body.unique
   have childFound : invocation.source.lookupExpression? id = some node := by simpa only [sameSource] using found
@@ -141,7 +139,7 @@ theorem of_accepted
   have childTree : Syntax invocation.source id := .leaf (.read childFound form)
   have childReached : Reaches invocation.source (function.body.map NodeId.statement) (.expression id) := by
     simpa only [sameSource] using reached
-  have childAccepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody (min fuel code.fuel)
+  have childAccepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody fuel
       code.compilation invocation.source current id code.reasonAt = .ok lowered := by
     simpa only [sameSource] using compiledChild
   have coercions : ∀ id node, Syntax invocation.source id →
@@ -160,7 +158,7 @@ theorem of_accepted
     support.body.frame support.body.extended).1.transport fields
   let root : Root compiled code.policy code.lowerBody code.compilation compiled.indexed.fuel
       context invocation code.reasonAt current id lowered node.type faults := {
-    compilerFuel := min fuel code.fuel
+    compilerFuel := fuel
     accepted := childAccepted
     certificate := certificate
     node := node
@@ -181,6 +179,25 @@ theorem of_accepted
         (by simpa only [sameSource] using receipt) location
     callsReady := ready }
   exact ⟨RootAt.ofRoot root⟩
+
+
+include provenance receiver wellFormed original in
+/-- The lexical packet is one actual caller of the shared read producer. -/
+theorem of_accepted
+    {context : SourceSemantics.Context} {current : SourceCoreLocalCell.Scope}
+    {invocation : Staging.Recursive.Scope} (selected : stages.Closure function invocation)
+    (fields : Dynamic.RuntimeContextFields support.body.context context)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations function.source current context)
+    {id : ExpressionId} {node : ExpressionNode} {name : String} {binder : Resolved.LocalId}
+    (reached : Reaches function.source (function.body.map NodeId.statement) (.expression id))
+    (found : function.source.lookupExpression? id = some node)
+    (form : node.form = .reference name (.local binder))
+    (typed : ExpressionHasType function.source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : choice.packet.policy.lowerExpression fuel code.view current id choice.packet.reasonAt = .ok lowered) :
+    Nonempty (RootAt compiled context invocation current id lowered faults) := by
+  apply of_child code support provenance receiver wellFormed original selected fields declarations reached found form typed
+  simpa only [choice.callback, choice.reason, FunctionCode.children] using accepted
 
 
 /-- The first lexical closure fragment permits any number of original reads. -/
