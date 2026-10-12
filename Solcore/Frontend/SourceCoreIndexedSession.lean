@@ -4290,3 +4290,40 @@ theorem Session.RawEncodedAt.reimports_function
       rfl
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+/-- A failed completion retains its actual returned native state. -/
+theorem Checkpoint.FailedResultAt.native_at
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {returned : Session artifact}
+    {fuel : Nat} {native : Core.Value} {store : Core.Store} {reason : Core.Word}
+    (failed : checkpoint.FailedResultAt fuel native store reason returned) :
+    returned.NativeAt (store.map Core.Value.type) store :=
+  ⟨failed.2.2.2.1, failed.2.2.1⟩
+
+/-- Language failure preserves every earlier handle at the actual returned
+store. The original registry is weakened along execution without exporting a
+new value or replaying the failed call. -/
+theorem Checkpoint.FailedResultAt.encodes_function
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session returned : Session artifact}
+    {key : Key} {arguments : List SourceCorePublicValues.Value} {startupFuel executionFuel : Nat}
+    {native : Core.Value} {store : Core.Store} {reason : Core.Word}
+    (failed : checkpoint.FailedResultAt executionFuel native store reason returned)
+    (started : checkpoint.RootStart session key arguments startupFuel)
+    {inputFuel : Nat} {expected : Ty} {handle : SourceCorePublicValues.Handle} {payload : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) payload) :
+    returned.EncodesAt inputFuel expected (.function handle) payload := by
+  obtain ⟨oldEncoded, oldAt, oldValue⟩ := imported
+  obtain ⟨_completed, _decoded, _store, _world, _values, _owner, authority,
+    _sourcePrefix, extension, registry⟩ := failed
+  have resolved := root_start_resolves_weaken started (encoded_function_resolves oldAt) extension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  have registryEq : returnedRegistry = _ := eq_of_heq registry
+  rw [← registryEq] at resolved
+  change returnedAuthority = checkpoint.origin.authority at authority
+  rw [← authority] at resolved
+  exact ⟨_, execution_encode_function_at_registry oldAt resolved returnedValues.registry, oldValue⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession

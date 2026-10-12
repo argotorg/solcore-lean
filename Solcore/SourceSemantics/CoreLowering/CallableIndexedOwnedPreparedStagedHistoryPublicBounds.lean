@@ -97,7 +97,7 @@ local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults
 include wellFormed prepared selected history started inputReceipts metadata in
 /-- History supplies the current state and every retained function's meaning.
 The actual encoder supplies all new data and argument positions. -/
-private theorem current_arguments :
+theorem current_arguments :
     CallableIndexedOwnedIndirectExpressionHeads.StableRows caller ∧
       CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
         rootFunctions mapping world before store ∧

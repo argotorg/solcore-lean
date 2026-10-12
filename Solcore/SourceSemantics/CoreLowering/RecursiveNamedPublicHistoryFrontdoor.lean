@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicContinuations
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicFailures
 
-/-! A successful public start selects its original native checkpoint, complete
+/-! An accepted public start selects its original native checkpoint, complete
 Source header and original input encoding. Current history fixes the starting
 world and store. The public execution consumer derives these receipts before
 calling the existing semantic theorem and returns its reusable next history. -/
@@ -337,5 +338,51 @@ theorem public_run_succeeded_collects
     outcome, after, finalMap, finalWorld, succeeded, ⟨valueEq, typeEq, budgetEq, sessionAt⟩,
     trace, result, reached, added, handles, related, continued⟩
 
+
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
+  prepared complete history atRecipe atSession inputsFor metadataFor descriptors in
+/-- Actual public startup and a failed execution return a reusable history at
+the failure heap, preserving every earlier handle and its captured environment. -/
+theorem public_run_failed_retains
+    {returned : SourceCoreExecution.Session publicArtifact} {reason : Word}
+    (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
+    (publicRun : publicSession.RunAt key publicArguments options (.ok (.failed reason returned))) :
+    ∃ (request : Started (headers rows) prepared publicCheckpoint nativeSession key publicArguments
+      options.inputValidationFuel world store) (arguments : List Dynamic.Value),
+      RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
+        (request.header.bindings.map (fun binding => binding.1.scheme.body)) publicArguments arguments ∧
+      ∃ (actual : SourceCoreIndexedSession.Session nativeArtifact) (value : Core.Value) (finalStore : Store)
+        (capture : CallableIndexedOwnedFunctionValues.NamedCapture rootHeaders (rootOwner).key request.header mapping world)
+        (sourceSize : Nat) (outcome : Staging.Recursive.Outcome) (after : Dynamic.Heap)
+        (finalMap : LocationMap) (finalWorld : StoreTyping),
+        request.checkpoint.FailedResultAt options.executionFuel value finalStore reason actual ∧
+        returned.IndexedAt actual ∧
+        Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
+          (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation anchor.function.context before
+          (.global request.function) arguments outcome after ∧
+        ∃ _result : CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds.ResultAt
+          (registry := completion.result.context.registry) (payloads := request.payloads)
+          (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
+          rootFunctions rootOwner caller request.header capture anchor.function.context
+          outcome after value finalStore finalMap finalWorld rootFaults,
+        ∃ reached : RecursiveNamedPublicFunctionHistory.Caller rootHeaders rootKeys finalMap finalWorld after finalStore,
+          Relates caller reached ∧
+          RecursiveNamedPublicFunctionHistory.History rootHeaders rootKeys rootFunctions
+            completion.result.context.registry anchor actual finalMap finalWorld after finalStore reached entries := by
+  obtain ⟨request⟩ := recover_start prepared inputs rows complete atRecipe history.current.1 atSession publicStart
+  obtain ⟨arguments, inputReceipts⟩ := inputsFor request
+  obtain ⟨descriptor⟩ := descriptors request
+  obtain ⟨actual, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
+      failed, sessionAt, trace, result, reached, related, continued⟩ :=
+    CallableIndexedOwnedPreparedStagedHistoryPublicFailures.public_run_failed_retains
+      (inputs := inputs) (rows := rows) (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
+      (observations := observations) (extension := extension) (semantic := semantic)
+      (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+      (wellFormed := wellFormed) (prepared := prepared) (selected := request.selected)
+      (caller := caller) (history := history) (atCheckpoint := request.atCheckpoint) (started := request.started)
+      (inputReceipts := inputReceipts) (metadata := metadataFor request) (sourceAt := request.sourceAt)
+      publicStart publicRun descriptor
+  exact ⟨request, arguments, inputReceipts, actual, value, finalStore, capture, sourceSize,
+    outcome, after, finalMap, finalWorld, failed, sessionAt, trace, result, reached, related, continued⟩
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistoryFrontdoor

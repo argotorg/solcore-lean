@@ -36,7 +36,7 @@ private theorem header_supports {compiled : SourceCoreUnifiedCompilation.Compile
 
 /-- The actual Source frame provides declaration validity and full evidence
 coverage. Its retained substitution order is preserved verbatim. -/
-private theorem source_typed {compiled : SourceCoreUnifiedCompilation.Compiled}
+theorem source_typed {compiled : SourceCoreUnifiedCompilation.Compiled}
     {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
     {rawD : SourceTypedRuntime.RuntimeEvidenceEnvironment} {source : Dynamic.GlobalFunction}
     (sourceAt : NamedSourceAt header rawD source)

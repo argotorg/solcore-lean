@@ -45,6 +45,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function distinctClosureUse(bundle: (function(Word) returns (Word), mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))))) returns (Word) { match (bundle) { case (first, table) { match (table[3]) { case (again, other) { return first(2) + again(6) + other(7); } default { return 995; } } } default { return 994; } } }",
     "function integratedHistoryUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (Word)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, namedFunction)) { match (table[3]) { case (again, other) { return convert(first(2) + again(6) + other(7) + namedFunction(3)); } default { return 993; } } } default { return 992; } } }",
     "function makePair(firstSeed: Word, secondSeed: Word) returns (function(Word) returns (Word), function(Word) returns (Word)) { return (lam(step: Word) { firstSeed += step; return firstSeed; }, lam(step: Word) { secondSeed += step; return secondSeed; }); }",
+    "function touchThenFail(f: function(Word) returns (Word), step: Word) returns (Word) { f(step); let absent: Word; return absent; }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -85,10 +86,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse", "distinctClosureUse", "integratedHistoryUse", "makePair"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse", "distinctClosureUse", "integratedHistoryUse", "makePair", "touchThenFail"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 17 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 18 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -108,7 +109,7 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 17 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 18 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
   have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
   let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
@@ -278,6 +279,20 @@ def run : IO Unit := do
   let pairRightContinued ← execute pairLeftContinued.session (← key 1) [pairRight, word 1]
   require (pairLeftContinued.value == word 21 && pairRightContinued.value == word 111)
     "reused product outputs lost shared mutation, independent captures or first-match mapping order"
+  let touching ← pairRightContinued.session.runWithReceipt (← key 17) [pairLeft, word 9]
+    {executionFuel := 300000}
+  let failedPair ← match touching.val with
+    | .ok (.failed reason session) =>
+        match ← get "mutation before failure diagnostic" (session.diagnostic (← key 17) reason) with
+        | some {error := .uninitializedLocal _, span := some _, ..} => pure session
+        | _ => throw (IO.userError "failure after closure mutation lost its actual source diagnosis")
+    | _ => throw (IO.userError "closure mutation followed by failure changed outcome")
+  let afterFailedData ← execute failedPair (← key 2) [word 2]
+  require (afterFailedData.value == word 31) "data execution could not continue after closure mutation and failure"
+  let afterFailedLeft ← execute afterFailedData.session (← key 1) [pairLeft, word 1]
+  let afterFailedRight ← execute afterFailedLeft.session (← key 1) [pairRight, word 1]
+  require (afterFailedLeft.value == word 31 && afterFailedRight.value == word 112)
+    "failure lost a retained handle, rolled back an earlier capture change or changed the independent capture"
   let recursive ← execute second.session (← key 2) [word 5]
   require (recursive.value == word 31) "public recursive result changed"
   let localResult ← execute recursive.session (← key 3) [.bool true]
