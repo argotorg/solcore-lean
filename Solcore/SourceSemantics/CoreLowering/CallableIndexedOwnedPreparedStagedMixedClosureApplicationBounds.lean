@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalLambdaApplicationBounds
@@ -168,6 +169,21 @@ theorem application_preserves (budget : Nat)
         metadata, returned, related, post⟩ := result
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | branching branching =>
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branching) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | empty empty =>
       obtain ⟨value, finalStore, evaluated, result⟩ :=
         CallableIndexedOwnedPreparedStagedEmptyLambdaApplicationBounds.application_preserves
@@ -256,6 +272,21 @@ theorem application_preserves (budget : Nat)
         CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds.application_preserves
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := imperative) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | branching branching =>
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_preserves
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
           (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
           (heaps := heaps) (locals := raw.captures) (reference := reference)
@@ -393,6 +424,21 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         metadata, returned, related, post⟩ := result
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | branching branching =>
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branching) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) (valid := valid) children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
     | empty empty =>
       obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
         CallableIndexedOwnedPreparedStagedEmptyLambdaApplicationBounds.application_reflects
@@ -481,6 +527,21 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         CallableIndexedOwnedPreparedStagedImperativeLambdaApplicationBounds.application_reflects
           (profile := profile) (captured := captured) (code := code) (history := history)
           (inputs := support.body.toContext) (packet := imperative) (support := supported)
+          (owner := owner) (caller := caller) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) (valid := valid) children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | branching branching =>
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedBranchingLambdaApplicationBounds.application_reflects
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (inputs := support.body.toContext) (packet := branching) (support := supported)
           (owner := owner) (caller := caller) (stable := stable)
           (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
           (heaps := heaps) (locals := raw.captures) (reference := reference)

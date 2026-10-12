@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchTree
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
@@ -129,6 +130,29 @@ structure Imperative {compiled : SourceCoreUnifiedCompilation.Compiled}
   child : Staging.Recursive.Scope
   selected : stages.Closure function child
 
+/-- The branching packet retains the actual compiled flow and footer at the
+same closure Code. Source shape excludes control statements outside this fragment. -/
+structure Branching {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  policy : SourceCoreLoops.Policy
+  fuel : Nat
+  reasonAt : ExpressionId → Word
+  fellThrough : Word
+  escaped : Word
+  allocationOwner : SourceSpecialization.SpecializationKey
+  active : TypeSystem.Substitution
+  onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error
+  flow : Expr
+  accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel code.view
+    (parameterScope code) function.body code.receipt.resultCore reasonAt true escaped = .ok flow
+  emitted : code.receipt.body = CompatibleStatements.finish code.receipt.resultCore flow fellThrough escaped
+  shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body
+  child : Staging.Recursive.Scope
+  selected : stages.Closure function child
+
 /-- Every constructor retains its authentic body shape at the same Code. -/
 inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
@@ -141,6 +165,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
   | empty (packet : Empty code stages)
   | lexical (packet : Lexical code stages)
   | imperative (packet : Imperative code stages)
+  | branching (packet : Branching code stages)
 
 /-- Original raw statement form and both original expression Roots remain
 explicit at all genuinely selected scopes. In particular, the first raw type
@@ -235,6 +260,26 @@ structure ImperativeSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
       compiled.indexed.layouts.definitions administrative
       inputs.context (parameterScope code) (.statements true function.body) function.resultType code.receipt.resultCore packet.flow
 
+/-- Branches retain the actual compiler tree at each reached lexical context. -/
+structure BranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Branching code stages)
+    (semanticFaults : FunctionCalls.FaultRep) : Type where
+  frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
+  projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
+  tree : ∀ child, stages.Closure function child →
+    GenericImperativeMatch.Tree compiled.indexed.layouts packet.allocationOwner packet.active
+      compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
+      (.initial compiled.compatible.checked) child.source (fun _ => True)
+      (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
+        (fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered semanticFaults)))
+      compiled.indexed.layouts.definitions administrative
+      inputs.context (parameterScope code) (.statements true function.body) function.resultType code.receipt.resultCore packet.flow
+
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -252,6 +297,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
   | .empty empty => EmptySupport code inputs stages empty semanticFaults
   | .lexical lexical => LexicalSupport code inputs stages lexical semanticFaults
   | .imperative imperative => ImperativeSupport code inputs stages imperative semanticFaults
+  | .branching branching => BranchingSupport code inputs stages branching semanticFaults
 
 /-- The Association is destructed only to retain its real Code and the actual
 BodyWith.toContext. Every branch retains that same parameter context. -/
