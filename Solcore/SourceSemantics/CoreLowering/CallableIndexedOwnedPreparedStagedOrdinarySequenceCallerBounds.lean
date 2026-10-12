@@ -133,13 +133,18 @@ def SequenceFor {mapping world function native bindings parameterCore resultCore
   | .principal _ _ _ _ _ _ _ _ _ _ _ =>
       Σ packet : PacketFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared), SupportFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared) packet
 
-/-- Static coverage includes an actual empty unit body as well as the
-existing terminal/discard sequence. The empty branch carries only Source shape. -/
+/-- Static coverage accepts genuine compiler packets and support. Empty bodies
+and ordinary sequences retain their existing producer conveniences. No body
+execution or semantic law is stored in any branch. -/
 inductive OrdinarySequenceFor {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) : Type where
   | sequence (support : SequenceFor stagePrepared association) : OrdinarySequenceFor association
   | empty (body : function.body = []) (unit : function.resultType = .unit) : OrdinarySequenceFor association
+  | compiled (supported : Nonempty (Σ packet :
+      PacketFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared),
+      SupportFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared) packet)) :
+      OrdinarySequenceFor association
 
 private theorem sequence_ready {named : CallableIndexedNamedGeneration.Named}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
@@ -198,6 +203,7 @@ theorem sequence_coverage
     Nonempty (Σ packet : PacketFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared), SupportFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared) packet) := by
   have input := family association
   cases input with
+  | compiled supported => exact supported
   | empty empty unit =>
     cases association with
     | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>

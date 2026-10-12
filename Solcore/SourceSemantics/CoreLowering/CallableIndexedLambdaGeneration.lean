@@ -223,6 +223,7 @@ structure Site {checked : SourceCoreCompatibleCatalog.Checked}
   code : Code prepared (closure named parameters result body sourceContext evidence captured) scope administrative
   compilation : code.compilation = context prepared named
   active : code.active = []
+  allocationError : code.allocationError = fun error => .sourceAllocation (reprStr error)
 
 private theorem descriptor_exists (table : SourceCoreStageCodebook.Table)
     {origin : SourceCoreStageCodebook.Origin} {id : Word} (selected : table.idAt? origin = some id) :
@@ -301,7 +302,7 @@ theorem of_certificate {checked : SourceCoreCompatibleCatalog.Checked}
     id, sourceNode, sourceFound, sourceForm, node, found, form, reported, reasonAt, lowered, receipt, accepted,
     allocationError := fun error => .sourceAllocation (reprStr error), allocationProfile, manifest, expressionProfile,
     callables, descriptor, projection, typed }
-  exact ⟨⟨code, rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl receipt⟩
+  exact ⟨⟨code, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, HEq.refl receipt⟩
 
 /-- Build every static code field from the actual named callback's accepted
 ordinary lambda branch. Canonical metadata and native checking remain explicit,
