@@ -118,6 +118,12 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
       apply ih child code
       change (child, code) ∈ (callee, compiler.calleeCode) :: ids.zip compiler.codes
       exact List.mem_cons_of_mem _ paired
+  | unary metadata form _found _input _output _profile _child ih =>
+    exact .unary metadata.found form ih
+  | binary metadata form _leftFound _rightFound _leftType _rightType _output _profile _first _second firstIH secondIH =>
+    exact .binary metadata.found form firstIH secondIH
+  | conditional metadata form _conditionFound _thenFound _elseFound _conditionType _thenType _elseType _test _yes _no testIH yesIH noIH =>
+    exact .conditional metadata.found form testIH yesIH noIH
 
 /-- Grammar at a reached call comes from its literal Calls path and certificate,
 including the leading callee and ordered argument entries. -/
@@ -136,6 +142,8 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
   | group _inside ih => exact ih
   | tuple_child _member _inside ih => exact ih
   | call_child _member _inside ih => exact ih
+  | unary_child _inside ih | binary_left _inside ih | binary_right _inside ih
+  | conditional_condition _inside ih | conditional_then _inside ih | conditional_else _inside ih => exact ih
 
 /-- One actual sidecar is chosen outside the universal static call proof.
 Each Port comes from the same successful prepareSidecar action, so its sidecar

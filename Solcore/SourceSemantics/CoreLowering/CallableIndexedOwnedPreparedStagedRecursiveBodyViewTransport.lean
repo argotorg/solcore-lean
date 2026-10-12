@@ -44,6 +44,21 @@ theorem syntax_view {id : ExpressionId} (tree : Syntax source id)
         (calleeIH calleeReached)
         (fun child member => childrenIH child member
           (.expression reached found (by simp [form, ExpressionForm.references, member])))
+  | @unary id node operator operand found form child ih =>
+      intro reached
+      exact .unary ((expression_lookup edited avoids reached).symm.trans found) form
+        (ih (.expression reached found (by simp [form, ExpressionForm.references])))
+  | @binary id node left operator right found form first second firstIH secondIH =>
+      intro reached
+      exact .binary ((expression_lookup edited avoids reached).symm.trans found) form
+        (firstIH (.expression reached found (by simp [form, ExpressionForm.references])))
+        (secondIH (.expression reached found (by simp [form, ExpressionForm.references])))
+  | @conditional id node condition yes no found form test thenBranch elseBranch testIH thenIH elseIH =>
+      intro reached
+      exact .conditional ((expression_lookup edited avoids reached).symm.trans found) form
+        (testIH (.expression reached found (by simp [form, ExpressionForm.references])))
+        (thenIH (.expression reached found (by simp [form, ExpressionForm.references])))
+        (elseIH (.expression reached found (by simp [form, ExpressionForm.references])))
 
 /-- Reverse syntax uses the original body's authentic reachability path. -/
 theorem syntax_original {id : ExpressionId} (tree : Syntax view id)
@@ -128,6 +143,9 @@ private inductive FormInFragment : ExpressionForm → Prop where
   | group {inner} : FormInFragment (.group inner)
   | tuple {ids} : FormInFragment (.tuple ids)
   | call {callee ids metadata} : FormInFragment (.call callee ids (.indirect metadata))
+  | unary {operator operand} : FormInFragment (.unary operator operand)
+  | binary {left operator right} : FormInFragment (.binary left operator right)
+  | conditional {test yes no} : FormInFragment (.conditional test yes no)
 
 private theorem syntax_found {source : TypedSource} {id : ExpressionId}
     (tree : Syntax source id) : ∃ node, source.lookupExpression? id = some node := by
@@ -136,6 +154,9 @@ private theorem syntax_found {source : TypedSource} {id : ExpressionId}
   | group found _ _ => exact ⟨_, found⟩
   | tuple found _ _ => exact ⟨_, found⟩
   | call found _ _ _ => exact ⟨_, found⟩
+  | unary found _ _ => exact ⟨_, found⟩
+  | binary found _ _ _ => exact ⟨_, found⟩
+  | conditional found _ _ _ _ => exact ⟨_, found⟩
 
 private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
     (tree : Syntax source id) (found : source.lookupExpression? id = some node) :
@@ -164,6 +185,15 @@ private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : E
   | call selected form _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.call
+  | unary selected form _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.unary
+  | binary selected form _ _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.binary
+  | conditional selected form _ _ _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.conditional
 
 /-- Direct references obtain their syntax from the actual finite parent tree.
 The projection preserves the literal argument vector, including duplicates. -/
@@ -206,6 +236,23 @@ private theorem syntax_child {source : TypedSource} {id child : ExpressionId}
       rcases member with same | member
       · exact same.symm ▸ calleeTree
       · exact children child member
+  | @unary _ _ operator operand selected form childTree =>
+      cases Option.some.inj (selected.symm.trans found)
+      have same : child = operand := by simpa [form, ExpressionForm.references] using edge
+      exact same.symm ▸ childTree
+  | @binary _ _ left operator right selected form first second =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = left ∨ child = right := by simpa [form, ExpressionForm.references] using edge
+      rcases member with same | same
+      · exact same.symm ▸ first
+      · exact same.symm ▸ second
+  | @conditional _ _ test yes no selected form testTree yesTree noTree =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = test ∨ child = yes ∨ child = no := by simpa [form, ExpressionForm.references] using edge
+      rcases member with same | same | same
+      · exact same.symm ▸ testTree
+      · exact same.symm ▸ yesTree
+      · exact same.symm ▸ noTree
 
 private theorem basic_atomic_eq {source view : TypedSource}
     (metadata : LambdaMetadataViews.MetadataView source view)
@@ -376,6 +423,18 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
                           simp only [formEq, viewReading, firstSame, secondSame]
                       | cons third tail =>
                           simp only [formEq, viewReading, tupleLeaf formEq]
+          | @unary operator operand =>
+              have child := children operand (by simp [formEq, ExpressionForm.references])
+              simp only [formEq, viewReading, child]
+          | @binary left operator right =>
+              have first := children left (by simp [formEq, ExpressionForm.references])
+              have second := children right (by simp [formEq, ExpressionForm.references])
+              simp only [formEq, viewReading, first, second]
+          | @conditional condition yes no =>
+              have test := children condition (by simp [formEq, ExpressionForm.references])
+              have thenBranch := children yes (by simp [formEq, ExpressionForm.references])
+              have elseBranch := children no (by simp [formEq, ExpressionForm.references])
+              simp only [formEq, viewReading, test, thenBranch, elseBranch]
           | @call callee ids metadata =>
               have calleeReached : Reaches source roots (.expression callee) :=
                 .expression reached found (by simp [formEq, ExpressionForm.references])

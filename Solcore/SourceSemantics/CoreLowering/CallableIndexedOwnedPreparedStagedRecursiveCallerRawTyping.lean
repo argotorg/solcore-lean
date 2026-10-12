@@ -90,4 +90,44 @@ theorem parent_typed
         row_member argumentsTyped (List.of_mem_zip remaining).1
       exact ih childTyped
 
+  | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualChild, actualCore, childFound, childTyped, actualProfile⟩ :=
+      CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
+        metadata.coercions metadata.requirements originalTyped
+    exact ih childTyped
+  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+      CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
+        metadata.coercions metadata.requirements originalTyped
+    exact ih leftTyped
+  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+      CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
+        metadata.coercions metadata.requirements originalTyped
+    exact ih rightTyped
+  | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualCondition, actualThen, actualElse, firstFound, secondFound, thirdFound,
+        firstType, secondType, thirdType, conditionTyped, thenTyped, elseTyped⟩ :=
+      CompatibleExpressionConditionals.conditional_source_types unique metadata.found form
+        metadata.coercions originalTyped
+    exact ih conditionTyped
+  | @conditional_then scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualCondition, actualThen, actualElse, firstFound, secondFound, thirdFound,
+        firstType, secondType, thirdType, conditionTyped, thenTyped, elseTyped⟩ :=
+      CompatibleExpressionConditionals.conditional_source_types unique metadata.found form
+        metadata.coercions originalTyped
+    exact ih thenTyped
+  | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    have originalTyped := typed_at_lookup unique metadata.found typed
+    obtain ⟨actualCondition, actualThen, actualElse, firstFound, secondFound, thirdFound,
+        firstType, secondType, thirdType, conditionTyped, thenTyped, elseTyped⟩ :=
+      CompatibleExpressionConditionals.conditional_source_types unique metadata.found form
+        metadata.coercions originalTyped
+    exact ih elseTyped
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerRawTyping

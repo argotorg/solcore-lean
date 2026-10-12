@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalCertificates
 
 /-! Successful compilation constructs a finite recursive caller certificate.
 The callee and ordered argument vector retain the exact compiler occurrences,
@@ -27,6 +28,14 @@ inductive Syntax (source : TypedSource) : ExpressionId → Prop where
       (form : node.form = .call callee ids (.indirect metadata))
       (calleeSyntax : Syntax source callee)
       (children : ∀ child, child ∈ ids → Syntax source child) : Syntax source id
+  | unary {id node operator operand} (found : source.lookupExpression? id = some node)
+      (form : node.form = .unary operator operand) (child : Syntax source operand) : Syntax source id
+  | binary {id node left operator right} (found : source.lookupExpression? id = some node)
+      (form : node.form = .binary left operator right)
+      (first : Syntax source left) (second : Syntax source right) : Syntax source id
+  | conditional {id node condition yes no} (found : source.lookupExpression? id = some node)
+      (form : node.form = .conditional condition yes no)
+      (test : Syntax source condition) (thenBranch : Syntax source yes) (elseBranch : Syntax source no) : Syntax source id
 
 structure PolicyFor (policy : SourceCoreFunctions.Policy) (compilation : SourceCoreFunctions.Context)
     (readFuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
@@ -92,6 +101,42 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
         Certificate policy body compilation readFuel values source context reasonAt scope child code) :
       Certificate policy body compilation readFuel values source context reasonAt scope id lowered
 
+  | unary {id node operand childNode operator operandType resultType core childCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node core.resultType)
+      (form : node.form = .unary operator operand)
+      (found : source.lookupExpression? operand = some childNode)
+      (inputType : childNode.type = operandType) (outputType : node.type = resultType)
+      (profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core)
+      (child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id
+        ⟨core.resultType, LocalPrimitiveResults.unary core childCode⟩
+  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator))
+      (form : node.form = .binary left operator right)
+      (leftFound : source.lookupExpression? left = some leftNode)
+      (rightFound : source.lookupExpression? right = some rightNode)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (outputType : node.type = resultType)
+      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode)
+      (first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
+      (second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id
+        ⟨mode.resultType operator, mode.binary operator leftCode rightCode⟩
+
+  | conditional {id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node type)
+      (form : node.form = .conditional condition thenId elseId)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (thenFound : source.lookupExpression? thenId = some thenNode)
+      (elseFound : source.lookupExpression? elseId = some elseNode)
+      (conditionType : conditionNode.type = .bool)
+      (thenType : thenNode.type = node.type) (elseType : elseNode.type = node.type)
+      (conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩)
+      (thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩)
+      (elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id
+        ⟨type, LocalControl.choose type conditionCode thenCode elseCode⟩
+
 variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
   {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
   {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
@@ -138,6 +183,65 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child childCode} (member : (child, childCode) ∈ outer.entries)
       (inside : Calls compiler (children child childCode member)) :
       Calls compiler (.call outer sequence children)
+
+  | unary_child {scope id node operand childNode operator operandType resultType core childCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node core.resultType}
+      {form : node.form = .unary operator operand} {found : source.lookupExpression? operand = some childNode}
+      {inputType : childNode.type = operandType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.UnaryProfile operator operandType resultType core}
+      {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
+      (inside : Calls compiler child) :
+      Calls compiler (.unary actual form found inputType outputType profile child)
+  | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
+      {form : node.form = .binary left operator right}
+      {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
+      {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
+      (inside : Calls compiler first) :
+      Calls compiler (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
+  | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
+      {form : node.form = .binary left operator right}
+      {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
+      {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
+      (inside : Calls compiler second) :
+      Calls compiler (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
+  | conditional_condition {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
+      {form : node.form = .conditional condition thenId elseId}
+      {conditionFound : source.lookupExpression? condition = some conditionNode}
+      {thenFound : source.lookupExpression? thenId = some thenNode} {elseFound : source.lookupExpression? elseId = some elseNode}
+      {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
+      {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
+      {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
+      (inside : Calls compiler conditionTree) :
+      Calls compiler (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+  | conditional_then {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
+      {form : node.form = .conditional condition thenId elseId}
+      {conditionFound : source.lookupExpression? condition = some conditionNode}
+      {thenFound : source.lookupExpression? thenId = some thenNode} {elseFound : source.lookupExpression? elseId = some elseNode}
+      {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
+      {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
+      {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
+      (inside : Calls compiler thenTree) :
+      Calls compiler (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
+  | conditional_else {scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode}
+      {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node type}
+      {form : node.form = .conditional condition thenId elseId}
+      {conditionFound : source.lookupExpression? condition = some conditionNode}
+      {thenFound : source.lookupExpression? thenId = some thenNode} {elseFound : source.lookupExpression? elseId = some elseNode}
+      {conditionType : conditionNode.type = .bool} {thenType : thenNode.type = node.type} {elseType : elseNode.type = node.type}
+      {conditionTree : Certificate policy body compilation readFuel values source context reasonAt scope condition ⟨.bool, conditionCode⟩}
+      {thenTree : Certificate policy body compilation readFuel values source context reasonAt scope thenId ⟨type, thenCode⟩} {elseTree : Certificate policy body compilation readFuel values source context reasonAt scope elseId ⟨type, elseCode⟩}
+      (inside : Calls compiler elseTree) :
+      Calls compiler (.conditional actual form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree)
 
 private theorem product_policy_on {scope : SourceCoreLocalCell.Scope} {allowed : ExpressionId → Prop}
     (policyFor : PolicyOn policy compilation readFuel values source scope reasonAt allowed) :
@@ -270,7 +374,7 @@ private theorem child_certificates {scope : SourceCoreLocalCell.Scope} {budget :
 
 /-- The actual successful action supplies every recursive compiler child.
 Independent raw Source typing supplies child types before their extraction. -/
-theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
+theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {allowed : ExpressionId → Prop}
@@ -284,14 +388,16 @@ theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
       source scope id reasonAt = .ok lowered) :
-    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered ∧
+      values.checked.catalog.project node.type = .ok lowered.type := by
   revert admitted
   induction syntaxTree generalizing node fuel lowered with
   | leaf tree =>
     intro admitted
-    exact .leaf (CallableIndexedOwnedPreparedStagedReadProductTreeBounds.of_functions_on
+    obtain ⟨tree, sites⟩ := CallableIndexedOwnedPreparedStagedReadProductTreeBounds.of_functions_on
       unique declarations (product_policy_on policyFor) closed
-      (fun id node allowed tree found => coercions id node allowed (.leaf tree) found) tree admitted found typed accepted)
+      (fun id node allowed tree found => coercions id node allowed (.leaf tree) found) tree admitted found typed accepted
+    exact ⟨.leaf ⟨tree, sites⟩, (CompatibleExpressionPrimitives.Tree.product tree).projected found⟩
   | group originalFound form child ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -304,7 +410,8 @@ theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
         (policyFor.read _ admitted (.group originalFound form child)) accepted
       obtain ⟨innerNode, innerFound, sourceType, childTyped⟩ :=
         CompatibleExpressionProducts.group_source_types unique originalFound form metadata.coercions typed
-      exact .group metadata form innerFound sourceType (ih innerFound childTyped generated (closed admitted originalFound (by simp [form, ExpressionForm.references])))
+      exact ⟨.group metadata form innerFound sourceType (ih innerFound childTyped generated
+        (closed admitted originalFound (by simp [form, ExpressionForm.references]))).1, metadata.projected⟩
   | tuple originalFound form children ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -319,12 +426,12 @@ theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
         unique originalFound form metadata.coercions typed
       obtain ⟨count, nodes, certified⟩ := child_certificates unique childTyped generated
         (fun child member childNode code childFound childTyped childAccepted =>
-          ih child member childFound childTyped childAccepted
-            (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
-      exact .tuple ⟨metadata, form, sourceType⟩
+          (ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member]))).1)
+      refine ⟨.tuple ⟨metadata, form, sourceType⟩
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
-            (_root_.List.zip _ _) scope child code))) certified
+            (_root_.List.zip _ _) scope child code))) certified, metadata.projected⟩
   | @call callId _original _callee _ids _metadata originalFound form calleeSyntax children calleeIH ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -345,19 +452,118 @@ theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
           compiler parent unique parentTyped
       obtain ⟨calleeNode, contains, sourceType⟩ := calleeTyped.stored_type
       have calleeFound := lookupExpression?_complete unique contains
-      have calleeCertified := calleeIH calleeFound (sourceType ▸ calleeTyped) compiler.calleeAccepted
-        (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+      have calleeCertified := (calleeIH calleeFound (sourceType ▸ calleeTyped) compiler.calleeAccepted
+        (closed admitted originalFound (by simp [form, ExpressionForm.references]))).1
       obtain ⟨count, nodes, certified⟩ := child_certificates unique argumentsTyped compiler.argumentsAccepted
         (fun child member childNode code childFound childTyped childAccepted =>
-          ih child member childFound childTyped childAccepted
-            (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
-      refine .call compiler (CompatibleExpressionConstructors.sequence_of_nodes count nodes ?_) ?_
-      · intro child code member
-        exact ⟨rfl, List.mem_cons_of_mem _ member⟩
-      · intro child code member
-        rcases List.mem_cons.mp member with head | remaining
-        · cases head; exact calleeCertified
-        · exact certified child code remaining
+          (ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member]))).1)
+      constructor
+      · refine .call compiler (CompatibleExpressionConstructors.sequence_of_nodes count nodes ?_) ?_
+        · intro child code member
+          exact ⟨rfl, List.mem_cons_of_mem _ member⟩
+        · intro child code member
+          rcases List.mem_cons.mp member with head | remaining
+          · cases head; exact calleeCertified
+          · exact certified child code remaining
+      · obtain ⟨_same, metadata⟩ := CallableIndexedOwnedPreparedStagedRecursiveCallerSourceReceipts.original_read_metadata compiler readPolicy
+        rw [compiler.output]
+        simpa only [originalSame] using metadata.projected
+
+  | unary originalFound form child ih =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.unary originalFound form child))
+        (policyFor.read _ admitted (.unary originalFound form child)) accepted
+      cases step with
+      | @unary operator operand compiled otherForm metadata generated inputChecked =>
+        obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (form.symm.trans otherForm)
+        obtain ⟨childNode, core, childFound, childTyped, profile⟩ :=
+          CompatibleExpressionPrimitives.unary_source_types unique originalFound form metadata.coercions metadata.requirements typed
+        obtain ⟨childTree, projected⟩ := ih childFound childTyped generated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        have chosen := CompatibleExpressionConditionals.unary_selected profile projected
+        rw [chosen] at metadata inputChecked ⊢
+        obtain ⟨childType, childCode⟩ := compiled
+        dsimp only at inputChecked childTree ⊢
+        subst childType
+        exact ⟨.unary metadata form childFound rfl rfl profile childTree, metadata.projected⟩
+      | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
+  | binary originalFound form leftSyntax rightSyntax leftIH rightIH =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.binary originalFound form leftSyntax rightSyntax))
+        (policyFor.read _ admitted (.binary originalFound form leftSyntax rightSyntax)) accepted
+      cases step with
+      | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
+        obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+          CompatibleExpressionPrimitives.binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
+        obtain ⟨firstTree, projected⟩ := leftIH leftFound leftTyped firstGenerated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        obtain ⟨secondTree, _projected⟩ := rightIH rightFound rightTyped secondGenerated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        have chosen := CompatibleExpressionConditionals.binary_selected profile projected
+        rw [chosen] at metadata leftChecked rightChecked ⊢
+        obtain ⟨firstType, leftCode⟩ := first
+        obtain ⟨secondType, rightCode⟩ := second
+        dsimp only at leftChecked rightChecked firstTree secondTree ⊢
+        subst firstType secondType
+        exact ⟨.binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree, metadata.projected⟩
+      | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
+  | conditional originalFound form conditionSyntax thenSyntax elseSyntax conditionIH thenIH elseIH =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have step := CompatibleExpressionConditionals.step_of_functions originalFound (by rw [form]; constructor)
+        (policyFor.special _ admitted (.conditional originalFound form conditionSyntax thenSyntax elseSyntax))
+        (policyFor.read _ admitted (.conditional originalFound form conditionSyntax thenSyntax elseSyntax)) accepted
+      cases step with
+      | @conditional condition thenId elseId conditionCode thenCode elseCode type otherForm metadata conditionGenerated thenGenerated elseGenerated =>
+        obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (form.symm.trans otherForm)
+        obtain ⟨conditionNode, thenNode, elseNode, conditionFound, thenFound, elseFound, conditionType, thenType, elseType,
+          conditionTyped, thenTyped, elseTyped⟩ := CompatibleExpressionConditionals.conditional_source_types unique originalFound form metadata.coercions typed
+        obtain ⟨conditionTree, _⟩ := conditionIH conditionFound conditionTyped conditionGenerated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        obtain ⟨thenTree, _⟩ := thenIH thenFound thenTyped thenGenerated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        obtain ⟨elseTree, _⟩ := elseIH elseFound elseTyped elseGenerated
+          (closed admitted originalFound (by simp [form, ExpressionForm.references]))
+        exact ⟨.conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType
+          conditionTree thenTree elseTree, metadata.projected⟩
+      | unary otherForm _ _ _ | binary otherForm _ _ _ _ _ | group otherForm _ _ | pair otherForm _ _ _ => simp [form] at otherForm
+
+
+theorem of_functions_on {scope : SourceCoreLocalCell.Scope}
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {allowed : ExpressionId → Prop}
+    (policyFor : PolicyOn policy compilation readFuel values source scope reasonAt allowed)
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → Syntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : Syntax source id) (admitted : allowed id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact (of_functions_on_projected unique declarations policyFor closed coercions
+    syntaxTree admitted found typed accepted).1
 
 theorem of_functions {scope : SourceCoreLocalCell.Scope}
     (unique : NodeOccurrencesUnique source)

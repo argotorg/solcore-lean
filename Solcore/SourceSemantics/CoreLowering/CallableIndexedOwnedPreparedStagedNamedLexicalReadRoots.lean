@@ -81,6 +81,31 @@ private theorem read_no_calls
     have same := outer.originalForm
     rw [identity, form] at same
     cases same
+  | @unary_child scope id node operand childNode operator operandType resultType core childCode actual otherForm childFound inputType outputType profile child inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+  | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode actual otherForm conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+  | @conditional_then scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode actual otherForm conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+  | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode actual otherForm conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside =>
+    have identity := Option.some.inj (actual.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+
 
 include aligned in
 /-- All dynamic-facing validity comes from the original Source Header and

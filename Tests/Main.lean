@@ -1526,6 +1526,7 @@ import Solcore.Test.SourceCoreNamedBranchPublicExecution
 import Solcore.Test.SourceCoreCapturedWhileForward
 import Solcore.Test.SourceCoreNamedWhilePublicExecution
 import Solcore.Test.SourceCoreNamedBlockPublicExecution
+import Solcore.Test.SourceCoreNamedOperatorsPublicExecution
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3124,6 +3125,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreCapturedWhile.runForward
   SourceCoreNamedWhile.run
   SourceCoreNamedBlock.run
+  SourceCoreNamedOperators.run
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run

@@ -21,29 +21,29 @@ private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected
   · simp [SourceCoreBasic.ensureType, same] at checked
 
 
-private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
+def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) : UnaryOp :=
   if operator = .bitNot && operand = .integer then .integerNot else SourceCorePrimitive.unaryOperator operator
-private def selectedMode (operand : Ty) : Mode := if operand = .integer then .integer else .word
+def selectedMode (operand : Ty) : Mode := if operand = .integer then .integer else .word
 
-private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
+theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.UnaryOp} {operand result : TypeSystem.Ty} {core : UnaryOp} {type : Ty}
     (profile : UnaryProfile operator operand result core) (projected : catalog.project operand = .ok type) :
     selectedUnary operator type = core := by
   cases profile <;> cases projected <;> rfl
-private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
+theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type) :
     selectedMode type = mode := by
   cases profile <;> cases projected <;> rfl
 
-private inductive Compound : ExpressionForm → Prop where
+inductive Compound : ExpressionForm → Prop where
   | unary (operator : Syntax.UnaryOp) (operand : ExpressionId) : Compound (.unary operator operand)
   | binary (operator : Syntax.BinaryOp) (left right : ExpressionId) : Compound (.binary left operator right)
   | group (inner : ExpressionId) : Compound (.group inner)
   | pair (left right : ExpressionId) : Compound (.tuple [left, right])
   | conditional (condition thenId elseId : ExpressionId) : Compound (.conditional condition thenId elseId)
 
-private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
+inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
     (fuel : Nat) (context : SourceCoreFunctions.Context) (values : ValuesContext)
     (source : TypedSource) (scope : Scope) (reasonAt : ExpressionId → Word)
     (id : ExpressionId) (node : ExpressionNode) : SourceCoreBasic.LoweredExpr → Prop where
@@ -84,7 +84,7 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
       Step policy body fuel context values source scope reasonAt id node
         ⟨type, LocalControl.choose type conditionCode thenCode elseCode⟩
 
-private theorem step_of_functions
+theorem step_of_functions
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {fuel : Nat} {context : SourceCoreFunctions.Context} {values : ValuesContext}
     {source : TypedSource} {scope : Scope} {id : ExpressionId} {node : ExpressionNode}
