@@ -46,6 +46,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -74,6 +75,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -102,6 +104,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -131,6 +134,7 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same

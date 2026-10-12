@@ -46,6 +46,35 @@ def StatementsPlain (program : Program) (mode : Bool) (scope : Scope) (context :
   | .fault (.stage ..) => True
 
 
+/-- Ordinary loop outcomes retain their finite independent iterations. -/
+def WhilePlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (condition : ExpressionId)
+    (statements : List StatementId) (outcome : BodyOutcome) (after : Heap) : Prop :=
+  match outcome with
+  | .fallthrough finalEnvironment => WhileExecutes program context scope.evidence scope.source environment before
+      condition statements context (.fallthrough finalEnvironment) after
+  | .returned value => WhileExecutes program context scope.evidence scope.source environment before
+      condition statements context (.returned value) after
+  | .fault (.semantic reason) => WhileFaults program context scope.evidence scope.source environment before
+      condition statements reason after
+  | .fault (.stage ..) => True
+
+theorem WhilePlain.next {program : Program} {scope : Scope} {context innerContext : Context}
+    {environment innerEnvironment : Environment} {before middle bodyHeap after : Heap}
+    {condition : ExpressionId} {statements : List StatementId} {outcome : BodyOutcome}
+    (test : ExpressionEvaluates program context scope.evidence scope.source environment before condition (.bool true) middle)
+    (body : StatementsExecute program context scope.evidence scope.source environment middle statements
+      innerContext (.fallthrough innerEnvironment) bodyHeap)
+    (next : WhilePlain program scope context environment bodyHeap condition statements outcome after) :
+    WhilePlain program scope context environment before condition statements outcome after := by
+  cases outcome with
+  | returned => exact .nextFallthrough test body next
+  | fallthrough => exact .nextFallthrough test body next
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .nextFallthrough test body next
+
+
 private theorem value_occurrence {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm} {value : Value}
     (occurrence : Occurrence scope id form)
@@ -234,6 +263,7 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     (motive_2 := fun scope context environment before ids outcome after _ => ExpressionsPlain program scope context environment before ids outcome after)
     (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
     (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
   case atomicValue contains _ uncoerced valueRule =>
     exact .intro contains (by simpa only [uncoerced] using valueRule) (by simpa only [uncoerced] using CoercionPathExecutes.nil)
   case atomicFault contains _ uncoerced faultRule =>
@@ -407,6 +437,29 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono ih)
+
+  case whileReturned contains form loop ih =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form]) (.whileLoop contains form ih)
+  case whileFault contains form loop ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.whileIteration contains form ih)
+  case whileFallthrough contains form loop next loopIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.whileLoop contains form loopIH) nextIH
+  case done test ih => exact .done ih
+  case conditionFault test ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .condition ih
+  case returned test body testIH bodyIH => exact .returns testIH bodyIH
+  case bodyFault test body testIH bodyIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .body testIH bodyIH
+  case next test body next testIH bodyIH nextIH => exact WhilePlain.next testIH bodyIH nextIH
 
 /-- Successful recursively staged expressions retain their ordinary source
 meaning, including all nested closure-body computations. -/

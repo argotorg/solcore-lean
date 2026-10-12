@@ -50,6 +50,19 @@ def StatementsAt (size : Nat) : Prop :=
     Size.StatementsIn program registry mode size scope context environment before statements runtimeFinal (.fault failure) after →
     HeapWellTyped context after ∧ HeapTypesExtend before after
 
+/-- A faulting finite loop restores the original typing context after every
+successful body prefix, including any cells allocated inside the iteration. -/
+def WhileAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context bodyFinal : Context} {environment : Environment}
+    {before after : Heap} {condition : ExpressionId} {statements : List StatementId}
+    {failure : Failure} {control : ControlContext} {facts : BodyFacts},
+    SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
+    EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+    ExpressionHasType scope.source context condition .bool →
+    StatementsHaveType scope.source control.enterLoop context statements bodyFinal facts →
+    Size.While program registry size scope context environment before condition statements (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
 variable {program registry}
 
 /-- A typed successful prefix uses its actual erasure; no completion is added

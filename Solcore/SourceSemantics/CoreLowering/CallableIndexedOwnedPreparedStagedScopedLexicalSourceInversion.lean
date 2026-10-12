@@ -50,6 +50,7 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
+  | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
   | letInitialized actual same _ _ _ _ _ | letFault actual same _ _ =>
@@ -92,6 +93,7 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
+  | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ =>
@@ -128,6 +130,7 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | returnUnit actual same => exact ⟨rfl, rfl, rfl⟩
   | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
+  | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _

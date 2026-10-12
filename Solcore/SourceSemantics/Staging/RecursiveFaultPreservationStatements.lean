@@ -40,7 +40,8 @@ private theorem statement_form
 and binder allocation, and the strictly smaller faulting child exactly once. -/
 theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
-    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
+    (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller) :
     StatementsAt program registry size := by
   intro mode scope context staticFinal runtimeFinal environment before after statements failure control facts
     runtime covers locals heap typed trace
@@ -164,6 +165,28 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
       exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | @whileFault loopSize mode scope context environment before after id rest node condition statements failure
+      contains form loop =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | whileLoop conditionTyped bodyTyped =>
+          exact whileIH loopSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap conditionTyped bodyTyped loop
+  | @whileFallthrough loopSize nextSize mode scope context finalContext environment before middle after
+      id rest node condition statements outcome contains form loop next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) middle := .whileLoop contains form loop.sound.plain
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before middle [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
   | @letUninitialized nextSize mode scope context middleContext finalContext environment before bound after id rest node
       binder location outcome contains form monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
@@ -212,5 +235,38 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
             (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             headExtends.trans (allocationExtends.trans tailExtends)⟩
       | letInitializedGeneralized polymorphic _ _ _ _ => exact (polymorphic monomorphic).elim
+
+/-- Each repeated iteration is strictly smaller, and a successful scoped body
+returns its actual heap to the original loop context before the next test. -/
+theorem while_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
+    (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller) :
+    WhileAt program registry size := by
+  intro scope context bodyFinal environment before after condition statements failure control facts
+    runtime covers locals heap conditionTyped bodyTyped trace
+  cases trace with
+  | @conditionFault testSize scope context environment before after condition statements failure test =>
+      exact expressionIH testSize (Size.child_lt_stepSize (by simp))
+        runtime covers locals heap conditionTyped test
+  | @bodyFault testSize bodySize scope context innerContext environment before middle after condition statements failure
+      test body =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      obtain ⟨afterTyped, bodyExtends⟩ := statementsIH bodySize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono testExtends) middleTyped bodyTyped body
+      exact ⟨afterTyped, testExtends.trans bodyExtends⟩
+  | @next testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after
+      condition statements outcome test body next =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap statements
+        (.fallthrough innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped body.sound.fallthrough_scoped
+      obtain ⟨afterTyped, nextExtends⟩ := whileIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers ((locals.mono testExtends).mono preserved.heap_extends) preserved.heap_typed
+        conditionTyped bodyTyped next
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans nextExtends)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.FaultPreservation

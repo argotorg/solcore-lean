@@ -16,6 +16,7 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     (motive_1 := fun _ _ _ _ _ _ _ _ => True)
     (motive_2 := fun _ _ _ _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
   all_goals try exact True.intro
   case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
@@ -80,6 +81,55 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     cases failure with
     | stage => trivial
     | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono child.semanticFault_plain)
+
+  case whileReturned contains form loop ih =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form]) (.whileLoop contains form ih)
+  case whileFault contains form loop ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.whileIteration contains form ih)
+  case whileFallthrough contains form loop next loopIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.whileLoop contains form loopIH) nextIH
+  case done test _ih => exact .done test.value_plain
+  case conditionFault test _ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .condition test.semanticFault_plain
+  case returned test body _testIH bodyIH => exact .returns test.value_plain bodyIH
+  case bodyFault test body _testIH bodyIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .body test.value_plain bodyIH
+  case next test body next _testIH bodyIH nextIH => exact WhilePlain.next test.value_plain bodyIH nextIH
+
+/-- Loops retain their actual finite ordinary iterations, including nested calls. -/
+theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap}
+    {condition : ExpressionId} {statements : List StatementId} {outcome : BodyOutcome}
+    (trace : While program registry scope context environment before condition statements outcome after) :
+    WhilePlain program scope context environment before condition statements outcome after := by
+  induction trace using While.rec
+    (motive_1 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_2 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ _ _ _ _ _ _ => True)
+  all_goals try exact True.intro
+  case done test _ih => exact .done test.value_plain
+  case conditionFault test _ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .condition test.semanticFault_plain
+  case returned test body _testIH _bodyIH => exact .returns test.value_plain body.body_plain
+  case bodyFault test body _testIH _bodyIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .body test.value_plain body.body_plain
+  case next test body next _testIH _bodyIH nextIH => exact WhilePlain.next test.value_plain body.body_plain nextIH
 
 /-- A scoped arm retains the independent ordinary sequence and its actual heap. -/
 theorem StatementsIn.returned_scoped {program : Program} {registry : Registry} {scope : Scope}

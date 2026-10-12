@@ -55,6 +55,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   cases trace with
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
+  | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _

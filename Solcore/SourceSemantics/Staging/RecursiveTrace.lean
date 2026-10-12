@@ -6,11 +6,11 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discards, conditional statements, and returns.
+containing monomorphic lets, bare plain assignments, discards, conditional statements, finite while loops, and returns.
 Conditional arms use scoped fallthrough: their local bindings are restored while
 heap changes remain visible to the following statements. The profile has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
-evidence-selected operator methods, coercion paths, projected or compound assignments, and loops require later recursive rules. These
+evidence-selected operator methods, coercion paths, projected or compound assignments, for loops, and loop-control transfers require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
@@ -292,6 +292,19 @@ mutual
           (if truth then thenBody else elseBody.getD []) innerContext (.fallthrough innerEnvironment) branchHeap)
         (next : StatementsIn program registry mode scope context environment branchHeap rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | whileReturned {mode scope context environment before after id rest node condition statements value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
+        (loop : While program registry scope context environment before condition statements (.returned value) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | whileFault {mode scope context environment before after id rest node condition statements failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
+        (loop : While program registry scope context environment before condition statements (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | whileFallthrough {mode scope context finalContext environment before middle after id rest node condition statements outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
+        (loop : While program registry scope context environment before condition statements (.fallthrough environment) middle)
+        (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
     | assignBare {mode scope context finalContext environment before middle written after
           id rest node assignment rhs value target updated outcome}
@@ -347,6 +360,31 @@ mutual
         StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
 
 
+  /-- Finite loop iterations restore their original lexical scope while retaining
+  all condition and body heap effects. Loop-control transfers are a later extension. -/
+  inductive While (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → ExpressionId → List StatementId → BodyOutcome → Heap → Prop where
+    | done {scope context environment before after condition statements}
+        (test : Expression program registry scope context environment before condition (.value (.bool false)) after) :
+        While program registry scope context environment before condition statements (.fallthrough environment) after
+    | conditionFault {scope context environment before after condition statements failure}
+        (test : Expression program registry scope context environment before condition (.fault failure) after) :
+        While program registry scope context environment before condition statements (.fault failure) after
+    | returned {scope context innerContext environment before middle after condition statements value}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false scope context environment middle statements innerContext (.returned value) after) :
+        While program registry scope context environment before condition statements (.returned value) after
+    | bodyFault {scope context innerContext environment before middle after condition statements failure}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false scope context environment middle statements innerContext (.fault failure) after) :
+        While program registry scope context environment before condition statements (.fault failure) after
+    | next {scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false scope context environment middle statements innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (next : While program registry scope context environment bodyHeap condition statements outcome after) :
+        While program registry scope context environment before condition statements outcome after
+
+
 end
 
 /-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
@@ -354,7 +392,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough whileReturned whileFault whileFallthrough)
 end Statements
 
 end Solcore.SourceSemantics.Staging.Recursive
