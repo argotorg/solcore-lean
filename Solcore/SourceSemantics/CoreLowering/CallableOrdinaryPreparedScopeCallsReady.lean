@@ -117,7 +117,8 @@ theorem calls_ready
     (typed : ExpressionHasType invocation.source context rootId rootType)
     (root : Certificate code.policy code.lowerBody code.compilation compiled.indexed.fuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
-      invocation.source context code.reasonAt rootScope rootId rootCode) :
+      invocation.source context code.reasonAt rootScope rootId rootCode)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source rootId) :
     CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := invocation) root := by
   rcases invocation with ⟨origin, actualSource, owned, invocationContext, evidence, guards⟩
@@ -127,7 +128,7 @@ theorem calls_ready
   subst actualSource
   obtain ⟨canonical, issued, _canonicalSelected, ready⟩ :=
     CallableIndexedOwnedPreparedStagedCanonicalCallsReady.canonical_calls_ready
-      code retained metadata sourceReceipt unique typed root
+      code retained metadata sourceReceipt unique typed root tree
   have guardFrame := selected_frame accepted wellFormed signatureMember sourceOwner
     ranges issued sourceReceipt related
   intro callFuel callScope callId callee ids callMetadata lowered compiler path

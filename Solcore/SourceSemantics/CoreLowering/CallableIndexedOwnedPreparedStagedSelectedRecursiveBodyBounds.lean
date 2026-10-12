@@ -104,7 +104,7 @@ variable
       bindings parameterCore resultCore),
     ClosureSupportFor association stages (closureTerminals association))
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.LegacySupport headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
 
 include closureSupport in
@@ -220,7 +220,7 @@ theorem preserves (size : Nat) :
         root.support.runtimeLedger root.support.uninitialized size
         (fun childSize within => closure_preserves_below closureTerminals closureSupport ih within)
         (fun childSize within => named_preserves_below namedTerminals namedSupport ih within)
-        root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
+        root.support.certificate (.root (by simp)) root.support.noDirect root.support.callsReady size (Nat.le_refl _)
 
 include receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
@@ -241,6 +241,6 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         root.support.runtimeLedger root.support.uninitialized stageEq size
         (fun childSize within => closure_reflects_below closureTerminals closureSupport ih within)
         (fun childSize within => named_reflects_below namedTerminals namedSupport ih within)
-        root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
+        root.support.certificate (.root (by simp)) root.support.noDirect root.support.callsReady size (Nat.le_refl _)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds

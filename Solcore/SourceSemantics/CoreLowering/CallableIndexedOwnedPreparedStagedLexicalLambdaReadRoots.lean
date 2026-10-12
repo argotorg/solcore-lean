@@ -53,6 +53,11 @@ private theorem read_no_calls
     have same := Option.some.inj (header.metadata.found.symm.trans found)
     subst other
     simp [form] at otherForm
+  | @direct_child current id callee directIds instantiation fuel code types outer calleeTyped application sequence children child childCode member inside =>
+    have identity := Option.some.inj (outer.metadata.found.symm.trans found)
+    have same := outer.form
+    rw [identity, form] at same
+    cases same
   | @call_child current id otherCallee otherIds otherMetadata otherFuel code types outer sequence children child childCode member inside =>
     have identity := Option.some.inj (outer.found.symm.trans found)
     have same := outer.originalForm
@@ -207,7 +212,8 @@ theorem of_child
       exact CallableIndexedOwnedContextualLambdaReadDiagnostics.uninitialized support provenance.body_reasons receiver
         (Reaches.from_root reached (by simpa only [sameSource] using path))
         (by simpa only [sameSource] using receipt) location
-    callsReady := ready }
+    callsReady := ready
+    noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _ childTree }
   exact ⟨RootAt.ofRoot root⟩
 
 

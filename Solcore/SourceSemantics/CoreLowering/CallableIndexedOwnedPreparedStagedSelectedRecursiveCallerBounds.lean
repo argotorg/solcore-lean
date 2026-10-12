@@ -28,7 +28,7 @@ open CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds (TerminalFor 
 open CallableIndexedOwnedPreparedStagedTerminalClosureParentPreservation (PreservesBelowFor)
 open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls NoDirect)
 universe u
 open CallableLambdaBodyReachability
 
@@ -137,19 +137,19 @@ theorem preserves_reached
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode)
     (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
-    CallsReady root → ∀ size, size ≤ budget →
+    NoDirect root → CallsReady root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
   | leaf tree =>
-      intro reached _ports size _within current child code point
+      intro reached _noDirect _ports size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves_reached
         bridge functions extension sameLedger runtimeLedger callFaults uninitializedOn semantic
         unique wellFormed runtime covers size ⟨tree, reached⟩
   | @unary id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType unaryProfile child ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression operand) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have childMeaning : PreservesBelow bridge context model stages invocation
@@ -160,7 +160,8 @@ theorem preserves_reached
         have pair := Prod.mk.inj member
         obtain ⟨rfl, rfl⟩ := pair
         intro node
-        exact ih reached0 (fun compiler inside => ports compiler (.unary_child
+        exact ih reached0 (fun compiler inside => noDirect compiler (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => ports compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -168,7 +169,7 @@ theorem preserves_reached
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have reached1 : Reaches invocation.source [.expression faultRoot] (.expression right) :=
@@ -182,13 +183,17 @@ theorem preserves_reached
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihFirst reached0 (fun compiler inside => ports compiler (.binary_left
+          exact ihFirst reached0 (fun compiler inside => noDirect compiler (.binary_left
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => ports compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihSecond reached1 (fun compiler inside => ports compiler (.binary_right
+          exact ihSecond reached1 (fun compiler inside => noDirect compiler (.binary_right
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => ports compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -197,7 +202,7 @@ theorem preserves_reached
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .binary metadata form leftFound rightFound leftType rightType outputType binaryProfile (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree ihCondition ihThen ihElse =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression condition) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have reached1 : Reaches invocation.source [.expression faultRoot] (.expression thenId) :=
@@ -213,21 +218,30 @@ theorem preserves_reached
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihCondition reached0 (fun compiler inside => ports compiler (.conditional_condition
+          exact ihCondition reached0 (fun compiler inside => noDirect compiler (.conditional_condition
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihThen reached1 (fun compiler inside => ports compiler (.conditional_then
+          exact ihThen reached1 (fun compiler inside => noDirect compiler (.conditional_then
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member2
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihElse reached2 (fun compiler inside => ports compiler (.conditional_else
+          exact ihElse reached2 (fun compiler inside => noDirect compiler (.conditional_else
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
@@ -237,21 +251,22 @@ theorem preserves_reached
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have childMeaning : PreservesBelow bridge context model stages invocation
           (Point rootScope inner code) callFaults size := by
         intro childSize _smaller current child actual point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih innerReached (fun compiler inside => ports compiler
+        exact ih innerReached (fun compiler inside => noDirect compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => ports compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child actual point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size
         childMeaning size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @tuple id node ids types codes header sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -262,7 +277,8 @@ theorem preserves_reached
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun compiler inside => ports compiler
+          (fun compiler inside => noDirect compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -270,7 +286,7 @@ theorem preserves_reached
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
   | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -281,15 +297,19 @@ theorem preserves_reached
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun compiler inside => ports compiler
+          (fun compiler inside => noDirect compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_preserves
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
+      intro _reached noDirect
+      exact False.elim (noDirect compiler (.here calleeTyped application sequence children))
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ compiler.entries →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -304,7 +324,8 @@ theorem preserves_reached
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun nested inside => ports nested
+          (fun nested inside => noDirect nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       obtain ⟨port⟩ := ports compiler (.here sequence children)
       have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
@@ -341,19 +362,19 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode)
     (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
-    CallsReady root → ∀ size, size ≤ budget →
+    NoDirect root → CallsReady root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   revert reached
   induction root with
   | leaf tree =>
-      intro reached _ports size _within current child code point
+      intro reached _noDirect _ports size _within current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects_reached
         bridge functions extension sameLedger runtimeLedger callFaults uninitializedOn semantic
         unique wellFormed runtime covers size ⟨tree, reached⟩
   | @unary id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType unaryProfile child ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression operand) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have childMeaning : ReflectsBelow bridge context model stages invocation
@@ -364,7 +385,8 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         have pair := Prod.mk.inj member
         obtain ⟨rfl, rfl⟩ := pair
         intro node
-        exact ih reached0 (fun compiler inside => ports compiler (.unary_child
+        exact ih reached0 (fun compiler inside => noDirect compiler (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => ports compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -372,7 +394,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have reached1 : Reaches invocation.source [.expression faultRoot] (.expression right) :=
@@ -386,13 +408,17 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihFirst reached0 (fun compiler inside => ports compiler (.binary_left
+          exact ihFirst reached0 (fun compiler inside => noDirect compiler (.binary_left
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => ports compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihSecond reached1 (fun compiler inside => ports compiler (.binary_right
+          exact ihSecond reached1 (fun compiler inside => noDirect compiler (.binary_right
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => ports compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
@@ -401,7 +427,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .binary metadata form leftFound rightFound leftType rightType outputType binaryProfile (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree ihCondition ihThen ihElse =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression condition) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have reached1 : Reaches invocation.source [.expression faultRoot] (.expression thenId) :=
@@ -417,21 +443,30 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihCondition reached0 (fun compiler inside => ports compiler (.conditional_condition
+          exact ihCondition reached0 (fun compiler inside => noDirect compiler (.conditional_condition
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihThen reached1 (fun compiler inside => ports compiler (.conditional_then
+          exact ihThen reached1 (fun compiler inside => noDirect compiler (.conditional_then
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
         · have pair := Prod.mk.inj member2
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihElse reached2 (fun compiler inside => ports compiler (.conditional_else
+          exact ihElse reached2 (fun compiler inside => noDirect compiler (.conditional_else
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => ports compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
@@ -441,21 +476,22 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have innerReached : Reaches invocation.source [.expression faultRoot] (.expression inner) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
       have childMeaning : ReflectsAt bridge context model stages invocation
           (Point rootScope inner code) callFaults size := by
         intro current child actual point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih innerReached (fun compiler inside => ports compiler
+        exact ih innerReached (fun compiler inside => noDirect compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => ports compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size within ⟨rfl, rfl, rfl⟩
       intro current child actual point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size
         childMeaning (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @tuple id node ids types codes header sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -466,7 +502,8 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun compiler inside => ports compiler
+          (fun compiler inside => noDirect compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt_succ _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
@@ -474,7 +511,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
   | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -485,15 +522,19 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun compiler inside => ports compiler
+          (fun compiler inside => noDirect compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_reflects
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
+      intro _reached noDirect
+      exact False.elim (noDirect compiler (.here calleeTyped application sequence children))
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro reached ports size within
+      intro reached noDirect ports size within
       have childReached : ∀ child code, (child, code) ∈ compiler.entries →
           Reaches invocation.source [.expression faultRoot] (.expression child) := by
         intro child code member
@@ -508,7 +549,8 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member (childReached child code member)
-          (fun nested inside => ports nested
+          (fun nested inside => noDirect nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       obtain ⟨port⟩ := ports compiler (.here sequence children)
       have calleeCertified : RecursiveStageTupleMeaning.Entries rootScope compiler.entries
@@ -544,7 +586,7 @@ theorem preserves
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode) :
-    CallsReady root → ∀ size, size ≤ budget →
+    NoDirect root → CallsReady root → ∀ size, size ≤ budget →
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   exact preserves_reached (faultRoot := rootId) bridge receiver stagePrepared profile
@@ -577,7 +619,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode) :
-    CallsReady root → ∀ size, size ≤ budget →
+    NoDirect root → CallsReady root → ∀ size, size ≤ budget →
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   exact reflects_reached (faultRoot := rootId) bridge receiver stagePrepared profile

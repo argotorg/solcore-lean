@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds
@@ -127,8 +128,14 @@ theorem preserves_compiled
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
           (namedSupport named member) profile wellFormed selected extension
-          (fun smaller _strict => bodies smaller))
-      root ports size (Nat.le_refl _) certified
+          (fun smaller _strict => bodies smaller)
+          (fun smaller _strict =>
+            CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves_canonical
+              (profile := profile) (closurePackets := closurePackets) (closureSupport := closureSupport)
+              (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+              (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+              (extension := extension) (semantic := semantic) smaller))
+      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals namedSupport
@@ -175,7 +182,13 @@ theorem reflects_compiled
       (fun _childSize _within named member {_child} selected =>
         CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
           (namedSupport named member) profile wellFormed selected extension
-          (fun smaller _strict => bodies smaller))
-      root ports size (Nat.le_refl _) certified
+          (fun smaller _strict => bodies smaller)
+          (fun smaller _strict =>
+            CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects_canonical
+              (profile := profile) (closurePackets := closurePackets) (closureSupport := closureSupport)
+              (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+              (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+              (extension := extension) (semantic := semantic) stageEq smaller))
+      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerCompilerBounds

@@ -1,12 +1,14 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalRecursiveCallerBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds
 
-/-! Strong numeric recursion closes chosen mixed closure bodies. The same
-pool-zero RootAt target and original call authority are reused. Static mixed
-packets cover actual Associations; named bodies retain their terminal support.
-Structural caller recursion handles equal native group and singleton grades. -/
+/-! Simultaneous numeric recursion closes pool and canonical caller roots.
+Actual named parameter packets supply canonical slots, while existing closure
+packets retain their original pool support. Every called body consumes a
+strictly smaller grade; structural children retain their independent bounds. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -54,45 +56,111 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge
   (compiled := compiled) (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys)
 
-include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-/-- Each called first/tail expression consumes a genuinely smaller numeric Root.
-The static packet retains all actual Source selections; no execution law enters. -/
-theorem preserves (size : Nat) :
-    PreservesRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
-      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size := by
-  induction size using Nat.strongRecOn with
-  | ind size ih =>
-    intro context invocation scope expression lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.preserves_reached
-      poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
-      root.support.covers root.support.unique root.support.actualFunctionType observations
-      extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
-      root.support.runtimeLedger root.support.uninitialized size ih
-      (fun childSize within named member {_child} selected =>
-        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
-          (namedSupport named member) profile root.support.wellFormed selected extension
-          (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
-      root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
+local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
+  bodyRegistry semanticFaults profile
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
+  completion.result.context.registry functions
+local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+  completion.result.diagnostics
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
-/-- Only called-body evaluation decreases numerically. Structural group and
-singleton tuple reflection retain their honest equal-grade child behavior. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
-    (size : Nat) :
-    ReflectsRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
-      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size := by
+theorem preserves_both (size : Nat) :
+    PreservesRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size ∧
+    CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+      (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   induction size using Nat.strongRecOn with
   | ind size ih =>
-    intro context invocation scope expression lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.reflects_reached
-      poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
-      root.support.covers root.support.unique root.support.actualFunctionType observations
-      extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
-      root.support.runtimeLedger root.support.uninitialized stageEq size ih
-      (fun childSize within named member {_child} selected =>
-        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
-          (namedSupport named member) profile root.support.wellFormed selected extension
-          (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
-      root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
+    constructor
+    · intro context invocation scope expression lowered root
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.preserves_reached
+        poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
+        root.support.covers root.support.unique root.support.actualFunctionType observations
+        extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
+        root.support.runtimeLedger root.support.uninitialized size
+        (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize within named member {_child} selected =>
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+            (namedSupport named member) profile root.support.wellFormed selected extension
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
+        root.support.certificate (.root (by simp)) root.support.noDirect
+        root.support.callsReady size (Nat.le_refl _)
+    · intro context invocation scope expression lowered root owner caller callerBridge
+      exact CallableIndexedOwnedPreparedStagedCanonicalRecursiveCallerBounds.preserves_reached
+        owner callerBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
+        root.support.covers root.support.unique root.support.actualFunctionType observations
+        extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
+        root.support.runtimeLedger root.support.uninitialized size
+        (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize within named member {_child} selected =>
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+            (namedSupport named member) profile root.support.wellFormed selected extension
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
+        root.support.certificate (.root (by simp)) root.support.directReady
+        root.support.callsReady size (Nat.le_refl _)
+
+include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
+theorem preserves (size : Nat) :
+    PreservesRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size :=
+  (preserves_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic size).1
+
+include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
+theorem preserves_canonical (size : Nat) :
+    CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+      (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  (preserves_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic size).2
+
+include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
+theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+    ReflectsRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size ∧
+    CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+      (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    constructor
+    · intro context invocation scope expression lowered root
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds.reflects_reached
+        poolBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
+        root.support.covers root.support.unique root.support.actualFunctionType observations
+        extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
+        root.support.runtimeLedger root.support.uninitialized stageEq size
+        (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize within named member {_child} selected =>
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+            (namedSupport named member) profile root.support.wellFormed selected extension
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
+        root.support.certificate (.root (by simp)) root.support.noDirect
+        root.support.callsReady size (Nat.le_refl _)
+    · intro context invocation scope expression lowered root owner caller callerBridge
+      exact CallableIndexedOwnedPreparedStagedCanonicalRecursiveCallerBounds.reflects_reached
+        owner callerBridge receiver stagePrepared profile root.support.wellFormed root.support.runtime
+        root.support.covers root.support.unique root.support.actualFunctionType observations
+        extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
+        root.support.runtimeLedger root.support.uninitialized stageEq size
+        (fun childSize smaller => (ih childSize smaller).1)
+        (fun childSize within named member {_child} selected =>
+          CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+            (namedSupport named member) profile root.support.wellFormed selected extension
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
+            (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
+        root.support.certificate (.root (by simp)) root.support.directReady
+        root.support.callsReady size (Nat.le_refl _)
+
+include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
+theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+    ReflectsRootsAt (completion := completion) (stages := stages) (headers := headers) (keys := keys)
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile size :=
+  (reflects_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic stageEq size).1
+
+include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
+theorem reflects_canonical (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+    CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+      (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  (reflects_both profile closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic stageEq size).2
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds

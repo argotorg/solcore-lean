@@ -121,6 +121,8 @@ def of_view_action_on
   actualFunctionType := authority.actualFunctionType
   uninitialized := authority.uninitialized
   callsReady := ready
+  noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _
+    (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original edited avoids tree reached)
 
 /-- Existential compiler packaging retains the same original indices. -/
 def rootAt_of_view_action_on

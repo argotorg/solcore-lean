@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedInitialContextValidity
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLambdaFormationHeads
@@ -64,10 +65,17 @@ theorem Formation.of_actual
     exact ⟨actual⟩
   wellFormed := wellFormed
 
+inductive LegacySupport where
+  | recursive (static : CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.NamedSupport
+      header stages terminal semanticFaults)
+  | formation (static : Formation headers keys bodyRegistry header stages terminal semanticFaults)
+
 inductive Support where
   | recursive (static : CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.NamedSupport
       header stages terminal semanticFaults)
   | formation (static : Formation headers keys bodyRegistry header stages terminal semanticFaults)
+  | canonical (static : CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.NamedSupport
+      (headers := headers) (keys := keys) stages semanticFaults header terminal)
 
 variable {headers keys bodyRegistry header stages terminal semanticFaults}
   {receiving : SourceCoreRawMetadata.Registry}

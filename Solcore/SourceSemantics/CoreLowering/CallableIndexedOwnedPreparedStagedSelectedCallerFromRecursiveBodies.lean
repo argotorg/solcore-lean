@@ -54,7 +54,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       bindings parameterCore resultCore),
     ClosureSupportFor association stages (closureTerminals association))
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.LegacySupport headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
 
 local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
@@ -90,7 +90,7 @@ theorem preserves {context invocation scope expression lowered}
       closureTerminals closureSupport (fun smaller _ => bodies smaller) within)
     (fun childSize within => CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_preserves_below
       namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
-    root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _) point
+    root.support.certificate (.root (by simp)) root.support.noDirect root.support.callsReady size (Nat.le_refl _) point
 
 include bridge receiver stagePrepared observations extension semantic
   closureTerminals namedTerminals closureSupport namedSupport in
@@ -120,6 +120,6 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       closureTerminals closureSupport (fun smaller _ => bodies smaller) within)
     (fun childSize within => CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_reflects_below
       namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
-    root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _) point
+    root.support.certificate (.root (by simp)) root.support.noDirect root.support.callsReady size (Nat.le_refl _) point
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedCallerFromRecursiveBodies

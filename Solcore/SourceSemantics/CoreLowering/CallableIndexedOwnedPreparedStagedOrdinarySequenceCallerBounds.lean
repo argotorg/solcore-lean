@@ -72,14 +72,15 @@ private theorem calls_ready {named : CallableIndexedNamedGeneration.Named}
     (typed : ExpressionHasType invocation.source context rootId rootType)
     (root : Certificate code.policy code.lowerBody code.compilation compiled.indexed.fuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
-      invocation.source context code.reasonAt rootScope rootId rootCode) :
+      invocation.source context code.reasonAt rootScope rootId rootCode)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source rootId) :
     CallsReady (compiled := compiled) (invocation := invocation) root := by
   rcases invocation with ⟨origin, actualSource, owned, invocationContext, evidence, guards⟩
   have sameSource : actualSource = function.source := ((RecursiveNamedPreparedStageScopes.registry stagePrepared)).source selected
   subst actualSource
   obtain ⟨canonical, issued, _canonicalSelected, ready⟩ :=
     CallableIndexedOwnedPreparedStagedCanonicalCallsReady.canonical_calls_ready
-      code retained metadata sourceReceipt unique typed root
+      code retained metadata sourceReceipt unique typed root tree
   have guardFrame := RecursiveNamedPreparedScopeCoherence.selected_frame stagePrepared accepted wellFormed signatureMember sourceOwner
     issued sourceReceipt selected
   intro callFuel callScope callId callee ids callMetadata lowered compiler path
@@ -171,6 +172,10 @@ private theorem sequence_ready {named : CallableIndexedNamedGeneration.Named}
   refine ⟨?_⟩
   intro expression child used
   have typed := (static.authority expression child used).typed
+  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original
+    static.edited static.avoids (static.syntaxTree expression child used)
+    (CallableIndexedOwnedPreparedStagedDiscardSequenceSourceBodyTyping.children_reached
+      choice.packet.receipt.tree static.edited.metadata expression child used)
   have certificate := static.certificate expression child used
   have atIndices (readFuel : Nat) (reasonAt : ExpressionId → Word)
       (sameFuel : readFuel = compiled.indexed.fuel) (sameReason : reasonAt = code.reasonAt)
@@ -182,7 +187,7 @@ private theorem sequence_ready {named : CallableIndexedNamedGeneration.Named}
     subst readFuel
     subst reasonAt
     exact calls_ready stagePrepared code packet.retained packet.metadata sourceReceipt body.unique
-      accepted wellFormed packet.signatureMember packet.sourceOwner selected typed root
+      accepted wellFormed packet.signatureMember packet.sourceOwner selected typed root syntaxTree
   intro callFuel callScope callId callee ids callMetadata lowered compiler path
   exact atIndices (packet.conditions choice).readFuel choice.packet.reasonAt
     (packet.readFuel choice) choice.reason certificate compiler path
@@ -314,7 +319,7 @@ theorem preserves_compiled (size : Nat) :
     conditions.unique conditions.declarations policyFor conditions.coercions syntaxTree found typed accepted
   have ready : CallsReady (compiled := compiled) (invocation := invocation) root :=
     calls_ready stagePrepared code retained metadata sourceReceipt unique
-    acceptedPlan wellFormed signatureMember sourceOwner selected typed root
+    acceptedPlan wellFormed signatureMember sourceOwner selected typed root syntaxTree
   intro current expression emitted point
   exact CallableIndexedOwnedPreparedStagedMixedCoveredCallerCompilerBounds.preserves_compiled
     (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared)
@@ -346,7 +351,7 @@ theorem reflects_compiled (size : Nat) :
     conditions.unique conditions.declarations policyFor conditions.coercions syntaxTree found typed accepted
   have ready : CallsReady (compiled := compiled) (invocation := invocation) root :=
     calls_ready stagePrepared code retained metadata sourceReceipt unique
-    acceptedPlan wellFormed signatureMember sourceOwner selected typed root
+    acceptedPlan wellFormed signatureMember sourceOwner selected typed root syntaxTree
   intro current expression emitted point
   exact CallableIndexedOwnedPreparedStagedMixedCoveredCallerCompilerBounds.reflects_compiled
     (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared)
@@ -462,6 +467,12 @@ theorem preserves_root
         (namedTerminals := namedTerminals) (namedSupport := namedSupport)
         (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
         (extension := extension) (semantic := semantic) smaller)
+      (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves_canonical
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) smaller)
   obtain ⟨capture⟩ := CallableIndexedOwnedFunctionEntries.capture_from_pool caller owner selected.member
   let nativeCapture := CallableIndexedOwnedFunctionValues.NamedCapture.of_capture capture
   obtain ⟨value, finalStore, finalMap, finalWorld, result⟩ :=
@@ -546,6 +557,12 @@ theorem reflects_root
     exact CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
       (namedSupport header selected.member) profile wellFormed childSelected extension
       (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) rfl smaller)
+      (fun smaller _strict => CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects_canonical
         (profile := profile) (closurePackets := fun association => (chosen association).1)
         (closureSupport := fun association => (chosen association).2)
         (namedTerminals := namedTerminals) (namedSupport := namedSupport)

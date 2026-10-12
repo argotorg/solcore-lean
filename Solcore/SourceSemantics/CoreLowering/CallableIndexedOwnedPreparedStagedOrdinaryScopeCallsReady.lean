@@ -86,13 +86,14 @@ theorem ordinary_calls_ready
     (typed : ExpressionHasType function.source context rootId rootType)
     (root : Certificate code.policy code.lowerBody code.compilation compiled.indexed.fuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
-      function.source context code.reasonAt rootScope rootId rootCode) :
+      function.source context code.reasonAt rootScope rootId rootCode)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax function.source rootId) :
     CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled)
       (invocation := RecursiveStageRegistry.scope selected selectedActive function) root := by
   obtain ⟨actualCanonical, actualIssued, _actualSelected, ready⟩ :=
     CallableIndexedOwnedPreparedStagedCanonicalCallsReady.canonical_calls_ready
-      code retained metadata sourceReceipt unique typed root
+      code retained metadata sourceReceipt unique typed root tree
   have same : actualCanonical = canonical :=
     Except.ok.inj (actualIssued.symm.trans canonicalIssued)
   cases same

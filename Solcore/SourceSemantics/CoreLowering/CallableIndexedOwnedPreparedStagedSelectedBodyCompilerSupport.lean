@@ -77,7 +77,8 @@ def Root.of_compiled
     covers := covers
     actualFunctionType := actualFunctionType
     uninitialized := fun current id code receipt _reached => uninitialized current id code receipt
-    callsReady := callsReady }
+    callsReady := callsReady
+    noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _ syntaxTree }
 
 /-- Packaging retains all actual compiler indices while fixing the original
   Source invocation, parameter context, physical occurrence and lowered child. -/

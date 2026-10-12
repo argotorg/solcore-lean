@@ -1,6 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
 
 /-! Static support for the pool-zero numeric family. The certificate belongs
   to the actual original Source and parameter context. The chosen terminal
@@ -21,7 +23,7 @@ def poolZero {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Progr
 
 /-- Exact static authority at one original expression occurrence. Runtime
   validity and evidence coverage are propositions, not completed executions. -/
-structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
+structure RootData (compiled : SourceCoreUnifiedCompilation.Compiled)
     (policy : SourceCoreFunctions.Policy) (lowerBody : SourceCoreFunctions.BodyLowerer)
     (compilation : SourceCoreFunctions.Context) (readFuel : Nat)
     (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
@@ -56,6 +58,38 @@ structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
   callsReady : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
     (compiled := compiled) (invocation := invocation) certificate
 
+/-- A pool-only law covers precisely the legacy finite certificates. Its
+absence of direct calls is derived from actual supported syntax. -/
+structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (policy : SourceCoreFunctions.Policy) (lowerBody : SourceCoreFunctions.BodyLowerer)
+    (compilation : SourceCoreFunctions.Context) (readFuel : Nat)
+    (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
+    (reasonAt : ExpressionId → Word) (scope : SourceCoreLocalCell.Scope)
+    (expression : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr)
+    (rawType : TypeSystem.Ty) (semanticFaults : FunctionCalls.FaultRep) extends
+    RootData compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults where
+  noDirect : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoDirect toRootData.certificate
+
+/-- Direct-enabled roots retain selected static authority in the same ordered
+finite Header inventory. Actual canonical slot values remain runtime inputs. -/
+structure CanonicalRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (policy : SourceCoreFunctions.Policy) (lowerBody : SourceCoreFunctions.BodyLowerer)
+    (compilation : SourceCoreFunctions.Context) (readFuel : Nat)
+    (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
+    (reasonAt : ExpressionId → Word) (scope : SourceCoreLocalCell.Scope)
+    (expression : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr)
+    (rawType : TypeSystem.Ty) (semanticFaults : FunctionCalls.FaultRep)
+    (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))) extends
+    RootData compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults where
+  directReady : ∀ {fuel callScope callId callee ids instantiation callCode}
+    (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt
+      policy lowerBody fuel compilation (.initial compiled.compatible.checked)
+      invocation.source callScope callId callee ids instantiation reasonAt callCode),
+    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler toRootData.certificate →
+    Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.Port compiler headers)
+
 /-- Existential packaging for the numeric IH. All compiler indices belong to
   the stored authentic Root; the ambient Source/context/scope/child stay fixed. -/
 structure RootAt (compiled : SourceCoreUnifiedCompilation.Compiled)
@@ -82,6 +116,74 @@ def RootAt.ofRoot {compiled : SourceCoreUnifiedCompilation.Compiled}
     (root : Root compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults) :
     RootAt compiled context invocation scope expression lowered semanticFaults :=
+  ⟨policy, lowerBody, compilation, readFuel, reasonAt, rawType, root⟩
+
+section RootConstruction
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.BodyLowerer}
+    {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
+    {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
+    {reasonAt : ExpressionId → Word} {scope : SourceCoreLocalCell.Scope}
+    {expression : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    {rawType : TypeSystem.Ty} {semanticFaults : FunctionCalls.FaultRep}
+
+/-- Legacy syntax proves the pool-only restriction for this exact extracted
+certificate, including all recursively evaluated callee and argument entries. -/
+def RootData.legacy
+    (root : RootData compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults)
+    (syntaxTree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source expression) :
+    Root compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults :=
+  ⟨root, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree⟩
+
+/-- All reached direct sites use the original finite inventory and authentic
+compiler context; no semantic call law or runtime globals are manufactured. -/
+def RootData.canonical
+    (root : RootData compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults)
+    {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+    (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+    (complete : RecursiveNamedCatalogNativeContexts.Complete
+      (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
+    (plan : compilation.plan = compiled.indexed.base.plan)
+    (globals : compilation.globals = compiled.indexed.base.globals) :
+    CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) :=
+  ⟨root, fun compiler _path =>
+    CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals⟩
+end RootConstruction
+
+/-- The direct-enabled numeric family keeps the same authentic static indices
+and a finite inventory; the actual caller supplies its physical slot values. -/
+structure CanonicalRootAt (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
+    (scope : SourceCoreLocalCell.Scope) (expression : ExpressionId)
+    (lowered : SourceCoreBasic.LoweredExpr) (semanticFaults : FunctionCalls.FaultRep) where
+  policy : SourceCoreFunctions.Policy
+  lowerBody : SourceCoreFunctions.BodyLowerer
+  compilation : SourceCoreFunctions.Context
+  readFuel : Nat
+  reasonAt : ExpressionId → Word
+  rawType : TypeSystem.Ty
+  support : CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
+    reasonAt scope expression lowered rawType semanticFaults headers
+
+def CanonicalRootAt.ofRoot {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.BodyLowerer}
+    {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
+    {context : SourceSemantics.Context} {invocation : Staging.Recursive.Scope}
+    {reasonAt : ExpressionId → Word} {scope : SourceCoreLocalCell.Scope}
+    {expression : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    {rawType : TypeSystem.Ty} {semanticFaults : FunctionCalls.FaultRep}
+    (root : CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults headers) :
+    CanonicalRootAt compiled headers context invocation scope expression lowered semanticFaults :=
   ⟨policy, lowerBody, compilation, readFuel, reasonAt, rawType, root⟩
 
 /-- The context is the actual retained EntryPrefix.Context. P receives static

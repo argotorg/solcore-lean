@@ -56,6 +56,10 @@ theorem ready_of_preparation
   refine ⟨?_⟩
   intro expression child used
   have typed := (packet.authority expression child used).typed
+  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original
+    packet.edited packet.avoids (packet.syntaxTree expression child used)
+    (CallableIndexedOwnedPreparedStagedDiscardSequenceSourceBodyTyping.children_reached
+      choice.packet.receipt.tree packet.edited.metadata expression child used)
   have root : Certificate code.policy code.lowerBody code.compilation conditions.readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source body.toContext.context choice.packet.reasonAt
@@ -75,7 +79,7 @@ theorem ready_of_preparation
     subst reasonAt
     exact CallableOrdinaryPreparedScopeAnnotationCallsReady.calls_ready
       code retained metadata sourceReceipt unique accepted wellFormed signatureMember sourceOwner
-      selected typed certificate
+      selected typed certificate syntaxTree
   intro callFuel callScope callId callee ids callMetadata lowered compiler path
   exact atIndices conditions.readFuel choice.packet.reasonAt readFuel_eq choice.reason root compiler path
 

@@ -108,7 +108,7 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
 
 local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
 
-include metadata in
+include metadata tree in
 /-- Every reached indirect call uses the same root policy and real sidecar.
 The original parent typing supplies the callee occurrence and raw types. -/
 theorem calls_ready {fuel : Nat}
@@ -130,6 +130,7 @@ theorem calls_ready {fuel : Nat}
       (compiled := compiled) (invocation := invocation) certificate := by
   intro callFuel callScope id callee ids callMetadata lowered compiler path
   have syntaxTree := CallableIndexedOwnedPreparedStagedCanonicalCallsReady.calls_syntax path
+    (by simpa only [sameSource] using tree)
   have profile := CallableIndexedOwnedPreparedStagedRecursiveCallerPolicyProfiles.recipe_policy_for
     root.compilerPolicy metadata callScope header.reasonAt
   have readPolicy := profile.read id (by simpa only [sameSource] using syntaxTree)
@@ -220,7 +221,7 @@ def at_scope {fuel : Nat}
     unique childDeclarations childProfile coercions childTree childFound childTyped accepted
   have ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := child) certificate :=
-    calls_ready terminal metadata root sourceEq authority childTyped certificate
+    calls_ready terminal metadata tree root sourceEq authority childTyped certificate
   have runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram)
       header.context child.source := by
     rw [sourceEq]

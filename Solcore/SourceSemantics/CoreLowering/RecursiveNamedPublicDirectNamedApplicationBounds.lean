@@ -143,13 +143,20 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
       (namedSupport header member) profile wellFormed childSelected extension
-    intro childSize _smaller childContext childScope current id lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
-      (profile := profile) (closurePackets := fun association => (chosen association).1)
-      (closureSupport := fun association => (chosen association).2)
-      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
-      (extension := extension) (semantic := semantic) rfl childSize root
+    · intro childSize _smaller childContext childScope current id lowered root
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) rfl childSize root
+    · intro childSize _smaller
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects_canonical
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) rfl childSize
   have evaluation : EvaluationSize size
       [CallableIndexedOwnedPreparedStagedTerminalNamedApplicationBounds.carrier
         (owner := owner) header capture identity descriptor.id, DataPatternValues.packValues values]
@@ -257,13 +264,20 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
     intro child childSelected
     apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
       (namedSupport header member) profile wellFormed childSelected extension
-    intro childSize _smaller childContext childScope current id lowered root
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
-      (profile := profile) (closurePackets := fun association => (chosen association).1)
-      (closureSupport := fun association => (chosen association).2)
-      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
-      (extension := extension) (semantic := semantic) childSize root
+    · intro childSize _smaller childContext childScope current id lowered root
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) childSize root
+    · intro childSize _smaller
+      exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves_canonical
+        (profile := profile) (closurePackets := fun association => (chosen association).1)
+        (closureSupport := fun association => (chosen association).2)
+        (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+        (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+        (extension := extension) (semantic := semantic) childSize
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, resultAt⟩ :=
     CallableIndexedOwnedPreparedStagedNamedApplicationBounds.application_preserves
       functions owner caller header capture sourceAt packet.layouts member wellFormed

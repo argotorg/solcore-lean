@@ -60,7 +60,10 @@ theorem Support.preserves
     {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
       RootAt compiled context child scope expression lowered semanticFaults →
-      PreservesAt poolBridge context model stages child (Point scope expression lowered) faults size) :
+      PreservesAt poolBridge context model stages child (Point scope expression lowered) faults size)
+    (canonicalChildren : ∀ size, size < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.PreservesRootsAt
+        (headers := headers) (keys := keys) model stages semanticFaults faults size) :
     CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages invocation faults budget := by
   cases body with
@@ -81,6 +84,9 @@ theorem Support.preserves
       | formation support =>
         exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.preserves
           (profile := profile) (faults := faults) support selected budget
+      | canonical support =>
+        exact CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.NamedSupport.preserves
+          support selected canonicalChildren
     | lexical receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.preserves
         static aligned.globals profile selected layouts children
@@ -94,7 +100,10 @@ theorem Support.reflects
     {budget : Nat}
     (children : ∀ size, size < budget → ∀ {context child scope expression lowered},
       RootAt compiled context child scope expression lowered semanticFaults →
-      ReflectsAt poolBridge context model stages child (Point scope expression lowered) faults size) :
+      ReflectsAt poolBridge context model stages child (Point scope expression lowered) faults size)
+    (canonicalChildren : ∀ size, size < budget →
+      CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.ReflectsRootsAt
+        (headers := headers) (keys := keys) model stages semanticFaults faults size) :
     CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages invocation faults budget := by
   cases body with
@@ -115,6 +124,9 @@ theorem Support.reflects
       | formation support =>
         exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.reflects
           (profile := profile) (faults := faults) support selected budget
+      | canonical support =>
+        exact CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.NamedSupport.reflects
+          support selected canonicalChildren
     | lexical receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedLexicalSupport.reflects
         static aligned.globals profile selected layouts children

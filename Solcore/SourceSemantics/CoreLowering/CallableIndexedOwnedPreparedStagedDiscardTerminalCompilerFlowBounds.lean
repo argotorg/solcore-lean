@@ -216,7 +216,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       bindings parameterCore resultCore),
     ClosureSupportFor association stages (closureTerminals association))
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.LegacySupport headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
 
 local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
