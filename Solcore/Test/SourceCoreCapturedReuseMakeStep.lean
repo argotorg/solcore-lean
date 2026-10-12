@@ -21,13 +21,14 @@ variable {fixture : CompiledFixture} {observed : ObservedProgram fixture}
 
 /-- An actual public make call constructs Source execution and the next history.
 Every older entry remains in order, followed by this call's exported handle. -/
-theorem RetainedState.make
+theorem RetainedState.make_typed_handle
     (extra : ObservedMake fixture observed)
     (state : RetainedState support publicSession entries)
     {word : Core.Word}
     (call : ObservedFunctionCall publicSession observed.makeRow.row.key [.word word])
     (invocation : Staging.Recursive.Scope) :
     ∃ entry : Entry, entry.sourceType = .function .unit .word ∧ entry.handle = call.handle ∧
+      call.handle.sourceType = .function .unit .word ∧
       ∃ after : RetainedState support call.completion.session (entries ++ [entry]),
         SourceCall support support.makeHeader.header invocation state.heap [.word word]
           (.value entry.source) after.heap := by
@@ -89,11 +90,36 @@ theorem RetainedState.make
       rw [registryAt] at registered
       exact registered
     history := continued }
-  refine ⟨entry, ?_, rfl, after, request.rawD, request.function, sourceSize, ?_, ?_⟩
+  have atRecipe : state.artifact.RecipeAt fixture.recipe := by
+    have convert : ∀ (artifact : SourceCoreIndexedSession.Artifact) (recipe : SourceCoreIndexedSession.Recipe),
+        RecursiveNamedPublicStartMeaning.ArtifactRecipe artifact recipe → artifact.RecipeAt recipe :=
+      fun artifact _ atRecipe => by cases artifact; exact atRecipe
+    exact convert _ _ state.atRecipe
+  have requested := request.started.original.result_type_at atRecipe request.started.selected
+  have resultType := (RecursiveNamedPublicRootSourceSignature.inputs_and_result request.selected).2
+  rw [resultType, selected, support.makeHeader.make_result_type] at requested
+  have handleType := succeeded.function_source_type requested (valueEq.symm.trans call.returned)
+  refine ⟨entry, ?_, rfl, handleType, after, request.rawD, request.function, sourceSize, ?_, ?_⟩
   · change request.header.function.resultType = .function .unit .word
     rw [selected]
     exact support.makeHeader.make_result_type
   · exact selected ▸ request.sourceAt
   · simpa only [entry, after, sourceValue] using trace
+
+/-- Preserve the original continuation API for clients that only need the
+Source value and the new retained history. -/
+theorem RetainedState.make
+    (extra : ObservedMake fixture observed)
+    (state : RetainedState support publicSession entries)
+    {word : Core.Word}
+    (call : ObservedFunctionCall publicSession observed.makeRow.row.key [.word word])
+    (invocation : Staging.Recursive.Scope) :
+    ∃ entry : Entry, entry.sourceType = .function .unit .word ∧ entry.handle = call.handle ∧
+      ∃ after : RetainedState support call.completion.session (entries ++ [entry]),
+        SourceCall support support.makeHeader.header invocation state.heap [.word word]
+          (.value entry.source) after.heap := by
+  obtain ⟨entry, sourceType, handle, _handleType, after, trace⟩ :=
+    state.make_typed_handle extra call invocation
+  exact ⟨entry, sourceType, handle, after, trace⟩
 
 end Tests.SourceCoreCapturedReuse

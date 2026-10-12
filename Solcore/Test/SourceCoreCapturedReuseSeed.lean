@@ -11,13 +11,14 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open RecursiveNamedPublicFunctionHistory (Entry)
 
-theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
     (extra : ObservedMake fixture observed) (support : PublicSupports receiver)
     (makeStages : ObservedStages fixture observed.makeRow)
     (first : ObservedPublicRun fixture observed.makeRow) :
     ∃ entry : Entry,
       entry.sourceType = .function .unit .word ∧ entry.handle = first.handle ∧
+      first.handle.sourceType = .function .unit .word ∧
       ∃ state : RetainedState support first.completion.session [entry],
         SourceCall support support.makeHeader.header
           (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
@@ -55,7 +56,7 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
     rw [support.makeEq]
     exact support.makePacket.sourceAt
   obtain ⟨caller, returnedCompletion, generation, value, finalStore, capture, sourceSize, outcome, after,
-      finalMap, finalWorld, succeeded, _valueEq, _typeEq, _budgetEq, returnedAt, trace, _fullResult,
+      finalMap, finalWorld, succeeded, valueEq, _typeEq, _budgetEq, returnedAt, trace, _fullResult,
       returnedCaller, source, payload, sourceValue, _nativeValue, _related, retained⟩ :=
     CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
       (inputs := [support.makeInput, support.readInput]) (rows := support.rows) (distinct := support.distinct)
@@ -89,7 +90,31 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fi
     atRecipe := started.recipe_eq
     registry := returnedRegistry
     history := retained }
-  refine ⟨entry, support.makeHeader.make_result_type, rfl, state, ?_⟩
+  have atRecipe : artifact.RecipeAt fixture.recipe := by
+    cases artifact
+    exact started.recipe_eq
+  have requested := started.original.result_type_at atRecipe started.selected
+  have resultType := (RecursiveNamedPublicRootSourceSignature.inputs_and_result selected).2
+  rw [resultType, support.makeHeader.make_result_type] at requested
+  have handleType := succeeded.function_source_type requested (valueEq.symm.trans first.returned)
+  refine ⟨entry, support.makeHeader.make_result_type, rfl, handleType, state, ?_⟩
   exact ⟨support.makeInput.prepared.available, _, sourceSize, sourceAt, sourceValue ▸ trace⟩
+
+/-- The original factory theorem remains available when the public handle's
+raw type is not needed by the caller. -/
+theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    {receiver : ObservedReceiver fixture observed}
+    (extra : ObservedMake fixture observed) (support : PublicSupports receiver)
+    (makeStages : ObservedStages fixture observed.makeRow)
+    (first : ObservedPublicRun fixture observed.makeRow) :
+    ∃ entry : Entry,
+      entry.sourceType = .function .unit .word ∧ entry.handle = first.handle ∧
+      ∃ state : RetainedState support first.completion.session [entry],
+        SourceCall support support.makeHeader.header
+          (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
+          ⟨[]⟩ [.word seed] (.value entry.source) state.heap := by
+  obtain ⟨entry, sourceType, handle, _handleType, state, trace⟩ :=
+    first_meaning_typed_handle extra support makeStages first
+  exact ⟨entry, sourceType, handle, state, trace⟩
 
 end Tests.SourceCoreCapturedReuse

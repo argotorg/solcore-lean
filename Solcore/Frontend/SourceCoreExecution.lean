@@ -831,11 +831,28 @@ def Session.run {artifact : Artifact} (session : Session artifact) (key : Key)
     (arguments : List Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
   pure (← session.runWithReceipt key arguments options).val
 
+/-- Direct calls retain their actual start result and original resume receipt. -/
+def Session.InvokeAt {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (options : RunOptions)
+    (result : Except SourceCoreIndexedSession.Error (Outcome artifact)) : Prop :=
+  match result with
+  | .error error => session.startHandlePacked handle argument options.inputValidationFuel = .error error
+  | .ok outcome => ∃ checkpoint,
+      session.startHandlePacked handle argument options.inputValidationFuel = .ok checkpoint ∧
+      checkpoint.ResumeAt options.executionFuel options.outputValidationFuel outcome
+
+def Session.invokePackedWithReceipt {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (options : RunOptions := {}) :
+    IO {result : Except SourceCoreIndexedSession.Error (Outcome artifact) // session.InvokeAt handle argument options result} := do
+  match started : session.startHandlePacked handle argument options.inputValidationFuel with
+  | .error error => pure ⟨.error error, started⟩
+  | .ok checkpoint =>
+      let resumed ← checkpoint.resumeWithReceipt options.executionFuel options.outputValidationFuel
+      pure ⟨.ok resumed.val, checkpoint, started, resumed.property⟩
+
 def Session.invokePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
     (argument : Value) (options : RunOptions := {}) : IO (Except SourceCoreIndexedSession.Error (Outcome artifact)) := do
-  match session.startHandlePacked handle argument options.inputValidationFuel with
-  | .error error => pure (.error error)
-  | .ok checkpoint => pure (.ok (← checkpoint.resume options.executionFuel options.outputValidationFuel))
+  pure (← session.invokePackedWithReceipt handle argument options).val
 
 
 private def PrefixPayload (artifact : Artifact) : Type :=
@@ -1090,6 +1107,33 @@ theorem Session.restoreSnapshot_ready
               cases RestoredSnapshot.ready.inj (Except.ok.inj restored)
               simp only [Snapshot.restore, actual]
           | suspended checkpoint => cases restored
+
+
+end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+theorem Session.startHandlePacked_indexed {compiled : Compiled} {artifact : Artifact}
+    {session : Session artifact} {handle : Handle} {argument : Value} {fuel : Nat}
+    {checkpoint : Checkpoint artifact} (opened : artifact.CompiledAt compiled)
+    (accepted : session.startHandlePacked handle argument fuel = .ok checkpoint) :
+    ∃ (recipe : SourceCoreIndexedSession.Recipe) (native : SourceCoreIndexedSession.Artifact)
+      (indexedSession : SourceCoreIndexedSession.Session native)
+      (indexedCheckpoint : SourceCoreIndexedSession.Checkpoint native),
+      artifact.IndexedAt compiled recipe native ∧ session.IndexedAt indexedSession ∧
+      checkpoint.IndexedAt indexedCheckpoint ∧ indexedSession.startHandlePacked handle argument fuel = .ok indexedCheckpoint := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => cases accepted
+  | indexed recipe selected native atRecipe =>
+      rcases session with ⟨indexedSession⟩
+      change actual = compiled at opened
+      subst compiled
+      change (indexedSession.startHandlePacked handle argument fuel >>= fun next => .ok ⟨next⟩) = .ok checkpoint at accepted
+      obtain ⟨indexedCheckpoint, issued, accepted⟩ := bind_ok accepted
+      cases accepted
+      exact ⟨recipe, native, indexedSession, indexedCheckpoint,
+        ⟨rfl, rfl, rfl⟩, ⟨rfl, HEq.rfl⟩, ⟨rfl, HEq.rfl⟩, issued⟩
 
 
 end Solcore.Frontend.SourceCoreExecution

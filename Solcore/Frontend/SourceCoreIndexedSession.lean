@@ -1028,11 +1028,27 @@ def Session.run {artifact : Artifact} (session : Session artifact) (key : Key) (
 /-- Direct host runtime invocation of the retained callable. It shares the
 same typed completion, language-failure, mutable heap and resume machinery as
 cached source roots. Staged source invocations remain compiled-root operations. -/
+def Session.InvokeAt {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (fuel boundaryFuel : Nat) (result : Except Error (Outcome artifact)) : Prop :=
+  match result with
+  | .error error => session.startHandlePacked handle argument boundaryFuel = .error error
+  | .ok outcome => ∃ checkpoint,
+      session.startHandlePacked handle argument boundaryFuel = .ok checkpoint ∧
+      checkpoint.ResumeAt fuel boundaryFuel outcome
+
+/-- Keep the original direct startup and the single native resume action. -/
+def Session.invokePackedWithReceipt {artifact : Artifact} (session : Session artifact) (handle : Handle)
+    (argument : Value) (fuel : Nat) (boundaryFuel : Nat := 1024) :
+    IO {result : Except Error (Outcome artifact) // session.InvokeAt handle argument fuel boundaryFuel result} := do
+  match started : session.startHandlePacked handle argument boundaryFuel with
+  | .error error => pure ⟨.error error, started⟩
+  | .ok checkpoint =>
+      let resumed ← checkpoint.resumeWithReceipt fuel boundaryFuel
+      pure ⟨.ok resumed.val, checkpoint, started, resumed.property⟩
+
 def Session.invokePacked {artifact : Artifact} (session : Session artifact) (handle : Handle)
     (argument : Value) (fuel : Nat) (boundaryFuel : Nat := 1024) : IO (Except Error (Outcome artifact)) := do
-  match session.startHandlePacked handle argument boundaryFuel with
-  | .error error => pure (.error error)
-  | .ok checkpoint => pure (.ok (← checkpoint.resume fuel boundaryFuel))
+  pure (← session.invokePackedWithReceipt handle argument fuel boundaryFuel).val
 
 theorem Completion.typed {artifact : Artifact} (completion : Completion artifact) :
     completion.session.Authenticates completion.boundaryFuel completion.sourceType completion.value := completion.authenticated
@@ -4407,5 +4423,403 @@ theorem Checkpoint.RootStart.function_registry {artifact : Artifact} {session : 
     _world, _initial, _slots, values⟩ := receipt
   rw [values]
   exact function_argument_registry accepted
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+/-- The callable chosen by the actual host boundary, before input encoding. -/
+def Session.HandleSelectionAt {artifact : Artifact} (session : Session artifact)
+    (handle : Handle) (parameter result : Ty) (nativeParameter nativeResult : Core.Ty)
+    (callable : Core.Value) : Prop :=
+  ∃ selected : CallableSelection artifact session.world,
+    selectCallable session handle = .ok selected ∧ selected.parameter = parameter ∧
+    selected.request.result = result ∧ selected.nativeParameter = nativeParameter ∧
+    selected.request.type = nativeResult ∧ selected.value = callable
+
+private theorem function_parts_view {type parameter result : Ty}
+    (parts : functionParts type = some (parameter, result)) :
+    SourceCoreRawMetadata.runtimeType type =
+      .function (SourceCoreRawMetadata.runtimeType parameter) (SourceCoreRawMetadata.runtimeType result) := by
+  induction type with
+  | comptime type ih => exact ih parts
+  | function left right => cases parts; rfl
+  | _ => cases parts
+
+/-- Selection retains the real descriptor, its ordinary host gate, exact raw
+signature projections and the resolved native closure with all captures. -/
+theorem Session.HandleSelectionAt.spec {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {parameter result : Ty} {nativeParameter nativeResult : Core.Ty}
+    {callable : Core.Value}
+    (selected : session.HandleSelectionAt handle parameter result nativeParameter nativeResult callable) :
+    functionParts handle.sourceType = some (parameter, result) ∧
+    SourceCoreRawMetadata.runtimeType handle.sourceType =
+      .function (SourceCoreRawMetadata.runtimeType parameter) (SourceCoreRawMetadata.runtimeType result) ∧
+    artifact.recipe.compiled.compatible.checked.catalog.project parameter = .ok nativeParameter ∧
+    artifact.recipe.compiled.compatible.checked.catalog.project result = .ok nativeResult ∧
+    session.EncodesAt 1 handle.sourceType (.function handle) callable ∧
+    Core.RuntimeValueHasType session.world callable
+      (Core.CallableContract.functionType nativeParameter nativeResult) artifact.program.layouts.definitions ∧
+    ∃ (identity closure : Core.Value) (descriptor : Core.Word)
+      (context : SourceCoreGeneralFunctions.CallableContext) (entry : SourceCoreStageCodebook.Entry),
+      callable = .pair (.pair identity closure) (.word descriptor) ∧
+      artifact.program.base.callableContext = some context ∧ context.table.entryAt? descriptor = some entry ∧
+      (∀ contract, entry.contract = some contract →
+        contract.stagedResult = false ∧ contract.parameterStages.any id = false) := by
+  obtain ⟨selected, accepted, rfl, rfl, rfl, rfl, rfl⟩ := selected
+  unfold selectCallable at accepted
+  obtain ⟨value, resolved, accepted⟩ := root_factory_bind_ok accepted
+  split at accepted
+  next identity closure descriptor =>
+    cases contextAt : artifact.program.base.callableContext with
+    | none => simp [contextAt, bind, Except.bind, throw, throwThe] at accepted
+    | some context =>
+      simp only [contextAt, pure, Except.pure, bind, Except.bind] at accepted
+      cases entryAt : context.table.entryAt? descriptor with
+      | none => simp [entryAt, throw, throwThe] at accepted
+      | some entry =>
+        simp only [entryAt] at accepted
+        have finish (gate : ∀ contract, entry.contract = some contract →
+              contract.stagedResult = false ∧ contract.parameterStages.any id = false)
+            (accepted : ((do
+              let (parameter, result) ← match functionParts handle.sourceType with
+                | some signature => pure signature
+                | none => throw ⟨[], .notFunction handle.sourceType⟩
+              let nativeParameter ← (artifact.recipe.compiled.compatible.checked.catalog.project parameter).mapError fromCatalog
+              match generated : artifact.recipe.compiled.compatible.checked.catalog.project result with
+              | .error error => throw (fromCatalog error)
+              | .ok nativeResult =>
+                let validated ← validateAt artifact.program.layouts.definitions session.world
+                  (.pair (.pair identity closure) (.word descriptor))
+                  (Core.CallableContract.functionType nativeParameter nativeResult)
+                let key := match entry.origin with
+                  | .named key | .lambda key .. => some key
+                  | .builtin _ => none
+                pure ⟨parameter, nativeParameter, ⟨result, nativeResult, generated, key⟩,
+                  .pair (.pair identity closure) (.word descriptor), validated.typed⟩) : Except Error (CallableSelection artifact session.world)) = .ok selected) :
+                functionParts handle.sourceType = some (selected.parameter, selected.request.result) ∧
+                SourceCoreRawMetadata.runtimeType handle.sourceType =
+                  .function (SourceCoreRawMetadata.runtimeType selected.parameter) (SourceCoreRawMetadata.runtimeType selected.request.result) ∧
+                artifact.recipe.compiled.compatible.checked.catalog.project selected.parameter = .ok selected.nativeParameter ∧
+                artifact.recipe.compiled.compatible.checked.catalog.project selected.request.result = .ok selected.request.type ∧
+                session.EncodesAt 1 handle.sourceType (.function handle) selected.value ∧
+                Core.RuntimeValueHasType session.world selected.value
+                  (Core.CallableContract.functionType selected.nativeParameter selected.request.type) artifact.program.layouts.definitions ∧
+                ∃ (identity closure : Core.Value) (descriptor : Core.Word)
+                  (context : SourceCoreGeneralFunctions.CallableContext) (entry : SourceCoreStageCodebook.Entry),
+                  selected.value = .pair (.pair identity closure) (.word descriptor) ∧
+                  artifact.program.base.callableContext = some context ∧ context.table.entryAt? descriptor = some entry ∧
+                  (∀ contract, entry.contract = some contract →
+                    contract.stagedResult = false ∧ contract.parameterStages.any id = false) := by
+          cases parts : functionParts handle.sourceType with
+          | none => simp [parts, bind, Except.bind, throw, throwThe] at accepted
+          | some signature =>
+            rcases signature with ⟨parameter, result⟩
+            simp only [parts, pure, Except.pure, bind, Except.bind] at accepted
+            cases projectedParameter : artifact.recipe.compiled.compatible.checked.catalog.project parameter with
+            | error error => simp [projectedParameter, Except.mapError] at accepted
+            | ok nativeParameter =>
+              simp only [projectedParameter, Except.mapError] at accepted
+              split at accepted
+              next error projectedResult => cases accepted
+              next nativeResult projectedResult =>
+                obtain ⟨validated, _validated, accepted⟩ := root_factory_bind_ok accepted
+                cases accepted
+                have view := function_parts_view parts
+                refine ⟨rfl, view, projectedParameter, projectedResult, ?_, validated.typed,
+                  identity, closure, descriptor, context, entry, rfl, contextAt, entryAt, gate⟩
+                refine ⟨.pure session.values.registry _, ?_, rfl⟩
+                unfold encodeRaw
+                rw [view]
+                dsimp only
+                rw [resolved]
+                rfl
+        cases contractAt : entry.contract with
+        | none =>
+          simp only [contractAt] at accepted
+          simpa only [contextAt] using finish (by intro contract found; simp [contractAt] at found) accepted
+        | some contract =>
+          simp only [contractAt] at accepted
+          split at accepted
+          · simp [throw, throwThe] at accepted
+          · rename_i ordinary
+            suffices gate : ∀ actual, entry.contract = some actual →
+                actual.stagedResult = false ∧ actual.parameterStages.any id = false by
+              simpa only [contextAt] using finish gate accepted
+            intro actual found
+            have same := Option.some.inj (contractAt.symm.trans found)
+            subst actual
+            simpa only [Bool.or_eq_true, not_or, Bool.not_eq_true] using ordinary
+  next value mismatch => cases accepted
+
+/-- Direct startup retains the same original authority, world and slots. -/
+def Checkpoint.InitialRegistryFrom {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (session : Session artifact) : Prop :=
+  checkpoint.origin = session ∧ checkpoint.world = session.world ∧ HEq checkpoint.registry session.registry
+
+/-- A receipt of the original direct startup and its singleton packed encoder. -/
+def Checkpoint.HandleStart {artifact : Artifact} (session : Session artifact)
+    (handle : Handle) (argument : Value) (fuel : Nat) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ selected : CallableSelection artifact session.world,
+    selectCallable session handle = .ok selected ∧
+    ∃ encoded : Arguments artifact session.world [selected.nativeParameter],
+      encodeArguments session.authority session.registry fuel session.values session.owner
+        [selected.parameter] [selected.nativeParameter] [argument] = .ok encoded ∧
+      checkpoint.InitialRegistryFrom session ∧ checkpoint.request = selected.request ∧
+      checkpoint.state = .initial packedInvocation (selected.value :: encoded.native ++ environment artifact) session.store ∧
+      checkpoint.values = encoded.values
+
+theorem Session.startHandlePacked_receipt {artifact : Artifact} (session : Session artifact)
+    {handle : Handle} {argument : Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (accepted : session.startHandlePacked handle argument fuel = .ok checkpoint) :
+    checkpoint.HandleStart session handle argument fuel := by
+  unfold Session.startHandlePacked at accepted
+  obtain ⟨selected, selectedAt, accepted⟩ := root_factory_bind_ok accepted
+  obtain ⟨_globals, _checked, accepted⟩ := root_factory_bind_ok accepted
+  obtain ⟨encoded, encodedAt, accepted⟩ := root_factory_bind_ok accepted
+  cases accepted
+  exact ⟨selected, selectedAt, encoded, encodedAt, ⟨rfl, rfl, HEq.rfl⟩, rfl, rfl, rfl⟩
+
+theorem Checkpoint.RootStart.initial_registry {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.RootStart session key arguments fuel) : checkpoint.InitialRegistryFrom session := by
+  obtain ⟨_root, _found, _key, _count, _encoded, _accepted, origin, _request, world, _initial, registry, _values⟩ := started
+  exact ⟨origin, world, registry⟩
+
+theorem Checkpoint.HandleStart.initial_registry {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {argument : Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.HandleStart session handle argument fuel) : checkpoint.InitialRegistryFrom session := by
+  obtain ⟨_selected, _found, _encoded, _accepted, initial, _rest⟩ := started
+  exact initial
+
+private theorem singleton_arguments_raw {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {parameter : Ty} {nativeParameter : Core.Ty} {argument : Value}
+    {encoded : Arguments artifact world [nativeParameter]}
+    (accepted : encodeArguments authority slots fuel values owner [parameter] [nativeParameter] [argument] = .ok encoded) :
+    ∃ raw : SourceCoreCompatibleValues.Extended values.registry Core.Value,
+      encodeRaw authority slots fuel values.registry parameter argument = .ok raw ∧
+      encoded.native = [raw.value] ∧ encoded.values.registry = raw.registry ∧
+      Core.RuntimeValueHasType world raw.value nativeParameter artifact.program.layouts.definitions := by
+  simp only [encodeArguments] at accepted
+  cases projected : artifact.recipe.compiled.compatible.checked.catalog.project parameter with
+  | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+  | ok actual =>
+    simp only [projected, bind, Except.bind] at accepted
+    split at accepted
+    · rename_i same
+      subst actual
+      obtain ⟨raw, rawAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨validated, _checked, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨raw, rawAt, rfl, rfl, validated.typed⟩
+    · simp [throw, throwThe] at accepted
+
+/-- Every exposed value comes from the original selection and actual packed
+input encoding. Metadata and the full ambient native environment stay exact. -/
+theorem Checkpoint.HandleStart.details {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {argument : Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.HandleStart session handle argument fuel) :
+    ∃ (parameter result : Ty) (nativeParameter nativeResult : Core.Ty) (callable : Core.Value)
+      (before : SourceCoreRawMetadata.Registry) (raw : SourceCoreCompatibleValues.Extended before Core.Value)
+      (encodedValues : Values),
+      session.HandleSelectionAt handle parameter result nativeParameter nativeResult callable ∧
+      session.RegistryAt before ∧ session.RawEncodedAt fuel before parameter argument raw ∧
+      checkpoint.values = encodedValues ∧ encodedValues.registry = raw.registry ∧
+      encodedValues.checked = artifact.recipe.compiled.compatible.checked ∧
+      Core.RuntimeValueHasType session.world raw.value nativeParameter artifact.program.layouts.definitions ∧
+      checkpoint.ResultTypeAt result ∧ checkpoint.PayloadTypeAt nativeResult ∧
+      checkpoint.state = .initial
+        (.apply (.second (.first (.var 0))) (.var 1))
+        (callable :: raw.value :: environment artifact) session.store := by
+  obtain ⟨selected, found, encoded, accepted, _origin, request, initial, values⟩ := started
+  obtain ⟨raw, rawAt, native, registry, typed⟩ := singleton_arguments_raw accepted
+  refine ⟨selected.parameter, selected.request.result, selected.nativeParameter, selected.request.type,
+    selected.value, session.values.registry, raw, encoded.values,
+    ⟨selected, found, rfl, rfl, rfl, rfl, rfl⟩, rfl, rawAt, values, registry, encoded.owner, typed, ?_, ?_, ?_⟩
+  · change checkpoint.request.result = selected.request.result
+    rw [request]
+  · change checkpoint.request.type = selected.request.type
+    rw [request]
+  · simpa only [native, List.cons_append, List.nil_append, packedInvocation] using initial
+
+/-- A prior retained encoding identifies exactly the callable selected now. -/
+theorem Session.HandleSelectionAt.callable_eq {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {parameter result : Ty} {nativeParameter nativeResult : Core.Ty} {callable : Core.Value}
+    (selected : session.HandleSelectionAt handle parameter result nativeParameter nativeResult callable)
+    {fuel : Nat} {expected : Ty} {native : Core.Value}
+    (imported : session.EncodesAt fuel expected (.function handle) native) : callable = native := by
+  obtain ⟨encoded, accepted, value⟩ := selected.spec.2.2.2.2.1
+  obtain ⟨old, oldAt, oldValue⟩ := imported
+  exact value.symm.trans ((resolve_unique (encoded_function_resolves accepted) (encoded_function_resolves oldAt)).trans oldValue)
+
+/-- Literal function handles retain their exact raw signature, including
+annotations beneath the function constructor. -/
+theorem Session.HandleSelectionAt.signature {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {parameter result expectedParameter expectedResult : Ty}
+    {nativeParameter nativeResult : Core.Ty} {callable : Core.Value}
+    (selected : session.HandleSelectionAt handle parameter result nativeParameter nativeResult callable)
+    (sourceType : handle.sourceType = .function expectedParameter expectedResult) :
+    parameter = expectedParameter ∧ result = expectedResult := by
+  have parts := selected.spec.1
+  rw [sourceType] at parts
+  have same := Option.some.inj parts
+  exact ⟨(congrArg Prod.fst same).symm, (congrArg Prod.snd same).symm⟩
+
+/-- Simple packed arguments preserve the actual metadata registry. -/
+theorem Checkpoint.HandleStart.simple_registry {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {argument : Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.HandleStart session handle argument fuel) (simple : SimplePublic argument) :
+    checkpoint.values.registry = session.values.registry := by
+  obtain ⟨_selected, _found, encoded, accepted, _origin, _request, _initial, values⟩ := started
+  rw [values]
+  exact (simple_arguments (by intro value member; simpa using (List.mem_singleton.mp member ▸ simple)) accepted).2.2
+
+/-- Successful direct export retains the metadata context from actual startup. -/
+theorem Checkpoint.HandleStart.returned_registry {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {argument : Value} {inputFuel : Nat} {checkpoint : Checkpoint artifact}
+    (_started : checkpoint.HandleStart session handle argument inputFuel)
+    {executionFuel outputFuel : Nat} {generation : ExportGeneration} {native : Core.Value}
+    {store : Core.Store} {completion : Completion artifact}
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native store completion) :
+    completion.session.RegistryAt checkpoint.values.registry := by
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, values, _⟩ := succeeded
+  exact congrArg SourceCoreCompatibleValues.Context.registry values
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+private theorem initial_registry_resolves_weaken
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session : Session artifact}
+    (started : checkpoint.InitialRegistryFrom session)
+    {expected : Ty} {handle : Handle} {native : Core.Value}
+    (resolved : resolve session.authority session.registry expected handle = .ok native)
+    {future : Core.StoreTyping} (extension : Core.WorldExtends checkpoint.world future) :
+    resolve checkpoint.origin.authority (checkpoint.registry.weaken extension) expected handle = .ok native := by
+  obtain ⟨origin, world, registry⟩ := started
+  cases checkpoint
+  rename_i originSession request initialWorld state stored typed extension' initialRegistry values owner
+  change originSession = session at origin
+  subst originSession
+  change initialWorld = session.world at world
+  subst initialWorld
+  have registryEq : initialRegistry = session.registry := eq_of_heq registry
+  subst initialRegistry
+  exact execution_resolve_weaken resolved extension
+
+theorem Checkpoint.SucceededResultAt.encodes_function_from
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session : Session artifact}
+    {executionFuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {completion : Completion artifact}
+    (succeeded : checkpoint.SucceededResultAt executionFuel boundaryFuel generation native store completion)
+    (started : checkpoint.InitialRegistryFrom session)
+    {inputFuel : Nat} {expected : Ty} {handle : Handle} {payload : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) payload) :
+    completion.session.EncodesAt inputFuel expected (.function handle) payload := by
+  obtain ⟨oldEncoded, oldAt, oldValue⟩ := imported
+  obtain ⟨_completed, result, extension, slots, encoded, _decoded, decode, _encode, _recovered,
+    _sourceType, _boundary, _stored, world, authority, _sourcePrefix, values, _owner, registry,
+    _origin, _authenticated⟩ := succeeded
+  obtain ⟨suffix, slotsEq⟩ := (decode_slots_append boundaryFuel).1
+    checkpoint.origin.authority generation checkpoint.values _ _ _ _ slots decode
+  have resolved := initial_registry_resolves_weaken started (encoded_function_resolves oldAt) extension
+  have returnedResolved := issuance_resolve_append resolved suffix
+  rw [← slotsEq] at returnedResolved
+  have returnedEncoded := execution_encode_function_at_registry oldAt returnedResolved completion.session.values.registry
+  cases completion
+  rename_i value resultType returned outputFuel authenticated origin completionExtension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  change returnedWorld = store.map Core.Value.type at world
+  subst returnedWorld
+  have registryEq : returnedRegistry = slots := eq_of_heq registry
+  subst returnedRegistry
+  change returnedAuthority = checkpoint.origin.authority at authority
+  subst returnedAuthority
+  exact ⟨_, returnedEncoded, oldValue⟩
+
+
+theorem Checkpoint.FailedResultAt.encodes_function_from
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session returned : Session artifact}
+    {executionFuel : Nat}
+    {native : Core.Value} {store : Core.Store} {reason : Core.Word}
+    (failed : checkpoint.FailedResultAt executionFuel native store reason returned)
+    (started : checkpoint.InitialRegistryFrom session)
+    {inputFuel : Nat} {expected : Ty} {handle : SourceCorePublicValues.Handle} {payload : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) payload) :
+    returned.EncodesAt inputFuel expected (.function handle) payload := by
+  obtain ⟨oldEncoded, oldAt, oldValue⟩ := imported
+  obtain ⟨_completed, _decoded, _store, _world, _values, _owner, authority,
+    _sourcePrefix, extension, registry⟩ := failed
+  have resolved := initial_registry_resolves_weaken started (encoded_function_resolves oldAt) extension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  have registryEq : returnedRegistry = _ := eq_of_heq registry
+  rw [← registryEq] at resolved
+  change returnedAuthority = checkpoint.origin.authority at authority
+  rw [← authority] at resolved
+  exact ⟨_, execution_encode_function_at_registry oldAt resolved returnedValues.registry, oldValue⟩
+
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- The actual packed unit encoder produces the native unit value. -/
+theorem Session.RawEncodedAt.unit {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry}
+    {raw : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry .unit .unit raw) : raw.value = .unit := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel => cases accepted; rfl
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+private theorem registered_source_type {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration}
+    {slots returned : Registry artifact world} {expected : Ty} {native : Core.Value} {handle : Handle}
+    (accepted : register authority generation slots expected native = .ok (handle, returned)) :
+    handle.sourceType = expected := by
+  unfold register at accepted
+  split at accepted
+  · rename_i slot found
+    cases accepted
+    exact (of_decide_eq_true (List.find?_some
+      (p := fun slot : Slot artifact world => decide (slot.handle.sourceType = expected ∧ slot.value = native)) found)).1
+  · split at accepted
+    · cases accepted
+    · obtain ⟨checked, _checked, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      rfl
+
+/-- A function returned by the real exporter keeps the exact requested raw
+type. Reusing an old slot also checks raw type equality before returning it. -/
+theorem Checkpoint.SucceededResultAt.function_source_type {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {completion : Completion artifact}
+    {expected : Ty} {handle : Handle}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion)
+    (requested : checkpoint.ResultTypeAt expected) (functionValue : completion.value = .function handle) :
+    handle.sourceType = expected := by
+  obtain ⟨_completed, _payload, _extension, _slots, _encoded, _decoded, decode, encode, _rest⟩ := receipt
+  rw [functionValue] at decode encode
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view encode
+  cases boundaryFuel with
+  | zero => cases decode
+  | succ remaining =>
+      unfold decodeRaw at decode
+      rw [view] at decode
+      obtain ⟨⟨actual, slots⟩, registered, decode⟩ := root_factory_bind_ok decode
+      cases decode
+      exact (registered_source_type registered).trans requested
 
 end Solcore.Frontend.SourceCoreIndexedSession
