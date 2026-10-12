@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFiniteCallHeadBounds
@@ -225,6 +226,20 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
       exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
+      intro ports size
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun compiler inside => ports compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_preserves
+        bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
+        header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
@@ -367,6 +382,20 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
+      intro ports size
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun compiler inside => ports compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_reflects
+        bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
+        header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation

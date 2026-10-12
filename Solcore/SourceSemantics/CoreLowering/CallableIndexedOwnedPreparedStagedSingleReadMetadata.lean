@@ -16,7 +16,7 @@ private theorem syntax_node {source : TypedSource} {id : ExpressionId}
     (tree : Syntax source id) : ∃ node, source.lookupExpression? id = some node := by
   cases tree with
   | leaf product => cases product <;> exact ⟨_, by assumption⟩
-  | group found _ _ | tuple found _ _ | call found _ _ _
+  | group found _ _ | tuple found _ _ | call found _ _ _ | constructor found _ _ _
   | unary found _ _ | binary found _ _ _ | conditional found _ _ _ _ =>
     exact ⟨_, found⟩
 
@@ -38,7 +38,7 @@ private theorem syntax_not_lambda {source : TypedSource} {id : ExpressionId}
       subst node
       rw [form] at shape
       cases shape
-  | group other shape _ | tuple other shape _ | call other shape _ _
+  | group other shape _ | tuple other shape _ | call other shape _ _ | constructor other shape _ _
   | unary other shape _ | binary other shape _ _ | conditional other shape _ _ _ =>
     have same := Option.some.inj (other.symm.trans found)
     subst node

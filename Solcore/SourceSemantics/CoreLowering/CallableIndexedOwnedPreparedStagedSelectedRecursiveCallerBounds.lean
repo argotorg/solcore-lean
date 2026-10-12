@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds
@@ -268,6 +269,25 @@ theorem preserves_reached
       exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached header.metadata.found
+          (by simp [form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun compiler inside => ports compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_preserves
+        bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
+        header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro reached ports size within
       have childReached : ∀ child code, (child, code) ∈ compiler.entries →
@@ -453,6 +473,25 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
+  | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
+      intro reached ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached header.metadata.found
+          (by simp [form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun compiler inside => ports compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_reflects
+        bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
+        header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro reached ports size within
       have childReached : ∀ child code, (child, code) ∈ compiler.entries →

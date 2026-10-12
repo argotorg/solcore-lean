@@ -76,6 +76,10 @@ private theorem read_no_calls
     have same := header.form
     rw [identity, form] at same
     cases same
+  | @constructor_child current id other instantiation constructorIds tag headerWord codes header otherForm admissible ranges count nodes sequence children child childCode member inside =>
+    have same := Option.some.inj (header.metadata.found.symm.trans found)
+    subst other
+    simp [form] at otherForm
   | @call_child current id otherCallee otherIds otherMetadata otherFuel code types outer sequence children child childCode member inside =>
     have identity := Option.some.inj (outer.found.symm.trans found)
     have same := outer.originalForm

@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRe
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalCertificates
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorExtraction
 
 /-! Successful compilation constructs a finite recursive caller certificate.
 The callee and ordered argument vector retain the exact compiler occurrences,
@@ -23,6 +24,10 @@ inductive Syntax (source : TypedSource) : ExpressionId → Prop where
       (form : node.form = .group inner) (child : Syntax source inner) : Syntax source id
   | tuple {id node ids} (found : source.lookupExpression? id = some node)
       (form : node.form = .tuple ids)
+      (children : ∀ child, child ∈ ids → Syntax source child) : Syntax source id
+  | constructor {id node instantiation ids} (found : source.lookupExpression? id = some node)
+      (form : node.form = .constructor instantiation ids)
+      (ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
       (children : ∀ child, child ∈ ids → Syntax source child) : Syntax source id
   | call {id node callee ids metadata} (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.indirect metadata))
@@ -92,6 +97,20 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
         Certificate policy body compilation readFuel values source context reasonAt scope child code) :
       Certificate policy body compilation readFuel values source context reasonAt scope id
         (SourceCoreCalls.packArguments codes)
+  | constructor {id node instantiation ids tag headerWord codes}
+      (header : CompatibleExpressionConstructors.Header values source id node instantiation tag headerWord codes)
+      (form : node.form = .constructor instantiation ids)
+      (admissible : SourceSemantics.DataConstructorInstantiation.Admissible context instantiation)
+      (ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
+      (count : ids.length = instantiation.payloadTypes.length)
+      (nodes : CompatibleExpressionConstructors.Nodes source ids instantiation.payloadTypes codes)
+      (sequence : DataExpressionSequence.Tree source
+        (RecursiveStageTupleMeaning.Entries scope (ids.zip codes)) scope ids instantiation.payloadTypes codes)
+      (children : ∀ child code, (child, code) ∈ ids.zip codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope child code) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id
+        ⟨.namedData tag.owner, SourceCoreCompatibleDataExpressions.construct tag headerWord
+          (SourceCoreCalls.packArguments codes).expression⟩
   | call {id callee ids metadata fuel lowered types}
       (compiler : CallableIndirectCallCertificates.Receipt policy body fuel compilation source scope
         id callee ids metadata reasonAt lowered)
@@ -173,6 +192,20 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child childCode} (member : (child, childCode) ∈ tupleIds.zip codes)
       (inside : Calls compiler (children child childCode member)) :
       Calls compiler (.tuple header sequence children)
+  | constructor_child {scope id node instantiation constructorIds tag headerWord codes}
+      {header : CompatibleExpressionConstructors.Header values source id node instantiation tag headerWord codes}
+      {form : node.form = .constructor instantiation constructorIds}
+      {admissible : SourceSemantics.DataConstructorInstantiation.Admissible context instantiation}
+      {ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution}
+      {count : constructorIds.length = instantiation.payloadTypes.length}
+      {nodes : CompatibleExpressionConstructors.Nodes source constructorIds instantiation.payloadTypes codes}
+      {sequence : DataExpressionSequence.Tree source
+        (RecursiveStageTupleMeaning.Entries scope (constructorIds.zip codes)) scope constructorIds instantiation.payloadTypes codes}
+      {children : ∀ child code, (child, code) ∈ constructorIds.zip codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope child code}
+      {child childCode} (member : (child, childCode) ∈ constructorIds.zip codes)
+      (inside : Calls compiler (children child childCode member)) :
+      Calls compiler (.constructor header form admissible ranges count nodes sequence children)
   | call_child {scope id otherCallee otherIds otherMetadata otherFuel code types}
       {outer : CallableIndirectCallCertificates.Receipt policy body otherFuel compilation source scope
         id otherCallee otherIds otherMetadata reasonAt code}
@@ -432,6 +465,27 @@ theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
             (_root_.List.zip _ _) scope child code))) certified, metadata.projected⟩
+  | constructor originalFound form ranges children ih =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨tag, headerWord, codes, rfl, receipt, count, arguments⟩ :=
+        CompatibleExpressionConstructors.constructor_of_functions originalFound form
+          (policyFor.special _ admitted (.constructor originalFound form ranges children))
+          (policyFor.read _ admitted (.constructor originalFound form ranges children)) policyFor.leaf accepted
+      obtain ⟨admissible, argumentsTyped, _sourceType⟩ :=
+        CompatibleExpressionConstructors.constructor_source_types unique originalFound form receipt.metadata.coercions typed
+      obtain ⟨nodes, certified⟩ := CompatibleExpressionConstructors.child_certificates unique argumentsTyped arguments
+        (fun child member childNode code childFound childTyped childAccepted =>
+          (ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member]))).1)
+      exact ⟨.constructor receipt form admissible ranges count nodes
+        (CompatibleExpressionConstructors.sequence_of_nodes count nodes
+          (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
+            (_root_.List.zip _ _) scope child code))) certified, receipt.metadata.projected⟩
   | @call callId _original _callee _ids _metadata originalFound form calleeSyntax children calleeIH ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)

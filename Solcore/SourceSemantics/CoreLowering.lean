@@ -1665,6 +1665,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedFo
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingHeaderCollectors
 
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorSourceInversion
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

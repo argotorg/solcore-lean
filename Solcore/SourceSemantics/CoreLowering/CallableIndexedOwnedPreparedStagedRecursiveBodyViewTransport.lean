@@ -36,6 +36,11 @@ theorem syntax_view {id : ExpressionId} (tree : Syntax source id)
       exact .tuple ((expression_lookup edited avoids reached).symm.trans found) form
         (fun child member => ih child member
           (.expression reached found (by simp [form, ExpressionForm.references, member])))
+  | @constructor id node instantiation ids found form ranges children ih =>
+      intro reached
+      exact .constructor ((expression_lookup edited avoids reached).symm.trans found) form ranges
+        (fun child member => ih child member
+          (.expression reached found (by simp [form, ExpressionForm.references, member])))
   | @call id node callee ids metadata found form calleeTree children calleeIH childrenIH =>
       intro reached
       have calleeReached : Reaches source roots (.expression callee) :=
@@ -142,6 +147,7 @@ private inductive FormInFragment : ExpressionForm → Prop where
   | read {name binder} : FormInFragment (.reference name (.local binder))
   | group {inner} : FormInFragment (.group inner)
   | tuple {ids} : FormInFragment (.tuple ids)
+  | constructor {instantiation ids} : FormInFragment (.constructor instantiation ids)
   | call {callee ids metadata} : FormInFragment (.call callee ids (.indirect metadata))
   | unary {operator operand} : FormInFragment (.unary operator operand)
   | binary {left operator right} : FormInFragment (.binary left operator right)
@@ -153,6 +159,7 @@ private theorem syntax_found {source : TypedSource} {id : ExpressionId}
   | leaf finite => cases finite <;> exact ⟨_, ‹source.lookupExpression? id = some _›⟩
   | group found _ _ => exact ⟨_, found⟩
   | tuple found _ _ => exact ⟨_, found⟩
+  | constructor found _ _ _ => exact ⟨_, found⟩
   | call found _ _ _ => exact ⟨_, found⟩
   | unary found _ _ => exact ⟨_, found⟩
   | binary found _ _ _ => exact ⟨_, found⟩
@@ -182,6 +189,9 @@ private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : E
   | tuple selected form _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.tuple
+  | constructor selected form _ _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.constructor
   | call selected form _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.call
@@ -227,6 +237,9 @@ private theorem syntax_child {source : TypedSource} {id child : ExpressionId}
       have same : child = inner := by simpa [form, ExpressionForm.references] using edge
       exact same.symm ▸ innerTree
   | tuple selected form children =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact children child (by simpa [form, ExpressionForm.references] using edge)
+  | constructor selected form _ranges children =>
       cases Option.some.inj (selected.symm.trans found)
       exact children child (by simpa [form, ExpressionForm.references] using edge)
   | @call _ _ callee ids _ selected form calleeTree children =>
@@ -423,6 +436,35 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
                           simp only [formEq, viewReading, firstSame, secondSame]
                       | cons third tail =>
                           simp only [formEq, viewReading, tupleLeaf formEq]
+          | @constructor instantiation ids =>
+              have argumentsSame : (ids.zip instantiation.payloadTypes).mapM (fun (argument, expected) => do
+                  let expected ← SourceCoreCompatibleDataExpressions.projectType values.checked
+                    (.occurrence id.occurrence) expected
+                  let argument ← SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
+                    compilation source scope argument reasonAt
+                  SourceCoreBasic.ensureType (.occurrence id.occurrence) expected argument.type
+                  pure argument) =
+                (ids.zip instantiation.payloadTypes).mapM (fun (argument, expected) => do
+                  let expected ← SourceCoreCompatibleDataExpressions.projectType values.checked
+                    (.occurrence id.occurrence) expected
+                  let argument ← SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
+                    compilation view scope argument reasonAt
+                  SourceCoreBasic.ensureType (.occurrence id.occurrence) expected argument.type
+                  pure argument) := by
+                apply mapM_eq_of_members
+                intro pair member
+                have child := children pair.1 (by
+                  simp only [formEq, ExpressionForm.references, List.mem_map, NodeId.expression.injEq]
+                  exact ⟨pair.1, (List.of_mem_zip member).1, rfl⟩)
+                cases pair
+                dsimp only at child ⊢
+                rw [child]
+              simp only [bind, Except.bind] at argumentsSame
+              simp only [formEq, viewReading, sourceProfile.leaf,
+                SourceCoreCompatibleDataExpressions.leafLowerer, compatibleReading,
+                viewCompatibleReading, bind, Except.bind]
+              simp only [SourceCoreCompatibleDataExpressions.lowerWithReasons, compatibleReading,
+                viewCompatibleReading, bind, Except.bind, formEq, Nat.min_self, argumentsSame]
           | @unary operator operand =>
               have child := children operand (by simp [formEq, ExpressionForm.references])
               simp only [formEq, viewReading, child]

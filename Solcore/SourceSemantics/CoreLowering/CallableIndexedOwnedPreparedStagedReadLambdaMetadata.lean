@@ -36,7 +36,7 @@ private theorem syntax_not_lambda {source : TypedSource} {id : ExpressionId}
       subst node
       rw [form] at shape
       cases shape
-  | group other shape _ | tuple other shape _ | call other shape _ _
+  | group other shape _ | tuple other shape _ | call other shape _ _ | constructor other shape _ _
   | unary other shape _ | binary other shape _ _ | conditional other shape _ _ _ =>
     have same := Option.some.inj (other.symm.trans found)
     subst node

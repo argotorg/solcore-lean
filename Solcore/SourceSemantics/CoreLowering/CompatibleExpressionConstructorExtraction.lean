@@ -67,7 +67,7 @@ theorem constructor_of_functions
         | cons head tail ih => exact .cons ⟨head.projected, by simpa only [Nat.min_self] using head.generated⟩ ih
   · simp [owner, bind, Except.bind] at accepted
 
-private theorem child_certificates
+theorem child_certificates
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
     {context : SourceCoreFunctions.Context} {values : ValuesContext} {source : TypedSource} {scope : Scope}
     {reasonAt : ExpressionId → Word} {sourceContext : SourceSemantics.Context}

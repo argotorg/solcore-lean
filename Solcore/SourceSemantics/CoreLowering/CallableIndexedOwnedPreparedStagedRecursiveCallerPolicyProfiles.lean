@@ -23,6 +23,8 @@ private inductive SupportedForm : ExpressionForm → Prop where
   | conditional (condition yes no : ExpressionId) : SupportedForm (.conditional condition yes no)
   | group (inner : ExpressionId) : SupportedForm (.group inner)
   | tuple (ids : List ExpressionId) : SupportedForm (.tuple ids)
+  | constructor (instantiation : DataConstructorInstantiation) (ids : List ExpressionId) :
+      SupportedForm (.constructor instantiation ids)
   | call (callee : ExpressionId) (ids : List ExpressionId) (metadata : IndirectCallResolution) :
       SupportedForm (.call callee ids (.indirect metadata))
 
@@ -53,6 +55,10 @@ private theorem syntax_node {id : ExpressionId}
     refine ⟨_, found, ?_⟩
     rw [form]
     exact .tuple _
+  | constructor found form _ranges _children =>
+    refine ⟨_, found, ?_⟩
+    rw [form]
+    exact .constructor _ _
   | call found form _callee _children =>
     refine ⟨_, found, ?_⟩
     rw [form]
@@ -189,7 +195,7 @@ private theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
     dsimp only
     rw [ordinary name binder form]
     rfl
-  | unary | binary | conditional | group => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
+  | unary | binary | conditional | group | constructor => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
   | tuple => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
   | call => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
 
@@ -218,7 +224,7 @@ private theorem evidence_none
         simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
     | read =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
-    | unary | binary | conditional | group =>
+    | unary | binary | conditional | group | constructor =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
     | tuple =>
       simp [SourceCoreEvidence.lowerWithProjector, found, form, ordinary, requirements, coercions]
@@ -259,7 +265,7 @@ private theorem special_none
   cases supported with
   | literal atomic => cases atomic <;> rfl
   | read name binder => simp only [metadata.localRead id tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
-  | unary | binary | conditional | group => rfl
+  | unary | binary | conditional | group | constructor => rfl
   | tuple => rfl
   | call => rfl
 
@@ -351,7 +357,7 @@ private theorem special_none_on
   cases supported with
   | literal atomic => cases atomic <;> rfl
   | read name binder => simp only [metadata.localRead id admitted tree node found name binder form, Bool.false_eq_true, ↓reduceIte]
-  | unary | binary | conditional | group => rfl
+  | unary | binary | conditional | group | constructor => rfl
   | tuple => rfl
   | call => rfl
 

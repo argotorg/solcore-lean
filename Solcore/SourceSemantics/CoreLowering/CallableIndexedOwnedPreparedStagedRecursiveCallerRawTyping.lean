@@ -78,6 +78,13 @@ theorem parent_typed
     obtain ⟨childType, childTyped⟩ :=
       row_member childrenTyped (List.of_mem_zip member).1
     exact ih childTyped
+  | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
+    have originalTyped := typed_at_lookup unique header.metadata.found typed
+    obtain ⟨_admissible, childrenTyped, _sameType⟩ :=
+      CompatibleExpressionConstructors.constructor_source_types unique header.metadata.found
+        form header.metadata.coercions originalTyped
+    obtain ⟨childType, childTyped⟩ := row_member childrenTyped (List.of_mem_zip member).1
+    exact ih childTyped
   | @call_child scope id otherCallee otherIds otherMetadata otherFuel code types
       outer sequence children child childCode member inside ih =>
     obtain ⟨parameter, result, rawTypes, calleeTyped, argumentsTyped, application⟩ :=
