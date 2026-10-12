@@ -253,6 +253,25 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
       (heapTyped : Dynamic.HeapWellTyped anchor.function.context after) :
       History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
         reached entries
+  | packed_export_error {session : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
+      {argument : SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat}
+      {generation : SourceCorePublicValues.ExportGeneration} {returned : Session artifact} {error : SourceCoreIndexedSession.Error}
+      {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+      {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+      {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+      (started : checkpoint.HandleStart session handle argument inputFuel)
+      (exported : checkpoint.ExportErrorResultAt executionFuel outputFuel generation native finalStore error returned)
+      (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+        anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults)
+      (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (post : Relates caller reached ∧
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context sourceType outcome reached) :
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached entries
   | issued {session next : Session artifact} {mapping world heap store}
       {caller : Caller headers keys mapping world heap store} {entries : List Entry}
       (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
@@ -456,6 +475,16 @@ theorem History.current {artifact : Artifact} {session : Session artifact} {entr
       exact ⟨failed.encodes_function_from started.initial_registry imported,
         represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
         typed.mono result.2.2.2.2.2.1⟩
+  | packed_export_error prior started exported result reached post ih =>
+      obtain ⟨payload, decoded⟩ := exported.succeeded
+      obtain ⟨_source, _outcome, _represented, heaps, worldEq, _returned, _related, _stable, typed, _valueTyped⟩ :=
+        RecursivePublicApplicationResult.returned_value result decoded
+      refine ⟨worldEq.symm ▸ exported.native_at, heaps, post.2.rows, typed, ?_⟩
+      intro entry member
+      obtain ⟨imported, represented, valueTyped⟩ := ih.2.2.2.2 entry member
+      exact ⟨exported.encodes_function_from started.initial_registry imported,
+        represented.extend (.refl _) result.2.2.1 result.2.2.2.1,
+        valueTyped.mono result.2.2.2.2.2.1⟩
   | issued prior continued ih =>
       refine ⟨continued.same_runtime.native_at ih.1, ih.2.1, ih.2.2.1, ih.2.2.2.1, ?_⟩
       intro entry member
@@ -611,6 +640,26 @@ theorem History.after_packed_failure
         reached entries := by
   obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
   exact ⟨reached, related, .packed_failed history started failed result reached ⟨related, post⟩ heapTyped⟩
+
+/-- A successful native call whose public export failed still retains all
+previous handles and the same successful Source after-heap. -/
+theorem History.after_packed_export_error
+    {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    {checkpoint : Checkpoint artifact} {handle : SourceCorePublicValues.Handle}
+    {argument : SourceCorePublicValues.Value} {inputFuel executionFuel outputFuel : Nat} {generation : ExportGeneration}
+    {returned : Session artifact} {error : SourceCoreIndexedSession.Error}
+    {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (started : checkpoint.HandleStart session handle argument inputFuel)
+    (exported : checkpoint.ExportErrorResultAt executionFuel outputFuel generation native finalStore error returned)
+    (result : RecursivePublicApplicationResult.ResultAt (registry := receiving) functions caller
+      anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults) :
+    ∃ reached : Caller headers keys finalMap finalWorld after finalStore,
+      Relates caller reached ∧
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached entries := by
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2
+  exact ⟨reached, related, .packed_export_error history started exported result reached ⟨related, post⟩⟩
 
 private theorem success_shape {payload : Core.Value}
     (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)

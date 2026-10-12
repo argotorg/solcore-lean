@@ -92,6 +92,8 @@ theorem extend_history {artifact : Artifact} {session : Session artifact} {entri
       exact .packed_next ih started succeeded (packed_result result extension) reached post addition
   | packed_failed prior started failed result reached post heapTyped ih =>
       exact .packed_failed ih started failed (packed_result result extension) reached post heapTyped
+  | packed_export_error prior started exported result reached post ih =>
+      exact .packed_export_error ih started exported (packed_result result extension) reached post
   | issued prior continued ih => exact .issued ih continued
   | remember_issued prior receipt ih => exact .remember_issued ih (issued_entry receipt)
   | restored prior restored ih => exact .restored ih restored
@@ -112,6 +114,7 @@ theorem indexed_entry {artifact : Artifact} {session : Session artifact} {entrie
   | failed _ _ _ _ _ _ _ _ _ ih => exact ih
   | packed_next _ _ _ _ _ _ _ ih => exact ih
   | packed_failed _ _ _ _ _ _ _ ih => exact ih
+  | packed_export_error _ _ _ _ _ _ ih => exact ih
   | issued _ _ ih => exact ih
   | remember_issued _ _ ih => exact ih
   | restored _ _ ih => exact ih
@@ -128,6 +131,7 @@ theorem named_header {artifact : Artifact} {session : Session artifact} {entries
   | failed _ _ _ _ _ _ _ _ _ ih => exact ih
   | packed_next _ _ _ _ _ _ _ ih => exact ih
   | packed_failed _ _ _ _ _ _ _ ih => exact ih
+  | packed_export_error _ _ _ _ _ _ ih => exact ih
   | issued _ _ ih => exact ih
   | remember_issued _ _ ih => exact ih
   | restored _ _ ih => exact ih

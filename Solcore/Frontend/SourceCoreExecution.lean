@@ -1340,3 +1340,87 @@ theorem Checkpoint.output_succeeded_uniform {artifact : Artifact}
         ⟨rfl, rfl, rfl, rfl, HEq.rfl⟩, returnedReady⟩
 
 end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+/-- An actual public export error retains its successful native execution and
+exact returned session. It is distinct from a Source language failure. -/
+theorem Checkpoint.ResumeAt.indexed_export_error {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat}
+    {error : SourceCoreIndexedSession.Error} {session : Session artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.exportError error session)) :
+    ∃ (actual : SourceCoreIndexedSession.Session native)
+      (generation : SourceCorePublicValues.ExportGeneration) (value : Core.Value) (store : Core.Store),
+      indexed.ExportErrorResultAt fuel boundaryFuel generation value store error actual ∧
+      session.IndexedAt actual := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨outcome, resumed, returned⟩ := receipt
+      cases outcome with
+      | succeeded actual => cases returned
+      | failed reason session => cases returned
+      | outOfFuel checkpoint => cases returned
+      | exportError actualError actualSession =>
+          cases returned
+          obtain ⟨generation, value, store, exported⟩ := resumed.export_error
+          exact ⟨actualSession, generation, value, store, exported, rfl, HEq.rfl⟩
+
+end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+set_option autoImplicit false
+set_option Elab.async false
+
+/-- Actual public resumption retains the terminal outcome and its one export
+generation. Only execution budgets add across an exhausted checkpoint. -/
+theorem Checkpoint.ResumeAt.then_resume {artifact : Artifact}
+    {original checkpoint : Checkpoint artifact} {spent priorOutput additional outputFuel : Nat}
+    {outcome : Outcome artifact}
+    (exhausted : original.ResumeAt spent priorOutput (.outOfFuel checkpoint))
+    (resumed : checkpoint.ResumeAt additional outputFuel outcome) :
+    original.ResumeAt (spent + additional) outputFuel outcome := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases original with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected native atRecipe =>
+    rcases original with ⟨original⟩
+    obtain ⟨actual, priorResume, same⟩ := exhausted
+    cases actual with
+    | succeeded completion => cases same
+    | failed reason session => cases same
+    | exportError error session => cases same
+    | outOfFuel pending =>
+      cases same
+      obtain ⟨actual, finished, returned⟩ := resumed
+      exact ⟨actual, priorResume.then_resume finished, returned⟩
+
+/-- A finite list of actual resume events. Each intermediate result is the
+checkpoint produced by fuel exhaustion, including its current heap and continuation. -/
+inductive Checkpoint.ResumeChain {artifact : Artifact} :
+    Checkpoint artifact → Nat → Nat → Outcome artifact → Prop where
+  | single {original : Checkpoint artifact} {fuel outputFuel : Nat} {outcome : Outcome artifact}
+      (resumed : original.ResumeAt fuel outputFuel outcome) :
+      Checkpoint.ResumeChain original fuel outputFuel outcome
+  | more {original checkpoint : Checkpoint artifact} {spent priorOutput additional outputFuel : Nat}
+      {outcome : Outcome artifact}
+      (exhausted : original.ResumeAt spent priorOutput (.outOfFuel checkpoint))
+      (continued : Checkpoint.ResumeChain checkpoint additional outputFuel outcome) :
+      Checkpoint.ResumeChain original (spent + additional) outputFuel outcome
+
+/-- Existing Source/public theorems apply to the original checkpoint after any
+finite number of real resumptions, with their exact final public outcome. -/
+theorem Checkpoint.ResumeChain.collapse {artifact : Artifact} {original : Checkpoint artifact}
+    {fuel outputFuel : Nat} {outcome : Outcome artifact}
+    (chain : original.ResumeChain fuel outputFuel outcome) : original.ResumeAt fuel outputFuel outcome := by
+  induction chain with
+  | single resumed => exact resumed
+  | more exhausted continued ih => exact exhausted.then_resume ih
+
+end Solcore.Frontend.SourceCoreExecution

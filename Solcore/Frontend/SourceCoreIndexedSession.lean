@@ -6296,3 +6296,225 @@ theorem Checkpoint.output_succeeded_uniform {artifact : Artifact}
     cases exhausted
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+/-- Native execution succeeded but the original public export failed. The
+returned session keeps the exact completed store and the weakened original
+callable slots; no partially exported handle is installed. -/
+def Checkpoint.ExportErrorResultAt {artifact : Artifact}
+    (checkpoint : Checkpoint artifact) (fuel boundaryFuel : Nat) (generation : ExportGeneration)
+    (native : Core.Value) (store : Core.Store) (error : Error) (returned : Session artifact) : Prop :=
+  checkpoint.NativeDone fuel native store ∧
+  ∃ payload,
+    Core.LanguageResult.decode? native = some (.succeeded payload) ∧
+    returned.store = store ∧ returned.world = store.map Core.Value.type ∧
+    returned.values = checkpoint.values ∧ HEq returned.owner checkpoint.owner ∧
+    returned.authority = checkpoint.origin.authority ∧
+    returned.sourcePrefix = checkpoint.origin.sourcePrefix ∧
+    ∃ extension : Core.WorldExtends checkpoint.world returned.world,
+      HEq returned.registry (checkpoint.registry.weaken extension) ∧
+      exportValue checkpoint.origin.authority generation boundaryFuel checkpoint.values
+        (checkpoint.registry.weaken extension) checkpoint.request.result payload = .error error
+
+/-- The export-error receipt comes from the same completion constructor as the
+actual resume, retaining its single native result and export generation. -/
+theorem Checkpoint.complete_export_error_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error} {returned : Session artifact}
+    (completed : checkpoint.NativeDone fuel native store)
+    (exported : complete checkpoint generation fuel boundaryFuel native store completed =
+      .exportError error returned) :
+    checkpoint.ExportErrorResultAt fuel boundaryFuel generation native store error returned := by
+  unfold complete at exported
+  dsimp only at exported
+  split at exported
+  next decoded =>
+    obtain ⟨_world, _stored, typed⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed completed
+    obtain ⟨_outcome, found, _typed⟩ := Core.LanguageResult.decode?_runtime_typed typed
+    rw [decoded] at found
+    cases found
+  next outcome decoded =>
+    cases outcome with
+    | failed reason => cases exported
+    | succeeded payload =>
+      dsimp only at exported
+      split at exported
+      · rename_i actualError failed
+        cases exported
+        refine ⟨completed, payload, decoded, rfl, rfl, rfl, HEq.rfl, rfl, rfl, ?_⟩
+        have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+          obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+          obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+          simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+        exact ⟨extension, HEq.rfl, failed⟩
+      · cases exported
+
+theorem Checkpoint.ResumeAt.export_error {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat}
+    {error : Error} {returned : Session artifact}
+    (resumed : checkpoint.ResumeAt fuel boundaryFuel (.exportError error returned)) :
+    ∃ generation native store,
+      checkpoint.ExportErrorResultAt fuel boundaryFuel generation native store error returned := by
+  rcases resumed with ⟨generation, native, store, completed, exported⟩ | ⟨state, exhausted, impossible⟩
+  · exact ⟨generation, native, store, checkpoint.complete_export_error_receipt completed exported⟩
+  · cases impossible
+
+theorem Checkpoint.ExportErrorResultAt.native_at {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error} {returned : Session artifact}
+    (exported : checkpoint.ExportErrorResultAt fuel boundaryFuel generation native store error returned) :
+    returned.NativeAt (store.map Core.Value.type) store := by
+  obtain ⟨_done, _payload, _decoded, stored, world, _rest⟩ := exported
+  exact ⟨world, stored⟩
+
+theorem Checkpoint.ExportErrorResultAt.values {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error} {returned : Session artifact}
+    (exported : checkpoint.ExportErrorResultAt fuel boundaryFuel generation native store error returned) :
+    returned.values = checkpoint.values := by
+  obtain ⟨_done, _payload, _decoded, _stored, _world, values, _rest⟩ := exported
+  exact values
+
+theorem Checkpoint.ExportErrorResultAt.succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error} {returned : Session artifact}
+    (exported : checkpoint.ExportErrorResultAt fuel boundaryFuel generation native store error returned) :
+    ∃ payload, Core.LanguageResult.decode? native = some (.succeeded payload) := by
+  obtain ⟨_done, payload, decoded, _rest⟩ := exported
+  exact ⟨payload, decoded⟩
+
+theorem Checkpoint.ExportErrorResultAt.encodes_function_from
+    {artifact : Artifact} {checkpoint : Checkpoint artifact} {session returned : Session artifact}
+    {executionFuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error}
+    (exported : checkpoint.ExportErrorResultAt executionFuel boundaryFuel generation native store error returned)
+    (started : checkpoint.InitialRegistryFrom session)
+    {inputFuel : Nat} {expected : Ty} {handle : Handle} {payload : Core.Value}
+    (imported : session.EncodesAt inputFuel expected (.function handle) payload) :
+    returned.EncodesAt inputFuel expected (.function handle) payload := by
+  obtain ⟨oldEncoded, oldAt, oldValue⟩ := imported
+  obtain ⟨_completed, _payload, _decoded, _store, _world, _values, _owner, authority,
+    _sourcePrefix, extension, registry, _exportError⟩ := exported
+  have resolved := initial_registry_resolves_weaken started (encoded_function_resolves oldAt) extension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  have registryEq : returnedRegistry = _ := eq_of_heq registry
+  rw [← registryEq] at resolved
+  change returnedAuthority = checkpoint.origin.authority at authority
+  rw [← authority] at resolved
+  exact ⟨_, execution_encode_function_at_registry oldAt resolved returnedValues.registry, oldValue⟩
+
+theorem Checkpoint.ExportErrorResultAt.exportsReady {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {executionFuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {error : Error} {returned : Session artifact}
+    (exported : checkpoint.ExportErrorResultAt executionFuel boundaryFuel generation native store error returned)
+    (ready : checkpoint.ExportsReady) : returned.ExportsReady := by
+  obtain ⟨_completed, _payload, _decoded, _store, _world, _values, _owner, authority,
+    _sourcePrefix, extension, registry, _exportError⟩ := exported
+  have returnedIssued := ready.2.weaken extension
+  have registryEq := eq_of_heq registry
+  rw [← registryEq, ← authority] at returnedIssued
+  exact ⟨by change returned.authority.IssuedFor artifact.authority; rw [authority]; exact ready.1,
+    returnedIssued⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+set_option autoImplicit false
+set_option Elab.async false
+
+private theorem complete_suspend {artifact : Artifact} {original : Checkpoint artifact}
+    {spent : Nat} {state : Core.State}
+    (exhausted : Core.runStateful spent original.state = .outOfFuel state)
+    (generation : ExportGeneration) (fuel boundaryFuel : Nat) (value : Core.Value) (store : Core.Store)
+    (finished : Core.runStateful fuel state = .done value store) :
+    complete (suspend original spent state exhausted) generation fuel boundaryFuel value store finished =
+      complete original generation (spent + fuel) boundaryFuel value store
+        ((Core.runStateful_resume exhausted fuel).symm.trans finished) := by
+  unfold complete
+  simp only [suspend, Registry.weaken, List.map_map, Function.comp_def]
+  split
+  next decoded =>
+    obtain ⟨_, _, typed⟩ := Core.well_typed_runStateful_preserves_result_type original.typed
+      ((Core.runStateful_resume exhausted fuel).symm.trans finished)
+    obtain ⟨_, found, _⟩ := Core.LanguageResult.decode?_runtime_typed typed
+    rw [decoded] at found
+  next outcome decoded =>
+    cases outcome with
+    | failed reason => rfl
+    | succeeded payload =>
+      dsimp only
+      split <;> rename_i result accepted <;> rw [accepted]
+
+private theorem suspend_suspend {artifact : Artifact} {original : Checkpoint artifact}
+    {spent additional : Nat} {state next : Core.State}
+    (exhausted : Core.runStateful spent original.state = .outOfFuel state)
+    (resumed : Core.runStateful additional state = .outOfFuel next) :
+    suspend (suspend original spent state exhausted) additional next resumed =
+      suspend original (spent + additional) next
+        ((Core.runStateful_resume exhausted additional).symm.trans resumed) := by
+  simp only [suspend, Registry.weaken, List.map_map]
+  rfl
+
+private theorem complete_ne_outOfFuel {artifact : Artifact} (checkpoint : Checkpoint artifact)
+    (generation : ExportGeneration) (fuel boundaryFuel : Nat) (value : Core.Value) (store : Core.Store)
+    (finished : checkpoint.NativeDone fuel value store) (pending : Checkpoint artifact) :
+    complete checkpoint generation fuel boundaryFuel value store finished ≠ .outOfFuel pending := by
+  intro accepted
+  unfold complete at accepted
+  dsimp only at accepted
+  split at accepted
+  next decoded =>
+    obtain ⟨_, _, typed⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed finished
+    obtain ⟨_, found, _⟩ := Core.LanguageResult.decode?_runtime_typed typed
+    rw [decoded] at found
+    cases found
+  next outcome decoded =>
+    cases outcome with
+    | failed reason => cases accepted
+    | succeeded payload =>
+      dsimp only at accepted
+      split at accepted <;> cases accepted
+
+/-- Two actual resume events compose using only the final event's output
+budget and export generation. The intermediate event must have exhausted fuel. -/
+theorem Checkpoint.ResumeAt.then_resume {artifact : Artifact}
+    {original checkpoint : Checkpoint artifact} {spent priorOutput additional outputFuel : Nat}
+    {outcome : Outcome artifact}
+    (exhausted : original.ResumeAt spent priorOutput (.outOfFuel checkpoint))
+    (resumed : checkpoint.ResumeAt additional outputFuel outcome) :
+    original.ResumeAt (spent + additional) outputFuel outcome := by
+  rcases exhausted with ⟨generation, value, store, finished, accepted⟩ | ⟨state, exhausted, suspended⟩
+  · exact False.elim (complete_ne_outOfFuel original generation spent priorOutput value store finished checkpoint accepted)
+  · have same := Outcome.outOfFuel.inj suspended
+    subst checkpoint
+    rcases resumed with ⟨generation, value, store, finished, accepted⟩ | ⟨next, continued, suspended⟩
+    · refine Or.inl ⟨generation, value, store,
+        (Core.runStateful_resume exhausted additional).symm.trans finished, ?_⟩
+      exact (complete_suspend exhausted generation additional outputFuel value store finished).symm.trans accepted
+    · refine Or.inr ⟨next, (Core.runStateful_resume exhausted additional).symm.trans continued, ?_⟩
+      exact suspended.trans (congrArg Outcome.outOfFuel (suspend_suspend exhausted continued))
+
+/-- Finite execution resumption records every actual exhaustion. Execution
+fuel adds across events; the final output budget is kept separately. -/
+inductive Checkpoint.ResumeChain {artifact : Artifact} :
+    Checkpoint artifact → Nat → Nat → Outcome artifact → Prop where
+  | single {original : Checkpoint artifact} {fuel outputFuel : Nat} {outcome : Outcome artifact}
+      (resumed : original.ResumeAt fuel outputFuel outcome) :
+      Checkpoint.ResumeChain original fuel outputFuel outcome
+  | more {original checkpoint : Checkpoint artifact} {spent priorOutput additional outputFuel : Nat}
+      {outcome : Outcome artifact}
+      (exhausted : original.ResumeAt spent priorOutput (.outOfFuel checkpoint))
+      (continued : Checkpoint.ResumeChain checkpoint additional outputFuel outcome) :
+      Checkpoint.ResumeChain original (spent + additional) outputFuel outcome
+
+theorem Checkpoint.ResumeChain.collapse {artifact : Artifact} {original : Checkpoint artifact}
+    {fuel outputFuel : Nat} {outcome : Outcome artifact}
+    (chain : original.ResumeChain fuel outputFuel outcome) : original.ResumeAt fuel outputFuel outcome := by
+  induction chain with
+  | single resumed => exact resumed
+  | more exhausted continued ih => exact exhausted.then_resume ih
+
+end Solcore.Frontend.SourceCoreIndexedSession
