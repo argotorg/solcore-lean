@@ -977,14 +977,29 @@ def Session.restoreSnapshot {artifact : Artifact} (session : Session artifact) (
       | .ready session => pure (.ready ⟨session⟩)
       | .suspended checkpoint => pure (.suspended ⟨checkpoint⟩)
 
-def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundaryFuel : Nat := 1024) :
-    IO (Except SourceCoreIndexedSession.Error (Snapshot artifact)) := by
+/-- The original successful observation of this ready public session. -/
+def Session.SnapshotAt {artifact : Artifact} (session : Session artifact)
+    (boundaryFuel : Nat) (snapshot : Snapshot artifact) : Prop :=
+  match artifact, session, snapshot with
+  | ⟨_, .empty _⟩, ⟨_⟩, ⟨_⟩ => True
+  | ⟨_, .indexed _ _ _ _⟩, ⟨session⟩, ⟨snapshot⟩ => session.SnapshotAt boundaryFuel snapshot
+
+/-- Take one snapshot and retain its successful indexed observation. -/
+def Session.snapshotWithReceipt {artifact : Artifact} (session : Session artifact)
+    (boundaryFuel : Nat := 1024) :
+    IO (Except SourceCoreIndexedSession.Error
+      { snapshot : Snapshot artifact // session.SnapshotAt boundaryFuel snapshot }) := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
-  | empty selected => exact pure (.ok ⟨()⟩)
+  | empty selected => exact pure (.ok ⟨⟨()⟩, trivial⟩)
   | indexed recipe selected native _atRecipe =>
       rcases session with ⟨session⟩
-      exact do return (← session.snapshot boundaryFuel).map fun snapshot => ⟨snapshot⟩
+      exact do return (← session.snapshotWithReceipt boundaryFuel).map fun captured =>
+        ⟨⟨captured.val⟩, captured.property⟩
+
+def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundaryFuel : Nat := 1024) :
+    IO (Except SourceCoreIndexedSession.Error (Snapshot artifact)) := do
+  pure ((← session.snapshotWithReceipt boundaryFuel).map Subtype.val)
 
 def Checkpoint.snapshot {artifact : Artifact} (checkpoint : Checkpoint artifact) (boundaryFuel : Nat := 1024) :
     IO (Except SourceCoreIndexedSession.Error (Snapshot artifact)) := by
@@ -1012,5 +1027,69 @@ theorem Snapshot.restore_native_size {artifact : Artifact} (snapshot : Snapshot 
 theorem Completion.typed {artifact : Artifact} (completion : Completion artifact) :
     completion.session.Authenticates completion.boundaryFuel completion.sourceType completion.value :=
   completion.authenticated
+
+end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+/-- Actual ready restoration identifies the indexed restored session and keeps
+its genuine snapshot transport receipt. No native fields are caller premises. -/
+theorem Session.SnapshotAt.restored_indexed
+    {artifact : Artifact} {before after : Session artifact} {snapshot : Snapshot artifact}
+    {fuel : Nat} (captured : before.SnapshotAt fuel snapshot)
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Session native}
+    (atSession : before.IndexedAt indexed) (restored : snapshot.restore = .ready after) :
+    ∃ returned : SourceCoreIndexedSession.Session native,
+      after.IndexedAt returned ∧ indexed.RestoredAt returned := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim atSession
+  | indexed recipe selected actual atRecipe =>
+      rcases before with ⟨before⟩
+      rcases snapshot with ⟨snapshot⟩
+      rcases atSession with ⟨rfl, same⟩
+      have sameSession : before = indexed := eq_of_heq same
+      subst before
+      cases nativeRestored : snapshot.restore with
+      | ready returned =>
+          simp only [Snapshot.restore, nativeRestored] at restored
+          cases RestoredSnapshot.ready.inj restored
+          exact ⟨returned, ⟨rfl, HEq.rfl⟩, snapshot, fuel, captured, nativeRestored⟩
+      | suspended checkpoint =>
+          simp only [Snapshot.restore, nativeRestored] at restored
+          cases restored
+
+/-- The ownership-checked restoration has the same successful ready result as
+the saved snapshot. This does not assert equality with the restoring caller. -/
+theorem Session.restoreSnapshot_ready
+    {artifact : Artifact} {session after : Session artifact} {snapshot : Snapshot artifact}
+    (restored : session.restoreSnapshot snapshot = .ok (.ready after)) :
+    snapshot.restore = .ready after := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected =>
+      rcases session with ⟨session⟩
+      rcases snapshot with ⟨snapshot⟩
+      cases restored
+      rfl
+  | indexed recipe selected native atRecipe =>
+      rcases session with ⟨session⟩
+      rcases snapshot with ⟨snapshot⟩
+      unfold Session.restoreSnapshot at restored
+      cases nativeRestored : session.restoreSnapshot snapshot with
+      | error error => simp [nativeRestored, bind, Except.bind] at restored
+      | ok result =>
+          simp only [nativeRestored, bind, Except.bind] at restored
+          have actual : snapshot.restore = result := by
+            unfold SourceCoreIndexedSession.Session.restoreSnapshot at nativeRestored
+            split at nativeRestored
+            · exact Except.ok.inj nativeRestored
+            · cases nativeRestored
+          cases result with
+          | ready returned =>
+              cases RestoredSnapshot.ready.inj (Except.ok.inj restored)
+              simp only [Snapshot.restore, actual]
+          | suspended checkpoint => cases restored
+
 
 end Solcore.Frontend.SourceCoreExecution

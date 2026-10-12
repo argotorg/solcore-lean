@@ -47,9 +47,6 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (namedSupport : ∀ header (member : header ∈ headers rows),
     NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
-  {beforePlan : SourceCompilationPlan.Plan} {planFuel planBudget : Nat}
-  (acceptedPlan : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget
-    compiled.sourceProgram beforePlan planFuel planBudget = .ok compiled.indexed.base.plan)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe}
   (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
@@ -119,7 +116,7 @@ private theorem current_arguments :
       inputReceipts metadata wellFormed
   exact ⟨stable, heaps, heapTyped.transportContext contexts.1, represented, argumentsTyped⟩
 
-include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
 theorem public_run_succeeded_reflects
@@ -154,14 +151,14 @@ theorem public_run_succeeded_reflects
       (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
       (observations := observations) (extension := extension) (semantic := semantic)
       (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (selected := selected)
+      (acceptedPlan := SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) (wellFormed := wellFormed) (selected := selected)
       (owner := rootOwner) (caller := caller) (globalReference := globalReference) (stable := stable)
       (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
       (heaps := heaps) (sourceAt := sourceAt) (supports := supports)
       (sameCompiled := SourceCoreIndexedSession.Recipe.prepare_compiled prepared) (started := started)
       publicStart atCheckpoint publicRun descriptor
 
-include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
 theorem public_run_failed_reflects
@@ -193,14 +190,14 @@ theorem public_run_failed_reflects
       (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
       (observations := observations) (extension := extension) (semantic := semantic)
       (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (selected := selected)
+      (acceptedPlan := SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) (wellFormed := wellFormed) (selected := selected)
       (owner := rootOwner) (caller := caller) (globalReference := globalReference) (stable := stable)
       (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
       (heaps := heaps) (sourceAt := sourceAt) (supports := supports)
       (sameCompiled := SourceCoreIndexedSession.Recipe.prepare_compiled prepared) (started := started)
       publicStart atCheckpoint publicRun descriptor
 
-include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Actual history feeds the public outcome at the current captured state. -/
 theorem public_word_preserved
@@ -229,7 +226,7 @@ theorem public_word_preserved
       (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
       (observations := observations) (extension := extension) (semantic := semantic)
       (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (selected := selected)
+      (acceptedPlan := SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) (wellFormed := wellFormed) (selected := selected)
       (owner := rootOwner) (caller := caller) (globalReference := globalReference) (stable := stable)
       (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
       (heaps := heaps) (sourceAt := sourceAt) (supports := supports)

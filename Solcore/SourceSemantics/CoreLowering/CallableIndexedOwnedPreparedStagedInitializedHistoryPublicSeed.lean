@@ -44,9 +44,6 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (namedSupport : ∀ header (member : header ∈ headers rows),
     NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
-  {beforePlan : SourceCompilationPlan.Plan} {planFuel planBudget : Nat}
-  (acceptedPlan : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget
-    compiled.sourceProgram beforePlan planFuel planBudget = .ok compiled.indexed.base.plan)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe}
   (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
@@ -93,7 +90,7 @@ local notation "rootFunctions" => CallableIndexedOwnedContextualCellOrigins.func
 local notation "rootModel" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry rootFunctions
 local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include distinct receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include distinct receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt in
 /-- A first actual public function export seeds the complete continuation
 history, including its captured environment and real returned session. -/
@@ -141,7 +138,7 @@ theorem public_run_succeeded_remembers
       (receiver := receiver) (profile := profile) (observations := observations)
       (extension := extension) (semantic := semantic) (family := family)
       (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
+      (acceptedPlan := SourceCoreUnifiedPreparationCertificates.compiled_planPrepared recipe.compiled) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
       (opened := opened) (fresh := fresh) (ready := ready) (sameRuntime := sameRuntime)
       (atSession := atSession) (atCheckpoint := atCheckpoint) (started := started)
       (inputReceipts := inputReceipts) (metadata := metadata) (sourceAt := sourceAt) (supports := supports)

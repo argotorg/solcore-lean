@@ -41,9 +41,6 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (namedSupport : ∀ header (member : header ∈ headers rows),
     NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
-  {beforePlan : SourceCompilationPlan.Plan} {planFuel planBudget : Nat}
-  (acceptedPlan : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget
-    compiled.sourceProgram beforePlan planFuel planBudget = .ok compiled.indexed.base.plan)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe}
   (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
@@ -91,7 +88,7 @@ local notation "rootFunctions" => CallableIndexedOwnedContextualCellOrigins.func
 local notation "rootModel" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry rootFunctions
 local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- Successful calls retain every earlier export at their real returned state. -/
 theorem public_run_succeeded_retains
@@ -129,7 +126,7 @@ theorem public_run_succeeded_retains
       (inputs := inputs) (rows := rows) (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
       (observations := observations) (extension := extension) (semantic := semantic)
       (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
+      (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
       (caller := caller) (history := history) (atCheckpoint := atCheckpoint) (started := started)
       (inputReceipts := inputReceipts) (metadata := metadata) (sourceAt := sourceAt)
       publicStart publicRun descriptor
@@ -137,7 +134,7 @@ theorem public_run_succeeded_retains
     succeeded, valueEq, typeEq, budgetEq, sessionAt, trace, result,
     history.after_success rfl started selected succeeded result⟩
 
-include receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
+include receiver observations extension semantic family namedTerminals namedSupport wellFormed
   prepared selected history atCheckpoint started inputReceipts metadata sourceAt in
 /-- A newly exported function joins the history of the real returned session. -/
 theorem public_run_succeeded_remembers
@@ -180,7 +177,7 @@ theorem public_run_succeeded_remembers
       (inputs := inputs) (rows := rows) (stagePrepared := stagePrepared) (receiver := receiver) (profile := profile)
       (observations := observations) (extension := extension) (semantic := semantic)
       (family := family) (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (acceptedPlan := acceptedPlan) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
+      (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
       (caller := caller) (history := history) (atCheckpoint := atCheckpoint) (started := started)
       (inputReceipts := inputReceipts) (metadata := metadata) (sourceAt := sourceAt)
       publicStart publicRun descriptor

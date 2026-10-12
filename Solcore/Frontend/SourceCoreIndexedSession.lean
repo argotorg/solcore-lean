@@ -1257,10 +1257,27 @@ def Session.restoreSnapshot {artifact : Artifact} (session : Session artifact) (
   if session.authority = snapshot.saved.session.authority then .ok snapshot.restore
   else .error ⟨[], .foreignSession⟩
 
+/-- The exact successful heap observation of this ready session. The saved
+native state remains opaque, while the actual observation is retained. -/
+def Session.SnapshotAt {artifact : Artifact} (session : Session artifact)
+    (boundaryFuel : Nat) (snapshot : Snapshot artifact) : Prop :=
+  ∃ (generation : ExportGeneration) (observed : HeapObservation session),
+    observeHeap session generation boundaryFuel = .ok observed ∧
+    snapshot = ⟨.ready session, observed⟩
+
+/-- Snapshot once and retain the original successful observation receipt. -/
+def Session.snapshotWithReceipt {artifact : Artifact} (session : Session artifact)
+    (boundaryFuel : Nat := 1024) :
+    IO (Except Error { snapshot : Snapshot artifact // session.SnapshotAt boundaryFuel snapshot }) := do
+  let generation ← SourceCorePublicValues.ExportGeneration.mint
+  match observedAt : observeHeap session generation boundaryFuel with
+  | .error error => pure (.error error)
+  | .ok observed =>
+      pure (.ok ⟨⟨.ready session, observed⟩, generation, observed, observedAt, rfl⟩)
+
 def Session.snapshot {artifact : Artifact} (session : Session artifact) (boundaryFuel : Nat := 1024) :
     IO (Except Error (Snapshot artifact)) := do
-  let generation ← SourceCorePublicValues.ExportGeneration.mint
-  pure <| (observeHeap session generation boundaryFuel).map fun observed => ⟨.ready session, observed⟩
+  pure ((← session.snapshotWithReceipt boundaryFuel).map Subtype.val)
 
 def Checkpoint.snapshot {artifact : Artifact} (checkpoint : Checkpoint artifact) (boundaryFuel : Nat := 1024) :
     IO (Except Error (Snapshot artifact)) := do
@@ -4082,5 +4099,151 @@ theorem Checkpoint.SucceededResultAt.encodes_function
   change returnedAuthority = checkpoint.origin.authority at authority
   subst returnedAuthority
   exact ⟨_, returnedEncoded, oldValue⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+private theorem issuance_global_read {artifact : Artifact} {session : Session artifact}
+    {factory : CallableFactory artifact.recipe.compiled} {generation : SourceCorePublicValues.ExportGeneration}
+    {fuel : Nat} {completion : Completion artifact}
+    (issued : issueCallable session factory generation fuel = .ok completion)
+    {location : Nat} {value : Core.Value}
+    (member : (location, value) ∈ artifact.recipe.templates.nativeGlobals) :
+    session.store[location]? = some value := by
+  unfold issueCallable at issued
+  obtain ⟨_globals, checked, _issued⟩ := root_factory_bind_ok issued
+  unfold checkGlobals SourceCoreCallableNativeSlots.checkPreparedGlobals at checked
+  split at checked
+  · rename_i exact
+    exact of_decide_eq_true (List.all_eq_true.mp exact _ member)
+  · split at checked <;> cases checked
+
+/-- Actual named issuance has checked this precise installed slot in the
+current physical store. No bootstrap-state equality is assumed. -/
+theorem Session.NamedIssuedAt.native_global_read
+    {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion)
+    {recipe : Recipe} (atRecipe : artifact.RecipeAt recipe)
+    {world : Core.StoreTyping} {store : Core.Store} (atNative : session.NativeAt world store)
+    {location : Nat} {value : Core.Value}
+    (member : (location, value) ∈ recipe.templates.nativeGlobals) :
+    store.read? location = some value := by
+  obtain ⟨row, generation, _selected, accepted⟩ := issued
+  have actualMember : (location, value) ∈ artifact.recipe.templates.nativeGlobals := by
+    rw [atRecipe]
+    exact member
+  have read := issuance_global_read accepted actualMember
+  rw [atNative.2] at read
+  exact read
+
+/-- A fixed accepted encoding has one exact native payload. -/
+theorem Session.EncodesAt.unique {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {expected : TypeSystem.Ty} {value : SourceCorePublicValues.Value}
+    {first second : Core.Value}
+    (left : session.EncodesAt fuel expected value first)
+    (right : session.EncodesAt fuel expected value second) : first = second := by
+  obtain ⟨left, leftAt, firstAt⟩ := left
+  obtain ⟨right, rightAt, secondAt⟩ := right
+  have same := Except.ok.inj (leftAt.symm.trans rightAt)
+  subst right
+  exact firstAt.symm.trans secondAt
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem snapshot_observe_row_append {artifact : Artifact} {world : Core.StoreTyping}
+    {store : Core.Store} {values : Values} {authority : SessionAuthority}
+    {generation : ExportGeneration} {slots : Registry artifact world}
+    {row : HeapRow artifact store} {fuel : Nat}
+    {observed : HeapCellExport (world := world) values authority row}
+    (accepted : observeRow values authority generation slots row fuel = .ok observed) :
+    ∃ suffix, observed.slots = slots ++ suffix := by
+  unfold observeRow at accepted
+  obtain ⟨selected, _selectedAt, accepted⟩ := root_factory_bind_ok accepted
+  split at accepted
+  · split at accepted
+    · cases accepted
+      exact ⟨[], (List.append_nil _).symm⟩
+    · split at accepted
+      · cases accepted
+      · split at accepted
+        · obtain ⟨exported, exportedAt, accepted⟩ := root_factory_bind_ok accepted
+          cases accepted
+          have decoded := (exportValue_success_receipt exportedAt).1
+          exact (decode_slots_append fuel).1 _ _ _ _ _ _ _ _ decoded
+        · cases accepted
+  · obtain ⟨restored, _restoredAt, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · cases accepted
+      exact ⟨[], (List.append_nil _).symm⟩
+    · cases accepted
+
+private theorem snapshot_observe_rows_append {artifact : Artifact} {world : Core.StoreTyping}
+    {store : Core.Store} {values : Values} {authority : SessionAuthority}
+    {generation : ExportGeneration} {fuel : Nat} {slots : Registry artifact world}
+    {rows : List (HeapRow artifact store)}
+    {observed : HeapCellsExport (world := world) values authority rows}
+    (accepted : observeRows values authority generation fuel slots rows = .ok observed) :
+    ∃ suffix, observed.slots = slots ++ suffix := by
+  induction rows generalizing slots with
+  | nil =>
+      cases accepted
+      exact ⟨[], (List.append_nil _).symm⟩
+  | cons row rows ih =>
+      unfold observeRows at accepted
+      obtain ⟨head, headAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨tail, tailAt, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      obtain ⟨headSuffix, headSlots⟩ := snapshot_observe_row_append headAt
+      obtain ⟨tailSuffix, tailSlots⟩ := ih tailAt
+      exact ⟨headSuffix ++ tailSuffix, by rw [tailSlots, headSlots, List.append_assoc]⟩
+
+private theorem snapshot_observe_heap_append {artifact : Artifact} {session : Session artifact}
+    {generation : ExportGeneration} {fuel : Nat} {observed : HeapObservation session}
+    (accepted : observeHeap session generation fuel = .ok observed) :
+    ∃ suffix, observed.native.slots = session.registry ++ suffix := by
+  unfold observeHeap at accepted
+  obtain ⟨ledger, _ledgerAt, accepted⟩ := root_factory_bind_ok accepted
+  obtain ⟨native, nativeAt, accepted⟩ := root_factory_bind_ok accepted
+  cases accepted
+  exact snapshot_observe_rows_append nativeAt
+
+/-- Restoration of the exact saved ready session and its successful original
+heap observation. This records the captured branch, including its old heap. -/
+def Session.RestoredAt {artifact : Artifact} (before after : Session artifact) : Prop :=
+  ∃ (snapshot : Snapshot artifact) (fuel : Nat),
+    before.SnapshotAt fuel snapshot ∧ snapshot.restore = .ready after
+
+/-- Ready restoration preserves the captured native state, authority and raw
+metadata. Heap observation may have appended authenticated handle slots. -/
+theorem Session.RestoredAt.same_runtime {artifact : Artifact} {before after : Session artifact}
+    (restored : before.RestoredAt after) : before.SameRuntime after := by
+  obtain ⟨snapshot, fuel, ⟨generation, observed, _observedAt, snapshotEq⟩, restored⟩ := restored
+  subst snapshot
+  change RestoredSnapshot.ready {before with registry := observed.native.slots} = .ready after at restored
+  cases RestoredSnapshot.ready.inj restored
+  exact ⟨rfl, rfl, rfl, rfl, rfl⟩
+
+/-- Existing exported functions keep their original payload and captured
+references through actual same-snapshot ready restoration. -/
+theorem Session.RestoredAt.encodes_function {artifact : Artifact} {before after : Session artifact}
+    (restored : before.RestoredAt after)
+    {fuel : Nat} {expected : Ty} {handle : Handle} {native : Core.Value}
+    (imported : before.EncodesAt fuel expected (.function handle) native) :
+    after.EncodesAt fuel expected (.function handle) native := by
+  obtain ⟨snapshot, boundaryFuel, ⟨generation, observed, observedAt, snapshotEq⟩, restored⟩ := restored
+  subst snapshot
+  change RestoredSnapshot.ready {before with registry := observed.native.slots} = .ready after at restored
+  cases RestoredSnapshot.ready.inj restored
+  obtain ⟨suffix, slotsEq⟩ := snapshot_observe_heap_append observedAt
+  obtain ⟨encoded, encodedAt, valueEq⟩ := imported
+  refine ⟨encoded, ?_, valueEq⟩
+  change encodeRaw before.authority observed.native.slots fuel before.values.registry expected (.function handle) = .ok encoded
+  rw [slotsEq]
+  exact issuance_encode_function_append encodedAt suffix
 
 end Solcore.Frontend.SourceCoreIndexedSession

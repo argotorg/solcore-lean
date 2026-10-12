@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistoryEntries
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicIssuedHistoryEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
 
 /-! Finite histories retain function exports through later successful calls.
@@ -127,6 +127,16 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
       (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
       (continued : session.IssuanceChain next) :
       History headers keys functions receiving anchor next mapping world heap store caller entries
+  | remember_issued {session next : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry} {entry : Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      (receipt : IssuedEntry headers keys functions receiving anchor session next entry) :
+      History headers keys functions receiving anchor next mapping world heap store caller (entries ++ [entry])
+  | restored {session next : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store} {entries : List Entry}
+      (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
+      (restored : session.RestoredAt next) :
+      History headers keys functions receiving anchor next mapping world heap store caller entries
 
 def EntriesAt {artifact : Artifact} (session : Session artifact)
     (mapping : LocationMap) (world : StoreTyping) (heap : Dynamic.Heap) (entries : List Entry) : Prop :=
@@ -206,6 +216,21 @@ theorem History.current {artifact : Artifact} {session : Session artifact} {entr
       intro entry member
       obtain ⟨imported, represented, typed⟩ := ih.2.2.2.2 entry member
       exact ⟨continued.encodes_function imported, represented, typed⟩
+  | @remember_issued session next mapping world heap store caller entries entry prior receipt ih =>
+      obtain ⟨same, imported, represented, typed⟩ := receipt.current caller ih.1
+      refine ⟨same.native_at ih.1, ih.2.1, ih.2.2.1, ih.2.2.2.1, ?_⟩
+      intro entry member
+      rcases List.mem_append.mp member with old | added
+      · obtain ⟨oldImported, oldRepresented, oldTyped⟩ := ih.2.2.2.2 entry old
+        exact ⟨receipt.chain.encodes_function oldImported, oldRepresented, oldTyped⟩
+      · have sameEntry := List.mem_singleton.mp added
+        subst entry
+        exact ⟨imported, represented, typed⟩
+  | restored prior restored ih =>
+      refine ⟨restored.same_runtime.native_at ih.1, ih.2.1, ih.2.2.1, ih.2.2.2.1, ?_⟩
+      intro entry member
+      obtain ⟨imported, represented, typed⟩ := ih.2.2.2.2 entry member
+      exact ⟨restored.encodes_function imported, represented, typed⟩
 
 private theorem success_shape {payload : Core.Value}
     (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
@@ -324,5 +349,84 @@ theorem History.remember_success
     .next history sameCompiled started selected succeeded result reached ⟨related, post⟩
       (.remember requested sourceValue nativeValue handleValue)⟩
 end Success
+
+section Issuance
+open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory)
+
+/-- A fresh named issuance joins the retained functions at the same current
+caller. The native payload and Source meaning come from actual preparation,
+issuance and the current pool, including after previous mutations. -/
+theorem History.remember_named
+    {recipe : Recipe} (prepared : Recipe.prepare compiled = .ok recipe)
+    (inputs : List (Input compiled)) (rows : Inventory inputs)
+    {input : Input compiled} (packet : Issued input) (member : Inventory.HasRow packet rows)
+    (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    {caller : Caller (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (CallableIndexedOwnedPreparedBootstrapRootState.keys compiled) mapping world heap store}
+    {anchor : Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (history : History (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (CallableIndexedOwnedPreparedBootstrapRootState.keys compiled)
+      (CallableIndexedOwnedContextualCellOrigins.functions
+        (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+        (CallableIndexedOwnedPreparedBootstrapRootState.keys compiled) bodyRegistry faults profile)
+      registry anchor session mapping world heap store caller entries)
+    {issued : Completion artifact} {issuanceFuel : Nat}
+    (issuance : session.NamedIssuedAt packet.header.named.signature.key issuanceFuel issued)
+    (atRecipe : RecursiveNamedPublicStartMeaning.ArtifactRecipe artifact recipe)
+    {handle : Handle} (handleValue : issued.value = .function handle)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
+    ∃ native, History (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (CallableIndexedOwnedPreparedBootstrapRootState.keys compiled)
+      (CallableIndexedOwnedContextualCellOrigins.functions
+        (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+        (CallableIndexedOwnedPreparedBootstrapRootState.keys compiled) bodyRegistry faults profile)
+      registry anchor issued.session mapping world heap store caller
+      (entries ++ [⟨packet.header.named.specialized.function.type,
+        .global (CallableNamedReversal.global (CallableNamedMetadata.global
+          packet.header.named.specialized input.prepared.available)), handle, native,
+        CallableContract.functionType packet.header.named.signature.parameterType packet.header.named.signature.resultType,
+        issuanceFuel⟩]) := by
+  obtain ⟨native, encoded, _represented, _typed⟩ :=
+    RecursiveNamedPublicCurrentFactoryValues.Session.named_value_represents_current
+      prepared inputs rows packet member bodyRegistry registry faults profile caller anchor
+      issuance history.current.1 (.refl _) atRecipe handleValue wellFormed
+  exact ⟨native, .remember_issued history (.named prepared inputs rows packet member
+    bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded wellFormed)⟩
+
+/-- Fresh builtin issuance appends its exact closed callable while all earlier
+closures retain the same captured state and registry identities. -/
+theorem History.remember_builtin
+    {recipe : Recipe} (prepared : Recipe.prepare compiled = .ok recipe)
+    (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
+    (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    {artifact : Artifact} {session : Session artifact} {entries : List Entry}
+    {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+    {caller : Caller headers keys mapping world heap store}
+    {anchor : Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (history : History headers keys
+      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)
+      registry anchor session mapping world heap store caller entries)
+    {issued : Completion artifact} {function : BuiltinFunctionId} {issuanceFuel : Nat}
+    (issuance : session.BuiltinIssuedAt function issuanceFuel issued)
+    (atRecipe : RecursiveNamedPublicStartMeaning.ArtifactRecipe artifact recipe)
+    {handle : Handle} (handleValue : issued.value = .function handle) :
+    ∃ native, History headers keys
+      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)
+      registry anchor issued.session mapping world heap store caller
+      (entries ++ [⟨function.type, .builtin ⟨function⟩, handle, native,
+        CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function),
+        issuanceFuel⟩]) := by
+  obtain ⟨native, _same, _type, encoded, _represented, _typed⟩ :=
+    RecursiveNamedPublicBuiltinArgumentReceipts.Session.builtin_value_represents_after
+      prepared headers keys bodyRegistry registry faults profile mapping anchor.function.context heap
+      issuance (.refl _) atRecipe handleValue (world := world)
+  exact ⟨native, .remember_issued history (.builtin prepared headers keys bodyRegistry registry faults profile
+    anchor issuance atRecipe handleValue encoded)⟩
+end Issuance
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistory

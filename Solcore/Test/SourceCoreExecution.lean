@@ -43,6 +43,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function nestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), Word)), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
     "function closureNestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, namedFunction) { return integerAdd(convert(first(2) + again(6)), last(namedFunction(0))); } default { return 997; } } } default { return 996; } } }",
     "function distinctClosureUse(bundle: (function(Word) returns (Word), mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))))) returns (Word) { match (bundle) { case (first, table) { match (table[3]) { case (again, other) { return first(2) + again(6) + other(7); } default { return 995; } } } default { return 994; } } }",
+    "function integratedHistoryUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), function(Word) returns (Word))), function(Word) returns (Word)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, namedFunction)) { match (table[3]) { case (again, other) { return convert(first(2) + again(6) + other(7) + namedFunction(3)); } default { return 993; } } } default { return 992; } } }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -82,10 +83,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse", "distinctClosureUse"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse", "closureNestedUse", "distinctClosureUse", "integratedHistoryUse"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 15 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 16 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -105,7 +106,7 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 15 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 16 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
   have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
   let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
@@ -214,6 +215,47 @@ def run : IO Unit := do
   require (firstDistinct.value == word 38) "first closure lost its shared mutation after distinct input execution"
   let secondDistinct ← execute firstDistinct.session (← key 1) [independent.value, word 1]
   require (secondDistinct.value == word 109) "second closure lost its independent mutation after distinct input execution"
+  let captured ← get "snapshot of both mutated closures" (← secondDistinct.session.snapshotWithReceipt)
+  have _captured : secondDistinct.session.SnapshotAt 1024 captured.val := captured.property
+  let afterCapture ← execute secondDistinct.session (← key 1) [made.value, word 9]
+  require (afterCapture.value == word 47) "original closure did not mutate after snapshot capture"
+  let restored ← match afterCapture.session.restoreSnapshot captured.val with
+    | .ok (.ready session) => pure session
+    | _ => throw (IO.userError "captured ready session did not restore through its original ownership domain")
+  require (restored.heapSize == secondDistinct.session.heapSize && restored.heapSize < afterCapture.session.heapSize)
+    "restoration retained later allocations or replayed initialization"
+  let restoredFirst ← execute restored (← key 1) [made.value, word 1]
+  require (restoredFirst.value == word 39)
+    "restoration used post-snapshot storage or lost the original closure handle"
+  let restoredSecond ← execute restoredFirst.session (← key 1) [independent.value, word 1]
+  require (restoredSecond.value == word 110)
+    "restoration lost the second original handle or aliased its independent capture"
+  let integratedNamed ← get "named receipt after distinct closure mutations"
+    (← secondDistinct.session.namedWithReceipt (← key 2))
+  let integratedBuiltin ← get "builtin receipt after distinct closure mutations"
+    (← integratedNamed.val.session.builtinWithReceipt .wordToInteger)
+  have _preservedIntegratedState : secondDistinct.session.SameRuntime integratedBuiltin.val.session :=
+    integratedNamed.property.same_runtime.trans integratedBuiltin.property.same_runtime
+  require (integratedNamed.val.value == closureNamed.val.value &&
+    integratedBuiltin.val.value == closureBuiltin.val.value &&
+    integratedBuiltin.val.session.functionCount == secondDistinct.session.functionCount &&
+    integratedBuiltin.val.session.heapSize == secondDistinct.session.heapSize)
+    "used-session issuance changed captures or failed to reuse existing function handles"
+  let integratedHolder : Value := .constructed nestedMetadata [made.value, integratedBuiltin.val.value]
+  let integratedBundle : Value := .product integratedHolder (.product distinctTable integratedNamed.val.value)
+  let integratedApplied ← execute integratedBuiltin.val.session (← key 15) [integratedBundle]
+  require (integratedApplied.value == .integer 233)
+    "combined retained and issued function inputs lost captures, aliases, recursive code or mapping order"
+  let firstIntegrated ← execute integratedApplied.session (← key 1) [made.value, word 1]
+  require (firstIntegrated.value == word 47) "combined execution lost the older closure's shared mutation"
+  let secondIntegrated ← execute firstIntegrated.session (← key 1) [independent.value, word 1]
+  require (secondIntegrated.value == word 117) "combined execution lost the independent closure's mutation"
+  let wrongIntegratedTable : Value := .mapping .word closurePairType
+    [(word 3, .product made.value integratedBuiltin.val.value)]
+  match integratedBuiltin.val.session.start (← key 15)
+      [.product integratedHolder (.product wrongIntegratedTable integratedNamed.val.value)] with
+  | .error {code := .handleTypeMismatch _ _, ..} => pure ()
+  | _ => throw (IO.userError "combined nested input accepted a builtin in a retained closure position")
   let recursive ← execute second.session (← key 2) [word 5]
   require (recursive.value == word 31) "public recursive result changed"
   let localResult ← execute recursive.session (← key 3) [.bool true]
