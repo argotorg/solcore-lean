@@ -3788,3 +3788,72 @@ theorem Checkpoint.RootStart.raw_input {artifact : Artifact} {session : Session 
   exact ⟨before, raw, type, actual, typeAt, projected, owner, encodedAt, extended⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open TypeSystem
+
+/-- The returned session reimports the exact payload of this actual success.
+This is the original export check, including the decoder's real slot registry. -/
+theorem Checkpoint.SucceededResultAt.reimports {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native : Core.Value} {store : Core.Store} {completion : Completion artifact}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion) :
+    ∃ payload, Core.LanguageResult.decode? native = some (.succeeded payload) ∧
+      completion.session.EncodesAt boundaryFuel completion.sourceType completion.value payload := by
+  obtain ⟨_completed, payload, _extension, slots, encoded, decoded, _decode, encode, recovered,
+    sourceType, _boundary, _stored, world, authority, _sourcePrefix, values, _owner, registry,
+    _origin, _authenticated⟩ := receipt
+  cases completion
+  rename_i value result returned outputFuel authenticated origin extension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  change returnedWorld = store.map Core.Value.type at world
+  subst returnedWorld
+  have registryEq : returnedRegistry = slots := eq_of_heq registry
+  subst returnedRegistry
+  change returnedAuthority = checkpoint.origin.authority at authority
+  subst returnedAuthority
+  change returnedValues = checkpoint.values at values
+  subst returnedValues
+  refine ⟨payload, decoded, encoded, ?_, recovered⟩
+  change result = checkpoint.request.result at sourceType
+  simpa only [sourceType] using encode
+
+/-- The actual request fixes the raw output type while the observed native
+success fixes its entire callable payload, including captured references. -/
+theorem Checkpoint.SucceededResultAt.reimports_payload {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native payload : Core.Value} {store : Core.Store} {completion : Completion artifact}
+    {expected : Ty}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion)
+    (requested : checkpoint.ResultTypeAt expected)
+    (decoded : Core.LanguageResult.decode? native = some (.succeeded payload)) :
+    completion.sourceType = expected ∧
+      completion.session.EncodesAt boundaryFuel expected completion.value payload := by
+  obtain ⟨actual, actualDecoded, encoded⟩ := receipt.reimports
+  have same : actual = payload := Core.LanguageResult.Outcome.succeeded.inj
+    (Option.some.inj (actualDecoded.symm.trans decoded))
+  subst actual
+  have sourceType := receipt.source_type requested
+  exact ⟨sourceType, sourceType ▸ encoded⟩
+
+/-- Later actual factory issuance preserves the exported function handle and
+its complete native payload at the completed store; no execution is replayed. -/
+theorem Checkpoint.SucceededResultAt.reimports_function_after {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {native payload : Core.Value} {store : Core.Store} {completion : Completion artifact}
+    {expected : Ty} {handle : Handle} {session : Session artifact}
+    (receipt : checkpoint.SucceededResultAt fuel boundaryFuel generation native store completion)
+    (requested : checkpoint.ResultTypeAt expected)
+    (decoded : Core.LanguageResult.decode? native = some (.succeeded payload))
+    (handleValue : completion.value = .function handle)
+    (continued : completion.session.IssuanceChain session) :
+    completion.sourceType = expected ∧
+      session.NativeAt (store.map Core.Value.type) store ∧
+      session.EncodesAt boundaryFuel expected (.function handle) payload := by
+  obtain ⟨sourceType, encoded⟩ := receipt.reimports_payload requested decoded
+  rw [handleValue] at encoded
+  exact ⟨sourceType, continued.same_runtime.native_at receipt.native_at.2,
+    continued.encodes_function encoded⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
