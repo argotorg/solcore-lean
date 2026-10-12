@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Match bodies and retained capture updates (2026-10-13)
+
+`d36b6b1a` adds staged Source match traces, measured children, ordinary erasure and failure-state preservation. `d64b1b5a` connects them to actual compiler output and both directions of the public proof family. Compiler receipts retain the selected pattern bindings, hidden cells, catalog, allocator and typed literals. Leaving an arm restores the outer lexical context while retaining its heap effects.
+
+The named `update` example returns `12 / 23` through successive real sessions. `106e24d6` adds six linked calls with separate closures capturing `10` and `20`, an intervening `make(30)`, and match arms that update captured cells. Direct calls return `10 / 20 / 11`, proving that the final call sees the earlier update. Independent Source traces, exact reached heaps, retained histories and sufficient execution/output fuel connect at the original public checkpoints.
+
+Validation: full build (6408 jobs), all registered tests (12686 build jobs and the final pass marker), kernel policy and 56 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Finite `for` initialization, body and post-header execution are the next connection under development; remaining compiler alternatives and final composition across every pass are incomplete.
+
+`PreparedNativeBranchingCollectors.collected` derives `PreparedBranchingCatalogSites.Collected` from the accepted compiler result. Its tree and reachable catalog-site witnesses feed `AdmittedStagedMatchTreeHeads.preserves` / `reflects` and the scoped imperative folds. `CompatibleMatchTypedLiteralSites.Certificate.sites` derives literal support from actual pattern instruction typing. These module names share the `CallableIndexedOwned` prefix except `CompatibleMatchTypedLiteralSites`.
+
+Closed endpoints are `Tests.SourceCoreNamedMatch.closed_sequence_meaning` and `Tests.SourceCoreCapturedMatch.closed_sequence_forward_meaning`. Their registered runners exercise actual checker acceptance, compilation, initialization and successive public calls.
+
 ## Recursive operators and retained function calls (2026-10-13)
 
 `5f17535e` connects unary, binary and conditional expressions through the recursive caller family. Child proofs use the actual selected Source nodes, compiler receipts and reached states. Short-circuit operators and conditional expressions evaluate only the selected children. Numeric literals retain the actual checked evidence. The closed `drain(n)` example executes subtraction in a while body and returns `0 / 0` from successive calls with `3 / 0`.

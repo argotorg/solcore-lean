@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Match bodies and retained capture updates (2026-10-13)
+
+`d36b6b1a` adds staged Source match traces, measured children, ordinary erasure and failure-state preservation. `d64b1b5a` connects them to actual compiler output and both directions of the public proof family. Compiler receipts retain the selected pattern bindings, hidden cells, catalog, allocator and typed literals. Leaving an arm restores the outer lexical context while retaining its heap effects.
+
+The named `update` example returns `12 / 23` through successive real sessions. `106e24d6` adds six linked calls with separate closures capturing `10` and `20`, an intervening `make(30)`, and match arms that update captured cells. Direct calls return `10 / 20 / 11`, proving that the final call sees the earlier update. Independent Source traces, exact reached heaps, retained histories and sufficient execution/output fuel connect at the original public checkpoints.
+
+Validation: full build (6408 jobs), all registered tests (12686 build jobs and the final pass marker), kernel policy and 56 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Finite `for` initialization, body and post-header execution are the next connection under development; remaining compiler alternatives and final composition across every pass are incomplete.
+
 ## Recursive operators and retained function calls (2026-10-13)
 
 `5f17535e` connects unary, binary and conditional expressions through the recursive caller family. Child proofs use the actual selected Source nodes, compiler receipts and reached states. Short-circuit operators and conditional expressions evaluate only the selected children. Numeric literals retain the actual checked evidence. The closed `drain(n)` example executes subtraction in a while body and returns `0 / 0` from successive calls with `3 / 0`.
@@ -172,11 +180,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `5f17535e` / `f68d6763`: recursive operators, genuine numeric evidence and retained function calls connect actual compilation to successive public sessions. |
-| Latest completed verification | Full build (6375 jobs), all registered tests, kernel policy and thirty endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional and finite while closure bodies retain separate mutable captures across intervening calls. |
-| Latest proof scope | Arithmetic while calls return `0 / 0`; conditional expressions containing retained named calls return `22 / 0`. Each derives exact successive Source heaps/histories and sufficient public fuel at both original checkpoints. Earlier block and captured-closure guarantees remain checked. |
-| Current implementation priority | Connect actual match compilation, selected pattern bindings and scoped heap effects to public execution, then widen remaining compiler coverage. |
+| Latest verified implementation | `d36b6b1a` / `d64b1b5a` / `106e24d6`: match traces, actual compiler receipts and retained capture updates connect to successive public sessions. |
+| Latest completed verification | Full build (6408 jobs), all registered tests, kernel policy and 56 endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional, finite while and match closure bodies retain separate mutable captures across intervening calls. |
+| Latest proof scope | Named match calls return `12 / 23`; captured match calls return `10 / 20 / 11` across intervening closure creation. Each derives exact successive Source heaps/histories and sufficient public fuel at its original checkpoints. Earlier operator, block and closure guarantees remain checked. |
+| Current implementation priority | Connect actual for-loop initialization, repeated body/post execution and restored outer scope to public execution, then widen remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
