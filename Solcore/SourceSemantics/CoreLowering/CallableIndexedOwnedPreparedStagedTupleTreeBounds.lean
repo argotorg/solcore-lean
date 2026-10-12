@@ -96,6 +96,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       have same := ExpressionForm.tuple.inj (form.symm.trans (occurrence_form unique metadata.found owned))
       subst ids
       exact ⟨_, _, Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp)), children, .fault _⟩
+  | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
   | constructorValue owned _ _ | constructorFault owned _
   | group owned _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _

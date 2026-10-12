@@ -58,7 +58,8 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih =>
+    case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
       exact ih s c r rfl
@@ -96,7 +97,8 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih =>
+    case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
       exact ih s c r rfl
@@ -134,7 +136,8 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih =>
+    case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
       exact ih s c r rfl
@@ -173,7 +176,8 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       intro s c r same
       cases same
       exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih =>
+    case tupleFault occurrence children ih | constructorFault occurrence children ih
+      | directArgumentsFault occurrence calleeOccurrence children ih =>
       intro s c r same
       cases same
       exact ih s c r rfl

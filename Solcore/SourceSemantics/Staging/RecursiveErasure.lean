@@ -358,6 +358,30 @@ private theorem global_body_result {program : Program} {registry : Registry} {sc
       exact ⟨function.evidence, .globalBody instantiates rfl
         (.statements rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body))⟩
 
+private theorem global_applies_evidence {program : Program} {context : Context}
+    {callerEvidence invocationEvidence : EvidenceEnvironment} {before after : Heap}
+    {function : GlobalFunction} {arguments : List Value} {result : Value}
+    (applies : CallableApplies program context callerEvidence invocationEvidence before
+      (.global function) arguments result after) :
+    CallableApplies program context callerEvidence function.evidence before
+      (.global function) arguments result after := by
+  cases applies with
+  | global instantiates same covers body => cases same; exact .global instantiates rfl covers body
+
+private theorem global_fault_evidence {program : Program} {context : Context}
+    {callerEvidence invocationEvidence : EvidenceEnvironment} {before after : Heap}
+    {function : GlobalFunction} {arguments : List Value} {reason : SemanticFault}
+    (fault : CallableFaults program context callerEvidence invocationEvidence before
+      (.global function) arguments reason after) :
+    CallableFaults program context callerEvidence function.evidence before
+      (.global function) arguments reason after := by
+  cases fault with
+  | notCallable invalid => exact False.elim (invalid trivial)
+  | globalSignatureMissing missing => exact .globalSignatureMissing missing
+  | globalBodyMissing missing => exact .globalBodyMissing missing
+  | globalArity instantiates mismatch => exact .globalArity instantiates mismatch
+  | globalBody instantiates same body => cases same; exact .globalBody instantiates rfl body
+
 private theorem projection {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
     (trace : Expression program registry scope context environment before id outcome after) :
@@ -450,6 +474,26 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact fault_occurrence occurrence (.conditionalCondition rfl ih)
+  case directArgumentsFault occurrence calleeOccurrence children ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic =>
+      obtain ⟨node, found, form, _requirements, _coercions⟩ := calleeOccurrence
+      exact fault_occurrence occurrence (.directArguments found form ih)
+  case directApplied occurrence calleeOccurrence valid children callEvidence invocation a b =>
+    rename_i evidence outcome
+    cases outcome with
+    | value =>
+      obtain ⟨_, applied⟩ := b
+      obtain ⟨node, found, form, requirements, coercions⟩ := calleeOccurrence
+      exact value_occurrence occurrence (.directCall found form requirements coercions valid a
+        callEvidence (global_applies_evidence applied))
+    | fault failure => cases failure with
+      | stage => trivial
+      | semantic =>
+        obtain ⟨_, fault⟩ := b
+        exact fault_occurrence occurrence (.directApply a callEvidence (global_fault_evidence fault))
   case calleeFault occurrence child ih =>
     rename_i failure
     cases failure with

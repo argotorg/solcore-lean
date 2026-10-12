@@ -5,11 +5,11 @@ uses these same mutually recursive judgments. Staging rejection is propagated
 unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, nominal constructor payloads, uncoerced primitive unary/binary operators, conditionals,
-indirect calls without argument/output coercions, builtins, and closure/global bodies
+direct declaration calls and indirect calls without argument/output coercions, builtins, and closure/global bodies
 containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while and for loops, ordered match arms, and returns.
 Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
 heap changes remain visible to the following statements. The profile has no plain
-Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
+Dynamic fallback for unsupported expressions or bodies. Method calls,
 evidence-selected operator methods, coercion paths, projected or compound assignments, loop-control transfers require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
@@ -156,6 +156,19 @@ mutual
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry scope context environment before condition (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
+    | directArgumentsFault {scope context environment before after id callee arguments instantiation name failure}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    | directApplied {scope context environment before argumentsHeap after id callee arguments instantiation name values evidence outcome}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (valid : SourceSemantics.DeclarationInstantiation.Valid context instantiation)
+        (children : Expressions program registry scope context environment before arguments (.values values) argumentsHeap)
+        (callEvidence : DirectCallProducesEvidence context scope.evidence [] [] instantiation.predicates evidence)
+        (invocation : Applies program registry scope context argumentsHeap (.global ⟨instantiation, evidence⟩) values outcome after) :
+        Expression program registry scope context environment before id outcome after
     | calleeFault {scope context environment before after id callee arguments metadata failure}
         (occurrence : Occurrence scope id (.call callee arguments (.indirect metadata)))
         (child : Expression program registry scope context environment before callee (.fault failure) after) :

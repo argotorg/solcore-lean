@@ -142,6 +142,19 @@ mutual
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry testSize scope context environment before condition (.fault failure) after) :
         Expression program registry (stepSize [testSize]) scope context environment before id (.fault failure) after
+    | directArgumentsFault {childrenSize : Nat} {scope context environment before after id callee arguments instantiation name failure}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (children : Expressions program registry childrenSize scope context environment before arguments (.fault failure) after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | directApplied {childrenSize invocationSize : Nat} {scope context environment before argumentsHeap after id callee arguments instantiation name values evidence outcome}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (valid : SourceSemantics.DeclarationInstantiation.Valid context instantiation)
+        (children : Expressions program registry childrenSize scope context environment before arguments (.values values) argumentsHeap)
+        (callEvidence : DirectCallProducesEvidence context scope.evidence [] [] instantiation.predicates evidence)
+        (invocation : Applies program registry invocationSize scope context argumentsHeap (.global ⟨instantiation, evidence⟩) values outcome after) :
+        Expression program registry (stepSize [childrenSize, invocationSize]) scope context environment before id outcome after
     | calleeFault {childSize : Nat} {scope context environment before after id callee arguments metadata failure}
         (occurrence : Occurrence scope id (.call callee arguments (.indirect metadata)))
         (child : Expression program registry childSize scope context environment before callee (.fault failure) after) :
@@ -593,6 +606,8 @@ local macro "erase_stage_grade" : tactic =>
     case binaryInvalid => apply Recursive.Expression.binaryInvalid <;> assumption
     case conditional => apply Recursive.Expression.conditional <;> assumption
     case conditionalFault => apply Recursive.Expression.conditionalFault <;> assumption
+    case directArgumentsFault => apply Recursive.Expression.directArgumentsFault <;> assumption
+    case directApplied => apply Recursive.Expression.directApplied <;> assumption
     case calleeFault => apply Recursive.Expression.calleeFault <;> assumption
     case notCallable => apply Recursive.Expression.notCallable <;> assumption
     case rejected => apply Recursive.Expression.rejected <;> assumption
@@ -739,6 +754,13 @@ local macro "construct_stage_grade" : tactic =>
     case conditionalFault occurrence test ih_test =>
       obtain ⟨testSize, graded_test⟩ := ih_test
       exact ⟨_, .conditionalFault occurrence graded_test⟩
+    case directArgumentsFault occurrence calleeOccurrence children ih_children =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      exact ⟨_, .directArgumentsFault occurrence calleeOccurrence graded_children⟩
+    case directApplied occurrence calleeOccurrence valid children callEvidence invocation ih_children ih_invocation =>
+      obtain ⟨_, graded_children⟩ := ih_children
+      obtain ⟨_, graded_invocation⟩ := ih_invocation
+      exact ⟨_, .directApplied occurrence calleeOccurrence valid graded_children callEvidence graded_invocation⟩
     case calleeFault occurrence child ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .calleeFault occurrence graded_child⟩

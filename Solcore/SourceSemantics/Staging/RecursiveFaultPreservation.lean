@@ -151,6 +151,35 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
       | conditional conditionTyped _ _ =>
           exact expressionIH testSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap conditionTyped test
+  | @directArgumentsFault childrenSize scope context environment before after id callee arguments instantiation name failure
+      occurrence _calleeOccurrence children =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | directCall _calleeTyped _application argumentsTyped =>
+          exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap argumentsTyped children
+  | @directApplied childrenSize invocationSize scope context environment before argumentsHeap after
+      id callee arguments instantiation name values evidence outcome occurrence _calleeOccurrence valid children callEvidence invocation =>
+      obtain ⟨raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | @directCall _ callee arguments instantiation parameterTypes resultType predicates _calleeTyped application argumentsTyped =>
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values wellFormed
+            runtime covers locals heap argumentsTyped children
+          cases application with
+          | intro _signature _admissible _declaration _parameters _result functionType _predicates =>
+              cases callEvidence with
+              | intro _coercions _requirements produces =>
+                  have calleeTyped : ValueHasType context argumentsHeap (.global ⟨instantiation, evidence⟩)
+                      (.function (Ty.productMany parameterTypes) raw) := by
+                    rw [← functionType]
+                    exact .global valid ⟨produces.valid, by
+                      intro predicate member
+                      exact produces.supplies predicate member⟩
+                  obtain ⟨packed, packing⟩ := ValuesPack.exists_pack values
+                  have argumentTyped := packing.hasType valuesTyped
+                  obtain ⟨afterTyped, invocationExtends⟩ := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
+                    runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
+                  exact ⟨afterTyped, argumentExtends.trans invocationExtends⟩
   | @calleeFault childSize scope context environment before after id callee arguments metadata failure occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
