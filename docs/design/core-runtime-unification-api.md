@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Recursive operators and retained function calls (2026-10-13)
+
+`5f17535e` connects unary, binary and conditional expressions through the recursive caller family. Child proofs use the actual selected Source nodes, compiler receipts and reached states. Short-circuit operators and conditional expressions evaluate only the selected children. Numeric literals retain the actual checked evidence. The closed `drain(n)` example executes subtraction in a while body and returns `0 / 0` from successive calls with `3 / 0`.
+
+`f68d6763` connects the same expression family to retained named function handles. The closed example obtains an `identity` handle and uses it inside both branches of `!flag ? f(value) + value : f(value) - value`. Successive calls return `22 / 0` through the preceding actual sessions. Both examples derive independent Source traces, exact reached heaps, retained histories and sufficient public execution/output fuel at their original checkpoints.
+
+Validation: full build (6375 jobs), all registered tests (12620 build jobs and the final pass marker), kernel policy and thirty endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The `match` connection is under development; remaining compiler alternatives and final composition across every pass are incomplete.
+
+`PreparedStagedOperatorBounds.preserves_at` / `reflects_at` supply the operator cases of the recursive family. `PreparedStagedNamedLexicalOperatorRoots.of_accepted` supplies an actual compiler producer for the call-free arithmetic fixture; the generic recursive operator certificates also admit indirect calls. Closed endpoints are `Tests.SourceCoreNamedOperators.closed_sequence_meaning` and `Tests.SourceCoreOperatorCalls.closed_sequence_meaning`.
+
 ## Scoped blocks connected to public execution (2026-10-13)
 
 `ea7ac706` adds recursive staged block traces, measured children, ordinary Source erasure and failure-state preservation. `18c4e95f` connects those traces through the actual compiler, scoped lexical and imperative body proofs, and public sessions. A block restores the outer lexical context after its body while keeping the reached heap. Return and failure bypass the suffix; a compiler-confirmed terminal block requires no suffix execution premise.

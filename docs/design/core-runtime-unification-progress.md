@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Recursive operators and retained function calls (2026-10-13)
+
+`5f17535e` connects unary, binary and conditional expressions through the recursive caller family. Child proofs use the actual selected Source nodes, compiler receipts and reached states. Short-circuit operators and conditional expressions evaluate only the selected children. Numeric literals retain the actual checked evidence. The closed `drain(n)` example executes subtraction in a while body and returns `0 / 0` from successive calls with `3 / 0`.
+
+`f68d6763` connects the same expression family to retained named function handles. The closed example obtains an `identity` handle and uses it inside both branches of `!flag ? f(value) + value : f(value) - value`. Successive calls return `22 / 0` through the preceding actual sessions. Both examples derive independent Source traces, exact reached heaps, retained histories and sufficient public execution/output fuel at their original checkpoints.
+
+Validation: full build (6375 jobs), all registered tests (12620 build jobs and the final pass marker), kernel policy and thirty endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The `match` connection is under development; remaining compiler alternatives and final composition across every pass are incomplete.
+
 ## Scoped blocks connected to public execution (2026-10-13)
 
 `ea7ac706` adds recursive staged block traces, measured children, ordinary Source erasure and failure-state preservation. `18c4e95f` connects those traces through the actual compiler, scoped lexical and imperative body proofs, and public sessions. A block restores the outer lexical context after its body while keeping the reached heap. Return and failure bypass the suffix; a compiler-confirmed terminal block requires no suffix execution premise.

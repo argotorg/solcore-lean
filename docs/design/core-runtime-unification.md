@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Recursive operators and retained function calls (2026-10-13)
+
+`5f17535e` connects unary, binary and conditional expressions through the recursive caller family. Child proofs use the actual selected Source nodes, compiler receipts and reached states. Short-circuit operators and conditional expressions evaluate only the selected children. Numeric literals retain the actual checked evidence. The closed `drain(n)` example executes subtraction in a while body and returns `0 / 0` from successive calls with `3 / 0`.
+
+`f68d6763` connects the same expression family to retained named function handles. The closed example obtains an `identity` handle and uses it inside both branches of `!flag ? f(value) + value : f(value) - value`. Successive calls return `22 / 0` through the preceding actual sessions. Both examples derive independent Source traces, exact reached heaps, retained histories and sufficient public execution/output fuel at their original checkpoints.
+
+Validation: full build (6375 jobs), all registered tests (12620 build jobs and the final pass marker), kernel policy and thirty endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The `match` connection is under development; remaining compiler alternatives and final composition across every pass are incomplete.
+
 ## Scoped blocks connected to public execution (2026-10-13)
 
 `ea7ac706` adds recursive staged block traces, measured children, ordinary Source erasure and failure-state preservation. `18c4e95f` connects those traces through the actual compiler, scoped lexical and imperative body proofs, and public sessions. A block restores the outer lexical context after its body while keeping the reached heap. Return and failure bypass the suffix; a compiler-confirmed terminal block requires no suffix execution premise.
@@ -164,11 +172,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `18c4e95f`: scoped blocks connect actual compilation and reached heap effects to first/following public sessions. |
-| Latest completed verification | Full build (6346 jobs), all registered tests, kernel policy and twenty-four endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `5f17535e` / `f68d6763`: recursive operators, genuine numeric evidence and retained function calls connect actual compilation to successive public sessions. |
+| Latest completed verification | Full build (6375 jobs), all registered tests, kernel policy and thirty endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional and finite while closure bodies retain separate mutable captures across intervening calls. |
-| Latest proof scope | The named block example proves results `12 / 23`, restored outer bindings, exact successive Source heaps/histories and sufficient public fuel at both original checkpoints. Earlier named and captured while guarantees remain checked. |
-| Current implementation priority | Connect recursive primitive/conditional expression certificates and actual numeric-literal evidence to public execution, then widen remaining compiler coverage. |
+| Latest proof scope | Arithmetic while calls return `0 / 0`; conditional expressions containing retained named calls return `22 / 0`. Each derives exact successive Source heaps/histories and sufficient public fuel at both original checkpoints. Earlier block and captured-closure guarantees remain checked. |
+| Current implementation priority | Connect actual match compilation, selected pattern bindings and scoped heap effects to public execution, then widen remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
