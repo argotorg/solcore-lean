@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct builtin calls through public sessions (2026-10-13)
+
+Commits `23740f15`, `cab7e4b0` and `4aeff59b` connect staged builtin evaluation, the accepted compiler action and public retained sessions. The Source rule evaluates the argument vector and applies the selected builtin. Its synthetic callee is authenticated statically. Compiler validation, original raw parameter types and physical native arguments agree before the actual contracted wrapper executes.
+
+The public test retains `wordFromInteger(0)` in the original Source and the genuine builtin compiler certificate. Its literal carries the actual solved evidence. An alternative with a runtime Integer intermediate was rejected by the existing compilation plan; the connected example obeys that policy. No staging restriction was weakened. Argument failures and successful calls retain the actual reached heap and admission.
+
+Validation: all 710 affected modules pass coherent checks. The full build (6,512 jobs), all registered tests (12,894 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The runtime and Core representation are unchanged. The next connection is direct declaration calls inside retained closure bodies. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Named direct calls and retained closure captures (2026-10-13)
 
 The direct-call connection is committed in `25b9a92a`, `8626c646` and `bc453668`. Source evaluation follows the actual argument vector and selected global application. It introduces neither a runtime evaluation of the synthetic declaration reference nor an indirect-call gate. Ordinary erasure retains the actual invocation dictionary, and failure preservation composes the argument and invocation heap extensions.

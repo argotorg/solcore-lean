@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct builtin calls through public sessions (2026-10-13)
+
+`23740f15` adds independent staged Source rules for direct builtin calls. `cab7e4b0` connects their actual compiler receipts, ordered arguments and literal callable wrapper to preservation and reflection. The native metadata producer retains the real evidence for integer literals.
+
+`4aeff59b` proves six successive public calls for `relay(seed) = make(identity(seed) + wordFromInteger(0))`: `relay(10); relay(20); A(); relay(30); B(); A()`. The retained closures return `10 / 20 / 10`, using the exact preceding session, Source heap and reusable handle history. Independent Source success gives sufficient execution and output fuel for all three relay calls. The actual accepted compiler action retains the builtin call.
+
+Validation: all 710 affected modules pass coherent checks. The full build (6,512 jobs), all registered tests (12,894 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The runtime and Core representation are unchanged. The next connection is direct declaration calls inside retained closure bodies. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Named direct calls and retained closure captures (2026-10-13)
 
 `25b9a92a` adds independent staged Source rules for direct declaration calls. `8626c646` connects actual compiler selection and canonical global entries to preservation and reflection. The complete specialization record, physical argument count, original argument types and selected body come from the real compiler and finite inventory. Ordered arguments run before the selected named body.

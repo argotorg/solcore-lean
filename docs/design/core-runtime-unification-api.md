@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Direct builtin calls through public sessions (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt` records the authentic builtin compiler action. `CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.preserves` and `reflects` compose ordered child execution with the selected builtin and retain the reached heap and full result. The four recursive caller folds consume this receipt.
+
+`CallableIndexedOwnedPreparedStagedNamedCanonicalTerminalSupport.of_actual_native` and `of_terminal_native` use `NativeMetadataFor`, including the actual integer-literal evidence. Existing ordinary metadata wrappers remain available.
+
+The closed public endpoints are `Tests.SourceCoreBuiltinCalls.closed_sequence_meaning` and `closed_forward_meaning`. `SequenceWitness.forward` supplies sufficient public fuel at the three actual relay checkpoints. `runForward` is registered alongside the existing builtin runtime test.
+
+Validation: all 710 affected modules pass coherent checks. The full build (6,512 jobs), all registered tests (12,894 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The runtime and Core representation are unchanged. The next connection is direct declaration calls inside retained closure bodies. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Named direct calls and retained closure captures (2026-10-13)
 
 `CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt` records the authentic direct compiler action. `DirectCallAuthority.Port` identifies its header from the complete initialized inventory. `DirectHeadBounds.preserves` and `reflects` compose ordered argument evaluation, real parameter entry and the selected body at the current owned pool. These shortened module names share the `CallableIndexedOwnedPreparedStaged` prefix.

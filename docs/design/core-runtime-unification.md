@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct builtin calls through public sessions (2026-10-13)
+
+Direct builtin calls now pass through the same recursive proof family as named and indirect calls. The certificate records genuine compiler validation, the original parameter types, ordered child actions, selected builtin identity and literal contracted call. The proof evaluates arguments once and then uses the existing builtin application semantics.
+
+The public example combines a direct `identity` call, addition, `wordFromInteger(0)` and closure creation. Its original integer literal retains the checked evidence required by the existing staging policy. Three closures are created across six public calls; the first two retain their separate captures when reused.
+
+Validation: all 710 affected modules pass coherent checks. The full build (6,512 jobs), all registered tests (12,894 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The runtime and Core representation are unchanged. The next connection is direct declaration calls inside retained closure bodies. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Named direct calls and retained closure captures (2026-10-13)
 
 Direct declaration calls now enter the same public proof family as indirect calls. Their static certificate retains the actual accepted compiler action, specialization, global slot and ordered child actions. The complete initialized inventory supplies the selected function header. At execution, canonical caller bindings supply the slot and the reached owned pool supplies its current capture.
@@ -209,10 +219,10 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
 | Latest verified implementation | `fd2b9008` / `181fa159` / `bb21dcc0`: finite for initialization, body and post-header execution connect through actual compiler receipts to successive public sessions. |
-| Latest completed verification | Full build (6450 jobs), all registered tests, kernel policy and 82 endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional, finite while/for and match closure bodies retain separate mutable captures across intervening calls. |
-| Latest proof scope | Named for calls return `12 / 22`; captured for calls return `10 / 20 / 11` across intervening closure creation. Each derives exact successive Source heaps/histories and sufficient public fuel at its original checkpoints. Earlier operator, block, match and closure guarantees remain checked. |
-| Current implementation priority | Connect direct builtin calls and direct calls inside retained closure bodies to public execution, then widen remaining compiler coverage. |
+| Latest completed verification | Full build (6512 jobs), all registered tests, kernel policy and 52 endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive constructors, operators, direct named calls and direct builtin calls share the proof family. |
+| Latest proof scope | Six public sessions combine direct named and builtin calls with closure creation; retained captures return `10 / 20 / 10`. The proof keeps exact successive Source heaps and histories and derives sufficient fuel at the three creation checkpoints. |
+| Current implementation priority | Connect direct calls inside retained closure bodies, then recursive mapping index children and remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
