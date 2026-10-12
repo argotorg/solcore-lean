@@ -56,6 +56,9 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
   | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
     exact ih (syntax_child tree header.metadata.found (by
       simp [form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @builtin_child scope id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.syntax_child tree outer.metadata.found (by
+      simp [outer.form, ExpressionForm.references, (List.of_mem_zip member).1]))
   | @direct_child scope id otherCallee otherIds instantiation otherFuel code types outer calleeTyped application sequence children child childCode member inside ih =>
     exact False.elim (syntax_not_direct tree outer.metadata.found outer.form)
   | @call_child scope id otherCallee otherIds metadata otherFuel code types outer sequence children child childCode member inside ih =>

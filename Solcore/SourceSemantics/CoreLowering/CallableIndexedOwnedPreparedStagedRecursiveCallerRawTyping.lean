@@ -85,6 +85,14 @@ theorem parent_typed
         form header.metadata.coercions originalTyped
     obtain ⟨childType, childTyped⟩ := row_member childrenTyped (List.of_mem_zip member).1
     exact ih childTyped
+  | @builtin_child scope id otherCallee otherIds function otherFuel code
+      outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    have originalTyped := typed_at_lookup unique outer.metadata.found typed
+    obtain ⟨_callee, argumentsTyped, _sourceType⟩ :=
+      CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.source_types
+        unique outer.metadata.found outer.form outer.metadata.coercions originalTyped
+    obtain ⟨childType, childTyped⟩ := row_member argumentsTyped (List.of_mem_zip member).1
+    exact ih childTyped
   | @direct_child scope id otherCallee otherIds otherInstantiation otherFuel code types
       outer calleeTyped application sequence children child childCode member inside ih =>
     have originalTyped := typed_at_lookup unique outer.metadata.found typed
@@ -188,6 +196,14 @@ theorem direct_parent_typed
       CompatibleExpressionConstructors.constructor_source_types unique header.metadata.found
         form header.metadata.coercions originalTyped
     obtain ⟨childType, childTyped⟩ := row_member childrenTyped (List.of_mem_zip member).1
+    exact ih childTyped
+  | @builtin_child scope id otherCallee otherIds function otherFuel code
+      outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    have originalTyped := typed_at_lookup unique outer.metadata.found typed
+    obtain ⟨_callee, argumentsTyped, _sourceType⟩ :=
+      CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.source_types
+        unique outer.metadata.found outer.form outer.metadata.coercions originalTyped
+    obtain ⟨childType, childTyped⟩ := row_member argumentsTyped (List.of_mem_zip member).1
     exact ih childTyped
   | @direct_child scope id otherCallee otherIds otherInstantiation otherFuel code types
       outer calleeTyped application sequence children child childCode member inside ih =>

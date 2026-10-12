@@ -165,6 +165,11 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
     intro child member
     obtain ⟨code, paired⟩ := zip_member (sequence_length sequence) member
     exact ih child code paired
+  | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
+    refine .builtin compiler.metadata.found compiler.form ?_
+    intro child member
+    obtain ⟨code, paired⟩ := zip_member (sequence_length sequence) member
+    exact ih child code paired
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children ih =>
     refine .direct compiler.metadata.found compiler.form compiler.monomorphic ?_
     intro child member
@@ -203,7 +208,7 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
   | here sequence children => exact certificate_syntax (.call compiler sequence children)
   | group _inside ih => exact ih
   | tuple_child _member _inside ih | constructor_child _member _inside ih
-  | direct_child _member _inside ih => exact ih
+  | direct_child _member _inside ih | builtin_child _member _inside ih => exact ih
   | call_child _member _inside ih => exact ih
   | unary_child _inside ih | binary_left _inside ih | binary_right _inside ih
   | conditional_condition _inside ih | conditional_then _inside ih | conditional_else _inside ih => exact ih
@@ -224,7 +229,7 @@ theorem direct_calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Sc
   | here calleeTyped application sequence children => exact certificate_syntax (.direct compiler calleeTyped application sequence children)
   | group _inside ih => exact ih
   | tuple_child _member _inside ih | constructor_child _member _inside ih
-  | direct_child _member _inside ih => exact ih
+  | direct_child _member _inside ih | builtin_child _member _inside ih => exact ih
   | call_child _member _inside ih => exact ih
   | unary_child _inside ih | binary_left _inside ih | binary_right _inside ih
   | conditional_condition _inside ih | conditional_then _inside ih | conditional_else _inside ih => exact ih
@@ -269,6 +274,9 @@ theorem no_direct_of_syntax
   | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
     exact ih (syntax_child tree header.metadata.found (by
       simp [form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @builtin_child scope id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    exact ih (syntax_child tree outer.metadata.found (by
+      simp [outer.form, ExpressionForm.references, (List.of_mem_zip member).1]))
   | @direct_child scope id otherCallee otherIds instantiation otherFuel code types outer calleeTyped application sequence children child childCode member inside ih =>
     exact syntax_not_direct tree outer.metadata.found outer.form
   | @call_child scope id otherCallee otherIds metadata otherFuel code types outer sequence children child childCode member inside ih =>

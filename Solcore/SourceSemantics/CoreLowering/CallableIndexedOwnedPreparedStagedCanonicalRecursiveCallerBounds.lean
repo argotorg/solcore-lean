@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -326,6 +327,32 @@ theorem preserves_reached
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_preserves
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
+      intro reached directReady ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached compiler.metadata.found
+          (by simp [compiler.form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
+        intro childSize smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun nested inside => directReady nested
+            (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
+            (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside))
+          childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.preserves
+        bridge functions observations callFaults unique wellFormed runtime covers
+        (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
+        ⟨rfl, rfl, compiler.output⟩
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children ih =>
       intro reached directReady ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
@@ -579,6 +606,32 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_reflects
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
+      intro reached directReady ports size within
+      have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
+          Reaches invocation.source [.expression faultRoot] (.expression child) := by
+        intro child code member
+        exact .expression reached compiler.metadata.found
+          (by simp [compiler.form, ExpressionForm.references, (List.of_mem_zip member).1])
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
+        intro childSize smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member (childReached child code member)
+          (fun nested inside => directReady nested
+            (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
+            (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside))
+          childSize (Nat.le_trans (Nat.le_of_lt smaller) within) ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.reflects
+        bridge functions observations callFaults unique wellFormed runtime covers
+        (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
+        ⟨rfl, rfl, compiler.output⟩
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children ih =>
       intro reached directReady ports size within
       have childReached : ∀ child code, (child, code) ∈ ids.zip compiler.codes →

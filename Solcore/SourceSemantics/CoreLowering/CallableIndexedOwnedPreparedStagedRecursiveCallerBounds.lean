@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedConstructorHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
@@ -257,6 +258,26 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_preserves
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
+      intro noDirect ports size
+      have childMeaning : PreservesBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun nested inside => noDirect nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.preserves
+        bridge functions observations callFaults unique wellFormed runtime covers
+        (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
+        ⟨rfl, rfl, compiler.output⟩
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
       intro noDirect
       exact False.elim (noDirect compiler (.here calleeTyped application sequence children))
@@ -434,6 +455,26 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       exact CallableIndexedOwnedPreparedStagedConstructorHeadBounds.constructor_reflects
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
+  | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
+      intro noDirect ports size
+      have childMeaning : ReflectsBelow bridge context model stages invocation
+          (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
+        intro childSize _smaller current child code entry
+        obtain ⟨rfl, member⟩ := entry
+        exact ih child code member
+          (fun nested inside => noDirect nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
+      intro current child code point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds.reflects
+        bridge functions observations callFaults unique wellFormed runtime covers
+        (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
+        ⟨rfl, rfl, compiler.output⟩
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
       intro noDirect
       exact False.elim (noDirect compiler (.here calleeTyped application sequence children))

@@ -80,6 +80,11 @@ private theorem read_no_calls
     have same := Option.some.inj (header.metadata.found.symm.trans found)
     subst other
     simp [form] at otherForm
+  | @builtin_child current id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside =>
+    have identity := Option.some.inj (outer.metadata.found.symm.trans found)
+    have same := outer.form
+    rw [identity, form] at same
+    cases same
   | @direct_child current id callee directIds instantiation fuel code types outer calleeTyped application sequence children child childCode member inside =>
     have identity := Option.some.inj (outer.metadata.found.symm.trans found)
     have same := outer.form

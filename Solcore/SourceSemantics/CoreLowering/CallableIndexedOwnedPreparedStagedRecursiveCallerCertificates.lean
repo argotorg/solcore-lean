@@ -5,6 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConditionalCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionConstructorExtraction
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinCallCertificates
 
 /-! Successful compilation constructs a finite recursive caller certificate.
 The callee and ordered argument vector retain the exact compiler occurrences,
@@ -84,6 +85,9 @@ inductive GeneralSyntax (source : TypedSource) : ExpressionId → Prop where
   | constructor {id node instantiation ids} (found : source.lookupExpression? id = some node)
       (form : node.form = .constructor instantiation ids)
       (ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
+      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+  | builtin {id node callee ids function} (found : source.lookupExpression? id = some node)
+      (form : node.form = .call callee ids (.builtinFunction function))
       (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
   | direct {id node callee ids instantiation}
       (found : source.lookupExpression? id = some node)
@@ -172,6 +176,17 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
       Certificate policy body compilation readFuel values source context reasonAt scope id
         ⟨.namedData tag.owner, SourceCoreCompatibleDataExpressions.construct tag headerWord
           (SourceCoreCalls.packArguments codes).expression⟩
+  | builtin {id callee ids function fuel lowered}
+      (compiler : CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body fuel compilation
+        values source scope id callee ids function reasonAt lowered)
+      (calleeTyped : DirectBuiltinCalleeValid source callee function)
+      (sourceType : compiler.node.type = function.returnType)
+      (nativeTypes : compiler.codes.map (·.type) = CompatibleBuiltinMeaning.argumentTypes function)
+      (sequence : DataExpressionSequence.Tree source
+        (RecursiveStageTupleMeaning.Entries scope (ids.zip compiler.codes)) scope ids function.parameterTypes compiler.codes)
+      (children : ∀ child code, (child, code) ∈ ids.zip compiler.codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope child code) :
+      Certificate policy body compilation readFuel values source context reasonAt scope id lowered
   | direct {id callee ids instantiation fuel lowered types}
       (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body fuel compilation
         values source scope id callee ids instantiation reasonAt lowered)
@@ -277,6 +292,19 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child childCode} (member : (child, childCode) ∈ constructorIds.zip codes)
       (inside : Calls compiler (children child childCode member)) :
       Calls compiler (.constructor header form admissible ranges count nodes sequence children)
+  | builtin_child {scope id otherCallee otherIds function otherFuel code}
+      {outer : CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body otherFuel compilation
+        values source scope id otherCallee otherIds function reasonAt code}
+      {calleeTyped : DirectBuiltinCalleeValid source otherCallee function}
+      {sourceType : outer.node.type = function.returnType}
+      {nativeTypes : outer.codes.map (·.type) = CompatibleBuiltinMeaning.argumentTypes function}
+      {sequence : DataExpressionSequence.Tree source
+        (RecursiveStageTupleMeaning.Entries scope (otherIds.zip outer.codes)) scope otherIds function.parameterTypes outer.codes}
+      {children : ∀ child childCode, (child, childCode) ∈ otherIds.zip outer.codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
+      {child childCode} (member : (child, childCode) ∈ otherIds.zip outer.codes)
+      (inside : Calls compiler (children child childCode member)) :
+      Calls compiler (.builtin outer calleeTyped sourceType nativeTypes sequence children)
   | direct_child {scope id otherCallee otherIds instantiation otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body otherFuel compilation
         values source scope id otherCallee otherIds instantiation reasonAt code}
@@ -404,6 +432,19 @@ inductive DirectCalls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child childCode} (member : (child, childCode) ∈ constructorIds.zip codes)
       (inside : DirectCalls compiler (children child childCode member)) :
       DirectCalls compiler (.constructor header form admissible ranges count nodes sequence children)
+  | builtin_child {scope id otherCallee otherIds function otherFuel code}
+      {outer : CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body otherFuel compilation
+        values source scope id otherCallee otherIds function reasonAt code}
+      {calleeTyped : DirectBuiltinCalleeValid source otherCallee function}
+      {sourceType : outer.node.type = function.returnType}
+      {nativeTypes : outer.codes.map (·.type) = CompatibleBuiltinMeaning.argumentTypes function}
+      {sequence : DataExpressionSequence.Tree source
+        (RecursiveStageTupleMeaning.Entries scope (otherIds.zip outer.codes)) scope otherIds function.parameterTypes outer.codes}
+      {children : ∀ child childCode, (child, childCode) ∈ otherIds.zip outer.codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope child childCode}
+      {child childCode} (member : (child, childCode) ∈ otherIds.zip outer.codes)
+      (inside : DirectCalls compiler (children child childCode member)) :
+      DirectCalls compiler (.builtin outer calleeTyped sourceType nativeTypes sequence children)
   | direct_child {scope id otherCallee otherIds instantiation otherFuel code types}
       {outer : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body otherFuel compilation
         values source scope id otherCallee otherIds instantiation reasonAt code}
@@ -864,7 +905,47 @@ theorem of_functions {scope : SourceCoreLocalCell.Scope}
 
 /-- The actual successful action supplies every recursive compiler child.
 Independent raw Source typing supplies child types before their extraction. -/
+private theorem projected_children
+    {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
+    {ids : List ExpressionId} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
+    (unique : NodeOccurrencesUnique source) (typed : ExpressionsHaveTypes source context ids types)
+    (generated : ids.mapM (fun id => SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt) = .ok codes)
+    (extract : ∀ id, id ∈ ids → ∀ node code, source.lookupExpression? id = some node →
+      ExpressionHasType source context id node.type →
+      SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt = .ok code →
+      Certificate policy body compilation readFuel values source context reasonAt scope id code ∧
+        values.checked.catalog.project node.type = .ok code.type) :
+    ids.length = types.length ∧ CompatibleExpressionConstructors.Nodes source ids types codes ∧
+      types.mapM values.checked.catalog.project = .ok (codes.map (·.type)) ∧
+      ∀ id code, (id, code) ∈ ids.zip codes →
+        Certificate policy body compilation readFuel values source context reasonAt scope id code := by
+  induction ids generalizing types codes with
+  | nil =>
+    cases typed
+    simp only [List.mapM_nil, pure, Except.pure, Except.ok.injEq] at generated
+    subst codes
+    exact ⟨rfl, .nil, rfl, by simp⟩
+  | cons id ids ih =>
+    cases typed with
+    | @cons _ _ _ type types head tail =>
+      rw [List.mapM_cons] at generated
+      obtain ⟨code, first, generated⟩ := bind_ok generated
+      obtain ⟨restCodes, rest, generated⟩ := bind_ok generated
+      cases generated
+      obtain ⟨node, contains, sourceType⟩ := head.stored_type
+      have found := lookupExpression?_complete unique contains
+      have child := extract id (by simp) node code found (sourceType ▸ head) first
+      obtain ⟨count, nodes, projected, children⟩ := ih tail rest (fun id member => extract id (by simp [member]))
+      refine ⟨congrArg Nat.succ count, .cons ⟨node, found, sourceType⟩ nodes, ?_, ?_⟩
+      · simp [List.mapM_cons, ← sourceType, child.2, projected, bind, Except.bind]
+      · intro other otherCode member
+        rcases List.mem_cons.mp member with same | remaining
+        · cases same; exact child.1
+        · exact children other otherCode remaining
+
 theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {allowed : ExpressionId → Prop}
@@ -943,6 +1024,33 @@ theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
             (_root_.List.zip _ _) scope child code))) certified, receipt.metadata.projected⟩
+  | @builtin callId _original _callee _ids function originalFound form children ih =>
+    intro admitted
+    have same := Option.some.inj (originalFound.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨compiler⟩ := CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.of_functions
+        native active callables originalFound form
+        (policyFor.special _ admitted (.builtin originalFound form children))
+        (policyFor.read _ admitted (.builtin originalFound form children)) accepted
+      have originalSame := Option.some.inj (compiler.metadata.found.symm.trans originalFound)
+      have parentTyped : ExpressionHasType source context callId compiler.node.type := by
+        simpa only [originalSame] using typed
+      obtain ⟨calleeTyped, argumentsTyped, sourceType⟩ :=
+        CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.source_types unique
+          compiler.metadata.found compiler.form compiler.metadata.coercions parentTyped
+      obtain ⟨count, nodes, projected, certified⟩ := projected_children unique argumentsTyped compiler.generated
+        (fun child member childNode code childFound childTyped childAccepted =>
+          ih child member childFound childTyped childAccepted
+            (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
+      rw [CompatibleBuiltinMeaning.argumentTypes_project function] at projected
+      exact ⟨.builtin compiler calleeTyped sourceType (Except.ok.inj projected).symm
+        (CompatibleExpressionConstructors.sequence_of_nodes count nodes
+          (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
+            (_root_.List.zip _ _) scope child code))) certified,
+        by simpa only [originalSame] using compiler.metadata.projected⟩
   | @direct callId _original _callee _ids _instantiation originalFound form monomorphic children ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -1085,6 +1193,8 @@ theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
 
 
 theorem of_general_functions_on {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {allowed : ExpressionId → Prop}
@@ -1099,10 +1209,12 @@ theorem of_general_functions_on {scope : SourceCoreLocalCell.Scope}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
       source scope id reasonAt = .ok lowered) :
     Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
-  exact (of_general_functions_on_projected unique declarations policyFor closed coercions
+  exact (of_general_functions_on_projected native active callables unique declarations policyFor closed coercions
     syntaxTree admitted found typed accepted).1
 
 theorem of_general_functions {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     (policyFor : GeneralPolicyFor policy compilation readFuel values source scope reasonAt)
@@ -1114,7 +1226,7 @@ theorem of_general_functions {scope : SourceCoreLocalCell.Scope}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
       source scope id reasonAt = .ok lowered) :
     Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
-  exact of_general_functions_on unique declarations (policyFor.on (fun _ => True))
+  exact of_general_functions_on native active callables unique declarations (policyFor.on (fun _ => True))
     (fun _ _ _ => trivial) (fun id node _ tree found => coercions id node tree found)
     syntaxTree trivial found typed accepted
 

@@ -1681,6 +1681,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedCanonicalTerminalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinCallCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinSourceInversion
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectBuiltinHeadBounds
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

@@ -22,6 +22,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 /-- The certificate is issued from this original Source's actual accepted
   action. Reachable call authority stays indexed by that exact issued proof. -/
 def RootData.of_general_compiled
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique invocation.source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
     (policyFor : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor
@@ -42,7 +44,7 @@ def RootData.of_general_compiled
         (policy := policy) (body := lowerBody) (compilation := compilation) (readFuel := readFuel)
         (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         (source := invocation.source) (context := context) (reasonAt := reasonAt) (scope := scope)
-        unique declarations policyFor coercions syntaxTree found typed accepted))
+        native active callables unique declarations policyFor coercions syntaxTree found typed accepted))
     (rawResult : node.type = rawType)
     (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
     (runtimeLedger : RuntimeRequirementLedgerValid context)
@@ -64,7 +66,7 @@ def RootData.of_general_compiled
       (policy := policy) (body := lowerBody) (compilation := compilation) (readFuel := readFuel)
       (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       (source := invocation.source) (context := context) (reasonAt := reasonAt) (scope := scope)
-      unique declarations policyFor coercions syntaxTree found typed accepted
+      native active callables unique declarations policyFor coercions syntaxTree found typed accepted
     node := node
     found := found
     rawResult := rawResult
@@ -82,6 +84,8 @@ def RootData.of_general_compiled
 /-- Packaging retains all actual compiler indices while fixing the original
   Source invocation, parameter context, physical occurrence and lowered child. -/
 def CanonicalRootAt.of_general_compiled
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique invocation.source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
     (policyFor : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor
@@ -102,7 +106,7 @@ def CanonicalRootAt.of_general_compiled
         (policy := policy) (body := lowerBody) (compilation := compilation) (readFuel := readFuel)
         (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
         (source := invocation.source) (context := context) (reasonAt := reasonAt) (scope := scope)
-        unique declarations policyFor coercions syntaxTree found typed accepted))
+        native active callables unique declarations policyFor coercions syntaxTree found typed accepted))
     (rawResult : node.type = rawType)
     (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
     (runtimeLedger : RuntimeRequirementLedgerValid context)
@@ -131,7 +135,7 @@ def CanonicalRootAt.of_general_compiled
     (readFuel := readFuel) (compilerFuel := compilerFuel) (context := context) (invocation := invocation)
     (reasonAt := reasonAt) (scope := scope) (expression := expression) (lowered := lowered)
     (node := node) (rawType := rawType) (semanticFaults := semanticFaults)
-    unique declarations policyFor coercions syntaxTree found typed accepted callsReady rawResult
+    native active callables unique declarations policyFor coercions syntaxTree found typed accepted callsReady rawResult
     sameLedger runtimeLedger wellFormed runtime covers actualFunctionType uninitialized).canonical rows complete plan globals)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
