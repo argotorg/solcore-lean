@@ -5038,3 +5038,591 @@ theorem Checkpoint.ResumeAt.runtime_word_succeeded {artifact : Artifact}
 
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem validate_complete {definitions : Core.DataEnvironment} {world : Core.StoreTyping}
+    {value : Core.Value} {type : Core.Ty}
+    (typed : Core.RuntimeValueHasType world value type definitions) :
+    ∃ validated, validateAt definitions world value type = .ok validated := by
+  induction typed using Core.RuntimeValueHasType.rec
+      (motive_2 := fun environment _ definitions _ =>
+        ∃ validated, validateEnvironment definitions world environment = .ok validated) with
+  | unit => exact ⟨⟨.unit⟩, by simp only [validateAt, pure, Except.pure]⟩
+  | bool => exact ⟨⟨.bool⟩, by simp only [validateAt, pure, Except.pure]⟩
+  | word => exact ⟨⟨.word⟩, by simp only [validateAt, pure, Except.pure]⟩
+  | integer => exact ⟨⟨.integer⟩, by simp only [validateAt, pure, Except.pure]⟩
+  | pair left right leftIH rightIH =>
+    obtain ⟨_, leftAt⟩ := leftIH
+    obtain ⟨_, rightAt⟩ := rightIH
+    exact ⟨⟨.pair left right⟩, by
+      simp only [validateAt, leftAt, rightAt, Except.mapError, bind, Except.bind, pure, Except.pure]⟩
+  | inLeft payload payloadIH =>
+    obtain ⟨_, payloadAt⟩ := payloadIH
+    exact ⟨⟨.inLeft payload⟩, by
+      simp only [validateAt, ↓reduceDIte, payloadAt, bind, Except.bind, pure, Except.pure]⟩
+  | inRight payload payloadIH =>
+    obtain ⟨_, payloadAt⟩ := payloadIH
+    exact ⟨⟨.inRight payload⟩, by
+      simp only [validateAt, ↓reduceDIte, payloadAt, bind, Except.bind, pure, Except.pure]⟩
+  | closure environment body environmentIH =>
+    obtain ⟨_, accepted⟩ := environmentIH
+    have inferred := Core.infer_complete body
+    rw [← environment.type_tags] at inferred
+    exact ⟨⟨.closure environment body⟩, by
+      simp only [validateAt, and_self, ↓reduceDIte, accepted, bind, Except.bind, inferred, pure, Except.pure]⟩
+  | cellRef found => exact ⟨⟨.cellRef found⟩, by
+      simp only [validateAt, ↓reduceDIte, found, pure, Except.pure]⟩
+  | constructed found payload payloadIH =>
+    obtain ⟨_, payloadAt⟩ := payloadIH
+    refine ⟨⟨.constructed found payload⟩, ?_⟩
+    simp only [validateAt, ↓reduceDIte]
+    split
+    next failed => rw [found] at failed; cases failed
+    next payloadType generated =>
+      have same := Option.some.inj (found.symm.trans generated)
+      cases same
+      simp only [payloadAt, Except.mapError, bind, Except.bind, pure, Except.pure]
+  | nil => exact ⟨⟨.nil⟩, by simp only [validateEnvironment, pure, Except.pure]⟩
+  | cons head tail headIH tailIH =>
+    cases head.type_eq
+    obtain ⟨_, headAt⟩ := headIH
+    obtain ⟨_, tailAt⟩ := tailIH
+    refine ⟨⟨by simpa only [List.map_cons, tail.type_tags] using Core.RuntimeEnvironmentHasTypes.cons head tail⟩, ?_⟩
+    simp only [validateEnvironment, headAt, tailAt, bind, Except.bind, pure, Except.pure]
+
+/-- Every retained handle has its original issuer and bounded issuance slot;
+no two physical slots name the same public handle. -/
+private def Registry.Issued {artifact : Artifact} {world : Core.StoreTyping}
+    (authority : SessionAuthority) (slots : Registry artifact world) : Prop :=
+  (slots.map (fun slot => slot.handle)).Nodup ∧
+  ∀ slot ∈ slots, ∃ generation index, index < slots.length ∧
+    slot.handle = authority.issue generation index slot.handle.sourceType
+
+/-- Actual authority and registry provenance needed for guaranteed callable
+export. Native typing by itself does not assert either property. -/
+def Session.ExportsReady {artifact : Artifact} (session : Session artifact) : Prop :=
+  session.authority.IssuedFor artifact.authority ∧ Registry.Issued session.authority session.registry
+
+/-- The initial checkpoint retains the authority minted for this artifact. -/
+def Bootstrap.ExportAuthorityAt {artifact : Artifact} (checkpoint : Bootstrap artifact) : Prop :=
+  checkpoint.authority.IssuedFor artifact.authority
+
+/-- The same fresh bootstrap operation keeps the session issuer association.
+The original bootstrap APIs and their receipts remain available. -/
+def Artifact.bootstrapFreshWithExportReceipt (artifact : Artifact) (recipe : Recipe)
+    (atRecipe : artifact.RecipeAt recipe) :
+    IO { checkpoint : Bootstrap artifact // checkpoint.InitialAt recipe {} ∧ checkpoint.ExportAuthorityAt } := do
+  let issued ← artifact.authority.newSessionWithReceipt
+  let checkpoint : Bootstrap artifact := ⟨issued.val, .initial artifact.recipe.bootstrap [] [],
+    .eval (.nil _) .nil artifact.recipe.bootstrapTyped .nil, ⟨{}, 1, rfl⟩⟩
+  pure ⟨checkpoint, ⟨atRecipe, by
+    change Core.State.initial artifact.recipe.bootstrap [] [] = Core.State.initial recipe.bootstrap [] []
+    rw [atRecipe], rfl⟩, issued.property⟩
+
+theorem Session.BootstrappedFrom.exportsReady {artifact : Artifact} {session : Session artifact}
+    {checkpoint : Bootstrap artifact} {store : Core.Store}
+    (bootstrapped : session.BootstrappedFrom checkpoint store)
+    (authority : checkpoint.ExportAuthorityAt) : session.ExportsReady := by
+  obtain ⟨sameAuthority, _world, _store, _prefix, slots, _values⟩ := bootstrapped
+  refine ⟨?_, ?_⟩
+  · change session.authority.IssuedFor artifact.authority
+    rw [sameAuthority]
+    exact authority
+  · change Registry.Issued session.authority session.registry
+    rw [slots]
+    exact ⟨.nil, by simp⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem Registry.Issued.weaken {artifact : Artifact} {world future : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    (issued : Registry.Issued authority slots) (extension : Core.WorldExtends world future) :
+    Registry.Issued authority (slots.weaken extension) := by
+  refine ⟨?_, ?_⟩
+  · simpa only [Registry.weaken, List.map_map, Function.comp_def] using issued.1
+  · intro slot member
+    simp only [Registry.weaken] at member
+    obtain ⟨old, oldMember, rfl⟩ := List.mem_map.mp member
+    obtain ⟨generation, index, bound, source⟩ := issued.2 old oldMember
+    exact ⟨generation, index, by simpa only [Registry.weaken, List.length_map] using bound, source⟩
+
+private theorem registry_find_handle {artifact : Artifact} {world : Core.StoreTyping}
+    {slots : Registry artifact world} {slot : Slot artifact world}
+    (unique : (slots.map (fun item => item.handle)).Nodup) (member : slot ∈ slots) :
+    slots.find? (fun item => decide (item.handle = slot.handle)) = some slot := by
+  induction slots with
+  | nil => cases member
+  | cons head tail ih =>
+    have nodup := List.nodup_cons.mp unique
+    rcases List.mem_cons.mp member with same | member
+    · subst head
+      simp only [List.find?_cons, decide_true]
+    · have different : head.handle ≠ slot.handle := by
+        intro same
+        exact nodup.1 (List.mem_map.mpr ⟨slot, member, same.symm⟩)
+      simp only [List.find?_cons, different, decide_false]
+      exact ih nodup.2 member
+
+private theorem Registry.Issued.resolved {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {slot : Slot artifact world}
+    (owned : authority.IssuedFor artifact.authority) (issued : Registry.Issued authority slots)
+    (member : slot ∈ slots) :
+    resolve authority slots slot.handle.sourceType slot.handle = .ok slot.value := by
+  have found := registry_find_handle issued.1 member
+  obtain ⟨generation, index, _bound, same⟩ := issued.2 slot member
+  have belongsArtifact : slot.handle.belongsToArtifact artifact.authority = true := by
+    rw [same]
+    exact authority.issue_artifact owned generation index _
+  have belongsSession : slot.handle.belongsToSession authority = true := by
+    rw [same]
+    exact authority.issue_session generation index _
+  simp only [resolve, belongsArtifact, belongsSession, ↓reduceIte, pure, Except.pure,
+    bind, Except.bind, found]
+
+private theorem Registry.Issued.fresh {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    (issued : Registry.Issued authority slots) (generation : ExportGeneration) (expected : Ty)
+    {slot : Slot artifact world} (member : slot ∈ slots) :
+    slot.handle ≠ authority.issue generation slots.length expected := by
+  obtain ⟨previous, index, bound, same⟩ := issued.2 slot member
+  intro equal
+  have number := SourceCorePublicValues.SessionAuthority.issue_index (same.symm.trans equal)
+  omega
+
+private theorem Registry.Issued.append {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    (issued : Registry.Issued authority slots) (generation : ExportGeneration) (expected : Ty)
+    {value : Core.Value} {type : Core.Ty}
+    (generated : artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type)
+    (typed : Core.RuntimeValueHasType world value type artifact.program.layouts.definitions) :
+    Registry.Issued authority (slots ++ [⟨authority.issue generation slots.length expected, value, type, generated, typed⟩]) := by
+  refine ⟨?_, ?_⟩
+  · rw [List.map_append]
+    apply List.nodup_append.mpr
+    refine ⟨issued.1, by simp, ?_⟩
+    intro left member right rightMember
+    obtain ⟨slot, oldMember, rfl⟩ := List.mem_map.mp member
+    simp only [List.map_cons, List.map_nil, List.mem_singleton] at rightMember
+    subst right
+    exact issued.fresh generation expected oldMember
+  · intro slot member
+    rcases List.mem_append.mp member with old | new
+    · obtain ⟨previous, index, bound, same⟩ := issued.2 slot old
+      exact ⟨previous, index, by simp only [List.length_append, List.length_singleton]; omega, same⟩
+    · have same := List.mem_singleton.mp new
+      subst slot
+      exact ⟨generation, slots.length, by simp, rfl⟩
+
+private theorem register_complete {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    (owned : authority.IssuedFor artifact.authority) (issued : Registry.Issued authority slots)
+    (generation : ExportGeneration) {expected : Ty} {value : Core.Value} {type : Core.Ty}
+    (generated : artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type)
+    (typed : Core.RuntimeValueHasType world value type artifact.program.layouts.definitions) :
+    ∃ handle returned,
+      register authority generation slots expected value = .ok (handle, returned) ∧
+      Registry.Issued authority returned ∧ handle.sourceType = expected ∧
+      resolve authority returned expected handle = .ok value := by
+  cases found : slots.find? (fun slot => decide (slot.handle.sourceType = expected ∧ slot.value = value)) with
+  | some slot =>
+    have member := List.mem_of_find?_eq_some found
+    have fields := of_decide_eq_true (List.find?_some
+      (p := fun slot : Slot artifact world => decide (slot.handle.sourceType = expected ∧ slot.value = value)) found)
+    refine ⟨slot.handle, slots, by simp only [register, found, pure, Except.pure], issued, fields.1, ?_⟩
+    have resolved := issued.resolved owned member
+    rw [fields.1, fields.2] at resolved
+    exact resolved
+  | none =>
+    obtain ⟨validated, accepted⟩ := validate_complete typed
+    let slot : Slot artifact world := ⟨authority.issue generation slots.length expected, value, type, generated, typed⟩
+    have all := issued.append generation expected generated typed
+    refine ⟨slot.handle, slots ++ [slot], ?_, all, rfl, ?_⟩
+    · simp only [register, found]
+      split
+      next failed => rw [generated] at failed; cases failed
+      next native projected =>
+        have same := Except.ok.inj (generated.symm.trans projected)
+        cases same
+        simp only [accepted, bind, Except.bind, pure, Except.pure]
+        rfl
+    · exact all.resolved owned (by simp [slot])
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem register_preserves_issued {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration}
+    {slots returned : Registry artifact world} {expected : Ty} {value : Core.Value} {handle : Handle}
+    (issued : Registry.Issued authority slots)
+    (accepted : register authority generation slots expected value = .ok (handle, returned)) :
+    Registry.Issued authority returned := by
+  unfold register at accepted
+  split at accepted
+  · cases accepted; exact issued
+  · split at accepted
+    · cases accepted
+    · rename_i type generated
+      obtain ⟨checked, _checked, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact issued.append generation expected generated checked.typed
+
+private def DecodedSlotsIssued (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (expected : Ty) (native : Core.Value) (value : Value) (returned : Registry artifact world),
+    Registry.Issued authority slots →
+    decodeRaw authority generation values fuel slots expected native = .ok (value, returned) →
+    Registry.Issued authority returned
+
+private def DecodedPayloadSlotsIssued (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (types : List Ty) (native : Core.Value) (output : List Value) (returned : Registry artifact world),
+    Registry.Issued authority slots →
+    decodePayloads authority generation values fuel slots types native = .ok (output, returned) →
+    Registry.Issued authority returned
+
+private def DecodedEntrySlotsIssued (fuel : Nat) : Prop :=
+  ∀ {artifact : Artifact} {world : Core.StoreTyping} (authority : SessionAuthority)
+    (generation : ExportGeneration) (values : Values) (slots : Registry artifact world)
+    (keyType valueType : Ty) (layout : Core.OrderedMapping.Layout) (native : Core.Value)
+    (output : List (Value × Value)) (returned : Registry artifact world),
+    Registry.Issued authority slots →
+    decodeEntries authority generation values fuel slots keyType valueType layout native = .ok (output, returned) →
+    Registry.Issued authority returned
+
+private theorem decode_raw_issued_succ {fuel : Nat} (raw : DecodedSlotsIssued fuel)
+    (payloads : DecodedPayloadSlotsIssued fuel) (entries : DecodedEntrySlotsIssued fuel) :
+    DecodedSlotsIssued (fuel + 1) := by
+  intro artifact world authority generation values slots expected native value returned issued accepted
+  unfold decodeRaw at accepted
+  split at accepted
+  · obtain ⟨⟨handle, next⟩, registered, accepted⟩ := root_factory_bind_ok accepted
+    cases accepted
+    exact register_preserves_issued issued registered
+  · cases accepted; exact issued
+  · cases accepted; exact issued
+  · cases accepted; exact issued
+  · cases accepted; exact issued
+  · obtain ⟨⟨left, first⟩, leftAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨⟨right, second⟩, rightAt, accepted⟩ := root_factory_bind_ok accepted
+    have firstIssued := raw authority generation values slots _ _ left first issued (simple_mapError_ok leftAt)
+    have secondIssued := raw authority generation values first _ _ right second firstIssued (simple_mapError_ok rightAt)
+    cases accepted
+    exact secondIssued
+  · obtain ⟨data, _decoded, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · cases accepted; exact issued
+    · cases accepted
+  · obtain ⟨header, _headerAt, accepted⟩ := root_factory_bind_ok accepted
+    cases header <;> simp only [pure, Except.pure, bind, Except.bind, throw, throwThe] at accepted
+    case proxy => cases accepted
+    case constructor => cases accepted
+    rename_i keyType valueType
+    obtain ⟨layout, _layoutAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨⟨decoded, next⟩, decodedAt, accepted⟩ := root_factory_bind_ok accepted
+    obtain ⟨fallback, _fallbackAt, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · have result := entries authority generation values slots keyType valueType layout _ decoded next issued decodedAt
+      cases accepted
+      exact result
+    · cases accepted
+  · obtain ⟨header, _headerAt, accepted⟩ := root_factory_bind_ok accepted
+    cases header <;> simp only [pure, Except.pure, bind, Except.bind, throw, throwThe] at accepted
+    case proxy => cases accepted
+    case mapping => cases accepted
+    rename_i instantiation
+    obtain ⟨tag, _tagAt, accepted⟩ := root_factory_bind_ok accepted
+    split at accepted
+    · obtain ⟨⟨decoded, next⟩, decodedAt, accepted⟩ := root_factory_bind_ok accepted
+      have result := payloads authority generation values slots instantiation.payloadTypes _ decoded next issued decodedAt
+      cases accepted
+      exact result
+    · cases accepted
+  · obtain ⟨_projected, _projection, accepted⟩ := root_factory_bind_ok accepted
+    cases accepted
+
+private theorem decode_payloads_issued_succ {fuel : Nat} (raw : DecodedSlotsIssued fuel)
+    (payloads : DecodedPayloadSlotsIssued fuel) : DecodedPayloadSlotsIssued (fuel + 1) := by
+  intro artifact world authority generation values slots types native output returned issued accepted
+  cases types with
+  | nil =>
+      cases native <;> simp only [decodePayloads] at accepted <;> cases accepted
+      exact issued
+  | cons type types =>
+      cases types with
+      | nil =>
+          simp only [decodePayloads] at accepted
+          obtain ⟨⟨value, next⟩, decoded, accepted⟩ := root_factory_bind_ok accepted
+          have result := raw authority generation values slots _ _ value next issued decoded
+          cases accepted
+          exact result
+      | cons type' types =>
+          cases native <;> simp only [decodePayloads] at accepted <;> try cases accepted
+          obtain ⟨⟨value, first⟩, firstAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨⟨rest, second⟩, restAt, accepted⟩ := root_factory_bind_ok accepted
+          have firstIssued := raw authority generation values slots _ _ value first issued firstAt
+          have secondIssued := payloads authority generation values first _ _ rest second firstIssued restAt
+          cases accepted
+          exact secondIssued
+
+private theorem decode_entries_issued_succ {fuel : Nat} (raw : DecodedSlotsIssued fuel)
+    (entries : DecodedEntrySlotsIssued fuel) : DecodedEntrySlotsIssued (fuel + 1) := by
+  intro artifact world authority generation values slots keyType valueType layout native output returned issued accepted
+  unfold decodeEntries at accepted
+  split at accepted
+  · split at accepted
+    · cases accepted; exact issued
+    · cases accepted
+  · split at accepted
+    · obtain ⟨⟨key, first⟩, keyAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨⟨value, second⟩, valueAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨⟨rest, third⟩, restAt, accepted⟩ := root_factory_bind_ok accepted
+      have firstIssued := raw authority generation values slots keyType _ key first issued keyAt
+      have secondIssued := raw authority generation values first valueType _ value second firstIssued valueAt
+      have thirdIssued := entries authority generation values second keyType valueType layout _ rest third secondIssued restAt
+      cases accepted
+      exact thirdIssued
+    · cases accepted
+  · cases accepted
+
+private theorem decode_slots_issued (fuel : Nat) :
+    DecodedSlotsIssued fuel ∧ DecodedPayloadSlotsIssued fuel ∧ DecodedEntrySlotsIssued fuel := by
+  induction fuel with
+  | zero =>
+      refine ⟨?_, ?_, ?_⟩
+      · intro artifact world authority generation values slots expected native value returned issued accepted
+        cases accepted
+      · intro artifact world authority generation values slots types native output returned issued accepted
+        cases types <;> cases native <;> simp only [decodePayloads] at accepted <;> cases accepted
+        exact issued
+      · intro artifact world authority generation values slots keyType valueType layout native output returned issued accepted
+        cases accepted
+  | succ fuel ih =>
+      exact ⟨decode_raw_issued_succ ih.1 ih.2.1 ih.2.2,
+        decode_payloads_issued_succ ih.1 ih.2.1, decode_entries_issued_succ ih.1 ih.2.2⟩
+
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- A genuine pending execution retains the same issuer and authentic slots. -/
+def Checkpoint.ExportsReady {artifact : Artifact} (checkpoint : Checkpoint artifact) : Prop :=
+  checkpoint.origin.authority.IssuedFor artifact.authority ∧
+    Registry.Issued checkpoint.origin.authority checkpoint.registry
+
+theorem Checkpoint.InitialRegistryFrom.exportsReady {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {session : Session artifact}
+    (started : checkpoint.InitialRegistryFrom session) (ready : session.ExportsReady) :
+    checkpoint.ExportsReady := by
+  obtain ⟨origin, world, registry⟩ := started
+  cases checkpoint
+  rename_i originSession request initialWorld state stored typed extension initialRegistry values owner
+  change originSession = session at origin
+  subst originSession
+  change initialWorld = session.world at world
+  subst initialWorld
+  have registryEq : initialRegistry = session.registry := eq_of_heq registry
+  subst initialRegistry
+  exact ready
+
+theorem Checkpoint.SucceededResultAt.exportsReady {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {executionFuel boundaryFuel : Nat}
+    {generation : ExportGeneration} {native : Core.Value} {store : Core.Store}
+    {completion : Completion artifact}
+    (succeeded : checkpoint.SucceededResultAt executionFuel boundaryFuel generation native store completion)
+    (ready : checkpoint.ExportsReady) : completion.session.ExportsReady := by
+  obtain ⟨_completed, result, extension, slots, encoded, _decoded, decode, _encode, _recovered,
+    _sourceType, _boundary, _stored, world, authority, _sourcePrefix, _values, _owner, registry,
+    _origin, _authenticated⟩ := succeeded
+  have returnedIssued := (decode_slots_issued boundaryFuel).1
+    checkpoint.origin.authority generation checkpoint.values _ _ _ _ slots (ready.2.weaken extension) decode
+  cases completion
+  rename_i value resultType returned outputFuel authenticated origin completionExtension
+  cases returned
+  rename_i returnedAuthority returnedWorld returnedStore stored environmentTyped returnedRegistry returnedValues owner sourcePrefix
+  change returnedWorld = store.map Core.Value.type at world
+  subst returnedWorld
+  have registryEq : returnedRegistry = slots := eq_of_heq registry
+  subst returnedRegistry
+  change returnedAuthority = checkpoint.origin.authority at authority
+  subst returnedAuthority
+  exact ⟨ready.1, returnedIssued⟩
+
+theorem Checkpoint.FailedResultAt.exportsReady {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {executionFuel : Nat}
+    {native : Core.Value} {store : Core.Store} {reason : Core.Word} {returned : Session artifact}
+    (failed : checkpoint.FailedResultAt executionFuel native store reason returned)
+    (ready : checkpoint.ExportsReady) : returned.ExportsReady := by
+  obtain ⟨_completed, _decoded, _store, _world, _values, _owner, authority,
+    _sourcePrefix, extension, registry⟩ := failed
+  have returnedIssued := ready.2.weaken extension
+  have registryEq := eq_of_heq registry
+  rw [← registryEq, ← authority] at returnedIssued
+  exact ⟨by change returned.authority.IssuedFor artifact.authority; rw [authority]; exact ready.1,
+    returnedIssued⟩
+
+private theorem issue_callable_exportsReady {artifact : Artifact} {session : Session artifact}
+    {factory : CallableFactory artifact.recipe.compiled} {generation : ExportGeneration}
+    {fuel : Nat} {completion : Completion artifact}
+    (issued : issueCallable session factory generation fuel = .ok completion)
+    (ready : session.ExportsReady) : completion.session.ExportsReady := by
+  unfold issueCallable at issued
+  obtain ⟨_globals, _checked, issued⟩ := root_factory_bind_ok issued
+  cases slot : factory.slot with
+  | none =>
+      simp only [slot] at issued
+      obtain ⟨_validated, _validatedAt, issued⟩ := root_factory_bind_ok issued
+      obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+      cases issued
+      exact ⟨ready.1, (decode_slots_issued fuel).1 _ _ _ _ _ _ _ _ ready.2
+        (exportValue_success_receipt exportedAt).1⟩
+  | some pair =>
+      rcases pair with ⟨location, expected⟩
+      simp only [slot] at issued
+      split at issued
+      · obtain ⟨_validated, _validatedAt, issued⟩ := root_factory_bind_ok issued
+        obtain ⟨exported, exportedAt, issued⟩ := root_factory_bind_ok issued
+        cases issued
+        exact ⟨ready.1, (decode_slots_issued fuel).1 _ _ _ _ _ _ _ _ ready.2
+          (exportValue_success_receipt exportedAt).1⟩
+      · simp [bind, Except.bind, throw, throwThe] at issued
+
+theorem Session.NamedIssuedAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion) (ready : session.ExportsReady) :
+    completion.session.ExportsReady := by
+  obtain ⟨_row, _generation, _selected, accepted⟩ := issued
+  exact issue_callable_exportsReady accepted ready
+
+theorem Session.BuiltinIssuedAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.BuiltinIssuedAt function fuel completion) (ready : session.ExportsReady) :
+    completion.session.ExportsReady := by
+  obtain ⟨_row, _generation, _selected, accepted⟩ := issued
+  exact issue_callable_exportsReady accepted ready
+
+private theorem exportValue_runtime_function_success {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {generation : ExportGeneration} {fuel : Nat}
+    {values : Values} {slots : Registry artifact world} {expected parameter result : Ty}
+    {native : Core.Value} {type : Core.Ty}
+    (owned : authority.IssuedFor artifact.authority) (issued : Registry.Issued authority slots)
+    (generated : artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type)
+    (typed : Core.RuntimeValueHasType world native type artifact.program.layouts.definitions)
+    (positive : 0 < fuel) (functionResult : SourceCoreRawMetadata.runtimeType expected = .function parameter result) :
+    ∃ exported : Exported (artifact := artifact) world authority fuel values expected native,
+      exportValue authority generation fuel values slots expected native = .ok exported ∧
+      ∃ handle, exported.value = .function handle ∧ handle.sourceType = expected := by
+  obtain ⟨handle, returned, registered, _returnedIssued, source, resolved⟩ :=
+    register_complete owned issued generation generated typed
+  cases fuel with
+  | zero => omega
+  | succ rest =>
+    have decoded : decodeRaw authority generation values (rest + 1) slots expected native =
+        .ok (.function handle, returned) := by
+      simp only [decodeRaw, functionResult, registered, bind, Except.bind, pure, Except.pure]
+    have encoded : encodeRaw authority returned (rest + 1) values.registry expected (.function handle) =
+        .ok (.pure values.registry native) := by
+      simp only [encodeRaw, functionResult, resolved, bind, Except.bind, pure, Except.pure]
+    let exported : Exported (artifact := artifact) world authority (rest + 1) values expected native :=
+      ⟨.function handle, returned, .pure values.registry native, encoded, rfl⟩
+    refine ⟨exported, ?_, handle, rfl, source⟩
+    unfold exportValue
+    rw [decoded]
+    dsimp only [bind, Except.bind]
+    split
+    · rename_i error failed
+      rw [encoded] at failed
+      cases failed
+    · rename_i actual accepted
+      have same := Except.ok.inj (accepted.symm.trans encoded)
+      subst actual
+      split
+      · rfl
+      · rename_i impossible
+        exact False.elim (impossible rfl)
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- The real typed native function result passes the actual decoder and
+re-encoder with one boundary step. Its returned session retains issuer and
+slot provenance for another guaranteed export. -/
+theorem Checkpoint.native_runtime_function_succeeded_receipt {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {generation : ExportGeneration}
+    {payload : Core.Value} {store : Core.Store} {expected parameter result : Ty}
+    (ready : checkpoint.ExportsReady)
+    (completed : checkpoint.NativeDone fuel (.inRight .word payload) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (functionResult : SourceCoreRawMetadata.runtimeType expected = .function parameter result)
+    (positive : 0 < boundaryFuel) :
+    ∃ (completion : Completion artifact) (handle : Handle),
+      complete checkpoint generation fuel boundaryFuel (.inRight .word payload) store completed =
+        .succeeded completion ∧
+      checkpoint.SucceededResultAt fuel boundaryFuel generation (.inRight .word payload) store completion ∧
+      completion.value = .function handle ∧ handle.sourceType = expected ∧ completion.session.ExportsReady := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word payload) store at completed
+  have extension : Core.WorldExtends checkpoint.world (store.map Core.Value.type) := by
+    obtain ⟨_, _, path⟩ := Core.runStateful_sound completed
+    obtain ⟨future, growth, typed⟩ := path.preserve_store_world checkpoint.typed checkpoint.stored
+    simpa only [typed.world_eq, Core.State.final, Core.State.store] using growth
+  have payloadTyped : Core.RuntimeValueHasType (store.map Core.Value.type) payload checkpoint.request.type
+      artifact.program.layouts.definitions := by
+    obtain ⟨future, stored, typed⟩ := Core.well_typed_runStateful_preserves_result_type checkpoint.typed completed
+    have nativeTyped : Core.RuntimeValueHasType (store.map Core.Value.type) (.inRight .word payload)
+        (Core.LanguageResult.resultType checkpoint.request.type) artifact.program.layouts.definitions := by
+      simpa only [stored.world_eq] using typed
+    cases nativeTyped with
+    | inRight typed => exact typed
+  obtain ⟨exported, exportedEq, handle, publicEq, sourceType⟩ := exportValue_runtime_function_success
+    (generation := generation) (values := checkpoint.values) (slots := checkpoint.registry.weaken extension)
+    ready.1 (ready.2.weaken extension) checkpoint.request.generated payloadTyped positive
+    (by rw [requested]; exact functionResult)
+  have actual : ∃ completion : Completion artifact,
+      complete checkpoint generation fuel boundaryFuel (.inRight .word payload) store completed =
+        .succeeded completion ∧ completion.value = .function handle := by
+    unfold complete
+    simp only [Core.LanguageResult.decode?]
+    rw [exportedEq]
+    exact ⟨_, rfl, publicEq⟩
+  obtain ⟨completion, succeeded, publicEq⟩ := actual
+  have receipt := checkpoint.complete_succeeded_receipt completed succeeded
+  exact ⟨completion, handle, succeeded, receipt, publicEq, sourceType.trans requested, receipt.exportsReady ready⟩
+
+/-- Every actual resume above the native bound exports the same function
+payload. Authority provenance comes from real session transitions. -/
+theorem Checkpoint.ResumeAt.runtime_function_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {payload : Core.Value} {store : Core.Store} {expected parameter result : Ty}
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (ready : checkpoint.ExportsReady)
+    (completed : checkpoint.NativeDone fuel (.inRight .word payload) store)
+    (requested : checkpoint.ResultTypeAt expected)
+    (functionResult : SourceCoreRawMetadata.runtimeType expected = .function parameter result)
+    (positive : 0 < boundaryFuel) :
+    ∃ (completion : Completion artifact) (handle : Handle),
+      outcome = .succeeded completion ∧ completion.value = .function handle ∧
+      handle.sourceType = expected ∧ completion.session.ExportsReady := by
+  change Core.runStateful fuel checkpoint.state = .done (.inRight .word payload) store at completed
+  rcases receipt with ⟨generation, native, actualStore, executed, same⟩ | ⟨state, exhausted, suspended⟩
+  · rw [completed] at executed
+    cases executed
+    obtain ⟨completion, handle, succeeded, _exported, publicValue, sourceType, returnedReady⟩ :=
+      checkpoint.native_runtime_function_succeeded_receipt ready completed requested functionResult positive
+        (generation := generation)
+    exact ⟨completion, handle, same.symm.trans succeeded, publicValue, sourceType, returnedReady⟩
+  · rw [completed] at exhausted
+    cases exhausted
+
+end Solcore.Frontend.SourceCoreIndexedSession

@@ -1509,7 +1509,7 @@ import Solcore.Test.SourceCoreCapturedPackedPublicExecution
 import Solcore.Test.SourceCoreCapturedPackedForward
 import Solcore.Test.SourceCoreDirectIssuedPublicExecution
 import Solcore.Test.SourceCoreDirectIssuedForward
-import Solcore.Test.SourceCoreDirectOutputPublicExecution
+import Solcore.Test.SourceCoreDirectFunctionForward
 import Solcore.Test.SourceCoreCapturedLocalPublicExecution
 import Solcore.Test.SourceCoreInitialLexicalFailurePublicExecution
 import Solcore.Test.SourceCoreInitialLexicalFailureForward
@@ -3440,7 +3440,7 @@ def run : IO Unit := do
   SourceCoreCapturedDirect.run
   SourceCoreCapturedPacked.runForward
   SourceCoreDirectIssued.runForward
-  SourceCoreDirectOutput.run
+  SourceCoreDirectFunctionForward.run
   SourceCoreCapturedLocal.run
   SourceCoreInitialLexicalFailure.runForward
   SourceCoreCapturedCopy.run

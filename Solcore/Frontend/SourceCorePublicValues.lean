@@ -123,3 +123,40 @@ def Value.type : Value → Ty
 
 
 end Solcore.Frontend.SourceCorePublicValues
+
+namespace Solcore.Frontend.SourceCorePublicValues
+
+/-- The original session issuer belongs to this artifact. This is a proof
+receipt, not an operational authority accessor. -/
+def SessionAuthority.IssuedFor (session : SessionAuthority) (artifact : ArtifactAuthority) : Prop :=
+  session.artifact = artifact
+
+/-- Mint once and retain the artifact association of that same authority. -/
+def ArtifactAuthority.newSessionWithReceipt (artifact : ArtifactAuthority) :
+    IO { session : SessionAuthority // session.IssuedFor artifact } := do
+  let identity ← fresh
+  pure ⟨⟨artifact, identity⟩, rfl⟩
+
+theorem SessionAuthority.issue_artifact {session : SessionAuthority} {artifact : ArtifactAuthority}
+    (issued : session.IssuedFor artifact) (generation : ExportGeneration) (index : Nat) (type : TypeSystem.Ty) :
+    (session.issue generation index type).belongsToArtifact artifact = true := by
+  change decide (session.artifact = artifact) = true
+  exact decide_eq_true issued
+
+theorem SessionAuthority.issue_session (session : SessionAuthority)
+    (generation : ExportGeneration) (index : Nat) (type : TypeSystem.Ty) :
+    (session.issue generation index type).belongsToSession session = true := by
+  simp [SessionAuthority.issue, Handle.belongsToSession]
+
+theorem SessionAuthority.issue_sourceType (session : SessionAuthority)
+    (generation : ExportGeneration) (index : Nat) (type : TypeSystem.Ty) :
+    (session.issue generation index type).sourceType = type := rfl
+
+theorem SessionAuthority.issue_index {session : SessionAuthority}
+    {leftGeneration rightGeneration : ExportGeneration} {leftIndex rightIndex : Nat}
+    {leftType rightType : TypeSystem.Ty}
+    (same : session.issue leftGeneration leftIndex leftType =
+      session.issue rightGeneration rightIndex rightType) : leftIndex = rightIndex := by
+  exact congrArg Handle.slot same
+
+end Solcore.Frontend.SourceCorePublicValues

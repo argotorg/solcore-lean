@@ -1168,3 +1168,132 @@ theorem Checkpoint.ResumeAt.runtime_word_succeeded {artifact : Artifact}
       exact ⟨wrapCompletion actual, returned.symm, publicValue⟩
 
 end Solcore.Frontend.SourceCoreExecution
+
+namespace Solcore.Frontend.SourceCoreExecution
+
+/-- The public session retains the indexed issuer and slot provenance. -/
+def Session.ExportsReady {artifact : Artifact} (session : Session artifact) : Prop :=
+  match artifact, session with
+  | ⟨_, .empty _⟩, ⟨_⟩ => True
+  | ⟨_, .indexed _ _ _ _⟩, ⟨indexed⟩ => indexed.ExportsReady
+
+/-- The initial public checkpoint retains its actual session issuer. -/
+def Bootstrap.ExportAuthorityAt {artifact : Artifact} (bootstrap : Bootstrap artifact) : Prop :=
+  match artifact, bootstrap with
+  | ⟨_, .empty _⟩, ⟨_⟩ => True
+  | ⟨_, .indexed _ _ _ _⟩, ⟨indexed⟩ => indexed.ExportAuthorityAt
+
+/-- Mint the original artifact-owned session once and retain both initial
+machine and issuer receipts. -/
+def Artifact.bootstrapWithExportReceipt (artifact : Artifact) :
+    IO { bootstrap : Bootstrap artifact // bootstrap.FreshAt ∧ bootstrap.ExportAuthorityAt } := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact pure ⟨⟨()⟩, True.intro, True.intro⟩
+  | indexed recipe selected native atRecipe => exact do
+      let fresh ← native.bootstrapFreshWithExportReceipt recipe atRecipe
+      pure ⟨⟨fresh.val⟩, fresh.property⟩
+
+theorem Session.IndexedAt.exportsReady_iff {artifact : Artifact} {session : Session artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Session native}
+    (atSession : session.IndexedAt indexed) : session.ExportsReady ↔ indexed.ExportsReady := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim atSession
+  | indexed recipe selected actual atRecipe =>
+      rcases session with ⟨payload⟩
+      rcases atSession with ⟨rfl, same⟩
+      cases eq_of_heq same
+      rfl
+
+theorem Bootstrap.ReadyAt.exportsReady {artifact : Artifact}
+    {bootstrap : Bootstrap artifact} {session : Session artifact} {fuel : Nat}
+    (ready : bootstrap.ReadyAt fuel session) (authority : bootstrap.ExportAuthorityAt) :
+    session.ExportsReady := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => trivial
+  | indexed recipe selected native atRecipe =>
+      obtain ⟨indexed, indexedSession, _value, store, atBootstrap, atSession, _completed, booted⟩ :=
+        ready.indexed_receipt (recipe := recipe) (native := native) ⟨rfl, rfl, rfl⟩
+      apply atSession.exportsReady_iff.mpr
+      have indexedAuthority : indexed.ExportAuthorityAt := by
+        rcases bootstrap with ⟨payload⟩
+        cases eq_of_heq atBootstrap.2
+        exact authority
+      exact booted.exportsReady indexedAuthority
+
+theorem Session.NamedIssuedAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion) (ready : session.ExportsReady) :
+    completion.session.ExportsReady := by
+  obtain ⟨native, before, actual, atSession, issued, atCompletion⟩ := issued
+  exact atCompletion.2.2.2.exportsReady_iff.mpr (issued.exportsReady (atSession.exportsReady_iff.mp ready))
+
+theorem Session.BuiltinIssuedAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.BuiltinIssuedAt function fuel completion) (ready : session.ExportsReady) :
+    completion.session.ExportsReady := by
+  obtain ⟨native, before, actual, atSession, issued, atCompletion⟩ := issued
+  exact atCompletion.2.2.2.exportsReady_iff.mpr (issued.exportsReady (atSession.exportsReady_iff.mp ready))
+
+theorem Checkpoint.ResumeAt.exportsReady {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {completion : Completion artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel (.succeeded completion))
+    (ready : indexed.ExportsReady) : completion.session.ExportsReady := by
+  obtain ⟨actual, _generation, _value, _store, _completed, exported, _valueAt, _sourceAt, _fuelAt, atSession⟩ :=
+    receipt.indexed_succeeded atCheckpoint
+  exact atSession.exportsReady_iff.mpr (exported.exportsReady ready)
+
+theorem Session.RunAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {options : RunOptions} {completion : Completion artifact}
+    (run : session.RunAt key arguments options (.ok (.succeeded completion)))
+    (ready : session.ExportsReady) : completion.session.ExportsReady := by
+  obtain ⟨checkpoint, started, resumed⟩ := run
+  obtain ⟨_recipe, _native, indexedSession, indexedCheckpoint, _opened, atSession, atCheckpoint, actualStart⟩ :=
+    Session.start_indexed (compiled := artifact.compilation) rfl started
+  exact resumed.exportsReady atCheckpoint
+    ((indexedSession.start_root_receipt actualStart).initial_registry.exportsReady (atSession.exportsReady_iff.mp ready))
+
+theorem Session.InvokeAt.exportsReady {artifact : Artifact} {session : Session artifact}
+    {handle : Handle} {argument : Value} {options : RunOptions} {completion : Completion artifact}
+    (run : session.InvokeAt handle argument options (.ok (.succeeded completion)))
+    (ready : session.ExportsReady) : completion.session.ExportsReady := by
+  obtain ⟨checkpoint, started, resumed⟩ := run
+  obtain ⟨_recipe, _native, indexedSession, indexedCheckpoint, _opened, atSession, atCheckpoint, actualStart⟩ :=
+    Session.startHandlePacked_indexed (compiled := artifact.compilation) rfl started
+  exact resumed.exportsReady atCheckpoint
+    ((indexedSession.startHandlePacked_receipt actualStart).initial_registry.exportsReady (atSession.exportsReady_iff.mp ready))
+
+/-- A genuine public resume exports the actual function result with one
+positive boundary step, including runtime-compatible raw annotations. -/
+theorem Checkpoint.ResumeAt.runtime_function_succeeded {artifact : Artifact}
+    {checkpoint : Checkpoint artifact} {fuel boundaryFuel : Nat} {outcome : Outcome artifact}
+    {native : SourceCoreIndexedSession.Artifact} {indexed : SourceCoreIndexedSession.Checkpoint native}
+    {expected parameter result : TypeSystem.Ty} {payload : Core.Value} {store : Core.Store}
+    (atCheckpoint : checkpoint.IndexedAt indexed)
+    (receipt : checkpoint.ResumeAt fuel boundaryFuel outcome)
+    (ready : indexed.ExportsReady)
+    (completed : indexed.NativeDone fuel (.inRight .word payload) store)
+    (requested : indexed.ResultTypeAt expected)
+    (functionResult : SourceCoreRawMetadata.runtimeType expected = .function parameter result)
+    (positive : 0 < boundaryFuel) :
+    ∃ (completion : Completion artifact) (handle : Handle),
+      outcome = .succeeded completion ∧ completion.value = .function handle ∧
+      handle.sourceType = expected ∧ completion.session.ExportsReady := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => rcases checkpoint with ⟨impossible⟩; exact nomatch impossible
+  | indexed recipe selected actualNative atRecipe =>
+      rcases checkpoint with ⟨actualCheckpoint⟩
+      rcases atCheckpoint with ⟨rfl, same⟩
+      cases eq_of_heq same
+      obtain ⟨actualOutcome, resumed, returned⟩ := receipt
+      obtain ⟨actual, handle, succeeded, publicValue, sourceType, exportedReady⟩ :=
+        resumed.runtime_function_succeeded ready completed requested functionResult positive
+      rw [succeeded] at returned
+      exact ⟨wrapCompletion actual, handle, returned.symm, publicValue, sourceType, exportedReady⟩
+
+end Solcore.Frontend.SourceCoreExecution
