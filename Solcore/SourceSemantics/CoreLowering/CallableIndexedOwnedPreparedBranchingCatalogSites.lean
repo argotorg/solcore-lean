@@ -53,6 +53,33 @@ structure Collected
     expressionSyntax certificates definitions administrative context scope position expected type code
   sites : ∀ registry faults, tree.CatalogSites .reachable registry faults
 
+/-- Every header assignment in the accepted fragment is a bare plain write.
+Its place/modifier errors are unreachable, so only the actual expression child
+certificates contribute failures. The original header tree is retained. -/
+theorem header_sites {items : List ForItemForm} {body : Expr}
+    {continuation : SourceSemantics.Context → SourceCoreLocalCell.Scope → Expr → Prop}
+    (tree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates
+      definitions administrative type continuation context scope items body)
+    (shape : ItemShape items) (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
+    tree.ReachableErrors registry faults := by
+  induction tree with
+  | nil next => exact .nil (next := next)
+  | uninitialized monomorphic extended ordinary projected allocation annotation same remaining ih =>
+      exact .uninitialized (monomorphic := monomorphic) (extended := extended) (ordinary := ordinary)
+        (projected := projected) (allocation := allocation) (annotation := annotation)
+        (same := same) (remaining := remaining) (ih shape.let_tail)
+  | initialized monomorphic extended ordinary found sourceType initial allocation annotation same remaining ih =>
+      exact .initialized (monomorphic := monomorphic) (extended := extended) (ordinary := ordinary)
+        (initializerFound := found) (sourceType := sourceType) (initial := initial)
+        (allocation := allocation) (annotation := annotation) (same := same) (remaining := remaining) (ih shape.let_tail)
+  | discard found value remaining ih =>
+      exact .discard (found := found) (value := value) (remaining := remaining) (ih shape.discard_tail)
+  | assign head remaining ih =>
+    obtain ⟨same, bare, rest⟩ := shape.assign_tail
+    cases same
+    exact .assign (head := head) (remaining := remaining) (ih rest) (GenericAssignmentStatements.Head.ReachableErrors.bare_equal (empty_steps head.shape bare))
+  | bitNot _ _ _ => cases shape
+
 namespace Collected
 
  theorem body {context scope mode statements expected type code}
@@ -254,6 +281,107 @@ namespace Collected
   refine ⟨.terminalMatch unique found form scrutineeFound scrutineeTyped casesTyped defaultTyped compilation sameValues sameDefinitions allocator requests receipt ordinary (fun request member childContext related => (children request member childContext related).tree) stops issued, ?_⟩
   intro registry faults
   exact .terminalMatch (unique := unique) (found := found) (form := form) (scrutineeFound := scrutineeFound) (scrutineeTyped := scrutineeTyped) (casesTyped := casesTyped) (defaultTyped := defaultTyped) (compilation := compilation) (sameValues := sameValues) (sameDefinitions := sameDefinitions) (allocator := allocator) (requests := requests) (receipt := receipt) (ordinary := ordinary) (children := (fun request member childContext related => (children request member childContext related).tree)) (stops := stops) (issued := issued) catalog patternContext (fun request member childContext related => (children request member childContext related).sites registry faults)
+
+
+ theorem forLoop {context scope mode id node initializer condition post statements rest expected type initialCode body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post statements)
+      (initial : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers initializer condition post statements) expected type initialCode)
+      (remaining : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode rest) expected type body) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements mode (id :: rest)) expected type (LocalLoop.sequence type initialCode body) := by
+  refine ⟨.forLoop found form initial.tree remaining.tree, ?_⟩
+  intro registry faults
+  exact .forLoop (found := found) (form := form) (initial := initial.tree)
+    (remaining := remaining.tree) (initial.sites registry faults) (remaining.sites registry faults)
+
+
+ theorem initializersDone {context scope condition conditionNode post statements expected type conditionCode bodyCode postCode selfReason}
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool)
+      (conditionTree : certificates context scope condition ⟨.bool, conditionCode⟩)
+      (loopBody : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.statements false statements) expected type bodyCode)
+      (postTree : GenericForHeader.Tree layouts owner active frame globals onError values source certificates definitions administrative
+        type (TypedForHeader.Fallthrough type) context scope post postCode)
+      (postShape : ItemShape post)
+      (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+        (LocalLoop.iterate type conditionCode bodyCode postCode selfReason) (LocalLoop.resultType type) definitions) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative context scope (.initializers [] condition post statements) expected type
+        (LocalLoop.iterate type conditionCode bodyCode postCode selfReason) := by
+  refine ⟨.initializersDone conditionFound conditionType conditionTree loopBody.tree postTree nativeTyped, ?_⟩
+  intro registry faults
+  exact .initializersDone (conditionFound := conditionFound) (conditionType := conditionType)
+    (conditionTree := conditionTree) (loopBody := loopBody.tree) (postTree := postTree)
+    (nativeTyped := nativeTyped) (loopBody.sites registry faults) (header_sites postTree postShape registry faults)
+
+
+ theorem initializerUninitialized {context nextContext scope binder rest body payload condition post statements expected type}
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (projected : values.checked.catalog.project binder.scheme.body = .ok payload)
+      (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (absentRequest source scope binder payload))
+      (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (absentRequest source scope binder payload))
+      (same : annotation.original = allocation.expression)
+      (remaining : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        nextContext ((binder.id, payload) :: scope) (.initializers rest condition post statements) expected type body) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.letDecl binder none :: rest) condition post statements) expected type (.letE annotation.expression body) := by
+  refine ⟨.initializerUninitialized monomorphic extended ordinary projected allocation annotation same remaining.tree, ?_⟩
+  intro registry faults
+  exact .initializerUninitialized (monomorphic := monomorphic) (extended := extended)
+    (ordinary := ordinary) (projected := projected) (allocation := allocation) (annotation := annotation)
+    (same := same) (remaining := remaining.tree) (remaining.sites registry faults)
+
+
+ theorem initializerInitialized {context nextContext scope binder initializer initializerNode lowered body rest condition post statements expected type}
+      (monomorphic : binder.scheme.quantified = [])
+      (extended : BinderExtends source.owner context binder nextContext)
+      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
+      (initializerFound : source.lookupExpression? initializer = some initializerNode)
+      (sourceType : initializerNode.type = binder.scheme.body)
+      (initial : certificates context scope initializer lowered)
+      (allocation : SourceCoreAllocationLayouts.Allocation layouts owner active (initializedRequest source scope binder lowered.type))
+      (annotation : SourceCoreCallableIndexedAllocationFrames.Annotated frame globals
+        (layouts.allocatorAt owner active onError) (initializedRequest source scope binder lowered.type))
+      (same : annotation.original = allocation.expression)
+      (remaining : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        nextContext ((binder.id, lowered.type) :: scope) (.initializers rest condition post statements) expected type body) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.letDecl binder (some initializer) :: rest) condition post statements) expected type (sequence type lowered.expression annotation.expression body) := by
+  refine ⟨.initializerInitialized monomorphic extended ordinary initializerFound sourceType initial allocation annotation same remaining.tree, ?_⟩
+  intro registry faults
+  exact .initializerInitialized (monomorphic := monomorphic) (extended := extended)
+    (ordinary := ordinary) (initializerFound := initializerFound) (sourceType := sourceType)
+    (initial := initial) (allocation := allocation) (annotation := annotation)
+    (same := same) (remaining := remaining.tree) (remaining.sites registry faults)
+
+
+ theorem initializerDiscard {context scope expression expressionNode rest lowered body condition post statements expected type}
+      (found : source.lookupExpression? expression = some expressionNode)
+      (value : certificates context scope expression lowered)
+      (remaining : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.expression expression :: rest) condition post statements) expected type (LocalSequence.discard (LocalLoop.controlType type) lowered.expression body) := by
+  refine ⟨.initializerDiscard found value remaining.tree, ?_⟩
+  intro registry faults
+  exact .initializerDiscard (found := found) (value := value) (remaining := remaining.tree)
+    (remaining.sites registry faults)
+
+
+ theorem initializerAssign {context scope assignment operator rhs rest body condition post statements expected type}
+      (head : GenericAssignmentStatements.Head values source context (certificates context) scope administrative definitions assignment operator rhs)
+      (remaining : Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body)
+      (equal : operator = .equal) (bare : assignment.target.projections = []) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
+  cases equal
+  refine ⟨.initializerAssign head remaining.tree, ?_⟩
+  intro registry faults
+  exact .initializerAssign (head := head) (remaining := remaining.tree)
+    (remaining.sites registry faults)
+    (GenericAssignmentStatements.Head.ReachableErrors.bare_equal (empty_steps head.shape bare))
 
 end Collected
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites

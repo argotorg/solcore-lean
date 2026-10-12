@@ -9,6 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableLambdaViewMatchRuntimeCertif
 import Solcore.SourceSemantics.CoreLowering.CompatibleMatchNativeReceipts
 import Solcore.SourceSemantics.CoreLowering.GenericMatchScopedContexts
 import Solcore.SourceSemantics.CoreLowering.GenericImperativeMatchCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingHeaderCollectors
 
 /-! The actual compiler flow and its native typing produce the original scoped
 branch and assignment tree. Only reached expression metadata is transported; allocations
@@ -148,9 +149,56 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
   {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
 
-/-- Genuine Source syntax and one native body witness suffice for every
-expression callback, including the RHS under the seven-slot assignment frame. -/
-theorem collected
+/-- Every callback is reached from the original body. Header references include
+all remaining initializers, the actual test, the post items and the loop body. -/
+def PositionReaches (source : TypedSource) (roots : List NodeId) : GenericImperativeMatch.Position → Prop
+  | .statements _ statements => ∀ id ∈ statements, Reaches source roots (.statement id)
+  | .initializers items condition post statements =>
+      ∀ id ∈ items.flatMap ForItemForm.references ++ [.expression condition] ++
+        post.flatMap ForItemForm.references ++ statements.map NodeId.statement,
+        Reaches source roots id
+
+/-- The for-header continuation is recovered from the actual outer compiler
+call. Its condition, post and body equations are retained together. -/
+def CompilerAccepted (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : TypedSource)
+    (scope : SourceCoreLocalCell.Scope) (position : GenericImperativeMatch.Position)
+    (type : Ty) (reasonAt : ExpressionId → Word) (selfReason : Word) (code : Expr) : Prop :=
+  match position with
+  | .statements mode statements =>
+      SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope statements type reasonAt mode selfReason = .ok code
+  | .initializers items condition post statements =>
+      ∃ headerFuel parentSite next,
+        SourceCoreLoops.lowerForItems policy parentSite headerFuel source scope items type reasonAt next = .ok code ∧
+        ∀ loopScope nextCode, next loopScope = .ok nextCode →
+          ∃ conditionCode loopCode postCode,
+            policy.lowerExpression fuel source loopScope condition reasonAt = .ok conditionCode ∧
+            conditionCode.type = .bool ∧
+            SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source loopScope statements type reasonAt false selfReason = .ok loopCode ∧
+            SourceCoreLoops.lowerForItems policy parentSite fuel source loopScope post type reasonAt
+              (fun _ => pure (LocalLoop.fallthrough type)) = .ok postCode ∧
+            nextCode = LocalLoop.iterate type conditionCode.expression loopCode postCode selfReason
+
+private theorem iterate_condition {definitions : DataEnvironment} {context : Core.Context}
+    {type result : Ty} {condition body post : Expr} {reason : Word}
+    (typed : HasType context (LocalLoop.iterate type condition body post reason) result definitions) :
+    ∃ conditionType, HasType context condition conditionType definitions := by
+  cases typed with
+  | letE allocation installed =>
+    cases allocation with
+    | newCell empty =>
+      cases installed with
+      | letE written invoked =>
+        cases written with
+        | storeCell reference closure =>
+          cases closure with
+          | inRight unitWF raw =>
+            cases raw with
+            | lambda parameterWF resultWF loop =>
+              obtain ⟨_, shifted⟩ := computation_child loop
+              exact ⟨_, TypedLexicalWhile.Native.remove_front
+                (TypedLexicalWhile.Native.remove_front shifted)⟩
+
+theorem collected_at
     (edited : LocalView source view changed) (avoids : Avoids source roots changed)
     (unique : NodeOccurrencesUnique source)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
@@ -177,24 +225,22 @@ theorem collected
         lowered.expression nativeType definitions → certificates context scope id lowered)
     {context : SourceSemantics.Context} {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty}
     (syntaxTree : GenericImperativeMatch.Syntax source expressionSyntax context position expected)
-    {mode : Bool} {statements : List StatementId} (atStatements : position = .statements mode statements)
-    (shape : Shape source mode statements)
+    (shape : PositionShape source position)
     (fields : Dynamic.RuntimeContextFields initial context)
     (closed : context.typeVariables = []) (residual : context.residualTypeVariables = true)
     (sourceSignatures : context.signatures = values.checked.signatures)
     {scope : SourceCoreLocalCell.Scope}
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
-    (reached : ∀ id ∈ statements, Reaches source roots (.statement id))
+    (reached : PositionReaches source roots position)
     {fuel : Nat} {type : Ty} {code : Expr} {selfReason : Word} {nativeType : Ty}
     (projection : values.checked.catalog.project expected = .ok type)
-    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel view scope statements type reasonAt mode selfReason = .ok code)
+    (accepted : CompilerAccepted policy fuel view scope position type reasonAt selfReason code)
     (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
     Collected layouts owner active frame globals onError values source expressionSyntax
       (TypedCertificate source certificates) definitions administrative context scope
-      (.statements mode statements) expected type code := by
-  induction syntaxTree generalizing mode statements scope fuel code nativeType with
+      position expected type code := by
+  induction syntaxTree generalizing scope fuel code nativeType with
   | body body =>
-    cases atStatements
     have viewed := CallableLambdaViewSourceTyping.lexical_syntax_with edited avoids unique
       (fun _ _ original => original) body reached
     have extracted := CallableIndexedOwnedPreparedNativeLexicalCollectors.tree_of_typed_flow_with_residual _
@@ -213,11 +259,10 @@ theorem collected
       (fun _ _ _ _ accessible value => value (accessible.metadata edited.metadata.symm)) discharged
       (fun id member => (reached id member).metadata edited.metadata))
   | @uninitialized context nextContext mode id node binder rest expected found form declaration mono extended ordinary remaining ih =>
-    cases atStatements
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -235,7 +280,7 @@ theorem collected
         (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata.symm) allocation
       obtain ⟨originalAnnotation, original, identical⟩ := CallableLambdaViewAllocations.annotation
         (request := TypedLexicalWhile.absentRequest view scope binder payload) edited.metadata.symm annotation
-      have tail := ih rfl (shape.tail_of_let found form) (fields.trans (.ofBinderExtends extended))
+      have tail := ih (shape.tail_of_let found form) (fields.trans (.ofBinderExtends extended))
         (by cases extended; exact closed) (by cases extended; exact residual) (by cases extended; exact sourceSignatures)
         (scope_bind payload declarations declaration extended) (fun child member => reached child (List.mem_cons_of_mem id member))
         projection generated (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
@@ -243,11 +288,10 @@ theorem collected
       exact .uninitialized found form mono extended ordinary (binder_projected (binderPolicy scope binder mono ▸ projected))
         originalAllocation originalAnnotation (by simpa only [originalAllocation, CallableLambdaViewAllocations.allocation] using original.trans same) tail
   | @initialized context nextContext mode id node binder initializer initializerNode rest expected found form declaration mono extended ordinary initializerFound sourceType typed initializerSyntax remaining ih =>
-    cases atStatements
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have identical := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -275,7 +319,7 @@ theorem collected
         (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata.symm) allocation
       obtain ⟨originalAnnotation, original, identical⟩ := CallableLambdaViewAllocations.annotation
         (request := TypedLexicalWhile.initializedRequest view scope binder lowered.type) edited.metadata.symm annotation
-      have tail := ih rfl (shape.tail_of_let found form) (fields.trans (.ofBinderExtends extended))
+      have tail := ih (shape.tail_of_let found form) (fields.trans (.ofBinderExtends extended))
         (by cases extended; exact closed) (by cases extended; exact residual) (by cases extended; exact sourceSignatures)
         (scope_bind lowered.type declarations declaration extended) (fun child member => reached child (List.mem_cons_of_mem id member))
         projection generatedBody (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
@@ -283,11 +327,10 @@ theorem collected
       exact .initialized found form mono extended ordinary initializerFound sourceType value originalAllocation originalAnnotation
         (by simpa only [originalAllocation, CallableLambdaViewAllocations.allocation] using original.trans same) tail
   | @discard context mode id node expression expressionNode semicolon rest expected found form notTail sourceType expressionFound typed syntaxValue remaining ih =>
-    cases atStatements
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -311,16 +354,15 @@ theorem collected
         .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
       exact .discard found form notTail expressionFound
         ⟨expressionNode, expressionFound, typed, children context fields declarations syntaxValue accessible expressionFound typed generated childTyped⟩
-        (ih rfl restShape fields closed residual sourceSignatures declarations
+        (ih restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
   | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile childSyntax remaining ih =>
-    cases atStatements
     obtain ⟨sameOperator, bare, restShape⟩ := shape.assign_tail found form
     cases sameOperator
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -367,12 +409,11 @@ theorem collected
       have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
       rw [emittedOriginal]
       exact .assign found form originalHead
-        (ih rfl restShape fields closed residual sourceSignatures declarations
+        (ih restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
           (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) rfl bare
   | @block context mode id node statements rest expected found form sourceType inner remaining innerIH restIH
   | @scopedBlock context mode id node statements rest expected found form inner remaining innerIH restIH =>
-    cases atStatements
     obtain ⟨innerShape, restShape⟩ := shape.block_children found form
     have innerReached : ∀ child ∈ statements, Reaches source roots (.statement child) := by
       intro child member
@@ -380,7 +421,7 @@ theorem collected
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -390,11 +431,10 @@ theorem collected
       cases accepted
       obtain ⟨⟨_, innerTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
       exact .block found form
-        (innerIH rfl innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
-        (restIH rfl restShape fields closed residual sourceSignatures declarations
+        (innerIH innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
+        (restIH restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
   | @terminalBlock context mode id node statements rest expected exactUnique found form sourceType inner stops innerIH =>
-    cases atStatements
     obtain ⟨innerShape, _restShape⟩ := shape.block_children found form
     have innerReached : ∀ child ∈ statements, Reaches source roots (.statement child) := by
       intro child member
@@ -402,7 +442,7 @@ theorem collected
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -412,10 +452,9 @@ theorem collected
       cases accepted
       obtain ⟨⟨_, innerTyped⟩, _⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
       exact .terminalBlock exactUnique found form
-        (innerIH rfl innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
+        (innerIH innerShape fields closed residual sourceSignatures declarations innerReached projection generatedInner innerTyped)
         stops ((GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix).transport (statement_identity edited.metadata.symm))
   | @ifThen context mode id node condition conditionNode thenBody elseBody rest expected found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax remaining thenIH elseIH restIH =>
-    cases atStatements
     obtain ⟨leftShape, rightShape, restShape⟩ := shape.branches found form
     have conditionReached : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
@@ -428,7 +467,7 @@ theorem collected
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -453,9 +492,9 @@ theorem collected
         obtain ⟨⟨_, thenTyped⟩, ⟨_, elseTyped⟩⟩ := TypedLexicalWhile.Native.conditional_children branchTyped
         exact .ifThen found form conditionFound conditionType
           ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax conditionReached conditionFound typed generatedCondition conditionTyped⟩
-          (thenIH rfl leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
-          (elseIH rfl rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
-          (restIH rfl restShape fields closed residual sourceSignatures declarations
+          (thenIH leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
+          (elseIH rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
+          (restIH restShape fields closed residual sourceSignatures declarations
             (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
       | some statements =>
         obtain ⟨elseCode, generatedElse, accepted⟩ := bind_ok accepted
@@ -466,12 +505,11 @@ theorem collected
         obtain ⟨⟨_, thenTyped⟩, ⟨_, elseTyped⟩⟩ := TypedLexicalWhile.Native.conditional_children branchTyped
         exact .ifThen found form conditionFound conditionType
           ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax conditionReached conditionFound typed generatedCondition conditionTyped⟩
-          (thenIH rfl leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
-          (elseIH rfl rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
-          (restIH rfl restShape fields closed residual sourceSignatures declarations
+          (thenIH leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
+          (elseIH rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
+          (restIH restShape fields closed residual sourceSignatures declarations
             (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
   | @terminalIf context mode id node condition conditionNode thenBody elseBody rest expected exactUnique found form sourceType conditionFound conditionType typed conditionSyntax thenSyntax elseSyntax thenStops elseStops thenIH elseIH =>
-    cases atStatements
     obtain ⟨leftShape, rightShape, _restShape⟩ := shape.branches found form
     have conditionReached : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
@@ -484,7 +522,7 @@ theorem collected
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -505,15 +543,13 @@ theorem collected
       obtain ⟨⟨_, thenTyped⟩, ⟨_, elseTyped⟩⟩ := TypedLexicalWhile.Native.conditional_children branchTyped
       exact .terminalIf exactUnique found form conditionFound conditionType
         ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax conditionReached conditionFound typed generatedCondition conditionTyped⟩
-        (thenIH rfl leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
-        (elseIH rfl rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
+        (thenIH leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
+        (elseIH rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
         thenStops elseStops ((GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix).transport (statement_identity edited.metadata.symm))
   | breaking found form | continuing found form =>
-    cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
   | @whileLoop context mode id node condition conditionNode statements rest expected found form conditionFound conditionType typed conditionSyntax loopSyntax remaining loopIH restIH =>
-    cases atStatements
     obtain ⟨loopShape, restShape⟩ := shape.loop found form
     have conditionReached : Reaches source roots (.expression condition) :=
       .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
@@ -523,7 +559,7 @@ theorem collected
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -545,18 +581,17 @@ theorem collected
       obtain ⟨⟨_, loopBodyTyped⟩, loopTyped⟩ := TypedLexicalWhile.Native.while_body loopTyped
       exact .whileLoop found form conditionFound conditionType
         ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax conditionReached conditionFound typed generatedCondition conditionTyped⟩
-        (loopIH rfl loopShape fields closed residual sourceSignatures declarations loopReached projection generatedLoop loopBodyTyped)
+        (loopIH loopShape fields closed residual sourceSignatures declarations loopReached projection generatedLoop loopBodyTyped)
         loopTyped
-        (restIH rfl restShape fields closed residual sourceSignatures declarations
+        (restIH restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
   | @matchWith context mode id node resolution scrutineeNode rest expected control caseFacts
       found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped
       hiddenOrdinary armsOrdinary childrenSyntax remaining childIH restIH =>
-    cases atStatements
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -601,7 +636,7 @@ theorem collected
           cases related with
           | arm _ _ _ extended _ => exact binders_fields extended
           | default _ _ => exact .refl _
-        apply childIH request childContext related.forget rfl (shape.match_request found form related.forget)
+        apply childIH request childContext related.forget (shape.match_request found form related.forget)
           (fields.trans childFields) (sameVariables.trans closed) (sameResidual.trans residual)
           (sameSignatures.trans sourceSignatures) childDeclarations
         · intro statement present
@@ -615,7 +650,7 @@ theorem collected
         · exact projection
         · exact generated
         · exact childTyped
-      · exact restIH rfl (shape.match_children found form).2.2 fields closed residual sourceSignatures declarations
+      · exact restIH (shape.match_children found form).2.2 fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped
       · exact catalog
       · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
@@ -623,11 +658,10 @@ theorem collected
   | @terminalMatch context mode id node resolution scrutineeNode rest expected control caseFacts
       exactUnique found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped
       hiddenOrdinary armsOrdinary childrenSyntax stops childIH =>
-    cases atStatements
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
-      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
       obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
       subst actual
@@ -672,7 +706,7 @@ theorem collected
           cases related with
           | arm _ _ _ extended _ => exact binders_fields extended
           | default _ _ => exact .refl _
-        apply childIH request childContext related.forget rfl (shape.match_request found form related.forget)
+        apply childIH request childContext related.forget (shape.match_request found form related.forget)
           (fields.trans childFields) (sameVariables.trans closed) (sameResidual.trans residual)
           (sameSignatures.trans sourceSignatures) childDeclarations
         · intro statement present
@@ -692,12 +726,236 @@ theorem collected
       · exact catalog
       · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
           fields.solvedRequirements.trans ledger⟩
-  | forLoop found form _ _ _ _ _
   | bitNot found form _ _ _ _ _ =>
-    cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
-  | initializersDone | initializerUninitialized | initializerInitialized | initializerDiscard
-  | initializerAssign | initializerBitNot => cases atStatements
+  | @forLoop context mode id node initializer condition post statements rest expected found form sourceType initialSyntax remaining initialIH restIH =>
+    obtain ⟨initialShape, postShape, bodyShape, restShape⟩ := shape.for_children found form
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      obtain ⟨initialCode, generatedInitial, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, initialTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      apply Collected.forLoop found form
+      · apply initialIH ⟨initialShape, postShape, bodyShape⟩ fields closed residual sourceSignatures declarations
+        · intro child member
+          exact .statement (reached id (by simp)) found (by simpa only [form, StatementForm.references] using member)
+        · exact projection
+        · refine ⟨fuel, .occurrence id.occurrence, _, generatedInitial, ?_⟩
+          intro loopScope nextCode generated
+          obtain ⟨conditionCode, conditionGenerated, generated⟩ := bind_ok generated
+          obtain ⟨checked, conditionChecked, generated⟩ := bind_ok generated
+          cases checked
+          obtain ⟨loopCode, loopGenerated, generated⟩ := bind_ok generated
+          obtain ⟨postCode, postGenerated, generated⟩ := bind_ok generated
+          cases generated
+          exact ⟨conditionCode, loopCode, postCode, conditionGenerated, (ensure_same conditionChecked).symm,
+            loopGenerated, postGenerated, rfl⟩
+        · exact initialTyped
+      · exact restIH restShape fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped
+  | @initializersDone context condition conditionNode post statements expected conditionFound conditionType typed conditionSyntax loopBody postSyntax loopIH =>
+    obtain ⟨headerFuel, parentSite, next, generated, nextReceipt⟩ := accepted
+    have nextAccepted : next scope = .ok code := by cases headerFuel <;> exact generated
+    obtain ⟨conditionCode, loopCode, postCode, conditionGenerated, conditionChecked, loopGenerated, postGenerated, rfl⟩ :=
+      nextReceipt scope code nextAccepted
+    rcases conditionCode with ⟨native, expression⟩
+    dsimp only at conditionChecked
+    subst native
+    obtain ⟨⟨_, bodyTyped⟩, ⟨_, postTyped⟩, loopTyped⟩ := TypedImperativeFor.Native.iterate_children nativeTyped
+    obtain ⟨_, conditionNative⟩ := iterate_condition loopTyped
+    have accessible : Reaches source roots (.expression condition) := reached _ (by simp)
+    apply Collected.initializersDone conditionFound conditionType
+      ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax accessible conditionFound typed conditionGenerated conditionNative⟩
+    · exact loopIH shape.2.2 fields closed residual sourceSignatures declarations
+        (fun child member => reached _ (by simp [member])) projection loopGenerated bodyTyped
+    · exact CallableIndexedOwnedPreparedNativeBranchingHeaderCollectors.tree edited avoids unique binderPolicy allocationPolicy
+        assignments children postSyntax shape.2.1 fields closed residual sourceSignatures declarations
+        (fun child member => reached _ (by simp [member])) postGenerated postTyped
+    · exact shape.2.1
+    · exact loopTyped
+  | @initializerUninitialized context nextContext binder rest condition post statements expected declaration mono extended ordinary remaining ih =>
+    obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems] at accepted
+      obtain ⟨payload, projected, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generated, accepted⟩ := bind_ok accepted
+      simp only [SourceCoreSourceCells.letUninitialized, allocationPolicy] at accepted
+      obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨allocation, annotation, same, rfl⟩ := CallableIndexedAllocationCompletion.accepted_receipts onError generatedAllocation
+      let originalAllocation := CallableLambdaViewAllocations.allocation
+        (request := TypedLexicalWhile.absentRequest view scope binder payload)
+        (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata.symm) allocation
+      obtain ⟨originalAnnotation, original, identical⟩ := CallableLambdaViewAllocations.annotation
+        (request := TypedLexicalWhile.absentRequest view scope binder payload) edited.metadata.symm annotation
+      have tail := ih ⟨shape.1.let_tail, shape.2⟩ (fields.trans (.ofBinderExtends extended))
+        (by cases extended; exact closed) (by cases extended; exact residual) (by cases extended; exact sourceSignatures)
+        (scope_bind payload declarations declaration extended)
+        (fun child member => reached child (by simpa [ForItemForm.references] using member))
+        projection ⟨headerFuel, parentSite, next, generated, nextReceipt⟩ (TypedLexicalWhile.Native.absent_child allocation annotation same nativeTyped)
+      rw [← identical]
+      exact .initializerUninitialized mono extended ordinary (binder_projected (binderPolicy scope binder mono ▸ projected))
+        originalAllocation originalAnnotation (by simpa only [originalAllocation, CallableLambdaViewAllocations.allocation] using original.trans same) tail
+  | @initializerInitialized context nextContext binder initializer initializerNode rest condition post statements expected declaration mono extended ordinary initializerFound sourceType typed initializerSyntax remaining ih =>
+    obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems] at accepted
+      obtain ⟨payload, projected, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      obtain ⟨lowered, generated, accepted⟩ := bind_ok accepted
+      obtain ⟨checked, checkedType, accepted⟩ := bind_ok accepted
+      cases checked
+      have sameType := ensure_same checkedType
+      subst payload
+      simp only [SourceCoreSourceCells.letInitialized, allocationPolicy] at accepted
+      obtain ⟨allocationCode, generatedAllocation, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨allocation, annotation, same, rfl⟩ := CallableIndexedAllocationCompletion.accepted_receipts onError generatedAllocation
+      obtain ⟨_, childTyped⟩ := computation_child nativeTyped
+      have accessible : Reaches source roots (.expression initializer) := reached _ (by simp [ForItemForm.references])
+      have value : TypedCertificate source certificates context scope initializer lowered :=
+        ⟨initializerNode, initializerFound, typed, children context fields declarations initializerSyntax accessible initializerFound typed generated childTyped⟩
+      let originalAllocation := CallableLambdaViewAllocations.allocation
+        (request := TypedLexicalWhile.initializedRequest view scope binder lowered.type)
+        (CallableIndexedLambdaViewPrefix.sourceView_eq edited.metadata.symm) allocation
+      obtain ⟨originalAnnotation, original, identical⟩ := CallableLambdaViewAllocations.annotation
+        (request := TypedLexicalWhile.initializedRequest view scope binder lowered.type) edited.metadata.symm annotation
+      have tail := ih ⟨shape.1.let_tail, shape.2⟩ (fields.trans (.ofBinderExtends extended))
+        (by cases extended; exact closed) (by cases extended; exact residual) (by cases extended; exact sourceSignatures)
+        (scope_bind lowered.type declarations declaration extended)
+        (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member)))
+        projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ (TypedLexicalWhile.Native.initialized_child allocation annotation same nativeTyped)
+      rw [← identical]
+      exact .initializerInitialized mono extended ordinary initializerFound sourceType value originalAllocation originalAnnotation
+        (by simpa only [originalAllocation, CallableLambdaViewAllocations.allocation] using original.trans same) tail
+  | @initializerDiscard context expression expressionNode rest condition post statements expected found typed syntaxValue remaining ih =>
+    obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems] at accepted
+      obtain ⟨lowered, generated, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨_, childTyped⟩ := computation_child nativeTyped
+      obtain ⟨_, tailTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
+      have accessible : Reaches source roots (.expression expression) := reached _ (by simp [ForItemForm.references])
+      exact .initializerDiscard found
+        ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩
+        (ih ⟨shape.1.discard_tail, shape.2⟩ fields closed residual sourceSignatures declarations
+          (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ tailTyped)
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile childSyntax remaining ih =>
+    obtain ⟨sameOperator, bare, restShape⟩ := shape.1.assign_tail
+    cases sameOperator
+    obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems] at accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      have compiled : SourceCoreCompatibleDataPlaces.lower values values.checked.signatures policy.lowerExpression headerFuel view scope parentSite
+          assignment .equal (some rhs) (LocalLoop.controlType type) body reasonAt
+          (invalidProjection parentSite assignment.target.root)
+          (invalidOperand parentSite assignment.target.root .equal)
+          (missingDefault parentSite assignment.target.root) = .ok code := by
+        simpa only [SourceCoreLoops.assignValue, assignments.equal] using accepted
+      have accessible : Reaches source roots (.expression rhs) := reached _ (by simp [ForItemForm.references])
+      obtain ⟨rhsSyntax, rhsNode, rhsFound, rhsTyped⟩ := childSyntax rhs (by simp)
+      obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot, _layout, generated, _sameType, _profile, codeEq⟩ :=
+        CompatibleBareAssignment.of_lower bare compiled
+      have rhsNative := CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_present_rhs
+        (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
+        (rhs := value.expression) (next := body) (output := LocalLoop.controlType type) (result := nativeType)
+        (operator := .equal) (codeEq ▸ nativeTyped)
+      have rhsType : rhsNode.type = assignment.target.type := by
+        obtain ⟨actualNode, contains, actualType⟩ := rightTyped.stored_type
+        have sameNode := Option.some.inj (rhsFound.symm.trans (lookupExpression?_complete unique contains))
+        exact sameNode ▸ actualType
+      let originalHead : GenericAssignmentStatements.Head values source context
+          (TypedCertificate source certificates context) scope administrative definitions assignment .equal rhs := {
+        prepared := prepared
+        index := index
+        codes := []
+        leaf := prepared.route.rootSourceType
+        lowered := value
+        node := rhsNode
+        invalid := invalidOperand parentSite assignment.target.root .equal
+        shape := .bare bare _layout
+        slot := _slot
+        writable := _rootType ▸ writable binder ((rootBinder edited.metadata _).trans _binding)
+        found := rhsFound
+        right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
+        rightView := by simpa only [rhsType] using _rawView
+        rightType := _sameType
+        profile := .inl rfl }
+      have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
+      rw [emittedOriginal]
+      exact .initializerAssign originalHead
+        (ih ⟨restShape, shape.2⟩ fields closed residual sourceSignatures declarations
+          (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩
+          (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) rfl bare
+  | initializerBitNot => cases shape.1
+
+
+theorem collected
+    (edited : LocalView source view changed) (avoids : Avoids source roots changed)
+    (unique : NodeOccurrencesUnique source)
+    (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement values.checked)
+    (binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
+      policy.lowerBinder view scope binder = SourceCoreCompatibleDataExpressions.lowerBinder values.checked view scope binder)
+    (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    {matchCompilation : SourceCoreCompatibleDataMatches.Context}
+    (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
+    (matchValues : matchCompilation.values = values)
+    (matchDefinitions : matchCompilation.definitions = definitions)
+    (matchAllocator : matchCompilation.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
+      (layouts.allocatorAt owner active onError)))
+    (hidden : GenericImperativeMatch.MatchHiddenFresh source)
+    (catalog : SignatureCatalogWellFormed values.checked.signatures)
+    (ledger : initial.solvedRequirements = matchCompilation.solvedRequirements)
+    (children : ∀ context, Dynamic.RuntimeContextFields initial context →
+      ∀ {scope fuel id node lowered}, CompatibleExpressionReads.ScopeDeclarations source scope context →
+      expressionSyntax id → Reaches source roots (.expression id) →
+      source.lookupExpression? id = some node → ExpressionHasType source context id node.type →
+      policy.lowerExpression fuel view scope id reasonAt = .ok lowered →
+      ∀ {nativeType}, HasType (SourceCoreLocalCell.coreContext scope ++ administrative)
+        lowered.expression nativeType definitions → certificates context scope id lowered)
+    {context : SourceSemantics.Context} {position : GenericImperativeMatch.Position} {expected : TypeSystem.Ty}
+    (syntaxTree : GenericImperativeMatch.Syntax source expressionSyntax context position expected)
+    {mode : Bool} {statements : List StatementId} (atStatements : position = .statements mode statements)
+    (shape : Shape source mode statements)
+    (fields : Dynamic.RuntimeContextFields initial context)
+    (closed : context.typeVariables = []) (residual : context.residualTypeVariables = true)
+    (sourceSignatures : context.signatures = values.checked.signatures)
+    {scope : SourceCoreLocalCell.Scope}
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (reached : ∀ id ∈ statements, Reaches source roots (.statement id))
+    {fuel : Nat} {type : Ty} {code : Expr} {selfReason : Word} {nativeType : Ty}
+    (projection : values.checked.catalog.project expected = .ok type)
+    (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel view scope statements type reasonAt mode selfReason = .ok code)
+    (nativeTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code nativeType definitions) :
+    Collected layouts owner active frame globals onError values source expressionSyntax
+      (TypedCertificate source certificates) definitions administrative context scope
+      (.statements mode statements) expected type code := by
+  cases atStatements
+  exact collected_at edited avoids unique readPolicy binderPolicy allocationPolicy assignments
+    matchPolicy matchValues matchDefinitions matchAllocator hidden catalog ledger children
+    syntaxTree shape fields closed residual sourceSignatures declarations reached projection accepted nativeTyped
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeBranchingCollectors
