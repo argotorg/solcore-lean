@@ -57,7 +57,10 @@ private theorem start_at_state {artifact : Artifact} {session : Session artifact
   change currentWorld = actualWorld ∧ currentStore = actualStore at state
   exact ⟨state.1.symm.trans native.1, state.2.symm.trans native.2⟩
 
-private theorem recover_start
+/-- Recover the actual selected root and current native input state for a
+following public call. The caller can then retain its exact Source arguments
+when invoking the public continuation theorem. -/
+theorem recover_start
     {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
     (prepared : Recipe.prepare compiled = .ok recipe)
     (inputs : List (Input compiled)) (rows : Inventory inputs)

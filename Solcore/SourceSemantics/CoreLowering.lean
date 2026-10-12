@@ -1474,6 +1474,12 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleInputRegis
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaReadDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
 
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicWordResultMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFreeSelectedScopes
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionInputRegistry
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

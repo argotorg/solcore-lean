@@ -157,7 +157,7 @@ private theorem special_none
   | tuple => rfl
   | call => rfl
 
-private theorem recipe_policy_for
+theorem recipe_policy_for
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     {compilation : Compilation prepared named diagnostics namedCode}
     {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}

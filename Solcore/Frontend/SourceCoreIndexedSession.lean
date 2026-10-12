@@ -4341,3 +4341,71 @@ theorem Checkpoint.FailedResultAt.encodes_function
   exact ⟨_, execution_encode_function_at_registry oldAt resolved returnedValues.registry, oldValue⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem encoded_function_registry {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {handle : Handle}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected (.function handle) = .ok encoded) :
+    encoded.registry = registry := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin => cases builtin <;> cases accepted
+      case function parameter result =>
+        obtain ⟨native, _resolved, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        rfl
+
+private theorem function_argument_registry {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List Ty} {types : List Core.Ty} {handle : Handle}
+    {encoded : Arguments artifact world types}
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types
+      [.function handle] = .ok encoded) :
+    encoded.values.registry = values.registry := by
+  cases sourceTypes with
+  | nil => cases types <;> cases accepted
+  | cons expected rest =>
+    cases types with
+    | nil => cases accepted
+    | cons type types =>
+      simp only [encodeArguments] at accepted
+      cases projected : artifact.recipe.compiled.compatible.checked.catalog.project expected with
+      | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+      | ok actual =>
+        simp only [projected, bind, Except.bind] at accepted
+        split at accepted
+        · rename_i same
+          subst actual
+          obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨validated, _validated, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+          cases accepted
+          cases rest <;> cases types <;> try (solve | cases tailEq)
+          cases tailEq
+          exact encoded_function_registry rawEq
+        · simp [throw, throwThe] at accepted
+
+/-- Starting a named call with one authenticated function handle preserves the
+metadata registry. The equality follows from the successful input encoding. -/
+theorem Checkpoint.RootStart.function_registry {artifact : Artifact} {session : Session artifact}
+    {key : Key} {handle : Handle} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key [.function handle] fuel) :
+    checkpoint.values.registry = session.values.registry := by
+  obtain ⟨root, _selected, _key, _arity, encoded, accepted, _origin, _request,
+    _world, _initial, _slots, values⟩ := receipt
+  rw [values]
+  exact function_argument_registry accepted
+
+end Solcore.Frontend.SourceCoreIndexedSession
