@@ -4,6 +4,12 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Named conditional calls at their actual checkpoints (2026-10-13)
+
+Checkpoint `00067020` connects named conditional bodies to actual initialization, the first call and a following call on its returned session. The closed `choose` example takes both branches and proves Source results `11 / 22`, exact successive heaps and reusable histories. The first branch allocates a local copy. Independent Source success also supplies sufficient execution and output fuel for every resume above the bounds at each original checkpoint.
+
+Static support comes from the genuine named Header and accepted compiler flow. The diagnostic receiver is constructed from its registry, without an additional execution. Full build (6299 jobs), all registered tests and kernel policy pass; twelve audited endpoints use only the standard three axioms. Finite staged loops are the next connection being verified. Wider compiler coverage and final all-pass composition remain incomplete.
+
 ## Conditional closure bodies connected to public execution (2026-10-13)
 
 Checkpoint `b5b60f45` connects conditional statements through the actual compiler, recursive Source semantics, closure application and public sessions. Branch arms execute in scoped mode. Falling through restores the surrounding lexical context while retaining the reached heap; returning or failing stops the suffix. Compiler receipts retain the actual accepted flow, selected branch code and native typing.
@@ -134,11 +140,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `b5b60f45`: conditional closure bodies reach independent Source traces, exact returned histories and sufficient public fuel. |
-| Latest completed verification | Full build (6284 jobs), all registered tests, kernel policy and twenty-seven endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `00067020`: named conditional bodies reach first and following public calls, exact Source histories and sufficient fuel at their original checkpoints. |
+| Latest completed verification | Full build (6299 jobs), all registered tests, kernel policy and twelve endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, encoded input registries, general output, nested handle collection, resumptions and export-error continuations connect to the public proof family. Conditional closure bodies preserve distinct mutable captures across intervening calls. |
 | Latest proof scope | The actual six-call conditional example proves distinct handles, results `11 / 20 / 11` and histories at the exact successive sessions/heaps. Static body conditions come from accepted compiler receipts. |
-| Current implementation priority | Close named conditional bodies, then extend staged loop and other body coverage through the same public endpoints. Wider expression/evidence/coercion coverage and all-pass composition remain open. |
+| Current implementation priority | Connect finite staged loops through actual compiler bodies and public sessions, then widen remaining body/expression coverage and compose all compiler passes. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

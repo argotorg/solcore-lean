@@ -4,6 +4,14 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Named conditional calls at their actual checkpoints (2026-10-13)
+
+Checkpoint `00067020` connects named conditional bodies to actual initialization, the first call and a following call on its returned session. The closed `choose` example takes both branches and proves Source results `11 / 22`, exact successive heaps and reusable histories. The first branch allocates a local copy. Independent Source success also supplies sufficient execution and output fuel for every resume above the bounds at each original checkpoint.
+
+Static support comes from the genuine named Header and accepted compiler flow. The diagnostic receiver is constructed from its registry, without an additional execution. Full build (6299 jobs), all registered tests and kernel policy pass; twelve audited endpoints use only the standard three axioms. Finite staged loops are the next connection being verified. Wider compiler coverage and final all-pass composition remain incomplete.
+
+`PreparedStagedNamedBodies.Compilation.branching` stores the genuine named flow receipt. `PreparedNamedBranchingCollectors.of_compiler` derives its static support, and `PreparedStagedNamedBranchingSupport.preserves` / `reflects` supply the existing public family. The closed endpoint is `Tests.SourceCoreNamedBranch.closed_sequence_meaning`; `run` observes the actual checker, compiler, bootstrap and both calls.
+
 ## Conditional closure bodies connected to public execution (2026-10-13)
 
 Checkpoint `b5b60f45` connects conditional statements through the actual compiler, recursive Source semantics, closure application and public sessions. Branch arms execute in scoped mode. Falling through restores the surrounding lexical context while retaining the reached heap; returning or failing stops the suffix. Compiler receipts retain the actual accepted flow, selected branch code and native typing.
