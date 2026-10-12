@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Continuations and collected output handles (2026-10-13)
+
+At `a0c2197f`, the public proof route includes finite execution resumption chains, direct export-error continuations and collection of function handles from nested constructor/mapping outputs. Following named calls use the actual encoded registry. Direct failure proofs retain authentic callable arity, including zero arguments.
+
+The new closed sequences retain the same Source heap across fuel exhaustion and output export failure. Another sequence collects `A, B, A` from an actual mapping result and invokes those collected handles, with an intervening factory allocation; the captured results are `10 / 20 / 10`. Mapping row order and duplicate keys are preserved. The forward collection guarantee is stated for selections of the actual exported value; it does not separately assert the fixture's exact mapping for every larger fuel budget.
+
+Full build (6244 jobs), all registered tests and kernel policy pass. Twenty audited endpoints for the continuation/nested-output additions use only the standard three axioms. Initial/following named export errors and staged conditional bodies are the next connections under development. General compiler coverage and the final composition theorem remain incomplete. See the [implementation log](core-runtime-unification-progress.md) for commit boundaries and the [API record](core-runtime-unification-api.md) for entry points. Earlier dated sections describe their own checkpoints.
+
 ## Actual input registries and general public output (2026-10-13)
 
 `8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.

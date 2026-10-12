@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Continuations and nested selection audit (2026-10-13)
+
+Checkpoint `a0c2197f` passes the full 6244-job build, all registered tests and kernel policy. Twenty audited endpoints for the two latest units use only `propext`, `Classical.choice` and `Quot.sound`.
+
+`2ab1db28` proves composition of actual execution resumptions. Each intermediate receipt must be a genuine out-of-fuel outcome. Composition preserves the terminal outcome, reached store, export generation and final output budget; it sums only execution fuel. The closed example exhausts positive execution fuel twice before each of two direct completions. Its forward theorem applies to every actual finite chain meeting the total execution and terminal output bounds.
+
+The same commit handles direct export errors. The receipt distinguishes successful native/Source execution from failure to export that result. It retains the reached session and old authenticated encodings without adding an output handle. Source heap typing follows from the full successful result. A closed call with output budget `0` continues from that exact state and reuses its older captured handle.
+
+`a0c2197f` collects ordered mapping entries `A, B, A` from the actual public result, including repeated handles and duplicate keys. Subsequent calls use those selected output entries, not an independently supplied list of input handles. They preserve separate captures through another allocation and return `10 / 20 / 10`. The general forward collector quantifies over selections of the actual exported value; the concrete ordered three-row mapping is identified in the observed reflection theorem.
+
+Preceding checkpoints `65a7ed23` and `990acc26` connect following named calls, nested selection and decoded arity to both semantic directions. In particular, a packed Unit value does not by itself determine whether the callable takes zero or one argument. Failure reflection uses the genuine decoded arity, and Source failure preservation uses authentic callable arity.
+
+Initial/following named export errors and staged conditional bodies remain under development at this checkpoint. No final all-pass preservation claim follows from these units.
+
 ## Actual input registries and general public output (2026-10-13)
 
 `8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.

@@ -4,6 +4,24 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Execution continuations and nested output collection (2026-10-13)
+
+Checkpoint `a0c2197f` adds proof interfaces without changing Core instructions or runtime behavior. Full build (6244 jobs), all registered tests and kernel policy pass; twenty audited endpoints for these additions use only the standard three axioms.
+
+| Module | Entry point | Connection |
+| --- | --- | --- |
+| `SourceCoreExecution` / `SourceCoreIndexedSession` | `Checkpoint.ResumeAt.then_resume`, `Checkpoint.ResumeChain.collapse` | Finite actual resumptions to the original checkpoint at summed execution fuel and terminal output budget. |
+| `SourceCoreIndexedSession` | `Checkpoint.ExportErrorResultAt`, `Checkpoint.ResumeAt.export_error` | Successful native completion, failed public export and the exact returned session. |
+| `RecursiveNamedPublicActualRegistryExportErrors` | `public_resume_export_error`, `public_invoke_export_error` | Direct export failure to independent Source success and retained History at the reached heap. |
+| `RecursiveNamedPublicActualRegistryOutputCollection` | `public_invoke_succeeded_collects` | Actual nested output selection to ordered retained function entries. |
+| `RecursiveNamedPublicActualRegistryOutputCollectionPreservation` | `public_resume_has_sufficient_fuel` | Source success to sufficient public fuel and History for selected actual output handles. |
+| `RecursiveNamedPublicActualRegistryNamedReflection` | `public_run_succeeded_retains`, `public_run_failed_retains` | Following named calls at the actual receiving registry. |
+| `RecursiveNamedPublicActualRegistryNamedOutputPreservation` | `public_resume_has_sufficient_fuel`, `public_resume_fault_has_sufficient_fuel` | Following named Source value/fault to public completion and retained History. |
+
+`ResumeChain` records genuine intermediate exhaustion; it does not reset the heap or add intermediate output budgets. An export error retains older handles and successful Source effects, but creates no new output entry. Initial/following named export-error interfaces are still under development at this checkpoint.
+
+`RecursiveNamedPublicNestedOutputSelections.Selection` traverses supported function, product, constructor-payload and explicit ordered mapping rows. It preserves duplicate keys and repeated handles. `SourceCoreCapturedNestedCollectionForward` registers a closed seven-call example that collects `A, B, A` from a real mapping output and proves captured results `10 / 20 / 10` across another allocation. Mapping defaults and additional annotated selection forms remain outside this selection grammar.
+
 ## Actual input registries and general public output (2026-10-13)
 
 `8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.

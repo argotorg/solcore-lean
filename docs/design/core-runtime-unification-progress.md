@@ -6,6 +6,19 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Public continuations and nested output handles (2026-10-13)
+
+The latest verified checkpoint is `a0c2197f`. Runtime unification is complete; preservation across every compiler pass remains unfinished.
+
+- `65a7ed23` connects constructor/mapping output selection, following named calls at their actual receiving registry, and direct Source failure preservation with authentic callable arity.
+- `990acc26` retains decoded argument count when reflecting failures. Its closed example starts with a failed named call, invokes a zero-argument failing handle, then completes an identity call with Word `37`. Both failed calls retain their allocated absent cells and reusable histories.
+- `2ab1db28` connects finite chains of actual execution resumptions and direct output export errors. Execution fuel is summed; only the terminal output budget matters. The closed mapping-input example performs two positive exhaustion events per call, then returns the capture `10` twice. A separate sequence fails output export at budget `0`, retains the successful Source after-heap and invokes the same older handle successfully.
+- `a0c2197f` exports a mapping containing handles `A, B, A`, preserves its ordered duplicate-key rows and collects those actual output entries. The selected handles return `10 / 20 / 10`, including after an intervening `make(30)`. Source success also derives sufficient public fuel and an ordered collected History for any selection of the actual output.
+
+Validation: full build (6244 jobs), all registered tests and kernel policy pass. Twenty audited continuation and nested-output endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next work connects initial/following named export errors and staged conditional bodies through the real compiler and public execution. Those changes are being developed separately and are not included in this checkpoint. Loops, match, wider expression/evidence/coercion coverage and final composition across all compiler passes remain open. Historical percentages below are unchanged estimates, not measurements of current coverage.
+
 ## Actual input registries and general public output (2026-10-13)
 
 `8f1fdfb2` connects current History to the registry produced by the actual input encoder. A proof-only receiver is constructed at that exact context, and genuine compiler diagnostics retain their token meanings along the forward extension. This removes the need to obtain a receiver from a separate execution or assume a reverse metadata extension. Captured environments, ordered entries and the reached Source heap stay intact.
@@ -125,7 +138,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Captured-cell assignment, actual receiving registries and general output decoding are connected to the public proof family. Initial and direct Source success derive both fuel bounds and reusable Histories. Full build (6205 jobs), registered tests, kernel policy and endpoint audits pass. Nested output collection, broader control flow, suspended/export-error continuations and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Actual receiving registries, general output, ordered nested handle collection, finite execution resumptions and direct export-error continuations reach the public proof family. Full build (6244 jobs), registered tests, kernel policy and endpoint audits pass. Initial/following named export errors, broader staged control flow and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
