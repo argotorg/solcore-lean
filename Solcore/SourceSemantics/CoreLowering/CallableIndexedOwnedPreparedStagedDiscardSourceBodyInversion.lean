@@ -82,6 +82,22 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
+  | assignBare actual same _ _ _ _ =>
+    have impossible := shape actual
+    rw [same] at impossible
+    cases impossible
+  | assignBareFault actual same _ _ =>
+    have impossible := shape actual
+    rw [same] at impossible
+    cases impossible
+  | assignBareUnbound actual same _ _ =>
+    have impossible := shape actual
+    rw [same] at impossible
+    cases impossible
+  | assignBareDangling actual same _ _ _ =>
+    have impossible := shape actual
+    rw [same] at impossible
+    cases impossible
 
 private theorem discard_typed {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {facts : StatementFacts}

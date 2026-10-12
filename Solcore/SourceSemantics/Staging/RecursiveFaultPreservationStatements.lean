@@ -60,6 +60,33 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | expressionValue expressionTyped | expressionDiscard expressionTyped =>
           exact expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
+  | @assignBareFault childSize scope context environment before after id rest node assignment rhs target failure
+      contains form _snapshot child =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ =>
+              exact expressionIH childSize (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap rhsTyped child
+          | wordCompound operator _ _ _ => cases operator
+  | assignBareUnbound | assignBareDangling => exact ⟨heap, .refl _⟩
+  | @assignBare childSize nextSize scope context finalContext environment before middle written after
+      id rest node assignment rhs value target updated outcome contains form snapshot child write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) written :=
+        .assignValue contains form (.intro (snapshot.resolves _ _ _ _) child.sound.value_plain write)
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved :=  wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before written [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
   | @letFault childSize scope context environment before after id rest node binder expression failure
       contains form monomorphic child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed

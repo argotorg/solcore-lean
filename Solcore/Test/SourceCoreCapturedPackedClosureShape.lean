@@ -63,6 +63,10 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
+  | assignBare contains otherForm _ _ _ _ =>
+    have impossible := (same contains) ▸ otherForm
+    rw [form] at impossible
+    cases impossible
 
 private theorem lambda_shape
     {program : Program} {source : TypedSource} {context : SourceSemantics.Context}

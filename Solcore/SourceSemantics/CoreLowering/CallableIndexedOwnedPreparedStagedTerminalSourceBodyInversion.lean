@@ -77,6 +77,22 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       have same := shape actual
       rw [form] at same
       cases same
+    | assignBare actual form snapshot child write next =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareFault actual form snapshot child =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareUnbound actual form bare missing =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareDangling actual form bare lookup missing =>
+      have same := shape actual
+      rw [form] at same
+      cases same
   | tail contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
@@ -115,6 +131,22 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
       rw [form] at same
       cases same
     | letFault actual form mono child =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBare actual form snapshot child write next =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareFault actual form snapshot child =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareUnbound actual form bare missing =>
+      have same := shape actual
+      rw [form] at same
+      cases same
+    | assignBareDangling actual form bare lookup missing =>
       have same := shape actual
       rw [form] at same
       cases same

@@ -44,6 +44,10 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
         ((binder.id, location) :: environment) bound rest finalContext outcome after := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
+      have impossible := (shape actual).symm.trans same
+      cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
   | letInitialized actual same _ _ _ _ _ | letFault actual same _ _ =>
@@ -80,6 +84,10 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
+      have impossible := (shape actual).symm.trans same
+      cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
   | letUninitialized actual same _ _ _ _ =>
@@ -109,6 +117,10 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
     finalContext = context ∧ outcome = .returned .unit ∧ after = before := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
+  | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
+      have impossible := (shape actual).symm.trans same
+      cases impossible
   | returnUnit actual same => exact ⟨rfl, rfl, rfl⟩
   | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _

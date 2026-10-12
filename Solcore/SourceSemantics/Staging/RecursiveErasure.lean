@@ -297,6 +297,19 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     cases failure with
     | stage => trivial
     | semantic => exact head_fault (.expression contains form ih)
+  case assignBare contains form snapshot child write _next childIH nextIH =>
+    exact prepend contains (by intro expression; simp [form])
+      (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
+  case assignBareFault contains form snapshot child childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact head_fault (.assignValue contains form
+        (.rhs (snapshot.resolves _ _ _ _) childIH))
+  case assignBareUnbound contains form _bare missing =>
+    exact head_fault (.assignValue contains form (.target (.unbound missing)))
+  case assignBareDangling contains form _bare lookup missing =>
+    exact head_fault (.assignValue contains form (.target (.dangling lookup missing)))
   case letUninitialized contains form mono extension allocate next ih =>
     exact prepend contains (by intro e; simp [form]) (.letUninitialized contains form mono extension allocate) ih
   case letInitialized contains form child mono extension allocate next a b =>

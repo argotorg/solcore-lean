@@ -258,6 +258,39 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression semicolon)
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
         Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+    /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | assignBare {childSize nextSize : Nat} {scope context finalContext environment before middle written after
+          id rest node assignment rhs value target updated outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+          middle target updated written)
+        (next : Statements program registry nextSize scope context environment written rest finalContext outcome after) :
+        Statements program registry (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | assignBareFault {childSize : Nat} {scope context environment before after id rest node assignment rhs target failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry childSize scope context environment before rhs (.fault failure) after) :
+        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | assignBareUnbound {scope context environment heap id rest node assignment rhs}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (bare : assignment.target.projections = [])
+        (missing : environment.Unbound assignment.target.root) :
+        Statements program registry (stepSize []) scope context environment heap (id :: rest) context
+          (.fault (.semantic (.unboundLocal assignment.target.root))) heap
+    | assignBareDangling {scope context environment heap id rest node assignment rhs location}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (bare : assignment.target.projections = [])
+        (lookup : Environment.LooksUp environment assignment.target.root location)
+        (missing : heap.Dangling location) :
+        Statements program registry (stepSize []) scope context environment heap (id :: rest) context
+          (.fault (.semantic (.danglingLocation location))) heap
     | letUninitialized {nextSize : Nat} {scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
@@ -328,6 +361,10 @@ local macro "erase_stage_grade" : tactic =>
     case tail => apply Recursive.Statements.tail <;> assumption
     case discard => apply Recursive.Statements.discard <;> assumption
     case expressionFault => apply Recursive.Statements.expressionFault <;> assumption
+    case assignBare => apply Recursive.Statements.assignBare <;> assumption
+    case assignBareFault => apply Recursive.Statements.assignBareFault <;> assumption
+    case assignBareUnbound => apply Recursive.Statements.assignBareUnbound <;> assumption
+    case assignBareDangling => apply Recursive.Statements.assignBareDangling <;> assumption
     case letUninitialized => apply Recursive.Statements.letUninitialized <;> assumption
     case letInitialized => apply Recursive.Statements.letInitialized <;> assumption
     case letFault => apply Recursive.Statements.letFault <;> assumption
@@ -467,6 +504,17 @@ local macro "construct_stage_grade" : tactic =>
     case expressionFault contains form child ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .expressionFault contains form graded_child⟩
+    case assignBare contains form snapshot child write next childIH nextIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      obtain ⟨nextSize, nextGraded⟩ := nextIH
+      exact ⟨_, .assignBare contains form snapshot childGraded write nextGraded⟩
+    case assignBareFault contains form snapshot child childIH =>
+      obtain ⟨childSize, childGraded⟩ := childIH
+      exact ⟨_, .assignBareFault contains form snapshot childGraded⟩
+    case assignBareUnbound contains form bare missing =>
+      exact ⟨_, .assignBareUnbound contains form bare missing⟩
+    case assignBareDangling contains form bare lookup missing =>
+      exact ⟨_, .assignBareDangling contains form bare lookup missing⟩
     case letUninitialized contains form monomorphic extension allocate next ih_next =>
       obtain ⟨nextSize, graded_next⟩ := ih_next
       exact ⟨_, .letUninitialized contains form monomorphic extension allocate graded_next⟩

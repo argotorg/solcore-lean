@@ -97,6 +97,19 @@ private theorem Statements.body_plain {program : Program} {registry : Registry} 
     cases failure with
     | stage => trivial
     | semantic => exact fault_body (.expression contains form child.semanticFault_plain)
+  case assignBare contains form snapshot child write _next _childIH nextIH =>
+    exact prepend_body contains (by intro expression; simp [form])
+      (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
+  case assignBareFault contains form snapshot child _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact fault_body (.assignValue contains form
+        (.rhs (snapshot.resolves _ _ _ _) child.semanticFault_plain))
+  case assignBareUnbound contains form _bare missing =>
+    exact fault_body (.assignValue contains form (.target (.unbound missing)))
+  case assignBareDangling contains form _bare lookup missing =>
+    exact fault_body (.assignValue contains form (.target (.dangling lookup missing)))
   case letUninitialized contains form mono extension allocate _next ih =>
     exact prepend_body contains (by intro expression; simp [form])
       (.letUninitialized contains form mono extension allocate) ih

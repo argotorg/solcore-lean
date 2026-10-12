@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveScope
+import Solcore.SourceSemantics.Staging.RecursiveBareTarget
 
 /-! A finite recursive staged profile. Every callee, argument and closure body
 uses these same mutually recursive judgments. Staging rejection is propagated
@@ -6,9 +6,9 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, discard, and returns. It deliberately has no plain
+containing monomorphic lets, bare plain assignments, discard, and returns. It deliberately has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
-evidence-selected operator methods, coercion paths, assignments, and loops require later recursive rules. These
+evidence-selected operator methods, coercion paths, projected or compound assignments, and loops require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
@@ -259,6 +259,39 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression semicolon)
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
         Statements program registry scope context environment before (id :: rest) context (.fault failure) after
+    /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
+    | assignBare {scope context finalContext environment before middle written after
+          id rest node assignment rhs value target updated outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+          middle target updated written)
+        (next : Statements program registry scope context environment written rest finalContext outcome after) :
+        Statements program registry scope context environment before (id :: rest) finalContext outcome after
+    | assignBareFault {scope context environment before after id rest node assignment rhs target failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.fault failure) after) :
+        Statements program registry scope context environment before (id :: rest) context (.fault failure) after
+    | assignBareUnbound {scope context environment heap id rest node assignment rhs}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (bare : assignment.target.projections = [])
+        (missing : environment.Unbound assignment.target.root) :
+        Statements program registry scope context environment heap (id :: rest) context
+          (.fault (.semantic (.unboundLocal assignment.target.root))) heap
+    | assignBareDangling {scope context environment heap id rest node assignment rhs location}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment .equal rhs)
+        (bare : assignment.target.projections = [])
+        (lookup : Environment.LooksUp environment assignment.target.root location)
+        (missing : heap.Dangling location) :
+        Statements program registry scope context environment heap (id :: rest) context
+          (.fault (.semantic (.danglingLocation location))) heap
     | letUninitialized {scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
