@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableLambdaBodyReachability
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates
 
 /-! Supported Source grammar follows the exact finite compiler-certificate
@@ -8,7 +9,7 @@ set_option Elab.async false
 set_option maxRecDepth 8192
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 open Core Frontend SourceInference
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls DirectCalls Syntax GeneralSyntax NoDirect)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls DirectCalls Indexes Syntax GeneralSyntax NoDirect NoIndexes)
 
 theorem syntax_child {source : TypedSource} {id child : ExpressionId}
     {node : ExpressionNode} (tree : Syntax source id)
@@ -192,6 +193,9 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
   | conditional metadata form _conditionFound _thenFound _elseFound _conditionType _thenType _elseType _test _yes _no testIH yesIH noIH =>
     exact .conditional metadata.found form testIH yesIH noIH
 
+  | index header keyFound form _sourceType scalar _first _second firstIH secondIH =>
+    exact .index header.metadata.found form keyFound scalar firstIH secondIH
+
 /-- Grammar at a reached call comes from its literal Calls path and certificate,
 including the leading callee and ordered argument entries. -/
 theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
@@ -206,7 +210,7 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
     (path : Calls compiler root) : GeneralSyntax source callId := by
   induction path with
   | here sequence children => exact certificate_syntax (.call compiler sequence children)
-  | group _inside ih => exact ih
+  | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
   | tuple_child _member _inside ih | constructor_child _member _inside ih
   | direct_child _member _inside ih | builtin_child _member _inside ih => exact ih
   | call_child _member _inside ih => exact ih
@@ -227,13 +231,34 @@ theorem direct_calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Sc
     (path : DirectCalls compiler root) : GeneralSyntax source callId := by
   induction path with
   | here calleeTyped application sequence children => exact certificate_syntax (.direct compiler calleeTyped application sequence children)
-  | group _inside ih => exact ih
+  | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
   | tuple_child _member _inside ih | constructor_child _member _inside ih
   | direct_child _member _inside ih | builtin_child _member _inside ih => exact ih
   | call_child _member _inside ih => exact ih
   | unary_child _inside ih | binary_left _inside ih | binary_right _inside ih
   | conditional_condition _inside ih | conditional_then _inside ih | conditional_else _inside ih => exact ih
 
+
+/-- Mapping indexes are absent from the established legacy grammar. -/
+theorem syntax_not_index {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
+    {base key : ExpressionId}
+    (tree : Syntax source id) (found : source.lookupExpression? id = some node)
+    (form : node.form = .index base key) : False := by
+  cases tree with
+  | leaf finite =>
+    cases finite with
+    | literal selected atomic =>
+      cases Option.some.inj (selected.symm.trans found)
+      rw [form] at atomic
+      cases atomic
+    | read selected actual | group selected actual _ | pair selected actual _ _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      simp [form] at actual
+  | group selected actual _ | tuple selected actual _ | constructor selected actual _ _
+  | call selected actual _ _ | unary selected actual _ | binary selected actual _ _
+  | conditional selected actual _ _ _ =>
+    cases Option.some.inj (selected.symm.trans found)
+    simp [form] at actual
 
 /-- Declaration calls are absent from the established legacy grammar. -/
 theorem syntax_not_direct {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
@@ -298,5 +323,137 @@ theorem no_direct_of_syntax
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+    exact syntax_not_index tree header.metadata.found form
+
+/-- Every stored index path contradicts authentic legacy syntax at its
+root. Children are followed through the exact original occurrence references. -/
+theorem no_indexes_of_syntax
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel values source context reasonAt scope id lowered)
+    (tree : Syntax source id) : NoIndexes root := by
+  intro indexScope indexId base key node baseNode keyNode layout comparison first second indexed keyFound form sourceType scalar path
+  induction path with
+  | here firstTree secondTree =>
+    exact syntax_not_index tree indexed.metadata.found form
+  | @group scope id node inner innerNode code actual form found sourceType child inside ih =>
+    exact ih (syntax_child tree actual.found (by simp [form, ExpressionForm.references]))
+  | @tuple_child scope id node tupleIds types codes header sequence children child childCode member inside ih =>
+    exact ih (syntax_child tree header.metadata.found (by
+      simp [header.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
+    exact ih (syntax_child tree header.metadata.found (by
+      simp [form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @builtin_child scope id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    exact ih (syntax_child tree outer.metadata.found (by
+      simp [outer.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @direct_child scope id otherCallee otherIds instantiation otherFuel code types outer calleeTyped application sequence children child childCode member inside ih =>
+    exact syntax_not_direct tree outer.metadata.found outer.form
+  | @call_child scope id otherCallee otherIds metadata otherFuel code types outer sequence children child childCode member inside ih =>
+    apply ih
+    apply syntax_child tree outer.found
+    rcases List.mem_cons.mp member with same | remaining
+    · cases same
+      simp [outer.originalForm, ExpressionForm.references]
+    · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
+  | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_then scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
+
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+    exact syntax_not_index tree header.metadata.found form
+
+
+/-- A reached index keeps its actual original lookup and supported children. -/
+theorem indexes_syntax
+    {indexScope : SourceCoreLocalCell.Scope} {indexId base key : ExpressionId}
+    {node baseNode keyNode : ExpressionNode} {layout : Core.OrderedMapping.Layout}
+    {comparison : SourceCoreCompatibleDataEquality.Prepared values.checked}
+    {first second : SourceCoreBasic.LoweredExpr}
+    {indexed : CompatibleExpressionIndices.Header values source indexId base node baseNode layout comparison first second}
+    {keyFound : source.lookupExpression? key = some keyNode}
+    {form : node.form = .index base key}
+    {sourceType : baseNode.type = .mapping keyNode.type node.type}
+    {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {rootCode : SourceCoreBasic.LoweredExpr}
+    {root : Certificate policy body compilation readFuel values source context reasonAt rootScope rootId rootCode}
+    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root) :
+    GeneralSyntax source indexId := by
+  induction path with
+  | here firstTree secondTree => exact certificate_syntax (.index indexed keyFound form sourceType scalar firstTree secondTree)
+  | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
+  | tuple_child _member _inside ih | constructor_child _member _inside ih
+  | direct_child _member _inside ih | builtin_child _member _inside ih | call_child _member _inside ih => exact ih
+  | unary_child _inside ih | binary_left _inside ih | binary_right _inside ih
+  | conditional_condition _inside ih | conditional_then _inside ih | conditional_else _inside ih => exact ih
+
+/-- Exact occurrence references carry every reached index from its real root. -/
+theorem indexes_reached
+    {indexScope : SourceCoreLocalCell.Scope} {indexId base key : ExpressionId}
+    {node baseNode keyNode : ExpressionNode} {layout : Core.OrderedMapping.Layout}
+    {comparison : SourceCoreCompatibleDataEquality.Prepared values.checked}
+    {first second : SourceCoreBasic.LoweredExpr}
+    {indexed : CompatibleExpressionIndices.Header values source indexId base node baseNode layout comparison first second}
+    {keyFound : source.lookupExpression? key = some keyNode}
+    {form : node.form = .index base key}
+    {sourceType : baseNode.type = .mapping keyNode.type node.type}
+    {scalar : CompatibleExpressionIndices.SourceScalar keyNode.type}
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {rootCode : SourceCoreBasic.LoweredExpr}
+    {root : Certificate policy body compilation readFuel values source context reasonAt rootScope rootId rootCode}
+    (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root)
+    {roots : List NodeId}
+    (reached : CallableLambdaBodyReachability.Reaches source roots (.expression rootId)) :
+    CallableLambdaBodyReachability.Reaches source roots (.expression indexId) := by
+  induction path with
+  | here firstTree secondTree => exact reached
+  | @group scope id node inner innerNode code actual form found sourceType child inside ih =>
+    exact ih (.expression reached actual.found (by simp [form, ExpressionForm.references]))
+  | @tuple_child scope id node tupleIds types codes header sequence children child childCode member inside ih =>
+    exact ih (.expression reached header.metadata.found (by
+      simp [header.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
+    exact ih (.expression reached header.metadata.found (by
+      simp [form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @builtin_child scope id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    exact ih (.expression reached outer.metadata.found (by
+      simp [outer.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @direct_child scope id otherCallee otherIds instantiation otherFuel code types outer calleeTyped application sequence children child childCode member inside ih =>
+    exact ih (.expression reached outer.metadata.found (by
+      simp [outer.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @call_child scope id otherCallee otherIds metadata otherFuel code types outer sequence children child childCode member inside ih =>
+    apply ih
+    apply CallableLambdaBodyReachability.Reaches.expression reached outer.found
+    rcases List.mem_cons.mp member with same | remaining
+    · cases same
+      simp [outer.originalForm, ExpressionForm.references]
+    · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
+  | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_then scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+  | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
+
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+    exact ih (.expression reached header.metadata.found (by simp [form, ExpressionForm.references]))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax

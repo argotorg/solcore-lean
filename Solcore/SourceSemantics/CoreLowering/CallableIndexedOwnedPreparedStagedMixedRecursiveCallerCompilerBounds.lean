@@ -141,7 +141,8 @@ theorem preserves_compiled
               (namedTerminals := namedTerminals) (namedSupport := namedSupport)
               (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
               (extension := extension) (semantic := semantic) smaller))
-      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
+      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree)
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals namedSupport
@@ -201,6 +202,7 @@ theorem reflects_compiled
               (namedTerminals := namedTerminals) (namedSupport := namedSupport)
               (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
               (extension := extension) (semantic := semantic) stageEq smaller))
-      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
+      root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree)
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root syntaxTree) ports size (Nat.le_refl _) certified
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerCompilerBounds

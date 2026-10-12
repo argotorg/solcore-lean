@@ -92,6 +92,12 @@ private theorem read_no_calls
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm
     cases otherForm
+  | @index_base scope id other base key baseNode keyNode layout comparison first second header keyFound otherForm sourceType scalar firstTree secondTree inside
+  | @index_key scope id other base key baseNode keyNode layout comparison first second header keyFound otherForm sourceType scalar firstTree secondTree inside =>
+    have identity := Option.some.inj (header.metadata.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+
 
 
 
@@ -218,7 +224,8 @@ theorem of_child
         (Reaches.from_root reached (by simpa only [sameSource] using path))
         (by simpa only [sameSource] using receipt) location
     callsReady := ready
-    noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _ childTree }
+    noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _ childTree
+    noIndexes := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax _ childTree }
   exact ⟨RootAt.ofRoot root⟩
 
 

@@ -109,7 +109,8 @@ theorem preserves_compiled
     exact CallableIndexedOwnedPreparedStagedRecursiveCallerBounds.preserves
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers
-      sameLedger runtimeLedger uninitialized root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size certified
+      sameLedger runtimeLedger uninitialized root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree)
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root syntaxTree) ports size certified
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
   actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers
@@ -143,6 +144,7 @@ theorem reflects_compiled
     exact CallableIndexedOwnedPreparedStagedRecursiveCallerBounds.reflects
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets namedTerminals namedCovers
-      sameLedger runtimeLedger uninitialized stageEq root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree) ports size certified
+      sameLedger runtimeLedger uninitialized stageEq root (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root syntaxTree)
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root syntaxTree) ports size certified
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerCompilerBounds

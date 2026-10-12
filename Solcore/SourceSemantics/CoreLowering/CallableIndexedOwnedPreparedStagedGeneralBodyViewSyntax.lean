@@ -36,6 +36,7 @@ theorem syntax_found {source : TypedSource} {id : ExpressionId}
   | call found _ _ _ => exact ⟨_, found⟩
   | unary found _ _ => exact ⟨_, found⟩
   | binary found _ _ _ => exact ⟨_, found⟩
+  | index found _ _ _ _ _ => exact ⟨_, found⟩
   | conditional found _ _ _ _ => exact ⟨_, found⟩
 
 theorem syntax_child {source : TypedSource} {id child : ExpressionId}
@@ -93,6 +94,12 @@ theorem syntax_child {source : TypedSource} {id child : ExpressionId}
   | @binary _ _ left operator right selected form first second =>
       cases Option.some.inj (selected.symm.trans found)
       have member : child = left ∨ child = right := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      rcases member with same | same
+      · exact same.symm ▸ first
+      · exact same.symm ▸ second
+  | @index _ _ base key _ selected form _keyFound _scalar first second =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = base ∨ child = key := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
       rcases member with same | same
       · exact same.symm ▸ first
       · exact same.symm ▸ second
@@ -160,6 +167,15 @@ theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id)
       exact .binary ((expression_lookup edited avoids reached).symm.trans found) form
         (firstIH (.expression reached found (by simp [form, ExpressionForm.references])))
         (secondIH (.expression reached found (by simp [form, ExpressionForm.references])))
+  | @index id node base key keyNode found form keyFound scalar first second firstIH secondIH =>
+      intro reached
+      have baseReached : Reaches source roots (.expression base) :=
+        .expression reached found (by simp [form, ExpressionForm.references])
+      have keyReached : Reaches source roots (.expression key) :=
+        .expression reached found (by simp [form, ExpressionForm.references])
+      exact .index ((expression_lookup edited avoids reached).symm.trans found) form
+        ((expression_lookup edited avoids keyReached).symm.trans keyFound) scalar
+        (firstIH baseReached) (secondIH keyReached)
   | @conditional id node condition yes no found form test thenBranch elseBranch testIH thenIH elseIH =>
       intro reached
       exact .conditional ((expression_lookup edited avoids reached).symm.trans found) form

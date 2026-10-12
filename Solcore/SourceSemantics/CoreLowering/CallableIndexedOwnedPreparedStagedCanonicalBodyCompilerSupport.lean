@@ -127,7 +127,13 @@ def CanonicalRootAt.of_general_compiled
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
     (plan : compilation.plan = compiled.indexed.base.plan)
-    (globals : compilation.globals = compiled.indexed.base.globals) :
+    (globals : compilation.globals = compiled.indexed.base.globals)
+    (indexReady : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_general_functions
+        (policy := policy) (body := lowerBody) (compilation := compilation) (readFuel := readFuel)
+        (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+        (source := invocation.source) (context := context) (reasonAt := reasonAt) (scope := scope)
+        native active callables unique declarations policyFor coercions syntaxTree found typed accepted)) :
     CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
       context invocation scope expression lowered semanticFaults :=
   CanonicalRootAt.ofRoot ((RootData.of_general_compiled
@@ -136,6 +142,6 @@ def CanonicalRootAt.of_general_compiled
     (reasonAt := reasonAt) (scope := scope) (expression := expression) (lowered := lowered)
     (node := node) (rawType := rawType) (semanticFaults := semanticFaults)
     native active callables unique declarations policyFor coercions syntaxTree found typed accepted callsReady rawResult
-    sameLedger runtimeLedger wellFormed runtime covers actualFunctionType uninitialized).canonical rows complete plan globals)
+    sameLedger runtimeLedger wellFormed runtime covers actualFunctionType uninitialized).canonical rows complete plan globals indexReady)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport

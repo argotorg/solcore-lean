@@ -81,6 +81,10 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
   | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
 
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+    exact False.elim (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.syntax_not_index tree header.metadata.found form)
+
 /-- One actual sidecar is chosen outside the universal static call proof.
 Each Port comes from the same successful prepareSidecar action, so its sidecar
 is identified by constructor injectivity. No execution or body law is used. -/

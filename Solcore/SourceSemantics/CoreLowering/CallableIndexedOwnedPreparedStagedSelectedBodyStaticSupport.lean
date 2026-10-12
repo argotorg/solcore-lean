@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminal
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority
 
 /-! Static support for the pool-zero numeric family. The certificate belongs
   to the actual original Source and parameter context. The chosen terminal
@@ -70,6 +71,7 @@ structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
     RootData compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults where
   noDirect : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoDirect toRootData.certificate
+  noIndexes : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoIndexes toRootData.certificate
 
 /-- Direct-enabled roots retain selected static authority in the same ordered
 finite Header inventory. Actual canonical slot values remain runtime inputs. -/
@@ -89,6 +91,7 @@ structure CanonicalRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
       invocation.source callScope callId callee ids instantiation reasonAt callCode),
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler toRootData.certificate →
     Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.Port compiler headers)
+  indexReady : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady toRootData.certificate
 
 /-- Existential packaging for the numeric IH. All compiler indices belong to
   the stored authentic Root; the ambient Source/context/scope/child stay fixed. -/
@@ -135,7 +138,8 @@ def RootData.legacy
     (syntaxTree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source expression) :
     Root compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults :=
-  ⟨root, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree⟩
+  ⟨root, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree,
+    CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root.certificate syntaxTree⟩
 
 /-- All reached direct sites use the original finite inventory and authentic
 compiler context; no semantic call law or runtime globals are manufactured. -/
@@ -149,12 +153,13 @@ def RootData.canonical
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
     (plan : compilation.plan = compiled.indexed.base.plan)
-    (globals : compilation.globals = compiled.indexed.base.globals) :
+    (globals : compilation.globals = compiled.indexed.base.globals)
+    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate) :
     CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) :=
   ⟨root, fun compiler _path =>
-    CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals⟩
+    CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals, indexes⟩
 end RootConstruction
 
 /-- The direct-enabled numeric family keeps the same authentic static indices

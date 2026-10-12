@@ -119,6 +119,12 @@ private theorem read_no_calls
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm
     cases otherForm
+  | @index_base scope id other base key baseNode keyNode layout comparison first second header keyFound otherForm sourceType scalar firstTree secondTree inside
+  | @index_key scope id other base key baseNode keyNode layout comparison first second header keyFound otherForm sourceType scalar firstTree secondTree inside =>
+    have identity := Option.some.inj (header.metadata.found.symm.trans found)
+    rw [identity, form] at otherForm
+    cases otherForm
+
 
 
 include aligned in

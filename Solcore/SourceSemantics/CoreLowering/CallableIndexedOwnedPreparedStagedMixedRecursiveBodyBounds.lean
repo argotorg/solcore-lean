@@ -85,7 +85,7 @@ theorem preserves_both (size : Nat) :
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
-        root.support.certificate (.root (by simp)) root.support.noDirect
+        root.support.certificate (.root (by simp)) root.support.noDirect root.support.noIndexes
         root.support.callsReady size (Nat.le_refl _)
     · intro context invocation scope expression lowered root owner caller callerBridge
       exact CallableIndexedOwnedPreparedStagedCanonicalRecursiveCallerBounds.preserves_reached
@@ -100,7 +100,7 @@ theorem preserves_both (size : Nat) :
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
-        root.support.certificate (.root (by simp)) root.support.directReady
+        root.support.certificate (.root (by simp)) root.support.directReady root.support.indexReady
         root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
@@ -137,7 +137,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
-        root.support.certificate (.root (by simp)) root.support.noDirect
+        root.support.certificate (.root (by simp)) root.support.noDirect root.support.noIndexes
         root.support.callsReady size (Nat.le_refl _)
     · intro context invocation scope expression lowered root owner caller callerBridge
       exact CallableIndexedOwnedPreparedStagedCanonicalRecursiveCallerBounds.reflects_reached
@@ -152,7 +152,7 @@ theorem reflects_both (stageEq : stages = RecursiveNamedPreparedStageScopes.regi
             (namedSupport named member) profile root.support.wellFormed selected extension
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).1)
             (fun smaller strict => (ih smaller (Nat.lt_of_lt_of_le strict within)).2))
-        root.support.certificate (.root (by simp)) root.support.directReady
+        root.support.certificate (.root (by simp)) root.support.directReady root.support.indexReady
         root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in

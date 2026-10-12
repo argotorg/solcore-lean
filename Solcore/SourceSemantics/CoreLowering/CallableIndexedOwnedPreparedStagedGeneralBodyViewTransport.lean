@@ -37,6 +37,7 @@ private inductive FormInFragment : ExpressionForm → Prop where
   | call {callee ids metadata} : FormInFragment (.call callee ids (.indirect metadata))
   | unary {operator operand} : FormInFragment (.unary operator operand)
   | binary {left operator right} : FormInFragment (.binary left operator right)
+  | index {base key} : FormInFragment (.index base key)
   | conditional {test yes no} : FormInFragment (.conditional test yes no)
 
 private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
@@ -81,6 +82,9 @@ private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : E
   | binary selected form _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.binary
+  | index selected form _ _ _ _ =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact form.symm ▸ FormInFragment.index
   | conditional selected form _ _ _ =>
       cases Option.some.inj (selected.symm.trans found)
       exact form.symm ▸ FormInFragment.conditional
@@ -292,6 +296,20 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
               have first := children left (by simp [RuntimeChild, formEq, ExpressionForm.references])
               have second := children right (by simp [RuntimeChild, formEq, ExpressionForm.references])
               simp only [formEq, viewReading, first, second]
+          | @index base key =>
+              have first := children base (by simp [RuntimeChild, formEq, ExpressionForm.references])
+              have second := children key (by simp [RuntimeChild, formEq, ExpressionForm.references])
+              have baseReached : Reaches source roots (.expression base) :=
+                .expression reached found (by simp [formEq, ExpressionForm.references])
+              have baseLookup := expression_lookup edited avoids baseReached
+              have baseReading : SourceCoreCompatibleDataExpressions.readExpression values.checked source base =
+                  SourceCoreCompatibleDataExpressions.readExpression values.checked view base := by
+                simp only [SourceCoreCompatibleDataExpressions.readExpression, baseLookup, edited.metadata.owner]
+              simp only [formEq, viewReading, sourceProfile.leaf,
+                SourceCoreCompatibleDataExpressions.leafLowerer, compatibleReading,
+                viewCompatibleReading, bind, Except.bind]
+              simp only [SourceCoreCompatibleDataExpressions.lowerWithReasons, compatibleReading,
+                viewCompatibleReading, bind, Except.bind, formEq, Nat.min_self, baseReading, first, second]
           | @conditional condition yes no =>
               have test := children condition (by simp [RuntimeChild, formEq, ExpressionForm.references])
               have thenBranch := children yes (by simp [RuntimeChild, formEq, ExpressionForm.references])

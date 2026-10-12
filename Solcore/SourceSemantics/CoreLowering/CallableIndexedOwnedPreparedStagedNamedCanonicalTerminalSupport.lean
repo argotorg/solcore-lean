@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedNamedCompilerRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualCompilerPolicyProfiles
@@ -254,6 +255,8 @@ def at_scope {fuel : Nat}
     (fun _ _ _ receipt location =>
       CallableIndexedOwnedPreparedStagedNamedReadDiagnostics.uninitialized terminal.prepared diagnostic
         terminal.aligned receiver (by simpa only [sourceEq] using receipt) location) rows complete rfl rfl
+    (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.named_ready
+      terminal.prepared diagnostic terminal.aligned sourceEq certificate)
   exact ⟨support, rfl, rfl, rfl⟩
 
 include diagnostic receiver wellFormed metadata tree rows complete zero in

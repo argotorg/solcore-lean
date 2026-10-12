@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndexDiagnosticProducers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryTerminalChoice
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGeneralBodyViewTransport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryGeneralCallsReady
@@ -162,6 +163,8 @@ def at_scope
         receiver (rootReached.from_root originalReached) (by simpa only [sameSource] using receipt) location
     callsReady := ready }
   exact root.canonical rows complete (by rw [support.compilation]; rfl) (by rw [support.compilation]; rfl)
+    (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.ordinary_ready support provenance.body_reasons
+      sameSource (CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.terminal_reached code packet) certificate)
 
 include receiver wellFormed metadata rows complete signatureMember sourceOwner provenance in
 /-- The accepted ordinary factory and complete Header inventory issue the
