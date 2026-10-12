@@ -4,6 +4,12 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Named export-error continuations (2026-10-13)
+
+At `e32c742b`, `InitializedExportErrors.public_run_export_error_seeds` creates the first History from actual bootstrap and a completed named call whose output export fails. `ActualRegistryNamedExportErrors.public_run_export_error_retains` extends a following named call at the actual receiving registry. Both expose independent Source success and retain the exact returned session/heap; failed export adds no new handle.
+
+`SourceCoreCapturedMappingNamedExportErrors` registers a closed four-call sequence: initial export error, successful closure export, following export error, then reuse of that closure returning Word `10`. Full build (6247 jobs), all registered tests and kernel policy pass. Six audited endpoints use only the standard three axioms. Staged conditional bodies and final all-pass composition remain under development.
+
 ## Execution continuations and nested output collection (2026-10-13)
 
 Checkpoint `a0c2197f` adds proof interfaces without changing Core instructions or runtime behavior. Full build (6244 jobs), all registered tests and kernel policy pass; twenty audited endpoints for these additions use only the standard three axioms.

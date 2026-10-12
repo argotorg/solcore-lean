@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Initial and following named export errors (2026-10-13)
+
+Checkpoint `e32c742b` connects successful Source execution to the state returned when a named call's output cannot be exported. Actual bootstrap derives the first empty-entry History; following calls retain earlier handles at the actual encoded registry. Both routes derive final heap typing from the full result and preserve authentic encodings and export authority.
+
+The closed four-call example begins with an export error, successfully exports a closure on the next call, encounters another named export error and invokes the retained closure. Its result is Word `10`. All four Source applications use the preceding actual session and reached heap. Failed exports add no handle.
+
+Validation: full build (6247 jobs), all registered tests, kernel policy and six standard-axiom endpoint audits pass. Staged conditional bodies are the next connection in progress; the final theorem covering every compiler pass remains incomplete. Earlier dated entries retain their own scope.
+
 ## Public continuations and nested output handles (2026-10-13)
 
 The latest verified checkpoint is `a0c2197f`. Runtime unification is complete; preservation across every compiler pass remains unfinished.
@@ -138,7 +146,7 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Actual receiving registries, general output, ordered nested handle collection, finite execution resumptions and direct export-error continuations reach the public proof family. Full build (6244 jobs), registered tests, kernel policy and endpoint audits pass. Initial/following named export errors, broader staged control flow and all-pass composition remain incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% (historical estimate) | Actual receiving registries, general output, ordered nested handle collection, finite execution resumptions and direct export-error continuations reach the public proof family. Initial/following named export errors also retain exact histories. Full build (6247 jobs), registered tests, kernel policy and endpoint audits pass. Broader staged control flow and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.

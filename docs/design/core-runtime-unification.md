@@ -4,6 +4,14 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Initial and following named export errors (2026-10-13)
+
+Checkpoint `e32c742b` connects successful Source execution to the state returned when a named call's output cannot be exported. Actual bootstrap derives the first empty-entry History; following calls retain earlier handles at the actual encoded registry. Both routes derive final heap typing from the full result and preserve authentic encodings and export authority.
+
+The closed four-call example begins with an export error, successfully exports a closure on the next call, encounters another named export error and invokes the retained closure. Its result is Word `10`. All four Source applications use the preceding actual session and reached heap. Failed exports add no handle.
+
+Validation: full build (6247 jobs), all registered tests, kernel policy and six standard-axiom endpoint audits pass. Staged conditional bodies are the next connection in progress; the final theorem covering every compiler pass remains incomplete. Earlier dated entries retain their own scope.
+
 ## Continuations and collected output handles (2026-10-13)
 
 At `a0c2197f`, the public proof route includes finite execution resumption chains, direct export-error continuations and collection of function handles from nested constructor/mapping outputs. Following named calls use the actual encoded registry. Direct failure proofs retain authentic callable arity, including zero arguments.
