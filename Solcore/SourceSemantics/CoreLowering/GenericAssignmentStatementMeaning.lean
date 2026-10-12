@@ -74,7 +74,7 @@ theorem preserves_fault_reachable (errors : head.ReachableErrors registry faults
       environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
   | projected layout ordinary =>
     exact CompatibleRenamedPlaceFaults.preserves layout ordinary extension meaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped slot writable trace next output invalid
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps locals agrees actualTyped slot writable trace next output invalid
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/
@@ -118,7 +118,7 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) (err
       exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, by simpa [Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext, Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed, continuation⟩
   | projected layout ordinary =>
     rcases CompatibleRenamedPlaceReflection.reflects layout ordinary extension reflection meaning functionTypes faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped locals slot writable completed with
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps agrees actualTyped locals slot writable completed with
       ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
       ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
     · exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩

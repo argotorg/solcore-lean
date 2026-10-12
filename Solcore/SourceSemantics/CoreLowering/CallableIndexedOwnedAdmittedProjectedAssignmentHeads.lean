@@ -201,7 +201,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
       ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded_with_producers budget layout ordinary extension callerProtocol transport faithful observations
-        errors.missing errors.uninitialized right found rightView rightType profile environments heaps locals agrees actualTyped initial
+        errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps locals agrees actualTyped initial
         (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.preserves bridge initial admitted
           layout.children unique keyTyped environments heaps locals
           (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
@@ -233,7 +233,7 @@ theorem reflects_reachable_bounded (budget : Nat)
     obtain ⟨type, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have result := ProtectedPlaceAssignmentReflection.Stateful.reflects_bounded_with_producers budget layout ordinary extension callerProtocol transport functionTypes faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile environments heaps agrees actualTyped initial
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps agrees actualTyped initial
       (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.reflects bridge initial admitted
         layout.children unique keyTyped environments heaps locals
         (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])

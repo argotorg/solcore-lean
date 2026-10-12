@@ -196,7 +196,7 @@ theorem interpret_prepared {first : Nat} {table : SourceCoreAssignmentFaultSites
     exact ⟨firstIH remaining.1, secondIH remaining.2⟩
   | assignment head _ _ _ _ _ _ =>
     intro remaining
-    exact ⟨remaining.missing, remaining.uninitialized, operandIncluded⟩
+    exact ⟨remaining.missing, (fun _ => remaining.uninitialized), operandIncluded⟩
   | unary head _ _ _ site origin same =>
     intro _
     change faults (.invalidUnaryOperand .bitNot) head.invalid

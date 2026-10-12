@@ -56,7 +56,7 @@ theorem ShapeErrors.of_uniform {values : SourceCoreCompatibleValues.Context} {re
     assignment.target prepared operator invalid initial faults shape
   cases shape with
   | bare empty layout => exact .bare (empty := empty) (layout := layout) errors.operands
-  | projected layout ordinary => exact .projected (layout := layout) (ordinary := ordinary) (MissingFor.of_uniform errors.missing) (UninitializedFor.of_uniform errors.uninitialized)
+  | projected layout ordinary => exact .projected (layout := layout) (ordinary := ordinary) (MissingFor.of_uniform errors.missing) (UninitializedFor.of_uniform (errors.uninitialized layout.nonempty))
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceReachedDiagnostics
 

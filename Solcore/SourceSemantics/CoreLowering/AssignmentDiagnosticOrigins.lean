@@ -183,7 +183,7 @@ structure Residual {values : SourceCoreCompatibleValues.Context} {source : Typed
     (table : SourceCoreAssignmentFaultSites.Table) (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) : Prop where
   missing : ∀ {root resolved reason word count},
     CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason word count → faults reason word
-  uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection
+  uninitialized : head.prepared.steps ≠ [] → ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection
   included : ∀ reason word, GenericAssignmentDiagnostics.OperandRep table reason word → faults reason word
 
 def Factory.prepared {first : Nat} {table : SourceCoreAssignmentFaultSites.Table}

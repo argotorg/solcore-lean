@@ -96,7 +96,7 @@ theorem Head.reachable_of_token
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason word count → faults reason word)
     (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
     head.ReachableErrors registry faults :=
-  ⟨missing, uninitialized, same.symm ▸ prepared_operands_included included prepared member occurs rawProfile⟩
+  ⟨missing, fun _ => uninitialized, same.symm ▸ prepared_operands_included included prepared member occurs rawProfile⟩
 
 /-- One compiler traversal supplies both the emitted expression and its exact
 operand token, then the actual prepared table supplies the reachable law. -/
