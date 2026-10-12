@@ -103,7 +103,8 @@ theorem preserves
         association (closureTerminals association) functions size)
     (namedChildren : ∀ header (member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      PreservesBelow poolBridge header.context model stages child
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child
         (namedTerminals header member).certificate callFaults size) :
     PreservesAt bridge context model stages invocation (Point scope id lowered) callFaults size := by
   intro current child code point node found parentTyped
@@ -151,7 +152,8 @@ theorem reflects
         association (closureTerminals association) functions size)
     (namedChildren : ∀ header (member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      ReflectsBelow poolBridge header.context model stages child
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model stages child
         (namedTerminals header member).certificate callFaults size) :
     ReflectsAt bridge context model stages invocation (Point scope id lowered) callFaults size := by
   intro current child code point node found parentTyped
@@ -173,7 +175,8 @@ theorem reflects
   have actualNamedChildren : ∀ header (member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope},
         (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-        ReflectsBelow poolBridge header.context model
+        CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model
           (RecursiveNamedPreparedStageScopes.registry stagePrepared) child
           (namedTerminals header member).certificate callFaults size := by
     simpa only [stageEq] using namedChildren

@@ -4247,3 +4247,46 @@ theorem Session.RestoredAt.encodes_function {artifact : Artifact} {before after 
   exact issuance_encode_function_append encodedAt suffix
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- A function selected inside an actual encoded result can be imported on its
+own. The full raw Source type keeps the same checked runtime view. -/
+theorem Session.RawEncodedAt.reimports_function
+    {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected sourceType : Ty}
+    {handle : Handle} {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected (.function handle) encoded)
+    (compatible : SourceCoreRawMetadata.runtimeType sourceType =
+      SourceCoreRawMetadata.runtimeType expected) :
+    session.EncodesAt fuel sourceType (.function handle) encoded.value := by
+  have resolved := encoded_function_resolves accepted
+  have resolved' : resolve session.authority session.registry sourceType handle = .ok encoded.value := by
+    by_cases artifactOwner : handle.belongsToArtifact artifact.authority = true
+    · by_cases sessionOwner : handle.belongsToSession session.authority = true
+      · obtain ⟨slot, found, _value⟩ := resolved_slot resolved
+        by_cases sameType : SourceCoreRawMetadata.runtimeType expected =
+            SourceCoreRawMetadata.runtimeType handle.sourceType
+        · simpa [resolve, artifactOwner, sessionOwner, found, compatible, sameType,
+            bind, Except.bind, pure, Except.pure, throw, throwThe] using resolved
+        · simp [resolve, artifactOwner, sessionOwner, found, sameType,
+            bind, Except.bind, pure, Except.pure, throw, throwThe] at resolved
+      · simp [resolve, artifactOwner, sessionOwner, bind, Except.bind,
+          pure, Except.pure, throw, throwThe] at resolved
+    · simp [resolve, artifactOwner, bind, Except.bind, pure, Except.pure,
+        throw, throwThe] at resolved
+  obtain ⟨parameter, result, view⟩ := issuance_encoded_function_view accepted
+  refine ⟨.pure session.values.registry encoded.value, ?_, rfl⟩
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      change encodeRaw session.authority session.registry (fuel + 1) session.values.registry
+        sourceType (.function handle) = _
+      unfold encodeRaw
+      rw [compatible, view]
+      dsimp only
+      rw [resolved']
+      rfl
+
+end Solcore.Frontend.SourceCoreIndexedSession

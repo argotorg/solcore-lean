@@ -140,7 +140,7 @@ private theorem preserves_issued {context invocation scope expression lowered}
     (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared)
     (profile := profile) (observations := observations) (extension := extension) (semantic := semantic)
     (closureTerminals := closure_terminals factories) (namedTerminals := named_terminals factories)
-    (closureSupport := closure_support factories) (namedSupport := named_support factories) root size
+    (closureSupport := closure_support factories) (namedSupport := fun header member => .recursive (named_support factories header member)) root size
 
 include bridge receiver stagePrepared observations extension semantic factories in
 private theorem reflects_issued
@@ -156,7 +156,7 @@ private theorem reflects_issued
     (bridge := bridge) (receiver := receiver) (stagePrepared := stagePrepared)
     (profile := profile) (observations := observations) (extension := extension) (semantic := semantic)
     (closureTerminals := closure_terminals factories) (namedTerminals := named_terminals factories)
-    (closureSupport := closure_support factories) (namedSupport := named_support factories) stageEq root size
+    (closureSupport := closure_support factories) (namedSupport := fun header member => .recursive (named_support factories header member)) stageEq root size
 
 section Closure
 variable {function : Dynamic.Closure} {localScope : SourceCoreLocalCell.Scope}

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedChildBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.BuiltinNamedCallMeaning
 
@@ -162,8 +163,8 @@ theorem preserves_invocation
     (supports : Dynamic.TypeContextSupports header.context context)
     (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
-        poolBridge header.context model stages child certificate faults budget)
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child certificate faults budget)
     {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages
       size invocation context heap (.global function) arguments outcome after)
@@ -233,8 +234,8 @@ theorem preserves_invocation
   have admitted : Admission poolBridge header.context parameterState := ⟨(receipt.source wellFormed).heapTyped, receipt.rows⟩
   obtain ⟨value, bodyStore, finalMap, finalWorld, bodyEvaluation, result, finalHeaps,
     bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyState, bodyRelated, bodyPost⟩ :=
-    CallableIndexedOwnedPreparedStagedTerminalNamedBodyBounds.preserves_body
-      (bridge := poolBridge) (selected := selected) (wellFormed := wellFormed)
+    CallableIndexedOwnedPreparedStagedNamedChildBounds.preserves_body
+      (owner := owner) (packet := fun zero globals => receipt.packet zero globals) (selected := selected) (wellFormed := wellFormed)
       (terminal := terminal) (certifies := certifies)
       (environments := entry.environments) (heaps := entry.heaps) (locals := entry.locals)
       (agrees := entry.lookups) (typed := entry.actualTyped) (initial := parameterState) (admitted := admitted)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds
 
 /-! An arbitrary admitted caller consumes the closed concrete pool body
@@ -52,7 +53,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       bindings parameterCore resultCore),
     ClosureSupportFor association stages (closureTerminals association))
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header stages (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+      header stages (namedTerminals header member) semanticFaults)
 
 local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile

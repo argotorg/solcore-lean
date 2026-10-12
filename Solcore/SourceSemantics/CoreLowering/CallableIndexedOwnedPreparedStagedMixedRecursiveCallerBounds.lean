@@ -99,7 +99,8 @@ theorem preserves
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      PreservesBelow poolBridge header.context model stages child
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child
         (namedTerminals header member).certificate callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -174,7 +175,8 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
     (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      ReflectsBelow poolBridge header.context model stages child
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model stages child
         (namedTerminals header member).certificate callFaults size)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}

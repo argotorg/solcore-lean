@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
 
 /-! Numeric recursion supplies the selected called bodies internally. The
@@ -102,7 +103,8 @@ variable
       bindings parameterCore resultCore),
     ClosureSupportFor association stages (closureTerminals association))
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header stages (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+      header stages (namedTerminals header member) semanticFaults)
 
 include closureSupport in
 theorem closure_preserves_below
@@ -149,12 +151,19 @@ theorem named_preserves_below
     (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) :
-    PreservesBelow poolBridge header.context model stages child
+    CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+      header model stages child
       (namedTerminals header member).certificate callFaults size := by
-  intro childSize smaller current id lowered point
-  rw [(namedSupport header member).point] at point
-  exact children childSize (Nat.lt_of_lt_of_le smaller within)
-    ((namedSupport header member).roots child selected).val point
+  cases namedSupport header member with
+  | recursive static =>
+    apply CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow.pool
+    intro childSize smaller current id lowered point
+    rw [static.point] at point
+    exact children childSize (Nat.lt_of_lt_of_le smaller within)
+      (static.roots child selected).val point
+  | formation static =>
+    exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.preserves
+      (profile := profile) (faults := callFaults) static selected size
 
 include namedSupport in
 theorem named_reflects_below
@@ -165,12 +174,19 @@ theorem named_reflects_below
     (header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) :
-    ReflectsBelow poolBridge header.context model stages child
+    CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+      header model stages child
       (namedTerminals header member).certificate callFaults size := by
-  intro childSize smaller current id lowered point
-  rw [(namedSupport header member).point] at point
-  exact children childSize (Nat.lt_of_lt_of_le smaller within)
-    ((namedSupport header member).roots child selected).val point
+  cases namedSupport header member with
+  | recursive static =>
+    apply CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow.pool
+    intro childSize smaller current id lowered point
+    rw [static.point] at point
+    exact children childSize (Nat.lt_of_lt_of_le smaller within)
+      (static.roots child selected).val point
+  | formation static =>
+    exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.reflects
+      (profile := profile) (faults := callFaults) static selected size
 
 variable
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry

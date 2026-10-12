@@ -17,7 +17,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds (OrdinarySequenceFor)
 open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
+open CallableIndexedOwnedPreparedStagedNamedBodySupport (Support)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
@@ -42,7 +42,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       mapping world function native bindings parameterCore resultCore), OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers rows → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers rows),
-    NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    Support (headers rows) (keys compiled) bodyRegistry header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe}
@@ -155,5 +155,73 @@ theorem public_run_succeeded_remembers
   exact ⟨caller, actual, generation, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
     succeeded, valueEq, typeEq, budgetEq, sessionAt, trace, result, reached, source, payload,
     sourceValue, nativeValue, related, retained⟩
+
+include distinct receiver observations extension semantic family namedTerminals namedSupport wellFormed
+  prepared selected opened fresh ready sameRuntime atSession atCheckpoint started inputReceipts metadata sourceAt in
+/-- Selected function leaves from the first actual public product output
+seed a history with their original captures and recursive validation budgets. -/
+theorem public_run_succeeded_collects
+    {publicCompletion : SourceCoreExecution.Completion publicArtifact}
+    (publicStart : publicSession.start key publicArguments options.inputValidationFuel = .ok publicCheckpoint)
+    (publicRun : publicSession.RunAt key publicArguments options (.ok (.succeeded publicCompletion)))
+    (outputSelection : RecursiveNamedPublicOutputSelections.Selection
+      header.function.resultType publicCompletion.value)
+    (descriptor : SourceCoreCallableContracts.Descriptor compiled.indexed.ancestry.graph.inputs.callable.table
+      (.named header.named.signature.key)) :
+    ∃ caller : State rootHeaders rootKeys
+        ⟨[], [], world, ⟨[]⟩, store, SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed⟩,
+      ∃ (actual : SourceCoreIndexedSession.Completion nativeArtifact)
+        (generation : SourceCorePublicValues.ExportGeneration) (value : Value) (finalStore : Store)
+        (capture : CallableIndexedOwnedFunctionValues.NamedCapture rootHeaders (rootOwner).key header [] world)
+        (sourceSize : Nat) (outcome : Staging.Recursive.Outcome) (after : Dynamic.Heap)
+        (finalMap : LocationMap) (finalWorld : StoreTyping),
+        nativeCheckpoint.SucceededResultAt options.executionFuel options.outputValidationFuel
+          generation value finalStore actual ∧
+        publicCompletion.value = actual.value ∧ publicCompletion.sourceType = actual.sourceType ∧
+        publicCompletion.boundaryFuel = actual.boundaryFuel ∧ publicCompletion.session.IndexedAt actual.session ∧
+        Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram)
+          (RecursiveNamedPreparedStageScopes.registry stagePrepared) sourceSize invocation header.function.context ⟨[]⟩
+          (.global function) arguments outcome after ∧
+        ∃ _result : CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds.ResultAt
+          (registry := completion.result.context.registry) (payloads := payloads)
+          (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
+          rootFunctions rootOwner caller header capture header.function.context outcome after value finalStore finalMap finalWorld rootFaults,
+        ∃ returned : RecursiveNamedPublicFunctionHistory.Caller rootHeaders rootKeys finalMap finalWorld after finalStore,
+        ∃ added : List RecursiveNamedPublicFunctionHistory.Entry,
+          added.map RecursiveNamedPublicFunctionHistory.Entry.handle = outputSelection.handles ∧
+          Relates caller returned ∧
+          RecursiveNamedPublicFunctionHistory.History rootHeaders rootKeys rootFunctions
+            completion.result.context.registry header actual.session finalMap finalWorld after finalStore
+            returned added := by
+  have sameCompiled := SourceCoreIndexedSession.Recipe.prepare_compiled prepared
+  cases sameCompiled
+  have supports := (RecursiveNamedPublicReturnedValues.header_context_supports header header wellFormed).2
+  obtain ⟨caller, actual, generation, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
+      succeeded, valueEq, typeEq, budgetEq, sessionAt, trace, result⟩ :=
+    CallableIndexedOwnedPreparedStagedInitializedNestedPublicBounds.public_run_succeeded_reflects
+      (inputs := inputs) (rows := rows) (distinct := distinct) (stagePrepared := stagePrepared)
+      (receiver := receiver) (profile := profile) (observations := observations)
+      (extension := extension) (semantic := semantic) (family := family)
+      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+      (acceptedPlan := SourceCoreUnifiedPreparationCertificates.compiled_planPrepared recipe.compiled) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
+      (opened := opened) (fresh := fresh) (ready := ready) (sameRuntime := sameRuntime)
+      (atSession := atSession) (atCheckpoint := atCheckpoint) (started := started)
+      (inputReceipts := inputReceipts) (metadata := metadata) (sourceAt := sourceAt) (supports := supports)
+      publicStart publicRun descriptor
+  have atRecipe : nativeArtifact.RecipeAt recipe := by
+    cases nativeArtifact
+    exact started.recipe_eq
+  have requested := started.original.result_type_at atRecipe started.selected
+  have rawResult := (RecursiveNamedPublicRootSourceSignature.inputs_and_result selected).2
+  rw [rawResult] at requested
+  let actualSelection : RecursiveNamedPublicOutputSelections.Selection header.function.resultType actual.value :=
+    valueEq ▸ outputSelection
+  obtain ⟨reached, added, handles, related, retained⟩ :=
+    RecursiveNamedPublicFunctionHistory.first_collected rfl started selected requested succeeded result actualSelection
+  have sameHandles : actualSelection.handles = outputSelection.handles :=
+    RecursiveNamedPublicOutputSelections.Selection.handles_cast valueEq outputSelection
+  exact ⟨caller, actual, generation, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
+    succeeded, valueEq, typeEq, budgetEq, sessionAt, trace, result, reached, added,
+    handles.trans sameHandles, related, retained⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed

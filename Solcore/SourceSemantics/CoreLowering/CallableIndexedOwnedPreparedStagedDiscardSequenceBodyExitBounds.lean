@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardSequenceCompilerBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyExitReceipts
@@ -92,7 +93,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
   (namedTerminals : ∀ header, header ∈ headers → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header stages (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+      header stages (namedTerminals header member) semanticFaults)
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled

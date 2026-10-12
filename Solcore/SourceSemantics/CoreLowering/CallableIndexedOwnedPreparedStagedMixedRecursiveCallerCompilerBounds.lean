@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds
 
 /-! Accepted original Source compilation issues the recursive caller certificate.
@@ -62,7 +63,8 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
   (namedTerminals : ∀ header, header ∈ headers → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header stages (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+      header stages (namedTerminals header member) semanticFaults)
 
 variable
   (sameLedger : context.solvedRequirements = compilation.solvedRequirements)

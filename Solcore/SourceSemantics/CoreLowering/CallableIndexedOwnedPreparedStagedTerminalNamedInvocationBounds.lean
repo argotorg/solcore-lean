@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedChildBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedEntryBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedSourceScopeReceipts
@@ -111,7 +112,8 @@ theorem reflects_invocation
     (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope},
       (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow poolBridge header.context model
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child certificate faults budget)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.captured) store
@@ -137,8 +139,8 @@ theorem reflects_invocation
     ⟨source.heapTyped, receipt.rows⟩
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, matched, result,
     finalHeaps, bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, bodyState, bodyRelated, bodyPost⟩ :=
-    CallableIndexedOwnedPreparedStagedTerminalNamedBodyBounds.reflects_body
-      (bridge := poolBridge) (selected := selected) (wellFormed := wellFormed)
+    CallableIndexedOwnedPreparedStagedNamedChildBounds.reflects_body
+      (owner := owner) (packet := fun zero globals => receipt.packet zero globals) (selected := selected) (wellFormed := wellFormed)
       (terminal := terminal) (certifies := certifies)
       (environments := packet.entry.environments) (heaps := packet.entry.heaps)
       (locals := packet.entry.locals) (agrees := packet.entry.lookups) (typed := packet.entry.actualTyped)

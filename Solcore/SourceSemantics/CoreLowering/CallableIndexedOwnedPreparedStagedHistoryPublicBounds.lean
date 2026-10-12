@@ -21,7 +21,7 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds (OrdinarySequenceFor)
 open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
+open CallableIndexedOwnedPreparedStagedNamedBodySupport (Support)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
@@ -45,7 +45,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       mapping world function native bindings parameterCore resultCore), OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers rows → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers rows),
-    NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    Support (headers rows) (keys compiled) bodyRegistry header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe}

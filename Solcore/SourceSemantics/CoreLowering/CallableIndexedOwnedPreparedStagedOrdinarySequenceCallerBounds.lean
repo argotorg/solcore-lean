@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedCoveredCallerCompilerBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryDiscardSequenceReadiness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationPreservation
@@ -289,7 +290,8 @@ variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.ind
       bindings parameterCore resultCore), OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared) (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support
+      headers keys bodyRegistry header (RecursiveNamedPreparedStageScopes.registry stagePrepared) (namedTerminals header member) semanticFaults)
   {before : SourceCompilationPlan.Plan} {fuel budget : Nat}
   (acceptedPlan : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget
     compiled.sourceProgram before fuel budget = .ok compiled.indexed.base.plan)
@@ -407,7 +409,8 @@ variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.ind
       bindings parameterCore resultCore), OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support
+      headers keys bodyRegistry header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)
   {beforePlan : SourceCompilationPlan.Plan} {planFuel planBudget : Nat}
   (acceptedPlan : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget
@@ -477,17 +480,25 @@ theorem preserves_root
   let packet := namedTerminals header selected.member
   have children : ∀ {child : Staging.Recursive.Scope},
       (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      PreservesBelow rootBridge header.context rootModel
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow
+        (headers := headers) (keys := keys) header rootModel
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child packet.certificate rootFaults size := by
-    intro child childSelected childSize _smaller current id lowered point
-    rw [(namedSupport header selected.member).point] at point
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
-      (profile := profile) (closurePackets := fun association => (chosen association).1)
-      (closureSupport := fun association => (chosen association).2)
-      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
-      (extension := extension) (semantic := semantic) childSize
-      ((namedSupport header selected.member).roots child childSelected).val point
+    intro child childSelected
+    cases namedSupport header selected.member with
+    | recursive static =>
+        apply CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow.pool
+        intro childSize _smaller current id lowered point
+        rw [static.point] at point
+        exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.preserves
+          (profile := profile) (closurePackets := fun association => (chosen association).1)
+          (closureSupport := fun association => (chosen association).2)
+          (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+          (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+          (extension := extension) (semantic := semantic) childSize
+          (static.roots child childSelected).val point
+    | formation static =>
+        exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.preserves
+          (profile := profile) (faults := rootFaults) static childSelected size
   obtain ⟨capture⟩ := CallableIndexedOwnedFunctionEntries.capture_from_pool caller owner selected.member
   let nativeCapture := CallableIndexedOwnedFunctionValues.NamedCapture.of_capture capture
   obtain ⟨value, finalStore, finalMap, finalWorld, result⟩ :=
@@ -565,17 +576,25 @@ theorem reflects_root
     argumentsEvaluated actualReference capture.read measured
   have children : ∀ {child : Staging.Recursive.Scope},
       (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      ReflectsBelow rootBridge header.context rootModel
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow
+        (headers := headers) (keys := keys) header rootModel
         (RecursiveNamedPreparedStageScopes.registry stagePrepared) child packet.certificate rootFaults size := by
-    intro child childSelected childSize _childSmaller current id lowered point
-    rw [(namedSupport header selected.member).point] at point
-    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
-      (profile := profile) (closurePackets := fun association => (chosen association).1)
-      (closureSupport := fun association => (chosen association).2)
-      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
-      (extension := extension) (semantic := semantic) rfl childSize
-      ((namedSupport header selected.member).roots child childSelected).val point
+    intro child childSelected
+    cases namedSupport header selected.member with
+    | recursive static =>
+        apply CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow.pool
+        intro childSize _childSmaller current id lowered point
+        rw [static.point] at point
+        exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
+          (profile := profile) (closurePackets := fun association => (chosen association).1)
+          (closureSupport := fun association => (chosen association).2)
+          (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+          (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+          (extension := extension) (semantic := semantic) rfl childSize
+          (static.roots child childSelected).val point
+    | formation static =>
+        exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.reflects
+          (profile := profile) (faults := rootFaults) static childSelected size
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result⟩ :=
     CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds.reflects_invocation
       (functions := rootFunctions) (registry := completion.result.context.registry)

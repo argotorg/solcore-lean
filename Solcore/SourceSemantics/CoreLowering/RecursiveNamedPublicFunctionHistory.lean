@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicOutputSelections
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicIssuedHistoryEntries
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
 
@@ -55,6 +56,14 @@ inductive Addition {artifact : Artifact} (checkpoint : Checkpoint artifact)
       (handleValue : completion.value = .function handle) :
       Addition checkpoint completion fuel sourceType nativeType outcome native
         [⟨sourceType, source, handle, payload, nativeType, fuel⟩]
+
+  | select {source : Dynamic.Value} {payload : Core.Value} {entries : List Entry}
+      (requested : checkpoint.ResultTypeAt sourceType)
+      (sourceValue : outcome = .value source)
+      (nativeValue : native = .inRight .word payload)
+      (selection : RecursiveNamedPublicOutputSelections.Selection sourceType completion.value)
+      (selected : RecursiveNamedPublicOutputSelections.Selected selection source payload nativeType fuel entries) :
+      Addition checkpoint completion fuel sourceType nativeType outcome native entries
 
 inductive History (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
     (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
@@ -188,6 +197,16 @@ private theorem addition_entries {artifact : Artifact} {checkpoint : Checkpoint 
       have sameEntry := List.mem_singleton.mp member
       subst entry
       exact ⟨imported, represented, valueTyped⟩
+
+  | @select source payload entries requested sourceValue nativeValue selection selected =>
+      have decoded : LanguageResult.decode? native = some (.succeeded payload) := by rw [nativeValue]; rfl
+      obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+      obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+        RecursiveNamedPublicReturnedValues.returned_value result decoded
+      have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+      subst actual
+      obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
+      exact RecursiveNamedPublicOutputSelections.Selected.current selection represented valueTyped encodedAt rfl payloadAt selected
 
 /-- Every retained handle is represented at the current actual caller. This
 projection derives all entry laws by induction over genuine successful calls. -/
@@ -348,6 +367,75 @@ theorem History.remember_success
   exact ⟨reached, source, payload, sourceValue, nativeValue, related,
     .next history sameCompiled started selected succeeded result reached ⟨related, post⟩
       (.remember requested sourceValue nativeValue handleValue)⟩
+
+private theorem collected_addition
+    (requested : checkpoint.ResultTypeAt header.function.resultType)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (selection : RecursiveNamedPublicOutputSelections.Selection header.function.resultType completion.value) :
+    ∃ added : List Entry, added.map Entry.handle = selection.handles ∧
+      Addition checkpoint completion outputFuel header.function.resultType header.output outcome native added := by
+  obtain ⟨payload, decoded, _imported⟩ := succeeded.reimports
+  obtain ⟨source, sourceValue, nativeValue⟩ := success_shape result decoded
+  obtain ⟨_sourceType, imported⟩ := succeeded.reimports_payload requested decoded
+  obtain ⟨actual, actualOutcome, represented, _heaps, _world, _returned, _related, _stable, _typed, valueTyped⟩ :=
+    RecursiveNamedPublicReturnedValues.returned_value result decoded
+  have same : actual = source := Staging.Recursive.Outcome.value.inj (actualOutcome.symm.trans sourceValue)
+  subst actual
+  obtain ⟨encoded, encodedAt, payloadAt⟩ := imported
+  obtain ⟨added, selected, handles, _meanings⟩ := selection.collect represented valueTyped encodedAt rfl payloadAt
+  exact ⟨added, handles, .select requested sourceValue nativeValue selection selected⟩
+
+/-- A first successful result can retain any selected function leaves inside
+products. The original export supplies all leaf values and recursive budgets. -/
+theorem first_collected
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (requested : checkpoint.ResultTypeAt header.function.resultType)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (selection : RecursiveNamedPublicOutputSelections.Selection header.function.resultType completion.value) :
+    ∃ (reached : Caller headers keys finalMap finalWorld after finalStore) (added : List Entry),
+      added.map Entry.handle = selection.handles ∧ Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached added := by
+  obtain ⟨added, handles, addition⟩ := collected_addition requested succeeded result selection
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, added, handles, related,
+    .first sameCompiled started selected succeeded result reached ⟨related, post⟩ addition⟩
+
+/-- Collecting a product result appends all selected function leaves while
+retaining earlier closures at the actual returned heap and session. -/
+theorem History.collect_success
+    (history : History headers keys functions receiving anchor session mapping world heap store caller entries)
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (requested : checkpoint.ResultTypeAt header.function.resultType)
+    (succeeded : checkpoint.SucceededResultAt executionFuel outputFuel generation native finalStore completion)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (selection : RecursiveNamedPublicOutputSelections.Selection header.function.resultType completion.value) :
+    ∃ (reached : Caller headers keys finalMap finalWorld after finalStore) (added : List Entry),
+      added.map Entry.handle = selection.handles ∧ Relates caller reached ∧
+      History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
+        reached (entries ++ added) := by
+  obtain ⟨added, handles, addition⟩ := collected_addition requested succeeded result selection
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, added, handles, related,
+    .next history sameCompiled started selected succeeded result reached ⟨related, post⟩ addition⟩
+
 end Success
 
 section Issuance

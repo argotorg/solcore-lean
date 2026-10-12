@@ -186,8 +186,8 @@ terminal body once. The native suffix and all three original binds then join
 the real callee and ordered argument effects into the whole caller result. -/
 theorem preserves_parent (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
-        poolBridge header.context model stages child certificate faults budget)
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child certificate faults budget)
     {calleeSize argumentsSize applicationSize : Nat}
     (calleeTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages calleeSize
       invocation context environment before callee (.value (.global function)) calleeHeap)
@@ -274,8 +274,8 @@ the returned pool supplies the full original parent's caller postcondition. -/
 theorem reflects_suffix (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope},
       (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
-        poolBridge header.context model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
         child certificate faults budget)
     {calleeSize argumentsSize : Nat}
     (calleeTrace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages calleeSize

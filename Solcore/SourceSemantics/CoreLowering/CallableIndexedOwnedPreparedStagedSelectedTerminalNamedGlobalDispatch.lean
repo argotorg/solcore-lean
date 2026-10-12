@@ -91,8 +91,8 @@ theorem reflects_global
     (children : ∀ header, ∀ member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope},
         (RecursiveNamedPreparedStageScopes.registry preparedStages).Closure header.function child →
-        CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
-          poolBridge header.context model (RecursiveNamedPreparedStageScopes.registry preparedStages)
+        CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model (RecursiveNamedPreparedStageScopes.registry preparedStages)
           child (terminals header member).certificate callFaults budget)
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (global : GlobalApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
@@ -199,8 +199,8 @@ theorem preserves_global
     (budget : Nat)
     (children : ∀ header, ∀ member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-        CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
-          poolBridge header.context model stages child (terminals header member).certificate callFaults budget)
+        CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child (terminals header member).certificate callFaults budget)
     {calleeSize argumentsSize applicationSize : Nat}
     {sourceValue : Dynamic.Value} {calleeHeap argumentsHeap : Dynamic.Heap}
     {sources : List Dynamic.Value} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}

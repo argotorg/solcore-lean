@@ -64,8 +64,8 @@ theorem application_preserves
     (supports : Dynamic.TypeContextSupports header.context context)
     (identity descriptor : Word) (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
-        poolBridge header.context model stages child certificate faults budget)
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child certificate faults budget)
     {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages
       size invocation context before (.global function) arguments outcome after)
@@ -109,8 +109,8 @@ theorem application_reflects
     (identity descriptorWord : Word) (budget : Nat)
     (children : ∀ {child : Staging.Recursive.Scope},
       (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
-        poolBridge header.context model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
+      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        header model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
         child certificate faults budget)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size

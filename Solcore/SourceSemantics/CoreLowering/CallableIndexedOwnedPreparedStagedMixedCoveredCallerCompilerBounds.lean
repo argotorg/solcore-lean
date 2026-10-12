@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerCompilerBounds
 
 /-! Static coverage supplies a dependent packet and support at each actual
@@ -59,7 +60,8 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
     Nonempty (Σ packet : PacketFor association stages, SupportFor association stages packet))
   (namedTerminals : ∀ header, header ∈ headers → Terminal header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    NamedSupport header stages (namedTerminals header member) semanticFaults)
+    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+      header stages (namedTerminals header member) semanticFaults)
 
 variable
   (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
