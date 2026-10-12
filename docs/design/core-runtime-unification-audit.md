@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Public function export from Source success (2026-10-13)
+
+Checkpoint `f7cbbfd8` passes the full build (6152 jobs), all registered tests and kernel policy. The ten preceding production/Source endpoint audits and two new initial-function endpoint audits use only `propext`, `Classical.choice` and `Quot.sound`.
+
+`5edd2500` proves sufficient public fuel for function results of direct named, builtin and closure applications. Successful independent Source execution implies actual function export for every sufficient execution budget and output budget at least `1`. The returned function joins the exact reached History. `Session.ExportsReady` records genuine issuer and registry integrity; actual initialization creates it and real session transitions preserve it. The proof does not assume that native execution or export succeeds. The existing runtime entry points and History type remain available.
+
+`f7cbbfd8` closes the corresponding initial named-call route. Its public theorem derives starting arguments, heap and caller from actual fresh initialization and startup, then constructs the first remembered function at the Source after-heap. The registered example proves both initial and later direct export at their original checkpoints while retaining the actual `10 / 20 / 10` capture sequence.
+
+`c0a118be` extends the same staged Source relation with bare plain assignment, RHS failure and target lookup failure. Target resolution precedes the RHS; a successful write uses the RHS's actual final heap. Both erasures, numeric grades, fault preservation and existing dependent proofs have been checked. The authentic compiler/body/public connection for these new assignment rules is still in progress. General output decoding, wider imperative control flow, suspended/export-error continuations and all-pass composition remain open.
+
 ## Lexical closures, callable preservation and failure continuation (2026-10-13)
 
 The latest verified implementation checkpoint is `b9c241f9`. The full build (6147 jobs), all registered tests and kernel policy pass. The endpoint audits for these additions use only `propext`, `Classical.choice` and `Quot.sound`.
