@@ -1458,6 +1458,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedEmptyLambdaBodySupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistorySourceInputs
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedHistoryPublicFailures
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEmptyLambdaFormation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedEmptyBodyCompilerReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedEmptyLambdaApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicEmptyInputRegistry
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

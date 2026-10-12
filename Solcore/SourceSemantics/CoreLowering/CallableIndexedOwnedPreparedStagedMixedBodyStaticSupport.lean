@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardSequenceCompilerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds
 
-/-! A chosen called body retains the terminal, one-discard or recursive
+/-! A chosen called body retains the empty, terminal, one-discard or recursive
 discard-sequence receipt for the same actual Code. Original expression Roots
 are retained at every Source-selected scope. Packets store no execution or
 meaning law. The whole-body assembly derives the raw result from original
@@ -63,6 +63,22 @@ structure Sequence {compiled : SourceCoreUnifiedCompilation.Compiled}
   child : Staging.Recursive.Scope
   selected : stages.Closure function child
 
+/-- Empty Source bodies retain their literal generated footer and genuine
+selected invocation scope. No expression or body meaning is a field. -/
+structure Empty {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  empty : function.body = []
+  unit : function.resultType = .unit
+  nativeUnit : code.receipt.resultCore = .unit
+  emitted : code.receipt.body = CompatibleStatements.finish code.receipt.resultCore
+    (LocalLoop.fallthrough code.receipt.resultCore)
+    code.compilation.internalReason code.compilation.internalReason
+  child : Staging.Recursive.Scope
+  selected : stages.Closure function child
+
 /-- Every constructor retains its authentic body shape at the same Code. -/
 inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
@@ -72,6 +88,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
   | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | discard (packet : Discard code stages)
   | sequence (packet : Sequence code stages)
+  | empty (packet : Empty code stages)
 
 /-- Original raw statement form and both original expression Roots remain
 explicit at all genuinely selected scopes. In particular, the first raw type
@@ -114,6 +131,17 @@ structure SequenceSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
       Nonempty (RootAt compiled inputs.context child (parameterScope code)
         expression childCode semanticFaults)
 
+/-- Empty bodies retain the same independently typed closure frame. -/
+structure EmptySupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (_inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (_packet : Empty code stages)
+    (_semanticFaults : FunctionCalls.FaultRep) : Type where
+  frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
+
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -128,6 +156,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
   | .terminal terminal => SelectedBody code inputs stages terminal semanticFaults
   | .discard discard => DiscardSupport code inputs stages discard semanticFaults
   | .sequence sequence => SequenceSupport code inputs stages sequence semanticFaults
+  | .empty empty => EmptySupport code inputs stages empty semanticFaults
 
 /-- The Association is destructed only to retain its real Code and the actual
 BodyWith.toContext. Every branch retains that same parameter context. -/

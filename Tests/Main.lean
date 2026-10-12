@@ -1501,6 +1501,7 @@ import Solcore.Test.SourceCoreIndexedSessionFactories
 import Solcore.Test.SourceCoreIndexedSessionInvocation
 import Solcore.Test.SourceCoreRootDiscovery
 import Solcore.Test.SourceCoreExecution
+import Solcore.Test.SourceCoreClosedLambdaPublicExecution
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3421,6 +3422,7 @@ def run : IO Unit := do
   SourceCoreIndexedSessionInvocation.run
   SourceCoreRootDiscovery.run
   SourceCoreExecution.run
+  SourceCoreClosedLambdaPublicExecution.run
   SourceCoreHeapSnapshot.run
   SourceCoreExecutionSnapshots.run
   SourceCoreActiveHeapPrefix.run

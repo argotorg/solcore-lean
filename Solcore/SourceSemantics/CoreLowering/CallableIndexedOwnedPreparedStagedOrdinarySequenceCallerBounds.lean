@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedEmptyBodyCompilerReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedCoveredCallerCompilerBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryDiscardSequenceReadiness
@@ -5,10 +6,11 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTe
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 
-/-! Connect actual ordinary-owner sequence receipts to the existing numeric
-caller/body proof. Ordinary Associations keep their exact Code and BodyWith
-context; their sequence packets and child call readiness are derived from
-preparation. Principal and named body support remain explicit static inputs.
+/-! Connect empty bodies and actual ordinary-owner sequence receipts to the
+existing numeric caller/body proof. Associations keep their exact Code and
+BodyWith context. Empty bodies obtain their original footer and selected scope
+from preparation; sequence packets obtain exact child call readiness.
+Principal nonempty and named body support remain explicit static inputs.
 Full retained policy, original metadata and sequence conditions are retained.
 
 The combined named/anonymous registry is used throughout. The actual ordinary
@@ -190,7 +192,7 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
 /-- Ordinary Associations supply static producer conditions at their own Code.
 Principal Associations retain their existing dependent packet/support pair;
 they are not required to have an ordinary function declaration owner. -/
-def OrdinarySequenceFor {mapping world function native bindings parameterCore resultCore}
+def SequenceFor {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) : Type :=
   match association with
@@ -198,6 +200,14 @@ def OrdinarySequenceFor {mapping world function native bindings parameterCore re
       OrdinarySequence stagePrepared support.caller.named code support.body
   | .principal _ _ _ _ _ _ _ _ _ _ _ =>
       Σ packet : PacketFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared), SupportFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared) packet
+
+/-- Static coverage includes an actual empty unit body as well as the
+existing terminal/discard sequence. The empty branch carries only Source shape. -/
+inductive OrdinarySequenceFor {mapping world function native bindings parameterCore resultCore}
+    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore) : Type where
+  | sequence (support : SequenceFor stagePrepared association) : OrdinarySequenceFor association
+  | empty (body : function.body = []) (unit : function.resultType = .unit) : OrdinarySequenceFor association
 
 private theorem sequence_ready {named : CallableIndexedNamedGeneration.Named}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
@@ -239,8 +249,9 @@ private theorem sequence_ready {named : CallableIndexedNamedGeneration.Named}
   exact atIndices (packet.conditions choice).readFuel choice.packet.reasonAt
     (packet.readFuel choice) choice.reason certificate compiler path
 
-/-- Construct ordinary packet/support using preparation and retain the exact
-principal fallback. The resulting family feeds the existing numeric theorem. -/
+/-- Construct empty or ordinary sequence packets using actual preparation,
+retaining the exact principal fallback. The resulting family feeds the same
+numeric theorem and original caller restoration. -/
 private theorem sequence_coverage
     (family : ∀ {mapping world function native bindings parameterCore resultCore}
       (association : Association headers keys bodyRegistry semanticFaults mapping world function native
@@ -254,22 +265,42 @@ private theorem sequence_coverage
       bindings parameterCore resultCore) :
     Nonempty (Σ packet : PacketFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared), SupportFor association (RecursiveNamedPreparedStageScopes.registry stagePrepared) packet) := by
   have input := family association
-  cases association with
-  | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>
-      let association := Association.ordinary owner captured code history support origin prefixContext
-        globals referenceIndex typed provenance
+  cases input with
+  | empty empty unit =>
+    cases association with
+    | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>
       obtain ⟨sidecar, _issued, selected⟩ :=
         CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.unique
-      have shape : ShapeFor association := input.shape
-      obtain ⟨chosen⟩ := choose_for association shape
+      obtain ⟨packet, packetSupport⟩ := CallableIndexedOwnedPreparedStagedEmptyBodyCompilerReceipts.of_empty
+        code provenance.body_recipe support.body empty unit
         (RecursiveStageRegistry.scope sidecar code.active function)
         (RecursiveNamedPreparedStageScopes.anonymous_preserved stagePrepared selected)
-      have ready := sequence_ready stagePrepared code support.body input chosen
-        support.source_receipt accepted wellFormed
-      exact ⟨⟨packet_for association chosen,
-        support_for association chosen (input.conditions chosen) ready⟩⟩
-  | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
-      exact ⟨input⟩
+      exact ⟨⟨.empty packet, packetSupport⟩⟩
+    | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
+      obtain ⟨sidecar, _issued, selected⟩ :=
+        CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.unique
+      obtain ⟨packet, packetSupport⟩ := CallableIndexedOwnedPreparedStagedEmptyBodyCompilerReceipts.of_empty
+        code provenance.body_recipe support.body empty unit
+        (RecursiveStageRegistry.scope sidecar code.active function)
+        (RecursiveNamedPreparedStageScopes.anonymous_preserved stagePrepared selected)
+      exact ⟨⟨.empty packet, packetSupport⟩⟩
+  | sequence input =>
+    cases association with
+    | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>
+        let association := Association.ordinary owner captured code history support origin prefixContext
+          globals referenceIndex typed provenance
+        obtain ⟨sidecar, _issued, selected⟩ :=
+          CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.unique
+        have shape : ShapeFor association := input.shape
+        obtain ⟨chosen⟩ := choose_for association shape
+          (RecursiveStageRegistry.scope sidecar code.active function)
+          (RecursiveNamedPreparedStageScopes.anonymous_preserved stagePrepared selected)
+        have ready := sequence_ready stagePrepared code support.body input chosen
+          support.source_receipt accepted wellFormed
+        exact ⟨⟨packet_for association chosen,
+          support_for association chosen (input.conditions chosen) ready⟩⟩
+    | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
+        exact ⟨input⟩
 
 section Caller
 variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}

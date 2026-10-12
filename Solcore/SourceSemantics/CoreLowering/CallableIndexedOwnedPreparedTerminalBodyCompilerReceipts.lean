@@ -169,6 +169,37 @@ theorem Receipt.native_child {policy : SourceCoreLoops.Policy} {fuel : Nat} {sou
   cases flowTyped with
   | caseE computation failure next => exact ⟨_, computation⟩
 
+/-- Enclosing checked code determines the exact language-result type of
+the used terminal child, including both error and success payloads. -/
+theorem Receipt.native_child_exact {policy : SourceCoreLoops.Policy} {fuel : Nat} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {expression : ExpressionId} {statements : List StatementId}
+    {result : Ty} {reasonAt : ExpressionId → Word} {fellThrough escaped : Word} {code : Expr}
+    (receipt : Receipt policy fuel source scope expression statements result reasonAt fellThrough escaped code)
+    {context : Core.Context} {nativeType : Ty} {definitions : DataEnvironment}
+    (typed : HasType context code nativeType definitions) :
+    HasType context receipt.child.expression (LanguageResult.resultType receipt.child.type) definitions := by
+  rw [receipt.emitted] at typed
+  obtain ⟨flowType, flowTyped⟩ := TypedLexicalWhile.Native.finished_flow typed
+  cases flowTyped with
+  | caseE computation failure success =>
+    cases failure with
+    | inLeft wellFormed error =>
+      cases error with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+        cases found
+        cases success with
+        | inRight wordValid returned =>
+          cases returned with
+          | inLeft transferValid returned =>
+            cases returned with
+            | inRight unitValid returned =>
+              cases returned with
+              | var found =>
+                simp only [List.getElem?_cons_zero, Option.some.injEq] at found
+                cases found
+                simpa only [receipt.sameType, LanguageResult.resultType] using computation
+
 /-- A chosen static body certificate stores only accepted compiler receipts. -/
 def certificate (policy : SourceCoreLoops.Policy) (reasonAt : ExpressionId → Word)
     (fellThrough escaped : Word) : FunctionCode.BodyCertificate :=
