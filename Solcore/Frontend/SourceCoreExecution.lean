@@ -250,6 +250,18 @@ def Session.IndexedAt {artifact : Artifact} (session : Session artifact)
   | ⟨_, .empty _⟩, ⟨_⟩ => False
   | ⟨_, .indexed _ _ actual _⟩, ⟨payload⟩ => actual = native ∧ HEq payload indexed
 
+/-- Two observations of the same public session identify its exact payload. -/
+theorem Session.IndexedAt.unique {artifact : Artifact} {session : Session artifact}
+    {native : SourceCoreIndexedSession.Artifact} {left right : SourceCoreIndexedSession.Session native}
+    (first : session.IndexedAt left) (second : session.IndexedAt right) : left = right := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim first
+  | indexed recipe selected actual atRecipe =>
+      rcases session with ⟨payload⟩
+      rcases first with ⟨rfl, same⟩
+      exact (eq_of_heq same).symm.trans (eq_of_heq second.2)
+
 private def BootstrapPayload (artifact : Artifact) : Type :=
   match artifact.opened with
   | .empty _ => Unit
@@ -258,11 +270,30 @@ private def BootstrapPayload (artifact : Artifact) : Type :=
 structure Bootstrap (artifact : Artifact) where private mk ::
   private payload : BootstrapPayload artifact
 
-def Artifact.bootstrap (artifact : Artifact) : IO (Bootstrap artifact) := by
+/-- The public checkpoint retains the original indexed fresh construction. -/
+def Bootstrap.FreshAt {artifact : Artifact} (bootstrap : Bootstrap artifact) : Prop :=
+  match artifact, bootstrap with
+  | ⟨_, .empty _⟩, ⟨_⟩ => True
+  | ⟨_, .indexed recipe _ _ _⟩, ⟨indexed⟩ => indexed.InitialAt recipe {}
+
+/-- Equality with the actual indexed bootstrap, without a machine getter. -/
+def Bootstrap.IndexedAt {artifact : Artifact} (bootstrap : Bootstrap artifact)
+    {native : SourceCoreIndexedSession.Artifact} (indexed : SourceCoreIndexedSession.Bootstrap native) : Prop :=
+  match artifact, bootstrap with
+  | ⟨_, .empty _⟩, ⟨_⟩ => False
+  | ⟨_, .indexed _ _ actual _⟩, ⟨payload⟩ => actual = native ∧ HEq payload indexed
+
+/-- Fresh bootstrap mints one original session authority and retains its proof. -/
+def Artifact.bootstrapWithReceipt (artifact : Artifact) : IO {bootstrap : Bootstrap artifact // bootstrap.FreshAt} := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
-  | empty selected => exact pure ⟨()⟩
-  | indexed recipe selected native _atRecipe => exact do return ⟨← native.bootstrapFresh⟩
+  | empty selected => exact pure ⟨⟨()⟩, True.intro⟩
+  | indexed recipe selected native atRecipe => exact do
+      let fresh ← native.bootstrapFreshWithReceipt recipe atRecipe
+      pure ⟨⟨fresh.val⟩, fresh.property⟩
+
+def Artifact.bootstrap (artifact : Artifact) : IO (Bootstrap artifact) := do
+  pure (← artifact.bootstrapWithReceipt).val
 
 inductive BootResult (artifact : Artifact) where
   | ready (session : Session artifact)
@@ -277,6 +308,31 @@ def Bootstrap.resume {artifact : Artifact} (bootstrap : Bootstrap artifact) (fue
       | .ready session => .ready ⟨session⟩
       | .outOfFuel checkpoint => .outOfFuel ⟨checkpoint⟩
       | .error error => .error error
+
+/-- The public ready equation retains the original fresh indexed checkpoint
+and the same indexed session. No native bootstrap is evaluated in this proof. -/
+theorem Bootstrap.ready_indexed {artifact : Artifact} {compiled : Compiled}
+    {recipe : SourceCoreIndexedSession.Recipe} {native : SourceCoreIndexedSession.Artifact}
+    {bootstrap : Bootstrap artifact} {session : Session artifact} {fuel : Nat}
+    (opened : artifact.IndexedAt compiled recipe native) (fresh : bootstrap.FreshAt)
+    (ready : bootstrap.resume fuel = .ready session) :
+    ∃ (indexed : SourceCoreIndexedSession.Bootstrap native)
+      (indexedSession : SourceCoreIndexedSession.Session native),
+      bootstrap.IndexedAt indexed ∧ indexed.InitialAt recipe {} ∧
+      session.IndexedAt indexedSession ∧ indexed.resume fuel = .ready indexedSession := by
+  rcases artifact with ⟨actual, openedState⟩
+  cases openedState with
+  | empty selected => exact False.elim opened.2
+  | indexed actualRecipe selected actualNative atRecipe =>
+      rcases opened with ⟨rfl, rfl, rfl⟩
+      rcases bootstrap with ⟨indexed⟩
+      cases completed : indexed.resume fuel with
+      | ready indexedSession =>
+          simp only [Bootstrap.resume, completed] at ready
+          cases ready
+          exact ⟨indexed, indexedSession, ⟨rfl, HEq.rfl⟩, fresh, ⟨rfl, HEq.rfl⟩, completed⟩
+      | outOfFuel checkpoint => simp only [Bootstrap.resume, completed] at ready; cases ready
+      | error error => simp only [Bootstrap.resume, completed] at ready; cases ready
 
 def Session.heapSize {artifact : Artifact} (session : Session artifact) : Nat :=
   match artifact, session with

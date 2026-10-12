@@ -53,11 +53,12 @@ export SourceCoreExecution.StaticWordProgram (compiled roots count rootForSelect
 end StaticWordProgram
 
 namespace Artifact
-export SourceCoreExecution.Artifact (keys rootCount root? bootstrap bootstrapFromPrefix preparePrefix CompiledAt IndexedAt)
+export SourceCoreExecution.Artifact
+  (keys rootCount root? bootstrap bootstrapWithReceipt bootstrapFromPrefix preparePrefix CompiledAt IndexedAt)
 end Artifact
 
 namespace Bootstrap
-export SourceCoreExecution.Bootstrap (resume)
+export SourceCoreExecution.Bootstrap (resume FreshAt IndexedAt ready_indexed)
 end Bootstrap
 
 namespace BootResult

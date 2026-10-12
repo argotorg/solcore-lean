@@ -52,7 +52,8 @@ private def execute {artifact : Artifact} (session : Session artifact) (key : Ke
   | .ok (.outOfFuel _) => throw (IO.userError "public execution exhausted")
   | .error error => throw (IO.userError s!"public invocation: {reprStr error}")
 private def boot (artifact : Artifact) : IO (Session artifact) := do
-  let bootstrap ← artifact.bootstrap
+  let fresh ← artifact.bootstrapWithReceipt
+  let bootstrap := fresh.val
   match bootstrap.resume 300000 with
   | .ready session => pure session
   | .error error => throw (IO.userError s!"public bootstrap: {reprStr error}")
