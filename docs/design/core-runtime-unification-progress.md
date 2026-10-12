@@ -6,6 +6,14 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Scoped blocks connected to public execution (2026-10-13)
+
+`ea7ac706` adds recursive staged block traces, measured children, ordinary Source erasure and failure-state preservation. `18c4e95f` connects those traces through the actual compiler, scoped lexical and imperative body proofs, and public sessions. A block restores the outer lexical context after its body while keeping the reached heap. Return and failure bypass the suffix; a compiler-confirmed terminal block requires no suffix execution premise.
+
+The closed `update(value, next)` example allocates a block-local copy of `next`, writes it to the outer `value` cell and returns that value after leaving the block. Its successive calls return `12 / 23`. Both Source traces, reached heaps and retained histories come from actual initialization and the preceding returned session. Independent Source success supplies sufficient execution and output fuel at both original checkpoints.
+
+Validation: full build (6346 jobs), all registered tests and kernel policy pass. Twenty-four audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Recursive primitive and conditional expressions are the next public connection under verification. Remaining control flow, broader compiler alternatives and final composition across every compiler pass remain incomplete.
+
 ## Named while bodies from actual call entries (2026-10-13)
 
 Checkpoint `04a8a508` connects named bodies with plain assignment and finite while loops to the same public proof family. The actual argument bundle, global slots and retained frame determine the compiler's native input prefix. The proof restricts the canonical view to those used slots while preserving the complete runtime environment, heap and owned pool. Existing input metadata extension receipts supply the required registry condition throughout public dispatch.
