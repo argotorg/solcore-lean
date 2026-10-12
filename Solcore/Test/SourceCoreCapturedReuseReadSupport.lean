@@ -82,14 +82,9 @@ theorem ActualHeader.read_support_at {fixture : CompiledFixture}
     Nonempty (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.NamedSupport
       actual.header (RecursiveNamedPreparedStageScopes.registry stagePrepared) terminal
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)) := by
-  apply CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport.of_actual
+  exact CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport.of_actual
     terminal diagnostic receiver fixture.source_wellFormed (ActualHeader.read_metadata observed actual terminal.prepared.named)
     (by rw [expression]; exact ActualHeader.read_syntax observed actual) stagePrepared point
-  · rw [actual.source]
-    exact observed.read_no_lambda
-  · intro row member sameOwner
-    rw [← terminal.aligned.named]
-    exact ActualHeader.unique_owner observed.readRow actual row member sameOwner
 
 /-- The actual terminal lowering supplies its own Point certificate and
 preparation packet before the concrete support producer is invoked. -/

@@ -4,6 +4,12 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Named terminal scope conditions (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport.of_actual` no longer takes `NoLambda` or specialization-key uniqueness arguments. `CallableIndexedActualNamedSourceReceipts.hook_sidecar` recovers the genuine canonical sidecar. `RecursiveNamedPreparedScopeCoherence.selected_frame` derives guard-frame equality from the actual preparation and Source well-formedness, for named or anonymous registry selections. It preserves the selected scope and substitution; it does not identify distinct sidecars or keys.
+
+`RecursiveNamedLambdaFreeSelectedScopes` has been removed. The captured-reuse fixture no longer checks owner-key uniqueness. `OrdinarySequenceCallerBounds.sequence_coverage` is public for application consumers that reuse the same supported body family. Full build (6035 jobs), registered tests, kernel policy and four standard-axiom endpoint checks pass. Runtime API behavior is unchanged.
+
 ## Public continuation for actual captured closures (2026-10-13)
 
 Commit `c187ce09` adds the registered `SourceCoreCapturedReusePublicExecution` test, which connects six actual public calls to Source execution and returned histories: `make(10)`, `make(20)`, `read(first)`, `make(30)`, `read(second)`, `read(first)`. The three read outcomes are proved to be Word `10`, `20` and `10`. Distinct exported handles and every earlier history entry remain attached to the real returned sessions.
@@ -13,7 +19,7 @@ The runtime API is unchanged. The following proof interfaces close this concrete
 - `RecursiveNamedPublicHistoryFrontdoor.recover_start` is now public. It derives the selected startup and Source function from the accepted public start and current native state. Direct continuation consumers can then provide an exact Source argument list.
 - `StartAt.function_registry` derives metadata identity for an actual singleton function-handle input. `StartAt.returned_registry` retains the input encoding's registry in the actual successful returned session.
 - `RecursiveNamedPublicWordResultMeaning.result_word` identifies the Source Word outcome using the same full invocation result and genuine public result decoding.
-- `NamedRecursiveTerminalSupport` constructs the named indirect-read support from the accepted terminal compiler action, actual source nodes and selected sidecar. `RecursiveNamedLambdaFreeSelectedScopes` derives that sidecar from authentic selection and the finite no-lambda source facts.
+- `NamedRecursiveTerminalSupport` constructs the named indirect-read support from the accepted terminal compiler action, actual source nodes and selected sidecar. The current `RecursiveNamedPreparedScopeCoherence` adapter derives guard-frame agreement from authentic preparation and Source typing; the earlier lambda-free restriction has been removed.
 
 The fixture's `RetainedState` carries the real indexed/public session correspondence, current caller/heap/store, metadata identity and History. Its make/read steps produce the next state from the previous one. `sequence_meaning` constructs static support internally and preserves all six state transitions. It accepts no replacement argument representation, Source execution or body meaning hypothesis.
 
@@ -39,7 +45,7 @@ The proof adapters retain the following facts at the same compiler Code:
 
 Concrete compiler producers derive these facts. Generic APIs accepting arbitrary Sites require authentic static receipts; they cannot infer original source schemes or diagnostic identity from native typing. Existing empty-body, terminal and discard adapters forward the added provenance.
 
-The fixture's later `invokePacked` call checks Word `10` at runtime. The public Source theorem currently covers creation, capture, export and History; the later public read through that history is still being connected. The receiving diagnostic table is issued by a separate genuine indexed execution of the same artifact. Progress estimates are unchanged.
+The fixture's later `invokePacked` call checks Word `10` at runtime. The public Source theorem currently covers creation, capture, export and History; the later public read through that history is covered by the six-call proof above. Direct `invokePacked` reflection is still being connected. The receiving diagnostic table is issued by a separate genuine indexed execution of the same artifact. Progress estimates are unchanged.
 
 Validation: strict Lean, full build (6019 jobs), all registered tests, kernel policy, the concrete public fixture and the six-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 

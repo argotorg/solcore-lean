@@ -7,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedReadDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderScopeDeclarations
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedLambdaFreeSelectedScopes
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedScopeCoherence
 
 /-! A named terminal's original compiler policy produces finite recursive
 expression support. Actual Source typing, diagnostic issuance and selected
@@ -258,23 +258,34 @@ theorem of_terminal
   exact at_scope terminal diagnostic receiver wellFormed metadata tree root child selected (scopes child selected)
 
 include diagnostic receiver wellFormed metadata tree in
-/-- A lambda-free original Source and actual finite owner identity discharge
-all selected-scope authority internally. This is the public body-family input. -/
+/-- The actual named hook supplies its canonical sidecar. Genuine Source
+origins and program typing identify every selected guard frame, without
+excluding lambdas or other specializations of the same declaration. -/
 theorem of_actual
     (actual : RecursiveNamedPreparedStageContracts.Prepared compiled
       compiled.indexed.ancestry.graph.inputs.callable)
     (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
-      terminal.expression terminal.receipt.child)
-    (noLambda : RecursiveNamedLambdaFreeSelectedScopes.NoLambda header.function.source)
-    (uniqueOwner : ∀ row ∈ compiled.indexed.base.plan.specializations,
-      row.function.typedBody.owner = header.function.source.owner →
-      row.key = terminal.prepared.named.signature.key) :
+      terminal.expression terminal.receipt.child) :
     Nonempty (CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.NamedSupport
       header (RecursiveNamedPreparedStageScopes.registry actual) terminal faults) := by
+  obtain ⟨sidecar, issued⟩ := CallableIndexedActualNamedSourceReceipts.hook_sidecar compiled header.hook
+  have sourceReceipt := (CallableIndexedActualNamedSourceReceipts.header_source compiled header).1
+  have canonicalSource : header.function.source = sidecar.source := by
+    simpa only [EmptySourceSubstitution.source] using sourceReceipt.source issued
+  obtain ⟨request, signature, generic, signatureMember, _genericMember, _requested, accepted⟩ :=
+    terminal.prepared.origin
+  have identities := RecursiveNamedSpecializationBodyFacts.identities accepted
+  have body := RecursiveNamedSpecializationBodyFacts.body accepted
+  have sourceOwner : header.function.source.owner = signature.id := by
+    rw [header.agreement.source, terminal.aligned.named, terminal.prepared.same]
+    exact (congrArg TypedSource.owner body).trans (identities.2.1.trans identities.1.symm)
   apply of_terminal terminal diagnostic receiver wellFormed metadata tree point
   intro child selected
-  exact SidecarAt.of_exists terminal (RecursiveNamedLambdaFreeSelectedScopes.selected actual
-    terminal.prepared.named.signature.key noLambda uniqueOwner selected)
+  refine { sidecar := sidecar, issued := ?_, view := .inl canonicalSource, guards := ?_ }
+  · simpa only [terminal.aligned.named] using issued
+  · exact RecursiveNamedPreparedScopeCoherence.selected_frame actual
+      (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed
+      signatureMember sourceOwner issued sourceReceipt selected
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedRecursiveTerminalSupport

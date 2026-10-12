@@ -6,6 +6,12 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Named terminal support without lambda and key restrictions (2026-10-13)
+
+The actual named compiler hook now supplies its canonical sidecar. Source preparation and annotation coherence establish the same guard frame for every authentic named or anonymous selection, even when specialization keys differ. The public static producer drops both its lambda-free Source premise and its owner-key uniqueness premise. The captured-reuse fixture also drops the obsolete owner-key observation.
+
+The existing Source well-formedness, metadata, policy and body grammar conditions remain. Full build (6035 jobs), all registered tests, kernel policy and four standard-axiom endpoint checks pass. The next connection is direct public `invokePacked` execution using the same retained captures and returned histories. Estimates are unchanged.
+
 ## First objective completion assessment (2026-10-01)
 
 **Removing direct typed-source evaluation at runtime and unifying public execution paths through Core are complete.** The assessment point is `a3168382`. Registered tests verified deletion of the old evaluator, migration of all 18 groups of old execution tests, the shared opaque artifact/value/session/checkpoint, the data initial heap, explicit raw migration, owned snapshot/full prefix, and authentication of inputs, heaps, and closures. An independent read-only audit also found no specific unresolved item blocking the first objective.

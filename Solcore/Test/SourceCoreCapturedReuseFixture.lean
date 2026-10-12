@@ -487,8 +487,6 @@ structure ObservedRow (fixture : CompiledFixture) (signature : ProgramFunctionSi
   entry : SourceCoreCallableIndexedPrograms.Entry fixture.recipe.compiled.indexed.layouts
   entryMember : entry ∈ fixture.recipe.compiled.indexed.entries
   entryKey : entry.key = row.key
-  ownerKeys : ∀ candidate, candidate ∈ fixture.recipe.compiled.indexed.base.plan.specializations →
-    candidate.function.typedBody.owner = row.function.typedBody.owner → candidate.key = row.key
 
 private def observeTarget (fixture : CompiledFixture) (row : SourceSpecialization.SpecializedFunction) :
     IO (PLift (SourceCompilationPlan.exactInstantiationKey fixture.recipe.compiled.indexed.base.plan
@@ -510,9 +508,6 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
     let ⟨parameters⟩ ← observed (row.parameterSubstitution = []) "reuse substitution"
     let ⟨ordinary⟩ ← observed (row.function.returnComptime = false) "reuse return marker"
     let ⟨ordinaryInputs⟩ ← observed (row.function.typedBody.inputs.all (fun binder => !binder.comptime) = true) "reuse parameter markers"
-    let ⟨ownerKeys⟩ ← observed (fixture.recipe.compiled.indexed.base.plan.specializations.all
-      (fun candidate => decide (candidate.function.typedBody.owner = row.function.typedBody.owner →
-        candidate.key = row.key)) = true) "reuse unique owner"
     let ⟨target⟩ ← observeTarget fixture row
     match slot : fixture.recipe.compiled.indexed.base.globals.zipIdx.filter
         (fun item => decide (item.1.key = row.key)) with
@@ -539,10 +534,7 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
           globalKey := globalKey
           entry := entry
           entryMember := List.mem_of_find?_eq_some entryFound
-          entryKey := entryKey
-          ownerKeys := by
-            intro candidate member same
-            exact of_decide_eq_true (List.all_eq_true.mp ownerKeys candidate member) same }
+          entryKey := entryKey }
     | _ => throw (IO.userError "reuse unique global slot")
 
 structure ObservedProgram (fixture : CompiledFixture) where
@@ -798,19 +790,6 @@ theorem ObservedProgram.read_no_lambda {fixture : CompiledFixture}
     · rcases List.mem_cons.mp rest with impossible | empty
       · cases impossible
       · cases empty
-
-/-- The finite compiler owner check aligns any genuine named selection with
-this Header's key. It does not assume a semantic function identity. -/
-theorem ActualHeader.unique_owner {fixture : CompiledFixture}
-    {signature : ProgramFunctionSignature} (observed : ObservedRow fixture signature)
-    (actual : ActualHeader fixture observed.row) :
-    ∀ candidate, candidate ∈ fixture.recipe.compiled.indexed.base.plan.specializations →
-      candidate.function.typedBody.owner = actual.header.function.source.owner →
-      candidate.key = actual.header.named.signature.key := by
-  intro candidate member owner
-  rw [actual.source] at owner
-  rw [actual.aligned.named, RecursiveNamedPreparedCallEvidence.Prepared.signature_key actual.prepared]
-  exact observed.ownerKeys candidate member owner
 
 private theorem recipe_unique {compiled : SourceCoreExecution.Compiled}
     {first second : SourceCoreIndexedSession.Recipe}

@@ -77,11 +77,13 @@ private theorem exact_member {plan : SourceCompilationPlan.Plan} {key : SourceCo
     exact List.mem_singleton.mp retained
   · cases accepted
 
-/-- The actual table authenticates the named entry selected by this hook. -/
-theorem hook_record_exists (compiled : SourceCoreUnifiedCompilation.Compiled)
+/-- The actual hook authenticates its original named sidecar. The retained
+compiler receipt determines the key; no scope identity is assumed. -/
+theorem hook_sidecar (compiled : SourceCoreUnifiedCompilation.Compiled)
     {named : SourceCoreGeneralFunctions.Function} {body output : Expr}
     (hook : SourceCoreCallableIndexedAncestry.namedBody compiled.indexed.ancestry named body = .ok output) :
-    ∃ row, SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok row := by
+    ∃ sidecar, SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan
+      named.signature.key = .ok sidecar := by
   obtain ⟨origin, _, selected, _, _⟩ := CallableIndexedFormation.namedBody_receipt compiled.indexed.ancestry hook
   let table := compiled.indexed.ancestry.graph.inputs.callable.table
   have owned : table.idAt? (.named named.signature.key) = some origin := selected
@@ -103,7 +105,15 @@ theorem hook_record_exists (compiled : SourceCoreUnifiedCompilation.Compiled)
     cases authenticated with
     | named accepted =>
       obtain ⟨receipt⟩ := CallContractCertificates.named_of_accepted accepted
-      exact ⟨receipt.sidecar.caller, sidecar_record receipt.prepared⟩
+      exact ⟨receipt.sidecar, receipt.prepared⟩
+
+/-- The actual table authenticates the named entry selected by this hook. -/
+theorem hook_record_exists (compiled : SourceCoreUnifiedCompilation.Compiled)
+    {named : SourceCoreGeneralFunctions.Function} {body output : Expr}
+    (hook : SourceCoreCallableIndexedAncestry.namedBody compiled.indexed.ancestry named body = .ok output) :
+    ∃ row, SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key = .ok row := by
+  obtain ⟨sidecar, issued⟩ := hook_sidecar compiled hook
+  exact ⟨sidecar.caller, sidecar_record issued⟩
 
 /-- Cached full-row preparation identifies the exact record selected by the
 same hook, including every source node and ordered requirement row. -/

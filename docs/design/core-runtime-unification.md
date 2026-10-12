@@ -4,6 +4,12 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Named body support across actual scope selections (2026-10-13)
+
+The named terminal connection now derives its canonical sidecar from the actual compiler hook and its Source origin from the prepared specialization. Shared scope coherence proves the selected guard frame for both named and anonymous selections, including different specialization keys. The connection no longer requires a lambda-free body or a unique specialization key per Source owner. It retains the existing Source typing, metadata, policy and supported body grammar requirements.
+
+The six-call captured-closure proof uses this general connection. Its obsolete owner-key runtime check has been removed. Full build (6035 jobs), all registered tests, kernel policy and a four-endpoint axiom audit pass. The audited endpoints use only `propext`, `Classical.choice` and `Quot.sound`. Direct public `invokePacked` meaning preservation remains in progress; estimates are unchanged.
+
 ## Current Implementation Status
 
 | Item | Status |

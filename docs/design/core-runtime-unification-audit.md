@@ -8,6 +8,12 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Named scope generalization (2026-10-13)
+
+The named terminal producer now obtains its canonical sidecar from the genuine hook and Source owner from the accepted ordinary specialization. The shared coherence theorem covers named and anonymous selections and differing specialization keys; its conclusion is guard-frame equality only. No Source execution law, body meaning law or replacement metadata premise has been added. Lambda-free Source and owner-key uniqueness restrictions, including the fixture's runtime uniqueness check, have been removed.
+
+Validation: full build (6035 jobs), all registered tests and kernel policy pass. `hook_sidecar`, `selected_frame`, `NamedRecursiveTerminalSupport.of_actual` and the closed six-call `sequence_meaning` depend only on `propext`, `Classical.choice` and `Quot.sound`. Direct public `invokePacked` meaning preservation remains unfinished.
+
 ## Sequential captured-closure reuse audit (2026-10-13)
 
 Commit `c187ce09` adds `SourceCoreCapturedReusePublicExecution.sequence_meaning`, which connects the actual six-call public sequence to six independent Source applications and reusable returned histories. Independent review checked the exact public inputs, selected functions, exported handles, Source arguments, heap transitions and final results.
