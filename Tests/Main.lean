@@ -1509,6 +1509,7 @@ import Solcore.Test.SourceCoreCapturedPackedPublicExecution
 import Solcore.Test.SourceCoreCapturedPackedForward
 import Solcore.Test.SourceCoreDirectIssuedPublicExecution
 import Solcore.Test.SourceCoreDirectOutputPublicExecution
+import Solcore.Test.SourceCoreCapturedLocalPublicExecution
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3436,6 +3437,7 @@ def run : IO Unit := do
   SourceCoreCapturedPacked.runForward
   SourceCoreDirectIssued.run
   SourceCoreDirectOutput.run
+  SourceCoreCapturedLocal.run
   SourceCoreHeapSnapshot.run
   SourceCoreExecutionSnapshots.run
   SourceCoreActiveHeapPrefix.run
