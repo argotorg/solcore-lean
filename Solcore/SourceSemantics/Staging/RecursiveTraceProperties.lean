@@ -27,6 +27,10 @@ private def BodyOrigin (outcome : BodyOutcome) : Prop :=
   ∀ (originScope : Scope) (call : ExpressionId) (reason : CallGuard.Fault),
     outcome = .fault (.stage originScope call reason) → Generated originScope call reason
 
+private def ForItemsOrigin (outcome : ForItemsOutcome) : Prop :=
+  ∀ (originScope : Scope) (call : ExpressionId) (reason : CallGuard.Fault),
+    outcome = .fault (.stage originScope call reason) → Generated originScope call reason
+
 private theorem body_result_stage {type : TypeSystem.Ty} {outcome : BodyOutcome} {result : Outcome}
     (converted : BodyResult type outcome result) {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
     (failed : result = .fault (.stage originScope call reason)) : outcome = .fault (.stage originScope call reason) := by
@@ -48,6 +52,8 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -68,7 +74,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
 theorem Expressions.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -84,6 +90,8 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -104,7 +112,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
 theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -120,6 +128,8 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -140,7 +150,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
 theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : Registry} {scope : Scope}
@@ -157,6 +167,8 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -177,7 +189,7 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
     case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   exact origin originScope call reason failed
 
 namespace Statements

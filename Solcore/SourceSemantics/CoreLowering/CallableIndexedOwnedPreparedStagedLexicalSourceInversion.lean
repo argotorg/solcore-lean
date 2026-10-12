@@ -50,6 +50,8 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
+  | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
@@ -95,6 +97,8 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
+  | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
@@ -134,6 +138,8 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | returnUnit actual same => exact ⟨rfl, rfl, rfl⟩
   | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
+  | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _

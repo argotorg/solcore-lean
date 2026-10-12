@@ -36,6 +36,8 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
     subst other
     exact form
   cases trace with
+  | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
+  | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _

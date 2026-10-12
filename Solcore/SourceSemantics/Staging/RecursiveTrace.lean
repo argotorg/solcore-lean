@@ -6,11 +6,11 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while loops, ordered match arms, and returns.
+containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while and for loops, ordered match arms, and returns.
 Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
 heap changes remain visible to the following statements. The profile has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
-evidence-selected operator methods, coercion paths, projected or compound assignments, for loops, and loop-control transfers require later recursive rules. These
+evidence-selected operator methods, coercion paths, projected or compound assignments, loop-control transfers require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
@@ -22,6 +22,11 @@ def BodyOutcome.restore (environment : Environment) : BodyOutcome → BodyOutcom
   | .fallthrough _ => .fallthrough environment
   | .returned value => .returned value
   | .fault failure => .fault failure
+
+/-- For-header completion retains its actual live bindings; headers do not transfer control. -/
+inductive ForItemsOutcome where
+  | done (environment : Dynamic.Environment)
+  | fault (failure : Failure)
 
 inductive BodyResult : TypeSystem.Ty → BodyOutcome → Outcome → Prop where
   | returned {type value} : BodyResult type (.returned value) (.value value)
@@ -325,6 +330,27 @@ mutual
         (matched : Match program registry scope context environment before resolution (.fallthrough environment) middle)
         (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | forInitializerFault {mode scope context failedContext environment before after id rest node initializer condition post body failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .forLoop initializer condition post body)
+        (initial : ForItems program registry scope context environment before initializer failedContext (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | forReturned {mode scope context loopContext environment loopEnvironment before middle after id rest node initializer condition post body value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .forLoop initializer condition post body)
+        (initial : ForItems program registry scope context environment before initializer loopContext (.done loopEnvironment) middle)
+        (loop : ForLoop program registry scope loopContext loopEnvironment middle condition post body (.returned value) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | forFault {mode scope context loopContext environment loopEnvironment before middle after id rest node initializer condition post body failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .forLoop initializer condition post body)
+        (initial : ForItems program registry scope context environment before initializer loopContext (.done loopEnvironment) middle)
+        (loop : ForLoop program registry scope loopContext loopEnvironment middle condition post body (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | forFallthrough {mode scope context loopContext finalContext environment loopEnvironment before middle loopHeap after
+          id rest node initializer condition post body outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .forLoop initializer condition post body)
+        (initial : ForItems program registry scope context environment before initializer loopContext (.done loopEnvironment) middle)
+        (loop : ForLoop program registry scope loopContext loopEnvironment middle condition post body (.fallthrough loopEnvironment) loopHeap)
+        (next : StatementsIn program registry mode scope context environment loopHeap rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     | whileReturned {mode scope context environment before after id rest node condition statements value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .whileLoop condition statements)
         (loop : While program registry scope context environment before condition statements (.returned value) after) :
@@ -456,6 +482,90 @@ mutual
         Match program registry scope context environment before resolution (.fallthrough environment) hidden
 
 
+  /-- Ordered ordinary for-header effects retain their actual lexical context.
+  A fault carries the context reached before the failing item. -/
+  inductive ForItems (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → List ForItemForm → Context → ForItemsOutcome → Heap → Prop where
+    | empty {scope context environment heap} :
+        ForItems program registry scope context environment heap [] context (.done environment) heap
+    | absent {scope context middleContext finalContext environment before bound after binder rest location outcome}
+        (monomorphic : binder.scheme.quantified = [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (allocate : Heap.Allocates before binder.scheme.body none location bound)
+        (next : ForItems program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.letDecl binder none :: rest) finalContext outcome after
+    | initialized {scope context middleContext finalContext environment before middle bound after binder initializer rest value location outcome}
+        (monomorphic : binder.scheme.quantified = [])
+        (extension : BinderExtends scope.source.owner context binder middleContext)
+        (child : Expression program registry scope context environment before initializer (.value value) middle)
+        (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
+        (next : ForItems program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.letDecl binder (some initializer) :: rest) finalContext outcome after
+    | initializerFault {scope context environment before after binder initializer rest failure}
+        (monomorphic : binder.scheme.quantified = [])
+        (child : Expression program registry scope context environment before initializer (.fault failure) after) :
+        ForItems program registry scope context environment before (.letDecl binder (some initializer) :: rest) context (.fault failure) after
+    | expression {scope context finalContext environment before middle after expression rest value outcome}
+        (child : Expression program registry scope context environment before expression (.value value) middle)
+        (next : ForItems program registry scope context environment middle rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.expression expression :: rest) finalContext outcome after
+    | expressionFailure {scope context environment before after expression rest failure}
+        (child : Expression program registry scope context environment before expression (.fault failure) after) :
+        ForItems program registry scope context environment before (.expression expression :: rest) context (.fault failure) after
+    | assignment {scope context finalContext environment before middle written after assignment rhs value target updated rest outcome}
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
+          middle target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignValue assignment .equal rhs :: rest) finalContext outcome after
+    | assignmentFailure {scope context environment before after assignment rhs target rest failure}
+        (snapshot : BareTarget environment before assignment.target target)
+        (child : Expression program registry scope context environment before rhs (.fault failure) after) :
+        ForItems program registry scope context environment before (.assignValue assignment .equal rhs :: rest) context (.fault failure) after
+    | unbound {scope context environment heap assignment rhs rest}
+        (bare : assignment.target.projections = [])
+        (missing : environment.Unbound assignment.target.root) :
+        ForItems program registry scope context environment heap (.assignValue assignment .equal rhs :: rest) context
+          (.fault (.semantic (.unboundLocal assignment.target.root))) heap
+    | dangling {scope context environment heap assignment rhs rest location}
+        (bare : assignment.target.projections = [])
+        (lookup : Environment.LooksUp environment assignment.target.root location)
+        (missing : heap.Dangling location) :
+        ForItems program registry scope context environment heap (.assignValue assignment .equal rhs :: rest) context
+          (.fault (.semantic (.danglingLocation location))) heap
+
+  /-- Finite for iteration runs each post header in the original loop scope.
+  Body/post local bindings are restored, while their heap effects persist. -/
+  inductive ForLoop (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → ExpressionId → List ForItemForm → List StatementId → BodyOutcome → Heap → Prop where
+    | testFault {scope context environment before after condition post body failure}
+        (test : Expression program registry scope context environment before condition (.fault failure) after) :
+        ForLoop program registry scope context environment before condition post body (.fault failure) after
+    | finished {scope context environment before after condition post body}
+        (test : Expression program registry scope context environment before condition (.value (.bool false)) after) :
+        ForLoop program registry scope context environment before condition post body (.fallthrough environment) after
+    | bodyFailure {scope context innerContext environment before middle after condition post body failure}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.fault failure) after) :
+        ForLoop program registry scope context environment before condition post body (.fault failure) after
+    | returnedFromBody {scope context innerContext environment before middle after condition post body value}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.returned value) after) :
+        ForLoop program registry scope context environment before condition post body (.returned value) after
+    | postFailure {scope context innerContext postContext environment innerEnvironment before middle bodyHeap after condition post body failure}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.fault failure) after) :
+        ForLoop program registry scope context environment before condition post body (.fault failure) after
+    | iterate {scope context innerContext postContext environment innerEnvironment postEnvironment before middle bodyHeap postHeap after condition post body outcome}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
+        (next : ForLoop program registry scope context environment postHeap condition post body outcome after) :
+        ForLoop program registry scope context environment before condition post body outcome after
+
 end
 
 /-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
@@ -463,7 +573,8 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
-  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough)
+  ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
+  forInitializerFault forReturned forFault forFallthrough)
 end Statements
 
 end Solcore.SourceSemantics.Staging.Recursive

@@ -47,6 +47,8 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
     subst other
     exact form
   cases trace with
+  | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
+  | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _

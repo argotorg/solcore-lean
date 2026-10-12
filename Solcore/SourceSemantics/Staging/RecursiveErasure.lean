@@ -126,6 +126,58 @@ theorem WhilePlain.next {program : Program} {scope : Scope} {context innerContex
     | semantic => exact .nextFallthrough test body next
 
 
+/-- Successful header prefixes retain the exact stopping context and bindings. -/
+def ForItemsPlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (items : List ForItemForm) (finalContext : Context)
+    (outcome : ForItemsOutcome) (after : Heap) : Prop :=
+  match outcome with
+  | .done finalEnvironment => ForItemsExecute program context scope.evidence scope.source environment before
+      items finalContext finalEnvironment after
+  | .fault (.semantic reason) => ForItemsFault program context scope.evidence scope.source environment before
+      items finalContext reason after
+  | .fault (.stage ..) => True
+
+theorem ForItemsPlain.prepend {program : Program} {scope : Scope} {context middleContext finalContext : Context}
+    {environment middleEnvironment : Environment} {before middle after : Heap}
+    {item : ForItemForm} {items : List ForItemForm} {outcome : ForItemsOutcome}
+    (head : ForItemExecutes program context scope.evidence scope.source environment before item middleContext middleEnvironment middle)
+    (tail : ForItemsPlain program scope middleContext middleEnvironment middle items finalContext outcome after) :
+    ForItemsPlain program scope context environment before (item :: items) finalContext outcome after := by
+  cases outcome with
+  | done => exact .cons head tail
+  | fault failure => cases failure with
+    | semantic => exact .tail head tail
+    | stage => trivial
+
+def ForLoopPlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (condition : ExpressionId)
+    (post : List ForItemForm) (body : List StatementId) (outcome : BodyOutcome) (after : Heap) : Prop :=
+  match outcome with
+  | .fallthrough finalEnvironment => ForLoopExecutes program context scope.evidence scope.source environment before
+      condition post body context (.fallthrough finalEnvironment) after
+  | .returned value => ForLoopExecutes program context scope.evidence scope.source environment before
+      condition post body context (.returned value) after
+  | .fault (.semantic reason) => ForLoopFaults program context scope.evidence scope.source environment before
+      condition post body reason after
+  | .fault (.stage ..) => True
+
+theorem ForLoopPlain.next {program : Program} {scope : Scope} {context innerContext postContext : Context}
+    {environment innerEnvironment postEnvironment : Environment} {before middle bodyHeap postHeap after : Heap}
+    {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId} {outcome : BodyOutcome}
+    (test : ExpressionEvaluates program context scope.evidence scope.source environment before condition (.bool true) middle)
+    (branch : StatementsExecute program context scope.evidence scope.source environment middle body
+      innerContext (.fallthrough innerEnvironment) bodyHeap)
+    (postTrace : ForItemsExecute program context scope.evidence scope.source environment bodyHeap post
+      postContext postEnvironment postHeap)
+    (next : ForLoopPlain program scope context environment postHeap condition post body outcome after) :
+    ForLoopPlain program scope context environment before condition post body outcome after := by
+  cases outcome with
+  | returned => exact .nextFallthrough test branch postTrace next
+  | fallthrough => exact .nextFallthrough test branch postTrace next
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .nextFallthrough test branch postTrace next
+
 private theorem value_occurrence {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm} {value : Value}
     (occurrence : Occurrence scope id form)
@@ -316,6 +368,8 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
     (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
     (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
   case atomicValue contains _ uncoerced valueRule =>
     exact .intro contains (by simpa only [uncoerced] using valueRule) (by simpa only [uncoerced] using CoercionPathExecutes.nil)
   case atomicFault contains _ uncoerced faultRule =>
@@ -547,6 +601,65 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
   case noBranch contains scrutinee hidden selected ih =>
     intro id node found form
     exact .matchNoBranch found form contains ih hidden selected
+
+  case forInitializerFault contains form initial initialIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.forInitializer contains form initialIH)
+  case forReturned contains form initial loop initialIH loopIH =>
+    exact StatementsPlain.terminal contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH)
+  case forFault contains form initial loop initialIH loopIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.forIteration contains form initialIH loopIH)
+  case forFallthrough contains form initial loop next initialIH loopIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH) nextIH
+  case empty => exact .nil
+  case absent mono extended allocated next nextIH =>
+    exact ForItemsPlain.prepend (.letUninitialized mono extended allocated) nextIH
+  case initialized mono extended child allocated next childIH nextIH =>
+    exact ForItemsPlain.prepend (.letInitialized childIH mono extended allocated) nextIH
+  case initializerFault mono child childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.letInitializer mono childIH)
+  case expression child next childIH nextIH => exact ForItemsPlain.prepend (.expression childIH) nextIH
+  case expressionFailure child childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.expression childIH)
+  case assignment snapshot child write next childIH nextIH =>
+    exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
+  case assignmentFailure snapshot child childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) childIH))
+  case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
+  case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
+  case testFault test testIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .condition testIH
+  case finished test testIH => exact .done testIH
+  case bodyFailure test branch testIH branchIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .body testIH branchIH
+  case returnedFromBody test branch testIH branchIH => exact .returns testIH branchIH
+  case postFailure test branch postTrace testIH branchIH postIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .postFallthrough testIH branchIH postIH
+  case iterate test branch postTrace next testIH branchIH postIH nextIH =>
+    exact ForLoopPlain.next testIH branchIH postIH nextIH
 
 /-- Successful recursively staged expressions retain their ordinary source
 meaning, including all nested closure-body computations. -/

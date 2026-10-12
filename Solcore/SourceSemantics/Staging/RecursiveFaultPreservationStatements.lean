@@ -42,7 +42,9 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
     (whileIH : ∀ smaller, smaller < size → WhileAt program registry smaller)
-    (matchIH : ∀ smaller, smaller < size → MatchAt program registry smaller) :
+    (matchIH : ∀ smaller, smaller < size → MatchAt program registry smaller)
+    (itemsIH : ∀ smaller, smaller < size → ForItemsAt program registry smaller)
+    (loopIH : ∀ smaller, smaller < size → ForLoopAt program registry smaller) :
     StatementsAt program registry size := by
   intro mode scope context staticFinal runtimeFinal environment before after statements failure control facts
     runtime covers locals heap typed trace
@@ -292,6 +294,47 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
             headExtends.trans (allocationExtends.trans tailExtends)⟩
       | letInitializedGeneralized polymorphic _ _ _ _ => exact (polymorphic monomorphic).elim
 
+  | @forInitializerFault initialSize mode scope context failedContext environment before after id rest node initial condition post body
+      failure contains form initialTrace =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | forLoop initialTyped _ _ _ =>
+          exact itemsIH initialSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap initialTyped initialTrace
+  | @forFault initialSize loopSize mode scope context loopContext environment loopEnvironment before initialized after
+      id rest node initial condition post body failure contains form initialTrace loop =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | forLoop initialTyped conditionTyped bodyTyped postTyped =>
+          obtain ⟨same, initialHeap, initialExtends, initialLocals⟩ :=
+            ForItemsExecute.preserved wellFormed runtime covers locals heap initialTyped initialTrace.sound.plain
+          subst loopContext
+          have fields := ForItemsHaveType.runtimeContextFields initialTyped
+          have loopClosed := fields.targetClosed runtime.closed
+          have initialAtLoop := initialHeap.transportClosed fields.signatures runtime.closed loopClosed
+            runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+          obtain ⟨afterTyped, loopExtends⟩ := loopIH loopSize (Size.child_lt_stepSize (by simp))
+            (runtime.transport fields) (fields.covers covers) initialLocals initialAtLoop
+            conditionTyped bodyTyped postTyped loop
+          exact ⟨afterTyped.transportClosed fields.signatures.symm loopClosed runtime.closed
+            (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+            initialExtends.trans loopExtends⟩
+  | @forFallthrough initialSize loopSize nextSize mode scope context loopContext finalContext environment loopEnvironment
+      before initialized middle after id rest node initial condition post body outcome contains form initialTrace loop next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) middle := .forLoop contains form initialTrace.sound.plain loop.sound.plain
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before middle [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+
 /-- Each repeated iteration is strictly smaller, and a successful scoped body
 returns its actual heap to the original loop context before the next test. -/
 theorem while_step (wellFormed : ProgramWellFormed program) (size : Nat)
@@ -407,5 +450,136 @@ theorem match_step (wellFormed : ProgramWellFormed program) (size : Nat)
           runtime covers (locals.mono (firstExtends.trans hiddenExtends)) hiddenTyped bodyTyped body
         exact ⟨afterTyped, firstExtends.trans (hiddenExtends.trans bodyExtends)⟩
   | noBranch => cases failed
+
+private theorem for_items_tail (wellFormed : ProgramWellFormed program)
+    {size : Nat} (itemsIH : ForItemsAt program registry size)
+    {scope : Scope} {control : ControlContext} {context staticMiddle runtimeMiddle staticFinal runtimeFinal : Context}
+    {environment middleEnvironment : Dynamic.Environment} {before middle after : Heap}
+    {item : ForItemForm} {items : List ForItemForm} {failure : Failure}
+    (runtime : SourceRuntimeValid program context scope.source) (covers : scope.evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
+    (headTyped : ForItemHasType scope.source control context item staticMiddle)
+    (tailTyped : ForItemsHaveType scope.source control staticMiddle items staticFinal)
+    (head : ForItemExecutes program context scope.evidence scope.source environment before item
+      runtimeMiddle middleEnvironment middle)
+    (next : Size.ForItems program registry size scope runtimeMiddle middleEnvironment middle items runtimeFinal (.fault failure) after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  obtain ⟨same, middleTyped, headExtends, middleLocals⟩ :=
+    ForItemsExecute.preserved wellFormed runtime covers locals heap (.cons headTyped (.nil _ _))
+      (.cons head .nil)
+  subst runtimeMiddle
+  have fields := ForItemHasType.runtimeContextFields headTyped
+  have middleClosed := fields.targetClosed runtime.closed
+  have heapAtMiddle := middleTyped.transportClosed fields.signatures runtime.closed middleClosed
+    runtime.variables_closed (fields.targetResidualVariablesOpen runtime.residual_variables_open)
+  obtain ⟨afterTyped, tailExtends⟩ := itemsIH (runtime.transport fields) (fields.covers covers)
+    middleLocals heapAtMiddle tailTyped next
+  exact ⟨afterTyped.transportClosed fields.signatures.symm middleClosed runtime.closed
+    (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+    headExtends.trans tailExtends⟩
+
+/-- Successful header effects are erased and preserved independently before
+using the strict faulting tail; a failed RHS never invents a write. -/
+theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
+    (itemsIH : ∀ smaller, smaller < size → ForItemsAt program registry smaller) :
+    ForItemsAt program registry size := by
+  intro scope context staticFinal runtimeFinal environment before after items failure control
+    runtime covers locals heap typed trace
+  cases trace with
+  | @absent nextSize scope context middleContext finalContext environment before bound after binder rest location outcome
+      mono extended allocated next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped (.letUninitialized mono extended allocated) next
+  | @initialized childSize nextSize scope context middleContext finalContext environment before middle bound after
+      binder initializer rest value location outcome mono extended child allocated next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.letInitialized child.sound.value_plain mono extended allocated) next
+  | @initializerFault childSize scope context environment before after binder initializer rest failure mono child =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | letInitialized initializerTyped _ _ _ =>
+          exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap initializerTyped child
+        | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
+  | @expression childSize nextSize scope context finalContext environment before middle after expression rest value outcome child next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped (.expression child.sound.value_plain) next
+  | @expressionFailure childSize scope context environment before after expression rest failure child =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | expression expressionTyped =>
+          exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
+  | @assignment childSize nextSize scope context finalContext environment before middle written after
+      assignment rhs value target updated rest outcome snapshot child write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.assignValue (.intro (snapshot.resolves _ _ _ _) child.sound.value_plain write)) next
+  | @assignmentFailure childSize scope context environment before after assignment rhs target rest failure snapshot child =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          cases assignmentTyped with
+          | equal _ rhsTyped _ =>
+            exact expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
+          | wordCompound operator _ _ _ => cases operator
+  | unbound | dangling => exact ⟨heap, .refl _⟩
+
+/-- Finite for faults keep every condition, body, and post-header prefix. -/
+theorem for_loop_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
+    (itemsIH : ∀ smaller, smaller < size → ForItemsAt program registry smaller)
+    (loopIH : ∀ smaller, smaller < size → ForLoopAt program registry smaller) :
+    ForLoopAt program registry size := by
+  intro scope context bodyFinal postFinal environment before after condition post body failure control facts
+    runtime covers locals heap conditionTyped bodyTyped postTyped trace
+  cases trace with
+  | @testFault testSize scope context environment before after condition post body failure test =>
+      exact expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+  | @bodyFailure testSize branchSize scope context innerContext environment before middle after condition post body failure
+      test branch =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      obtain ⟨afterTyped, branchExtends⟩ := statementsIH branchSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono testExtends) middleTyped bodyTyped branch
+      exact ⟨afterTyped, testExtends.trans branchExtends⟩
+  | @postFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
+      before middle bodyHeap after condition post body failure test branch postTrace =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap body
+        (.fallthrough innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped branch.sound.fallthrough_scoped
+      obtain ⟨afterTyped, postExtends⟩ := itemsIH postTraceSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans postExtends)⟩
+  | @iterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
+      before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap body
+        (.fallthrough innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped branch.sound.fallthrough_scoped
+      obtain ⟨_postContext, postHeapTyped, postExtends, _postLocals⟩ :=
+        ForItemsExecute.preserved wellFormed runtime covers
+          (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace.sound.plain
+      obtain ⟨afterTyped, nextExtends⟩ := loopIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono (testExtends.trans (preserved.heap_extends.trans postExtends)))
+        postHeapTyped conditionTyped bodyTyped postTyped next
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans (postExtends.trans nextExtends))⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.FaultPreservation

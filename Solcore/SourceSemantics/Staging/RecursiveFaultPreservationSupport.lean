@@ -77,6 +77,31 @@ def MatchAt (size : Nat) : Prop :=
     Size.Match program registry size scope context environment before resolution outcome after →
     outcome = .fault failure → HeapWellTyped context after ∧ HeapTypesExtend before after
 
+/-- Header faults retain all effects before the failing item, even when earlier
+items introduced a new lexical context. -/
+def ForItemsAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context staticFinal runtimeFinal : Context} {environment : Environment}
+    {before after : Heap} {items : List ForItemForm} {failure : Failure} {control : ControlContext},
+    SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
+    EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+    ForItemsHaveType scope.source control context items staticFinal →
+    Size.ForItems program registry size scope context environment before items runtimeFinal (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
+/-- Each finite for iteration restores the loop context before its post items
+and following test, without discarding any heap effects. -/
+def ForLoopAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context bodyFinal postFinal : Context} {environment : Environment}
+    {before after : Heap} {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId}
+    {failure : Failure} {control : ControlContext} {facts : BodyFacts},
+    SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
+    EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+    ExpressionHasType scope.source context condition .bool →
+    StatementsHaveType scope.source control.enterLoop context body bodyFinal facts →
+    ForItemsHaveType scope.source control.enterLoop context post postFinal →
+    Size.ForLoop program registry size scope context environment before condition post body (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
 variable {program registry}
 
 /-- A typed successful prefix uses its actual erasure; no completion is added
