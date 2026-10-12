@@ -15,6 +15,48 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open SourceCoreIndexedSession RecursiveNamedPublicStartMeaning
 open CallableIndexedOwnedFunctionValues (Header Key)
 
+/-- Actual builtin issuance constructs the receiving representation before
+selecting any argument position. Its accepted handle encoding remains valid
+after the retained issuance sequence, including use inside nested inputs. -/
+theorem Session.builtin_value_represents_after
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (prepared : Recipe.prepare compiled = .ok recipe)
+    (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (Key compiled (Program.ofChecked compiled.sourceProgram)))
+    (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (mapping : LocationMap) (context : SourceSemantics.Context) (heap : Dynamic.Heap)
+    {artifact : Artifact} {before : Session artifact} {issued : Completion artifact}
+    {function : BuiltinFunctionId} {issuanceFuel : Nat}
+    (issuance : before.BuiltinIssuedAt function issuanceFuel issued)
+    {session : Session artifact}
+    (continued : issued.session.IssuanceChain session)
+    (atRecipe : ArtifactRecipe artifact recipe)
+    {world : StoreTyping}
+    {handle : Handle} (handleValue : issued.value = .function handle) :
+    ∃ callable, before.SameRuntime issued.session ∧ issued.sourceType = function.type ∧
+      session.EncodesAt issuanceFuel function.type (.function handle) callable ∧
+      ValueRep compiled.compatible.checked registry
+        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)
+        mapping world function.type (.builtin ⟨function⟩) callable
+        (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) ∧
+      Dynamic.ValueHasType context heap (.builtin ⟨function⟩) function.type := by
+  obtain ⟨expected, callable, same, sourceType, _budget, encoded, factory⟩ := issuance.receipt
+  rw [handleValue] at encoded
+  have imported := continued.encodes_function encoded
+  have actualFactory : recipe.BuiltinCallableAt function expected callable := by
+    cases artifact
+    rename_i authority actualRecipe
+    change actualRecipe = recipe at atRecipe
+    subst recipe
+    exact factory
+  obtain ⟨actualType, builtinIndex, identity, descriptor, inventory, number, literal⟩ :=
+    actualFactory.prepared prepared
+  refine ⟨callable, same, sourceType.trans actualType, actualType ▸ imported, ?_, .builtin ⟨function⟩⟩
+  rw [literal]
+  exact .function (.builtin (.prior (.prior (.builtin
+    (CallableIndexedBuiltinValues.Represents.builtin inventory number descriptor .nil)))))
+
 /-- A builtin argument at its actual startup index has the complete receiving
 function representation and deep Source typing, for any Source heap/context.
 The caller still selects its actual raw parameter type independently. -/
@@ -45,14 +87,11 @@ theorem StartAt.builtin_argument_represents_after
         mapping world function.type (.builtin ⟨function⟩) callable
         (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) ∧
       Dynamic.ValueHasType context heap (.builtin ⟨function⟩) function.type := by
-  obtain ⟨expected, callable, same, sourceType, _budget, factory, selected⟩ :=
-    RecursiveNamedPublicIssuedFunctionInputs.StartAt.builtin_argument_after issuance continued started handleValue found
-  obtain ⟨actualType, builtinIndex, identity, descriptor, inventory, number, literal⟩ :=
-    factory.prepared prepared
-  refine ⟨callable, same, sourceType.trans actualType, selected, ?_, .builtin ⟨function⟩⟩
-  rw [literal]
-  exact .function (.builtin (.prior (.prior (.builtin
-    (CallableIndexedBuiltinValues.Represents.builtin inventory number descriptor .nil)))))
+  obtain ⟨callable, same, sourceType, imported, represented, typed⟩ :=
+    Session.builtin_value_represents_after prepared headers keys bodyRegistry registry faults profile
+      mapping context heap issuance continued started.recipe_eq handleValue (world := world)
+  exact ⟨callable, same, sourceType,
+    RecursiveNamedPublicIssuedFunctionInputs.StartAt.imported_function started imported found, represented, typed⟩
 
 /-- The original single-issuance interface is the empty continuation case. -/
 theorem StartAt.builtin_argument_represents

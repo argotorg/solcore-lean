@@ -3491,3 +3491,300 @@ theorem Checkpoint.RootStart.data_input {artifact : Artifact} {session : Session
   exact ⟨payload, type, actual, typeAt, projected, encodedAt⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- The original raw encoder with this session's authority and physical slots,
+retaining its actual input and output metadata registries. -/
+def Session.RawEncodedAt {artifact : Artifact} (session : Session artifact)
+    (fuel : Nat) (registry : SourceCoreRawMetadata.Registry) (expected : Ty) (value : Value)
+    (encoded : SourceCoreCompatibleValues.Extended registry Core.Value) : Prop :=
+  encodeRaw session.authority session.registry fuel registry expected value = .ok encoded
+
+/-- Original constructor-payload encoding, including singleton erasure. -/
+def Session.PayloadsEncodedAt {artifact : Artifact} (session : Session artifact)
+    (fuel : Nat) (registry : SourceCoreRawMetadata.Registry) (types : List Ty) (values : List Value)
+    (encoded : SourceCoreCompatibleValues.Extended registry Core.Value) : Prop :=
+  encodePayloads session.authority session.registry fuel registry types values = .ok encoded
+
+/-- Original ordered mapping-row encoding. -/
+def Session.EntriesEncodedAt {artifact : Artifact} (session : Session artifact)
+    (fuel : Nat) (registry : SourceCoreRawMetadata.Registry) (keyType valueType : Ty)
+    (layout : Core.OrderedMapping.Layout) (entries : List (Value × Value))
+    (encoded : SourceCoreCompatibleValues.Extended registry Core.Value) : Prop :=
+  encodeEntries session.authority session.registry fuel registry keyType valueType layout entries = .ok encoded
+
+theorem Session.RawEncodedAt.function_eq {artifact : Artifact} {session : Session artifact}
+    {fuel issuedFuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected issuedType : Ty}
+    {handle : Handle} {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    {native : Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected (.function handle) encoded)
+    (issued : session.EncodesAt issuedFuel issuedType (.function handle) native) :
+    encoded.value = native := by
+  obtain ⟨original, actual, recovered⟩ := issued
+  exact (resolve_unique (encoded_function_resolves accepted) (encoded_function_resolves actual)).trans recovered
+
+theorem Session.RawEncodedAt.data {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {value : Value}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected value encoded)
+    (owner : registry.signatures = artifact.recipe.compiled.compatible.checked.signatures)
+    (data : DataPublic value) :
+    EncodedDataInput artifact.recipe.compiled.compatible.checked encoded.registry expected value encoded.value := by
+  obtain ⟨carrier, image⟩ := data
+  refine ⟨carrier, fuel, registry, encoded, image, owner, ?_, rfl, .refl _⟩
+  exact (data_correspondence fuel).1 session.authority session.registry registry expected carrier encoded
+    (by rw [← image]; exact accepted)
+
+theorem Session.RawEncodedAt.product {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected leftType rightType : Ty}
+    {left right : Value} {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected (.product left right) encoded)
+    (view : SourceCoreRawMetadata.runtimeType expected = .product leftType rightType) :
+    ∃ remaining, fuel = remaining + 1 ∧
+      ∃ (leftEncoded : SourceCoreCompatibleValues.Extended registry Core.Value)
+        (rightEncoded : SourceCoreCompatibleValues.Extended leftEncoded.registry Core.Value),
+        session.RawEncodedAt remaining registry leftType left leftEncoded ∧
+        session.RawEncodedAt remaining leftEncoded.registry rightType right rightEncoded ∧
+        encoded = ⟨rightEncoded.registry, leftEncoded.preserves.trans rightEncoded.preserves,
+          .pair leftEncoded.value rightEncoded.value⟩ := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold RawEncodedAt encodeRaw at accepted
+      rw [view] at accepted
+      obtain ⟨a, aEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨b, bEq, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨fuel, rfl, a, b, simple_mapError_ok aEq, simple_mapError_ok bEq, rfl⟩
+
+theorem Session.RawEncodedAt.constructed {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected : Ty}
+    {instantiation : DataConstructorInstantiation} {values : List Value}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected (.constructed instantiation values) encoded) :
+    ∃ remaining, fuel = remaining + 1 ∧
+      ∃ (header : SourceCoreRawMetadata.Inserted registry expected (.constructor instantiation))
+        (tag : Core.ConstructorId) (payload : SourceCoreCompatibleValues.Extended header.registry Core.Value),
+        registry.intern expected (.constructor instantiation) = .ok header ∧
+        artifact.recipe.compiled.compatible.checked.resolveConstructor instantiation = .ok tag ∧
+        session.PayloadsEncodedAt remaining header.registry instantiation.payloadTypes values payload ∧
+        encoded = ⟨payload.registry, header.preserves.trans payload.preserves,
+          .constructed tag (.pair (.word header.id) payload.value)⟩ := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold RawEncodedAt at accepted
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      case constructor id =>
+        cases id <;> try (rename_i builtin; cases builtin)
+        all_goals
+          obtain ⟨header, headerAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨tag, tagAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨payload, payloadAt, accepted⟩ := root_factory_bind_ok accepted
+          cases accepted
+          exact ⟨fuel, rfl, header, tag, payload, simple_mapError_ok headerAt,
+            simple_mapError_ok tagAt, payloadAt, rfl⟩
+      all_goals
+        obtain ⟨header, headerAt, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨tag, tagAt, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨payload, payloadAt, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        exact ⟨fuel, rfl, header, tag, payload, simple_mapError_ok headerAt,
+          simple_mapError_ok tagAt, payloadAt, rfl⟩
+
+theorem Session.RawEncodedAt.mapping {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected keyType valueType : Ty}
+    {actualKey actualValue : Ty} {entries : List (Value × Value)}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected (.mapping actualKey actualValue entries) encoded)
+    (view : SourceCoreRawMetadata.runtimeType expected = .mapping keyType valueType) :
+    ∃ remaining, fuel = remaining + 1 ∧
+      ∃ (header : SourceCoreRawMetadata.Inserted registry expected (.mapping actualKey actualValue))
+        (layout : Core.OrderedMapping.Layout)
+        (rows : SourceCoreCompatibleValues.Extended header.registry Core.Value)
+        (fallback : SourceCoreCompatibleValues.Extended rows.registry Core.Value),
+        registry.intern expected (.mapping actualKey actualValue) = .ok header ∧
+        artifact.recipe.compiled.compatible.checked.catalog.mappingLayout keyType valueType = .ok layout ∧
+        session.EntriesEncodedAt remaining header.registry actualKey actualValue layout entries rows ∧
+        SourceCoreCompatibleValues.encodeDefaultRaw remaining artifact.recipe.compiled.compatible.checked
+          rows.registry actualValue layout.valueType = .ok fallback ∧
+        encoded = ⟨fallback.registry, header.preserves.trans (rows.preserves.trans fallback.preserves),
+          .pair (.word header.id) (.pair fallback.value rows.value)⟩ := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold RawEncodedAt encodeRaw at accepted
+      rw [view] at accepted
+      obtain ⟨header, headerAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨layout, layoutAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨rows, rowsAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨fallback, fallbackAt, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨fuel, rfl, header, layout, rows, fallback, simple_mapError_ok headerAt,
+        simple_mapError_ok layoutAt, rowsAt, simple_mapError_ok fallbackAt, rfl⟩
+
+theorem Session.PayloadsEncodedAt.nil {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.PayloadsEncodedAt fuel registry [] [] encoded) :
+    encoded = .pure registry .unit := by
+  cases fuel <;> cases accepted <;> rfl
+
+theorem Session.PayloadsEncodedAt.singleton {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {type : Ty} {value : Value}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.PayloadsEncodedAt fuel registry [type] [value] encoded) :
+    ∃ remaining, fuel = remaining + 1 ∧ session.RawEncodedAt remaining registry type value encoded := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel => exact ⟨fuel, rfl, accepted⟩
+
+theorem Session.PayloadsEncodedAt.cons {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {type : Ty} {types : List Ty}
+    {value : Value} {values : List Value} {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.PayloadsEncodedAt fuel registry (type :: types) (value :: values) encoded)
+    (more : types ≠ []) :
+    ∃ remaining, fuel = remaining + 1 ∧
+      ∃ (head : SourceCoreCompatibleValues.Extended registry Core.Value)
+        (tail : SourceCoreCompatibleValues.Extended head.registry Core.Value),
+        session.RawEncodedAt remaining registry type value head ∧
+        session.PayloadsEncodedAt remaining head.registry types values tail ∧
+        encoded = ⟨tail.registry, head.preserves.trans tail.preserves, .pair head.value tail.value⟩ := by
+  cases types with
+  | nil => exact False.elim (more rfl)
+  | cons next rest =>
+      cases fuel with
+      | zero => cases accepted
+      | succ fuel =>
+          unfold PayloadsEncodedAt encodePayloads at accepted
+          obtain ⟨head, headAt, accepted⟩ := root_factory_bind_ok accepted
+          obtain ⟨tail, tailAt, accepted⟩ := root_factory_bind_ok accepted
+          cases accepted
+          exact ⟨fuel, rfl, head, tail, headAt, tailAt, rfl⟩
+
+theorem Session.EntriesEncodedAt.nil {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {keyType valueType : Ty}
+    {layout : Core.OrderedMapping.Layout} {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.EntriesEncodedAt fuel registry keyType valueType layout [] encoded) :
+    encoded = .pure registry (Core.OrderedMapping.encode layout []) := by
+  cases fuel <;> cases accepted <;> rfl
+
+theorem Session.EntriesEncodedAt.cons {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {keyType valueType : Ty}
+    {layout : Core.OrderedMapping.Layout} {key value : Value} {entries : List (Value × Value)}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.EntriesEncodedAt fuel registry keyType valueType layout ((key, value) :: entries) encoded) :
+    ∃ remaining, fuel = remaining + 1 ∧
+      ∃ (keyEncoded : SourceCoreCompatibleValues.Extended registry Core.Value)
+        (valueEncoded : SourceCoreCompatibleValues.Extended keyEncoded.registry Core.Value)
+        (tail : SourceCoreCompatibleValues.Extended valueEncoded.registry Core.Value),
+        session.RawEncodedAt remaining registry keyType key keyEncoded ∧
+        session.RawEncodedAt remaining keyEncoded.registry valueType value valueEncoded ∧
+        session.EntriesEncodedAt remaining valueEncoded.registry keyType valueType layout entries tail ∧
+        encoded = ⟨tail.registry, keyEncoded.preserves.trans (valueEncoded.preserves.trans tail.preserves),
+          .constructed layout.consConstructor (.pair (.pair keyEncoded.value valueEncoded.value) tail.value)⟩ := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      unfold EntriesEncodedAt encodeEntries at accepted
+      obtain ⟨keyEncoded, keyAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨valueEncoded, valueAt, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨tail, tailAt, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      exact ⟨fuel, rfl, keyEncoded, valueEncoded, tail, keyAt, valueAt, tailAt, rfl⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem arguments_raw_at {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List Ty} {types : List Core.Ty} {arguments : List Value}
+    {encoded : Arguments artifact world types}
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
+    SourceCoreRawMetadata.Extends values.registry encoded.values.registry ∧
+      ∀ {index : Nat} {expected : Ty} {value : Value},
+        sourceTypes[index]? = some expected → arguments[index]? = some value →
+        ∃ (before : SourceCoreRawMetadata.Registry)
+          (raw : SourceCoreCompatibleValues.Extended before Core.Value) (type : Core.Ty),
+          encoded.native[index]? = some raw.value ∧ types[index]? = some type ∧
+          artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type ∧
+          before.signatures = artifact.recipe.compiled.compatible.checked.signatures ∧
+          encodeRaw authority slots fuel before expected value = .ok raw ∧
+          SourceCoreRawMetadata.Extends raw.registry encoded.values.registry := by
+  induction sourceTypes generalizing types arguments values encoded with
+  | nil =>
+      cases types <;> cases arguments <;> try (solve | cases accepted)
+      cases accepted
+      refine ⟨.refl _, ?_⟩
+      intro index expected value found
+      simp at found
+  | cons expected rest ih =>
+      cases types with
+      | nil => cases accepted
+      | cons type types =>
+          cases arguments with
+          | nil => cases accepted
+          | cons argument arguments =>
+              simp only [encodeArguments] at accepted
+              cases projected : artifact.recipe.compiled.compatible.checked.catalog.project expected with
+              | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+              | ok actual =>
+                  simp only [projected, bind, Except.bind] at accepted
+                  split at accepted
+                  · rename_i same
+                    subst actual
+                    obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨validated, _validated, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+                    cases accepted
+                    obtain ⟨extended, atIndex⟩ := ih tailEq
+                    refine ⟨raw.preserves.trans extended, ?_⟩
+                    intro index selectedType selectedValue foundType foundValue
+                    cases index with
+                    | zero =>
+                        have sameType := Option.some.inj foundType
+                        have sameValue := Option.some.inj foundValue
+                        subst selectedType
+                        subst selectedValue
+                        have beforeOwner : values.registry.signatures = artifact.recipe.compiled.compatible.checked.signatures :=
+                          values.registryOwner.trans (congrArg SourceCoreCompatibleCatalog.Checked.signatures owner)
+                        exact ⟨values.registry, raw, type, rfl, rfl, projected, beforeOwner, rawEq, extended⟩
+                    | succ index => exact atIndex foundType foundValue
+                  · simp [throw, throwThe] at accepted
+
+/-- One original raw input encoding at its actual startup position, with the
+metadata before that input and its real extension through the remaining inputs. -/
+def Checkpoint.RawInputAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (index fuel : Nat) (value : Value) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ (root : Root artifact.recipe.compiled) (native : Core.Environment),
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    (∀ expected, root.inputs[index]? = some expected →
+      ∃ (before : SourceCoreRawMetadata.Registry)
+        (raw : SourceCoreCompatibleValues.Extended before Core.Value) (type : Core.Ty),
+        native[index]? = some raw.value ∧ root.types[index]? = some type ∧
+        artifact.recipe.compiled.compatible.checked.catalog.project expected = .ok type ∧
+        before.signatures = artifact.recipe.compiled.compatible.checked.signatures ∧
+        session.RawEncodedAt fuel before expected value raw ∧
+        SourceCoreRawMetadata.Extends raw.registry checkpoint.values.registry) ∧
+    checkpoint.state = .initial root.body (native.reverse ++ environment artifact) session.store
+
+theorem Checkpoint.RootStart.raw_input {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.RootStart session key arguments fuel)
+    {index : Nat} {value : Value} (found : arguments[index]? = some value) :
+    checkpoint.RawInputAt session key index fuel value := by
+  obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, sameValues⟩ := started
+  obtain ⟨_extended, atIndex⟩ := arguments_raw_at accepted
+  refine ⟨root, encoded.native, selected, ?_, initial⟩
+  intro expected foundType
+  obtain ⟨before, raw, type, actual, typeAt, projected, owner, encodedAt, extended⟩ := atIndex foundType found
+  rw [← sameValues] at extended
+  exact ⟨before, raw, type, actual, typeAt, projected, owner, encodedAt, extended⟩
+
+end Solcore.Frontend.SourceCoreIndexedSession
