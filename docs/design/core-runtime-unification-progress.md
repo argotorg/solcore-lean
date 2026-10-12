@@ -25,10 +25,22 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Public success now derives actual startup and Source selection from the public start and current history. Product-output collection extends histories, and named terminal lambda formation uses actual parameter captures. Strict Lean, full build (5997 jobs), all registered tests, kernel policy and the twenty-one-endpoint axiom audit pass. The empty-body helper is included in the full build and axiom audit. Static body coverage and the closed public fixture remain incomplete, as do failed continuations, suspended snapshots, non-product output collection, model/registry changes and all-pass composition. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Public success now derives actual startup and Source selection from the public start and current history. Product-output collection extends histories, and named terminal lambda formation uses actual parameter captures. Strict Lean, full build (5997 jobs), all registered tests, kernel policy and the twenty-one-endpoint axiom audit pass. The empty-body helper is included in the full build and axiom audit. Failed continuations now derive final heap typing and return reusable histories; full build (6003 jobs), all registered tests, kernel policy, independent review and twelve endpoint axiom checks pass. Static body coverage, the closed public fixture, suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain incomplete. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Histories after failed public calls (2026-10-12)
+
+Commit `aba75ce5` connects a supported failed public call to a reusable history at its actual failure heap. `CallableIndexedOwnedPreparedStagedHistoryPublicFailures.public_run_failed_retains` derives the initial Source runtime, callable type and packed argument typing from the existing history, real input encoding and selected declaration frame. `RecursiveNamedPublicHistoryFrontdoor.public_run_failed_retains` also recovers startup and Source selection from the accepted public start. Neither endpoint requires a separate assumption that the final heap is well typed.
+
+`Staging.Recursive.FaultPreservation` proves heap typing and type-identity preservation for the existing recursive staged trace grammar. The proof follows faulting children and retains the effects of successful prefixes and real binder allocations. It covers both semantic and staging faults without identifying their failure tags. The public consumer uses this result immediately to construct `History.after_failure`.
+
+The actual failed-session receipt preserves each earlier handle's full native payload through registry extension. The Source result preserves its raw type, code, captured references and meaning at the returned heap. A later supported call may reuse any retained entry, and no new export is fabricated on failure.
+
+The runtime regression mutates the first of two retained product-output closures from `21` to `30`, then fails on an uninitialized local. An intervening recursive call returns `31`; the original handles then return `31` and `112`. This checks retention of the mutation and independence of the second capture. As before, these mutable regression bodies exceed the current static body grammar, so this runtime test is not a closed instance of the semantic endpoint.
+
+Validation: strict Lean, full build (6003 jobs), all registered tests and the kernel policy pass. Independent review found no issue in the failed-session, history or public adapters. The twelve checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The preceding startup/product/lambda unit is `82944a4e`, documented in `4bea6081`. Suspended/export-error continuations, an initial history from a first failed call, full body coverage, non-product output collection, model/registry changes and all-pass composition remain open.
 
 ### Actual startup, product-output histories and terminal lambda formation (2026-10-12)
 
