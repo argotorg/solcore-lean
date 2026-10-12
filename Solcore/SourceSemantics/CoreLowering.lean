@@ -1535,6 +1535,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableWo
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableFunctionPreservation
 
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedFailurePreservation
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedFunctionPreservation
 
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
