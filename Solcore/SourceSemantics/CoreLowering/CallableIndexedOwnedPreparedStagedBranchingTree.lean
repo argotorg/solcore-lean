@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBareAssignmentShapeFacts
 
-/-! The supported imperative fragment keeps branch arms in scoped mode. Its
+/-! The supported imperative fragment keeps branch arms and loop bodies in scoped mode. Its
 shape is a restriction on original syntax, independent of execution. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -39,9 +39,14 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
       (left : Shape source false thenBody)
       (right : Shape source false (elseBody.getD []))
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
+  | whileLoop {mode id node condition body rest}
+      (found : source.lookupStatement? id = some node)
+      (form : node.form = .whileLoop condition body)
+      (inner : Shape source false body)
+      (remaining : Shape source mode rest) : Shape source mode (id :: rest)
 
 def allowedForm : StatementForm → Bool
-  | .returnStmt _ | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ => true
+  | .returnStmt _ | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ | .whileLoop _ _ => true
   | .assignValue assignment .equal _ => assignment.target.projections.isEmpty
   | _ => false
 
@@ -56,7 +61,7 @@ theorem Shape.head_allowed {source mode id node rest}
   cases shape with
   | returnUnit _ actual form | returnValue _ actual form | tail actual form
   | discard actual form _ _ | absent actual form _ | initialized actual form _
-  | conditional actual form _ _ _ =>
+  | conditional actual form _ _ _ | whileLoop actual form _ _ =>
       cases node_eq found actual
       simp only [form, allowedForm]
   | assign actual form bare _ =>
@@ -69,7 +74,7 @@ theorem Shape.tail_of_let {source mode id node binder initializer rest}
     (form : node.form = .letDecl binder initializer) : Shape source mode rest := by
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | tail actual same
-  | discard actual same _ _ | assign actual same _ _ | conditional actual same _ _ _ =>
+  | discard actual same _ _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -83,7 +88,7 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
     (semicolon = true ∨ mode = false) ∧ Shape source mode rest := by
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | absent actual same _
-  | initialized actual same _ | assign actual same _ _ | conditional actual same _ _ _ =>
+  | initialized actual same _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -105,7 +110,7 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _
-  | conditional actual same _ _ _ =>
+  | conditional actual same _ _ _ | whileLoop actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -121,7 +126,8 @@ theorem Shape.branches {source mode id node condition thenBody elseBody rest}
     Shape source false thenBody ∧ Shape source false (elseBody.getD []) ∧ Shape source mode rest := by
   cases shape with
   | returnUnit _ actual same | returnValue _ actual same | tail actual same
-  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _ =>
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | whileLoop actual same _ _ =>
       cases node_eq found actual
       rw [form] at same
       cases same
@@ -130,6 +136,23 @@ theorem Shape.branches {source mode id node condition thenBody elseBody rest}
       rw [form] at same
       cases same
       exact ⟨left, right, remaining⟩
+
+theorem Shape.loop {source mode id node condition body rest}
+    (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
+    (form : node.form = .whileLoop condition body) :
+    Shape source false body ∧ Shape source mode rest := by
+  cases shape with
+  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
+  | conditional actual same _ _ _ =>
+      cases node_eq found actual
+      rw [form] at same
+      cases same
+  | whileLoop actual same inner remaining =>
+      cases node_eq found actual
+      rw [form] at same
+      cases same
+      exact ⟨inner, remaining⟩
 
 theorem Shape.not_block {source mode id node statements rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)

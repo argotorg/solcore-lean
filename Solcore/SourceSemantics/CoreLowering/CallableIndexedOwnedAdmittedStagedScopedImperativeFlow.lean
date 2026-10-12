@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileSequences
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedWhileSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedLexicalFlow
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareAssignmentHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
@@ -5,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuf
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedLexicalSourceInversion
 
-/-! Scoped compiler statements include conditionals, bare plain assignment,
+/-! Scoped compiler statements include conditionals, finite while loops, bare plain assignment,
 lexical allocation, discard and return. Strict child bounds run the original recursive
 Source relation; writes target the actual heap reached by the RHS. -/
 set_option autoImplicit false
@@ -297,7 +299,20 @@ theorem reflects_at {budget : Nat}
         (thenIH rfl leftShape leftTyped projection) (elseIH rfl rightShape rightTyped projection)
         found form (.inr ⟨exactUnique, thenStops, elseStops⟩) within
         environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-  | breaking found form | continuing found form | whileLoop found form _ _ _ _ _ _ _ _
+  | whileLoop found form conditionFound conditionType conditionTree loopTree nativeTyped remaining loopIH remainingIH =>
+      cases atStatements
+      obtain ⟨loopShape, restShape⟩ := shape.loop found form
+      obtain ⟨typedNode, typedFound, typed, certified⟩ := conditionTree
+      have same := Option.some.inj (conditionFound.symm.trans typedFound)
+      cases same
+      have loopTyped := (CallableIndexedOwnedPreparedStagedScopedWhileSourceTyping.children graph.nodeOccurrencesUnique sourceTyped found form).2
+      have restTyped := CallableIndexedOwnedPreparedStagedScopedWhileSourceTyping.suffix graph.nodeOccurrencesUnique sourceTyped found form
+      exact CallableIndexedOwnedAdmittedStagedWhileSequences.reflects bridge functions condition transport
+        (children _) conditionFound conditionType typed certified nativeTyped
+        (loopIH rfl loopShape loopTyped projection)
+        found form (remainingIH rfl restShape restTyped projection) within
+        environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+  | breaking found form | continuing found form
   | bitNot found form _ _ _ | forLoop found form _ _ _ _
   | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
   | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>

@@ -87,7 +87,14 @@ theorem sites
     cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
-  | whileLoop found form _ _ _ _ _ _ _ _ | forLoop found form _ _ _ _
+  | whileLoop found form conditionFound conditionType conditionTree loopBody nativeTyped remaining loopIH nextIH =>
+    cases atStatements
+    obtain ⟨inner, next⟩ := shape.loop found form
+    exact .whileLoop (found := found) (form := form) (conditionFound := conditionFound)
+      (conditionType := conditionType) (conditionTree := conditionTree)
+      (loopBody := loopBody) (nativeTyped := nativeTyped) (remaining := remaining)
+      (loopIH rfl inner) (nextIH rfl next)
+  | forLoop found form _ _ _ _
   | bitNot found form _ _ _ | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _ _ _
   | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     cases atStatements

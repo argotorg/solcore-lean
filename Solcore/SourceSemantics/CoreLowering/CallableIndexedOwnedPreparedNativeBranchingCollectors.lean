@@ -68,6 +68,26 @@ private theorem computation_child {definitions : DataEnvironment}
     ∃ childType, HasType context computation childType definitions := by
   cases typed with | caseE child _ _ => exact ⟨_, child⟩
 
+private theorem while_condition {definitions : DataEnvironment} {context : Core.Context}
+    {type result : Ty} {condition body : Expr} {reason : Word}
+    (typed : HasType context (LocalLoop.whileLoop type condition body reason) result definitions) :
+    ∃ conditionType, HasType context condition conditionType definitions := by
+  cases typed with
+  | letE allocation installed =>
+    cases allocation with
+    | newCell empty =>
+      cases installed with
+      | letE written invoked =>
+        cases written with
+        | storeCell reference closure =>
+          cases closure with
+          | inRight unitWF raw =>
+            cases raw with
+            | lambda parameterWF resultWF loop =>
+              obtain ⟨_, shifted⟩ := computation_child loop
+              exact ⟨_, TypedLexicalWhile.Native.remove_front
+                (TypedLexicalWhile.Native.remove_front shifted)⟩
+
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
   {active : TypeSystem.Substitution} {frame : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {onError : SourceCoreAllocationLayouts.Error → SourceCoreBasic.Error}
@@ -396,7 +416,44 @@ theorem tree
     cases atStatements
     have no := shape.head_allowed found
     simp only [form, allowedForm, Bool.false_eq_true] at no
-  | whileLoop found form _ _ _ _ _ _ _ _ | forLoop found form _ _ _ _ _
+  | @whileLoop context mode id node condition conditionNode statements rest expected found form conditionFound conditionType typed conditionSyntax loopSyntax remaining loopIH restIH =>
+    cases atStatements
+    obtain ⟨loopShape, restShape⟩ := shape.loop found form
+    have conditionReached : Reaches source roots (.expression condition) :=
+      .statement (reached id (by simp)) found (by simp [form, StatementForm.references])
+    have loopReached : ∀ child ∈ statements, Reaches source roots (.statement child) := by
+      intro child member
+      exact .statement (reached id (by simp)) found (by simp [form, StatementForm.references, member])
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      obtain ⟨conditionCode, generatedCondition, accepted⟩ := bind_ok accepted
+      obtain ⟨checked, checkedCondition, accepted⟩ := bind_ok accepted
+      cases checked
+      have conditionTypeEq := ensure_same checkedCondition
+      rcases conditionCode with ⟨native, code⟩
+      dsimp only at conditionTypeEq
+      subst native
+      obtain ⟨loopCode, generatedLoop, accepted⟩ := bind_ok accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      cases accepted
+      obtain ⟨⟨_, loopTyped⟩, ⟨_, tailTyped⟩⟩ := TypedLexicalWhile.Native.sequence_children nativeTyped
+      obtain ⟨_, conditionTyped⟩ := while_condition loopTyped
+      obtain ⟨⟨_, loopBodyTyped⟩, loopTyped⟩ := TypedLexicalWhile.Native.while_body loopTyped
+      exact .whileLoop found form conditionFound conditionType
+        ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax conditionReached conditionFound typed generatedCondition conditionTyped⟩
+        (loopIH rfl loopShape fields closed residual sourceSignatures declarations loopReached projection generatedLoop loopBodyTyped)
+        loopTyped
+        (restIH rfl restShape fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
+  | forLoop found form _ _ _ _ _
   | bitNot found form _ _ _ _ _ | matchWith found form _ _ _ _ _ _ _ _ _ _ _ _
   | terminalMatch _ found form _ _ _ _ _ _ _ _ _ _ _ =>
     cases atStatements
