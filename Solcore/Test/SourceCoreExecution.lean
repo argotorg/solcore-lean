@@ -39,6 +39,8 @@ private def workspace : Workspace.RawWorkspace := {
     "function builtinUse(f: function(Word) returns (integer)) returns (integer) { return f(9); }",
     "function namedUse(f: function(Word) returns (Word)) returns (Word) { return f(4); }",
     "function mixedUse(first: function(Word) returns (Word), step: Word, table: mapping(Word => Word), convert: function(Word) returns (integer), again: function(Word) returns (Word)) returns (integer) { return convert(first(step) + step + table[step] + again(step + 1)); }",
+    "enum NestedFunctions { Hold(function(Word) returns (Word), function(Word) returns (integer)) }",
+    "function nestedUse(bundle: (NestedFunctions, (mapping(Word => (function(Word) returns (Word), Word)), function(Word) returns (integer)))) returns (integer) { match (bundle) { case (.Hold(first, convert), (table, last)) { match (table[3]) { case (again, bonus) { return integerAdd(convert(first(3) + bonus + again(4)), last(2)); } default { return 999; } } } default { return 998; } } }",
     "export {recurse};"
   ]}] }
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -78,10 +80,10 @@ example {raw : Workspace.RawWorkspace} {options : Options} {compiled : StaticWor
 
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
-  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse"].mapM (seed program)
+  let seeds ← ["make", "use", "recurse", "local", "mappingEcho", "spin", "make", "uninitialized", "marked", "builtinUse", "namedUse", "mixedUse", "nestedUse"].mapM (seed program)
   let options : Options := {specializationBudget := 256, compilationFuel := 1000}
   let compiled ← get "public single compilation" (compile workspace seeds options)
-  require (compiled.rootCount == 12 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
+  require (compiled.rootCount == 13 && compiled.keys[0]? == compiled.keys[6]?) "public roots lost duplicate ordering"
   let key (index : Nat) : IO Key := match compiled.keys[index]? with
     | some key => pure key | none => throw (IO.userError "public root missing")
   let opened ← compiled.openWithReceipt
@@ -101,7 +103,7 @@ def run : IO Unit := do
     | .ready session => pure ⟨session, .suspend first.property (.suspend second.property (.single ready))⟩
     | _ => throw (IO.userError "public bootstrap resume failed")
   let initial := completed.val
-  require (artifact.rootCount == 12 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
+  require (artifact.rootCount == 13 && initial.functionCount == 0) "public artifact initialization changed roots/handles"
   let builtinInput ← get "fresh builtin handle" (← initial.builtinWithReceipt .wordToInteger)
   have _preservedFresh : initial.SameRuntime builtinInput.val.session := builtinInput.property.same_runtime
   let builtinApplied ← execute builtinInput.val.session (← key 9) [builtinInput.val.value]
@@ -133,6 +135,35 @@ def run : IO Unit := do
       [mixedBuiltin.val.value, word 3, mixedTable, namedInput.val.value, namedInput.val.value] with
   | .error {code := .handleTypeMismatch _ _, ..} => pure ()
   | _ => throw (IO.userError "mixed inputs accepted handles in incompatible argument positions")
+  let nestedSignature ← match program.signatures.dataTypes.filter (·.name == "NestedFunctions") with
+    | [signature] => pure signature
+    | _ => throw (IO.userError "nested callable data signature missing")
+  let nestedConstructor ← match nestedSignature.constructors.filter (·.name == "Hold") with
+    | [constructor] => pure constructor
+    | _ => throw (IO.userError "nested callable constructor missing")
+  let nestedMetadata : SourceInference.DataConstructorInstantiation := {
+    constructor := nestedConstructor.id, parameterSubstitution := [],
+    payloadTypes := nestedConstructor.payloadTypes, resultType := .nominal nestedSignature.id [] }
+  let nestedHolder : Value := .constructed nestedMetadata [namedInput.val.value, mixedBuiltin.val.value]
+  let nestedValueType : TypeSystem.Ty := .product (.function .word .word) .word
+  let nestedTable : Value := .mapping .word nestedValueType
+    [(word 3, .product namedInput.val.value (word 7)),
+      (word 3, .product namedInput.val.value (word 99))]
+  let nestedBundle : Value := .product nestedHolder (.product nestedTable mixedBuiltin.val.value)
+  let nestedApplied ← execute namedAgain.val.session (← key 12) [nestedBundle]
+  require (nestedApplied.value == .integer 71)
+    "nested inputs lost constructor payloads, repeated handles or first-match mapping order"
+  let wrongNestedTable : Value := .mapping .word nestedValueType
+    [(word 3, .product mixedBuiltin.val.value (word 7))]
+  match namedAgain.val.session.start (← key 12)
+      [.product nestedHolder (.product wrongNestedTable mixedBuiltin.val.value)] with
+  | .error {code := .handleTypeMismatch _ _, ..} => pure ()
+  | _ => throw (IO.userError "nested mapping payload accepted an incompatible function handle")
+  let wrongNestedHolder : Value := .constructed nestedMetadata [mixedBuiltin.val.value, mixedBuiltin.val.value]
+  match namedAgain.val.session.start (← key 12)
+      [.product wrongNestedHolder (.product nestedTable mixedBuiltin.val.value)] with
+  | .error {code := .handleTypeMismatch _ _, ..} => pure ()
+  | _ => throw (IO.userError "nested constructor payload accepted an incompatible function handle")
   let made ← execute initial (← key 0) [word 10]
   let first ← execute made.session (← key 1) [made.value, word 2]
   let second ← execute first.session (← key 1) [made.value, word 3]
