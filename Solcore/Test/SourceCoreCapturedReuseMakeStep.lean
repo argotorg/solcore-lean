@@ -65,7 +65,8 @@ theorem RetainedState.make_typed_handle
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)
       (observations := support.observations) (extension := receiver.completion.result.extension)
       (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := support.terminals) (namedSupport := support.supports)
+      (family := support.family) (namedTerminals := fun header member =>
+        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
       (wellFormed := fixture.source_wellFormed) (prepared := fixture.recipePrepared)
       (selected := request.selected) (caller := state.caller) (history := state.history)
       (atCheckpoint := request.atCheckpoint) (started := request.started)

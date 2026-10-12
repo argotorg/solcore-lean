@@ -1,8 +1,9 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPayloadReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedArgumentRows
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedApplicationBounds
 
 /-! A direct named handle keeps its genuine Header, Source dictionary and full
 stored native capture. Packed inputs use that Header's actual parameter row;
@@ -42,9 +43,9 @@ variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.ind
       bindings parameterCore resultCore),
     CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers →
-    CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal header)
+    CallableIndexedOwnedPreparedStagedNamedBodies.Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry header
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry header
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) (namedTerminals header member) semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
@@ -132,26 +133,20 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
         (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed association)
   let packet := namedTerminals header member
   have children : ∀ {child : Staging.Recursive.Scope}, (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow
         (headers := headers) (keys := keys) header
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
-        callStages child packet.certificate callFaults size := by
+        callStages child callFaults size := by
     intro child childSelected
-    cases namedSupport header member with
-    | recursive static =>
-        apply CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow.pool
-        intro childSize _smaller current id lowered point
-        rw [static.point] at point
-        exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
-          (profile := profile) (closurePackets := fun association => (chosen association).1)
-          (closureSupport := fun association => (chosen association).2)
-          (namedTerminals := namedTerminals) (namedSupport := namedSupport)
-          (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
-          (extension := extension) (semantic := semantic) rfl childSize
-          (static.roots child childSelected).val point
-    | formation static =>
-        exact CallableIndexedOwnedPreparedStagedNamedBodySupport.Formation.reflects
-          (profile := profile) (faults := callFaults) static childSelected size
+    apply CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+      (namedSupport header member) profile wellFormed childSelected
+    intro childSize _smaller childContext childScope current id lowered root
+    exact CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds.reflects
+      (profile := profile) (closurePackets := fun association => (chosen association).1)
+      (closureSupport := fun association => (chosen association).2)
+      (namedTerminals := namedTerminals) (namedSupport := namedSupport)
+      (receiver := receiver) (stagePrepared := stagePrepared) (observations := observations)
+      (extension := extension) (semantic := semantic) rfl childSize root
   have evaluation : EvaluationSize size
       [CallableIndexedOwnedPreparedStagedTerminalNamedApplicationBounds.carrier
         (owner := owner) header capture identity descriptor.id, DataPatternValues.packValues values]
@@ -161,9 +156,8 @@ theorem reflects_packed {invocation : Staging.Recursive.Scope}
     rw [nativeEq, packedEq] at measured
     exact measured
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, _evaluated, resultAt⟩ :=
-    CallableIndexedOwnedPreparedStagedTerminalNamedApplicationBounds.application_reflects
-      functions owner caller header capture sourceAt packet.receipt packet.certifies
-      packet.prepared packet.aligned stagePrepared descriptor packet.layouts member wellFormed
+    CallableIndexedOwnedPreparedStagedNamedApplicationBounds.application_reflects
+      functions owner caller header capture sourceAt packet.prepared packet.aligned stagePrepared descriptor packet.layouts member wellFormed
       stable bodyHeap argumentsTyped represented heaps supports identity descriptor.id size children evaluation (Nat.le_refl _)
   have actualResult : resultCore = header.output := nativeTypes.2.trans header.resultType
   have finalResult := resultAt.2

@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedIndirectDispatch
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedTerminalNamedGlobalDispatch
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedNamedGlobalDispatch
 
 /-! Original whole indirect calls consume the mixed closure dispatch and the
 unchanged selected named global producer. Caller callee/argument children and
@@ -17,7 +17,7 @@ open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
 open CallableIndexedOwnedPreparedStagedIndirectBuiltinApplicationDispatch (ParentResult)
 open CallableIndexedOwnedPreparedStagedIndirectBuiltinPreservationDispatch (ParentAt)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 universe u
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -113,13 +113,13 @@ theorem reflects_parent
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedTerminals : ∀ header, header ∈ headers → Terminal header)
-    (namedChildren : ∀ header, ∀ member : header ∈ headers,
+    (namedTerminals : ∀ header, header ∈ headers → Body header)
+    (namedChildren : ∀ header, ∀ _member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope},
         (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-        CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
         header model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
-          child (namedTerminals header member).certificate callFaults budget)
+          child callFaults budget)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
@@ -132,7 +132,7 @@ theorem reflects_parent
       sourceParent tree unique parentTyped wellFormed runtime covers actualFunctionType observations
       budget children closurePackets closureSupport bodyChildren completed within with parent | global
   · exact parent
-  · exact CallableIndexedOwnedPreparedStagedSelectedTerminalNamedGlobalDispatch.reflects_global
+  · exact CallableIndexedOwnedPreparedStagedSelectedNamedGlobalDispatch.reflects_global
       bridge profile compiler prepared initial sourceParent occurrence stagePrepared stageEq caller receiver
       wellFormed runtime covers locals sourceEq tree unique parentTyped found actualFunctionType
       namedTerminals namedChildren completed global
@@ -156,11 +156,11 @@ theorem preserves_parent (budget : Nat)
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedTerminals : ∀ header, header ∈ headers → Terminal header)
-    (namedChildren : ∀ header, ∀ member : header ∈ headers,
+    (namedTerminals : ∀ header, header ∈ headers → Body header)
+    (namedChildren : ∀ header, ∀ _member : header ∈ headers,
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-        CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
-        header model stages child (namedTerminals header member).certificate callFaults budget)
+        CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
+        header model stages child callFaults budget)
     {size : Nat} {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
       invocation context environment before id outcome after)
@@ -177,7 +177,7 @@ theorem preserves_parent (budget : Nat)
   · obtain ⟨calleeSize, argumentsSize, applicationSize, sourceValue, calleeHeap, argumentsHeap,
       sources, sizeEq, strict, globalPrefix⟩ := global
     cases sizeEq
-    exact CallableIndexedOwnedPreparedStagedSelectedTerminalNamedGlobalDispatch.preserves_global
+    exact CallableIndexedOwnedPreparedStagedSelectedNamedGlobalDispatch.preserves_global
       bridge profile compiler prepared initial sourceParent occurrence stagePrepared caller receiver
       wellFormed runtime covers locals sourceEq tree unique parentTyped found actualFunctionType
       namedTerminals guardFrame budget namedChildren globalPrefix (Nat.le_of_lt strict)

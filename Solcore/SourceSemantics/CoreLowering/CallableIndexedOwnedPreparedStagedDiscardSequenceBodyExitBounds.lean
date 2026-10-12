@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDiscardSequenceCompilerBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBodyExitReceipts
@@ -17,7 +17,7 @@ open CallableIndexedLambdaValues CallableIndexedOwnedFunctionState CallableIndex
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
   (Sequence SequenceSupport parameterScope PacketFor SupportFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedAdmittedStagedTerminalStatements (control)
@@ -91,9 +91,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds
 
 /-! Accepted original Source compilation issues the recursive caller certificate.
@@ -16,7 +16,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 universe u
@@ -61,9 +61,9 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
 
 variable
@@ -123,9 +123,10 @@ theorem preserves_compiled
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
       sameLedger runtimeLedger uninitialized size (fun childSize _ => bodies childSize)
-      (fun childSize within =>
-        CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_preserves_below
-          namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
+      (fun _childSize _within named member {_child} selected =>
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+          (namedSupport named member) profile wellFormed selected
+          (fun smaller _strict => bodies smaller))
       root ports size (Nat.le_refl _) certified
 
 include bridge receiver stagePrepared profile wellFormed runtime covers unique
@@ -170,9 +171,10 @@ theorem reflects_compiled
       bridge receiver stagePrepared profile wellFormed runtime covers unique
       actualFunctionType observations extension semantic closurePackets closureSupport namedTerminals
       sameLedger runtimeLedger uninitialized stageEq size (fun childSize _ => bodies childSize)
-      (fun childSize within =>
-        CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_reflects_below
-          namedTerminals namedSupport (fun smaller _ => bodies smaller) within)
+      (fun _childSize _within named member {_child} selected =>
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+          (namedSupport named member) profile wellFormed selected
+          (fun smaller _strict => bodies smaller))
       root ports size (Nat.le_refl _) certified
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerCompilerBounds

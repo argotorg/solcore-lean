@@ -65,7 +65,8 @@ private theorem forward_word {fixture : CompiledFixture} {observed : ObservedFac
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)
       (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := support.terminals) (namedSupport := support.supports)
+      (family := support.family) (namedTerminals := fun header member =>
+        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
       (wellFormed := fixture.source_wellFormed) (history := state.history)
       (entry := entry) (member := member) (entryType := entryType) (entrySource := entrySource)
       (input := input) started metadata (.singleton (.word argument)) trace atCheckpoint

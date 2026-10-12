@@ -17,7 +17,7 @@ open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
 open CallableIndexedOwnedPreparedStagedSelectedGeneralCallHeadBounds (Point Port)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 universe u
 
@@ -55,7 +55,7 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
 
 local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
   bodyRegistry semanticFaults profile
@@ -84,11 +84,11 @@ theorem preserves
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size)
+        callFaults size)
     (within : size ≤ budget) :
     PreservesAt bridge context model stages invocation (Point scope id lowered) callFaults size := by
   intro current child code point node found parentTyped
@@ -136,11 +136,11 @@ theorem reflects
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size)
+        callFaults size)
     (within : size ≤ budget) :
     ReflectsAt bridge context model stages invocation (Point scope id lowered) callFaults size := by
   intro current child code point node found parentTyped
@@ -159,13 +159,13 @@ theorem reflects
   have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.indirect metadata)) :=
     ⟨compiler.original, lookupExpression?_sound compiler.found, compiler.originalForm,
       port.sourceParent.requirements, port.sourceParent.coercions⟩
-  have actualNamedChildren : ∀ header (member : header ∈ headers),
+  have actualNamedChildren : ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope},
         (RecursiveNamedPreparedStageScopes.registry stagePrepared).Closure header.function child →
-        CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+        CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
         header model
           (RecursiveNamedPreparedStageScopes.registry stagePrepared) child
-          (namedTerminals header member).certificate callFaults size := by
+          callFaults size := by
     simpa only [stageEq] using namedChildren
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, _evaluated,
     represented, finalHeaps, maps, worlds, frame, metadataExtended, reached, related, post⟩ :=

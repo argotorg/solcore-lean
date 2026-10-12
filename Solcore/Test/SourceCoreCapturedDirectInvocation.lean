@@ -53,7 +53,8 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
       (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
       (observations := support.observations) (extension := receiver.completion.result.extension)
       (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := support.terminals) (namedSupport := support.supports)
+      (family := support.family) (namedTerminals := fun header member =>
+        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
       (wellFormed := fixture.source_wellFormed) (caller := state.caller) (stable := stable)
       (runtime := runtime) (heapTyped := heapTyped) (calleeTyped := sourceTyped)
       (calleeRelated := represented) (parameters := parameters) (heaps := heaps)

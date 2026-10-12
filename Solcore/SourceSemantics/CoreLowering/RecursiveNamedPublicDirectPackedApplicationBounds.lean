@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectClosureApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.RecursivePublicPackedArguments
 
@@ -41,9 +42,9 @@ variable {completion : SourceCoreCallableIndexedPrograms.Completion compiled.ind
       bindings parameterCore resultCore),
     CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers →
-    CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal header)
+    CallableIndexedOwnedPreparedStagedNamedBodies.Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry header
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry header
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) (namedTerminals header member) semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}

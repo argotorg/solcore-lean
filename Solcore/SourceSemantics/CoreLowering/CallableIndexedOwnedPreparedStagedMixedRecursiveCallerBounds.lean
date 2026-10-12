@@ -19,7 +19,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls)
 universe u
@@ -67,7 +67,7 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
 
 variable
   (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
@@ -105,11 +105,11 @@ theorem preserves_reached
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+        callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
@@ -199,11 +199,11 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size)
+        callFaults size)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -295,11 +295,11 @@ theorem preserves
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.PreservesRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.PreservesBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.PreservesBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+        callFaults size) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
@@ -325,11 +325,11 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.ReflectsRootsAt
         (completion := completion) (stages := stages) (headers := headers) (keys := keys)
         (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) profile childSize)
-    (namedChildren : ∀ size, size ≤ budget → ∀ header (member : header ∈ headers),
+    (namedChildren : ∀ size, size ≤ budget → ∀ header (_member : header ∈ headers),
       ∀ {child : Staging.Recursive.Scope}, stages.Closure header.function child →
-      CallableIndexedOwnedPreparedStagedNamedChildBounds.ReflectsBelow (headers := headers) (keys := keys)
+      CallableIndexedOwnedPreparedStagedNamedBodyPorts.ReflectsBelow (headers := headers) (keys := keys)
         header model stages child
-        (namedTerminals header member).certificate callFaults size)
+        callFaults size)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel

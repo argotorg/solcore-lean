@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistorySourceInputs
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservation
 
@@ -15,8 +16,8 @@ open CallableIndexedOwnedPreparedBootstrapRootState (keys owner)
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds (OrdinarySequenceFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedStagedNamedBodySupport (Support)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
+open CallableIndexedOwnedPreparedStagedNamedBodiesSupport (Support)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {completion : SourceCoreCallableIndexedPrograms.Completion compiled.indexed}
@@ -38,7 +39,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (family : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association (headers rows) (keys compiled) bodyRegistry semanticFaults
       mapping world function native bindings parameterCore resultCore), OrdinarySequenceFor stagePrepared association)
-  (namedTerminals : ∀ header, header ∈ headers rows → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers rows → Body header)
   (namedSupport : ∀ header (member : header ∈ headers rows),
     Support (headers rows) (keys compiled) bodyRegistry header (RecursiveNamedPreparedStageScopes.registry stagePrepared)
       (namedTerminals header member) semanticFaults)

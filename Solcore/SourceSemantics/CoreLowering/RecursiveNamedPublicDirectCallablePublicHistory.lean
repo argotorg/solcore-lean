@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableHistory
 
 /-! The successful public packed-call receipt supplies the original startup
@@ -41,9 +42,9 @@ variable {completion : SourceCoreCallableIndexedPrograms.Completion recipe.compi
       bindings parameterCore resultCore),
     CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.OrdinarySequenceFor stagePrepared association)
   (namedTerminals : ∀ header, header ∈ headers →
-    CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch.Terminal header)
+    CallableIndexedOwnedPreparedStagedNamedBodies.Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry header
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry header
       (RecursiveNamedPreparedStageScopes.registry stagePrepared) (namedTerminals header member) semanticFaults)
   (wellFormed : ProgramWellFormed (Program.ofChecked recipe.compiled.sourceProgram))
   {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}

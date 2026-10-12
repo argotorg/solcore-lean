@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerBounds
 
 /-! Strong numeric recursion closes chosen mixed closure bodies. The same
@@ -16,7 +16,7 @@ open CallableIndexedOwnedFunctionState
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
 open CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds (PreservesRootsAt ReflectsRootsAt)
 
@@ -33,9 +33,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)
@@ -67,9 +67,10 @@ theorem preserves (size : Nat) :
       root.support.covers root.support.unique root.support.actualFunctionType observations
       extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
       root.support.runtimeLedger root.support.uninitialized size ih
-      (fun childSize within =>
-        CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_preserves_below
-          namedTerminals namedSupport ih within)
+      (fun childSize within named member {_child} selected =>
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.preserves
+          (namedSupport named member) profile root.support.wellFormed selected
+          (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
       root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
 include closurePackets closureSupport namedTerminals namedSupport receiver stagePrepared observations extension semantic in
@@ -87,9 +88,10 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       root.support.covers root.support.unique root.support.actualFunctionType observations
       extension semantic closurePackets closureSupport namedTerminals root.support.sameLedger
       root.support.runtimeLedger root.support.uninitialized stageEq size ih
-      (fun childSize within =>
-        CallableIndexedOwnedPreparedStagedSelectedRecursiveBodyBounds.named_reflects_below
-          namedTerminals namedSupport ih within)
+      (fun childSize within named member {_child} selected =>
+        CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support.reflects
+          (namedSupport named member) profile root.support.wellFormed selected
+          (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within)))
       root.support.certificate (.root (by simp)) root.support.callsReady size (Nat.le_refl _)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveBodyBounds

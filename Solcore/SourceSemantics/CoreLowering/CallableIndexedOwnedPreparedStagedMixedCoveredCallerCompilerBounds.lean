@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedRecursiveCallerCompilerBounds
 
 /-! Static coverage supplies a dependent packet and support at each actual
@@ -15,7 +15,7 @@ open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport (PacketFor SupportFor)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
+open CallableIndexedOwnedPreparedStagedNamedBodies (Body)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (NamedSupport)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 universe u
@@ -58,9 +58,9 @@ variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Pr
     (association : Association headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore),
     Nonempty (Σ packet : PacketFor association stages, SupportFor association stages packet))
-  (namedTerminals : ∀ header, header ∈ headers → Terminal header)
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
   (namedSupport : ∀ header (member : header ∈ headers),
-    CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry
+    CallableIndexedOwnedPreparedStagedNamedBodiesSupport.Support headers keys bodyRegistry
       header stages (namedTerminals header member) semanticFaults)
 
 variable

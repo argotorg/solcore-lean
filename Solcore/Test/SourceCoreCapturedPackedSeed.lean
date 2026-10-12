@@ -55,7 +55,8 @@ theorem first_meaning {fixture : CompiledFixture} {observed : ObservedFactory fi
       (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)
       (observations := support.observations) (extension := receiver.completion.result.extension)
       (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := support.terminals) (namedSupport := support.supports)
+      (family := support.family) (namedTerminals := fun header member =>
+        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
       (wellFormed := fixture.source_wellFormed) (prepared := prepared) (selected := selected)
       (opened := opened) (fresh := first.fresh) (ready := .single first.ready)
       (sameRuntime := SourceCoreExecution.Session.SameRuntime.refl first.session) (atSession := sessionAt)

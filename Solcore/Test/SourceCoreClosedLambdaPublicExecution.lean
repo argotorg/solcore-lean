@@ -810,7 +810,8 @@ theorem public_factory_meaning (fixture : CompiledFixture) (observed : ObservedF
       (profile := observed.profile) (bodyRegistry := registry) (semanticFaults := faults)
       (observations := observations) (extension := receiver.completion.result.extension)
       (semantic := by intro reason token represented; exact represented)
-      (family := family) (namedTerminals := terminals) (namedSupport := supports)
+      (family := family) (namedTerminals := fun header member =>
+        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member)) (namedSupport := supports)
       (wellFormed := fixture.source_wellFormed) (prepared := prepared) (selected := selected)
       (opened := opened) (fresh := executed.fresh) (ready := .single executed.ready)
       (sameRuntime := SourceCoreExecution.Session.SameRuntime.refl executed.session) (atSession := sessionAt)

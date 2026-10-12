@@ -142,6 +142,35 @@ inductive History (headers : List (Header compiled (Program.ofChecked compiled.s
       (addition : Addition checkpoint completion outputFuel header.function.resultType header.output outcome native added) :
       History headers keys functions receiving anchor completion.session finalMap finalWorld after finalStore
         reached (entries ++ added)
+  | first_failed {session : Session artifact} {mapping world heap store}
+      {caller : Caller headers keys mapping world heap store}
+      {owner : OwnedKey keys} {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+      {capture : NamedCapture headers owner.key header mapping world} {arguments : List Core.Value}
+      {checkpoint : Checkpoint artifact} {key : SourceCoreIndexedSession.Key}
+      {publicArguments : List SourceCorePublicValues.Value} {inputFuel executionFuel : Nat}
+      {returned : Session artifact} {reason : Core.Word}
+      {outcome : Staging.Recursive.Outcome} {after : Dynamic.Heap} {native : Core.Value} {finalStore : Store}
+      {finalMap : LocationMap} {finalWorld : StoreTyping} {faults : RecursiveStageMeaning.FaultRep}
+      {recipe : Recipe} {root : Root compiled}
+      {encodedValues : SourceCoreCompatibleValues.Context}
+      (sameCompiled : recipe.compiled = compiled)
+      (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+        recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+      (selected : RecursiveNamedPublicRootMeaning.RootSelection
+        (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+        (program := Program.ofChecked compiled.sourceProgram) headers root header)
+      (failed : checkpoint.FailedResultAt executionFuel native finalStore reason returned)
+      (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+        owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+      (reached : Caller headers keys finalMap finalWorld after finalStore)
+      (post : Relates caller reached ∧
+        CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+          CallableIndexedOwnedBodyRestorationAdmission.bridge anchor.function.context
+          header.function.resultType outcome reached)
+      (heapTyped : Dynamic.HeapWellTyped anchor.function.context after) :
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached []
   | failed {session : Session artifact} {mapping world heap store}
       {caller : Caller headers keys mapping world heap store} {entries : List Entry}
       (prior : History headers keys functions receiving anchor session mapping world heap store caller entries)
@@ -365,6 +394,10 @@ theorem History.current {artifact : Artifact} {session : Session artifact} {entr
           represented.extend (.refl _) result.2.2.2.1 result.2.2.2.2.1,
           typed.mono result.2.2.2.2.2.2.1⟩
       · exact addition_entries succeeded result addition entry added
+  | first_failed sameCompiled started selected failed result reached post heapTyped =>
+      have heaps := result.2.2.1
+      have nativeAt : _ := heaps.runtime_hasTypes.world_eq.symm ▸ failed.native_at
+      exact ⟨nativeAt, heaps, post.2.rows, heapTyped, by intro entry member; cases member⟩
   | failed prior sameCompiled started selected failed result reached post heapTyped ih =>
       have heaps := result.2.2.1
       have nativeAt : _ := heaps.runtime_hasTypes.world_eq.symm ▸ failed.native_at
@@ -684,6 +717,29 @@ theorem History.collect_success
   obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
   exact ⟨reached, added, handles, related,
     .next history sameCompiled started selected succeeded result reached ⟨related, post⟩ addition⟩
+
+/-- A first failed call establishes an empty retained history at its actual
+returned state. The public bootstrap adapter derives final heap typing. -/
+theorem first_failure
+    {returned : Session artifact} {reason : Core.Word}
+    (sameCompiled : recipe.compiled = compiled)
+    (started : RecursiveNamedPublicStartMeaning.StartAt session key publicArguments inputFuel checkpoint
+      recipe (sameCompiled.symm ▸ root) world store arguments encodedValues)
+    (selected : RecursiveNamedPublicRootMeaning.RootSelection
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+      (program := Program.ofChecked compiled.sourceProgram) headers root header)
+    (failed : checkpoint.FailedResultAt executionFuel native finalStore reason returned)
+    (result : Result (functions := functions) (receiving := receiving) (anchor := anchor)
+      owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults)
+    (heapTyped : Dynamic.HeapWellTyped anchor.function.context after) :
+    ∃ reached : Caller headers keys finalMap finalWorld after finalStore,
+      Relates caller reached ∧
+      History headers keys functions receiving anchor returned finalMap finalWorld after finalStore
+        reached [] := by
+  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
+  exact ⟨reached, related, .first_failed sameCompiled started selected failed result
+    reached ⟨related, post⟩ heapTyped⟩
 
 /-- A failed call retains earlier functions once Source heap preservation is
 proved for its actual fault trace. Public adapters derive that condition. -/
