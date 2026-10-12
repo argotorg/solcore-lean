@@ -7,120 +7,103 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
 open Frontend Frontend.SourceInference Solcore.SourceSemantics.Dynamic
 
-private def BodyPlain (program : Program) (scope : Scope) (context : Context)
-    (environment : Environment) (before : Heap) (ids : List StatementId) (finalContext : Context)
-    (outcome : BodyOutcome) (after : Heap) : Prop :=
-  match outcome with
-  | .fallthrough finalEnvironment => FunctionStatementsExecute program context scope.evidence scope.source
-      environment before ids finalContext (.fallthrough finalEnvironment) after
-  | .returned value => FunctionStatementsExecute program context scope.evidence scope.source
-      environment before ids finalContext (.returned value) after
-  | .fault (.semantic reason) => FunctionStatementsFault program context scope.evidence scope.source
-      environment before ids finalContext reason after
-  | .fault (.stage ..) => True
-
-private theorem prepend_body {program : Program} {scope : Scope} {context middleContext finalContext : Context}
-    {environment middleEnvironment : Environment} {before middle after : Heap} {id : StatementId} {node : StatementNode}
-    {rest : List StatementId} {outcome : BodyOutcome}
-    (contains : ContainsStatement scope.source id node)
-    (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (head : StatementExecutes program context scope.evidence scope.source environment before id
-      middleContext (.fallthrough middleEnvironment) middle)
-    (tail : BodyPlain program scope middleContext middleEnvironment middle rest finalContext outcome after) :
-    BodyPlain program scope context environment before (id :: rest) finalContext outcome after := by
-  cases outcome with
-  | fault failure =>
-    cases failure with
-    | stage => trivial
-    | semantic =>
-      cases rest with
-      | nil => cases tail
-      | cons => exact .tail head tail
-  | fallthrough =>
-    cases rest with
-    | nil => cases tail; exact .singleton contains notTail head
-    | cons => exact .cons head tail
-  | returned =>
-    cases rest with
-    | nil => cases tail
-    | cons => exact .cons head tail
-
-private theorem terminal_body {program : Program} {scope : Scope} {context : Context}
-    {environment : Environment} {before after : Heap} {id : StatementId} {node : StatementNode}
-    {rest : List StatementId} {value : Value}
-    (contains : ContainsStatement scope.source id node)
-    (notTail : ∀ expression, node.form ≠ .expression expression false)
-    (head : StatementExecutes program context scope.evidence scope.source environment before id
-      context (.returned value) after) :
-    BodyPlain program scope context environment before (id :: rest) context (.returned value) after := by
-  cases rest with
-  | nil => exact .singleton contains notTail head
-  | cons => exact .terminal head (.returned _)
-
-private theorem fault_body {program : Program} {scope : Scope} {context : Context}
-    {environment : Environment} {before after : Heap} {id : StatementId} {rest : List StatementId}
-    {reason : SemanticFault}
-    (head : StatementFaults program context scope.evidence scope.source environment before id reason after) :
-    BodyPlain program scope context environment before (id :: rest) context (.fault (.semantic reason)) after := by
-  cases rest with
-  | nil => exact .singleton head
-  | cons => exact .head head
-
-private theorem Statements.body_plain {program : Program} {registry : Registry} {scope : Scope}
+theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode : Bool} {scope : Scope}
     {context finalContext : Context} {environment : Environment} {before after : Heap}
     {ids : List StatementId} {outcome : BodyOutcome}
-    (trace : Statements program registry scope context environment before ids finalContext outcome after) :
-    BodyPlain program scope context environment before ids finalContext outcome after := by
-  induction trace using Statements.rec
+    (trace : StatementsIn program registry mode scope context environment before ids finalContext outcome after) :
+    StatementsPlain program mode scope context environment before ids finalContext outcome after := by
+  induction trace using StatementsIn.rec
     (motive_1 := fun _ _ _ _ _ _ _ _ => True)
     (motive_2 := fun _ _ _ _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
-  case nil => exact FunctionStatementsExecute.nil
+  case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
-    exact terminal_body contains (by intro expression; simp [form]) (.returnUnit contains form)
+    exact StatementsPlain.terminal contains (by intro expression; simp [form]) (.returnUnit contains form)
   case returnValue contains form child _ih =>
-    exact terminal_body contains (by intro expression; simp [form])
+    exact StatementsPlain.terminal contains (by intro expression; simp [form])
       (.returnValue contains form child.value_plain)
   case returnFault contains form child _ih =>
     rename_i failure
     cases failure with
     | stage => trivial
-    | semantic => exact fault_body (.returnValue contains form child.semanticFault_plain)
+    | semantic => exact StatementsPlain.head_fault (.returnValue contains form child.semanticFault_plain)
   case tail contains form child _ih =>
     exact .tailExpression contains form child.value_plain
   case discard contains form child _next _childIH tailIH =>
-    exact prepend_body contains (by intro expression; simp [form])
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.expression contains form child.value_plain) tailIH
+  case discardValue contains form child _next _childIH tailIH =>
+    exact StatementsPlain.discard_value contains form child.value_plain tailIH
+  case ifConditionFault contains form test _ih =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.ifCondition contains form test.semanticFault_plain)
+  case ifReturned contains form test _branch _testIH branchIH =>
+    exact StatementsPlain.terminal contains (by intro e; simp [form])
+      (StatementsPlain.if_execute contains form test.value_plain branchIH)
+  case ifFault contains form test _branch _testIH branchIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (StatementsPlain.if_fault contains form test.value_plain branchIH)
+  case ifFallthrough contains form test _branch _next _testIH branchIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro e; simp [form])
+      (StatementsPlain.if_execute contains form test.value_plain branchIH) nextIH
   case expressionFault contains form child _ih =>
     rename_i failure
     cases failure with
     | stage => trivial
-    | semantic => exact fault_body (.expression contains form child.semanticFault_plain)
+    | semantic => exact StatementsPlain.head_fault (.expression contains form child.semanticFault_plain)
   case assignBare contains form snapshot child write _next _childIH nextIH =>
-    exact prepend_body contains (by intro expression; simp [form])
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
   case assignBareFault contains form snapshot child _childIH =>
     rename_i failure
     cases failure with
     | stage => trivial
-    | semantic => exact fault_body (.assignValue contains form
+    | semantic => exact StatementsPlain.head_fault (.assignValue contains form
         (.rhs (snapshot.resolves _ _ _ _) child.semanticFault_plain))
   case assignBareUnbound contains form _bare missing =>
-    exact fault_body (.assignValue contains form (.target (.unbound missing)))
+    exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
   case assignBareDangling contains form _bare lookup missing =>
-    exact fault_body (.assignValue contains form (.target (.dangling lookup missing)))
+    exact StatementsPlain.head_fault (.assignValue contains form (.target (.dangling lookup missing)))
   case letUninitialized contains form mono extension allocate _next ih =>
-    exact prepend_body contains (by intro expression; simp [form])
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.letUninitialized contains form mono extension allocate) ih
   case letInitialized contains form child mono extension allocate _next _childIH tailIH =>
-    exact prepend_body contains (by intro expression; simp [form])
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.letInitialized contains form child.value_plain mono extension allocate) tailIH
   case letFault contains form mono child _ih =>
     rename_i failure
     cases failure with
     | stage => trivial
-    | semantic => exact fault_body (.letInitializer contains form mono child.semanticFault_plain)
+    | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono child.semanticFault_plain)
+
+/-- A scoped arm retains the independent ordinary sequence and its actual heap. -/
+theorem StatementsIn.returned_scoped {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment : Environment} {before after : Heap}
+    {ids : List StatementId} {value : Value}
+    (trace : StatementsIn program registry false scope context environment before ids finalContext (.returned value) after) :
+    StatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.returned value) after := trace.body_plain
+
+theorem StatementsIn.fallthrough_scoped {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment finalEnvironment : Environment} {before after : Heap}
+    {ids : List StatementId}
+    (trace : StatementsIn program registry false scope context environment before ids finalContext
+      (.fallthrough finalEnvironment) after) :
+    StatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.fallthrough finalEnvironment) after := trace.body_plain
+
+theorem StatementsIn.semanticFault_scoped {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment : Environment} {before after : Heap}
+    {ids : List StatementId} {reason : SemanticFault}
+    (trace : StatementsIn program registry false scope context environment before ids finalContext
+      (.fault (.semantic reason)) after) :
+    StatementsFault program context scope.evidence scope.source environment before ids
+      finalContext reason after := trace.body_plain
 
 /-- Returned staged bodies retain their complete ordinary function trace. -/
 theorem Statements.returned_plain {program : Program} {registry : Registry} {scope : Scope}

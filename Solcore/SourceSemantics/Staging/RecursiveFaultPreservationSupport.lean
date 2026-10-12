@@ -41,13 +41,13 @@ def AppliesAt (size : Nat) : Prop :=
     HeapWellTyped context after ∧ HeapTypesExtend before after
 
 def StatementsAt (size : Nat) : Prop :=
-  ∀ {scope : Scope} {context staticFinal runtimeFinal : Context} {environment : Environment}
+  ∀ {mode : Bool} {scope : Scope} {context staticFinal runtimeFinal : Context} {environment : Environment}
     {before after : Heap} {statements : List StatementId} {failure : Failure}
     {control : ControlContext} {facts : BodyFacts},
     SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
     EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
     StatementsHaveType scope.source control context statements staticFinal facts →
-    Size.Statements program registry size scope context environment before statements runtimeFinal (.fault failure) after →
+    Size.StatementsIn program registry mode size scope context environment before statements runtimeFinal (.fault failure) after →
     HeapWellTyped context after ∧ HeapTypesExtend before after
 
 variable {program registry}

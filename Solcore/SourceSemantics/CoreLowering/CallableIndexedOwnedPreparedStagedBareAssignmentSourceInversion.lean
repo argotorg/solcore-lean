@@ -55,6 +55,8 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   cases trace with
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same

@@ -46,6 +46,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
         rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique contains form
   cases trace with
+  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifFallthrough actual same _ _ _ =>
+    have impossible := (shape actual).symm.trans same
+    cases impossible
   | returnUnit actual same =>
     have impossible := shape actual
     rw [same] at impossible

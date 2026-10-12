@@ -39,6 +39,11 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | returning rest contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _
+    | ifFallthrough actual form _ _ _ =>
+      have same := shape actual
+      rw [form] at same
+      cases same
     | returnUnit actual form =>
       have same := shape actual
       rw [form] at same
@@ -96,6 +101,11 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | tail contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _
+    | ifFallthrough actual form _ _ _ =>
+      have same := shape actual
+      rw [form] at same
+      cases same
     | returnUnit actual form =>
       have same := shape actual
       rw [form] at same

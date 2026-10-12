@@ -68,6 +68,8 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
     rw [form] at expressionEq
     cases expressionEq
     exact ⟨_, child⟩
+  | ifConditionFault contains otherForm _ | ifFault contains otherForm _ _
+  | ifFallthrough contains otherForm _ _ _
   | expressionFault contains otherForm _ | letFault contains otherForm _ _
   | discard contains otherForm _ _ | letUninitialized contains otherForm _ _ _ _
   | assignBare contains otherForm _ _ _ _ | assignBareFault contains otherForm _ _
@@ -112,6 +114,8 @@ theorem ActualHeader.failed_heap
       other = observed.failedShape.declared :=
     Option.some.inj ((lookupStatement?_complete unique contains).symm.trans declaredFound)
   cases body with
+  | ifConditionFault contains otherForm _ | ifFault contains otherForm _ _
+  | ifFallthrough contains otherForm _ _ _
   | returnFault contains otherForm _ | expressionFault contains otherForm _
   | letFault contains otherForm _ _ | discard contains otherForm _ _
   | assignBare contains otherForm _ _ _ _ | assignBareFault contains otherForm _ _
@@ -154,6 +158,10 @@ private theorem returned_expression
   have same {other : StatementNode} (contains : ContainsStatement scope.source id other) : other = node :=
     Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
   cases trace with
+  | ifReturned contains otherForm _ _ | ifFallthrough contains otherForm _ _ _ =>
+    have impossible := (same contains) ▸ otherForm
+    rw [form] at impossible
+    cases impossible
   | returnUnit contains otherForm =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible

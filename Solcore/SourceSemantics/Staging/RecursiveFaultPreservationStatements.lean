@@ -42,17 +42,17 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
     StatementsAt program registry size := by
-  intro scope context staticFinal runtimeFinal environment before after statements failure control facts
+  intro mode scope context staticFinal runtimeFinal environment before after statements failure control facts
     runtime covers locals heap typed trace
   cases trace with
-  | @returnFault childSize scope context environment before after id rest node expression failure contains form child =>
+  | @returnFault childSize mode scope context environment before after id rest node expression failure contains form child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
       | returnValue expressionTyped =>
           exact expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
-  | @expressionFault childSize scope context environment before after id rest node expression semicolon failure
+  | @expressionFault childSize mode scope context environment before after id rest node expression semicolon failure
       contains form child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -60,7 +60,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       | expressionValue expressionTyped | expressionDiscard expressionTyped =>
           exact expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
-  | @assignBareFault childSize scope context environment before after id rest node assignment rhs target failure
+  | @assignBareFault childSize mode scope context environment before after id rest node assignment rhs target failure
       contains form _snapshot child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -72,7 +72,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
                 runtime covers locals heap rhsTyped child
           | wordCompound operator _ _ _ => cases operator
   | assignBareUnbound | assignBareDangling => exact ⟨heap, .refl _⟩
-  | @assignBare childSize nextSize scope context finalContext environment before middle written after
+  | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
       id rest node assignment rhs value target updated outcome contains form snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have execution : StatementExecutes program context scope.evidence scope.source environment before id
@@ -87,7 +87,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
       exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
-  | @letFault childSize scope context environment before after id rest node binder expression failure
+  | @letFault childSize mode scope context environment before after id rest node binder expression failure
       contains form monomorphic child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -96,7 +96,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           exact expressionIH childSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap expressionTyped child
       | letInitializedGeneralized polymorphic _ _ _ _ => exact (polymorphic monomorphic).elim
-  | @discard childSize nextSize scope context finalContext environment before middle after id rest node expression
+  | @discard childSize nextSize mode scope context finalContext environment before middle after id rest node expression
       value outcome contains form child next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -107,7 +107,64 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
             runtime covers (locals.mono headExtends) middleTyped tailTyped next
           exact ⟨afterTyped, headExtends.trans tailExtends⟩
-  | @letUninitialized nextSize scope context middleContext finalContext environment before bound after id rest node
+  | @discardValue childSize nextSize scope context finalContext environment before middle after id rest node expression
+      value outcome contains form child next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | expressionValue expressionTyped =>
+          obtain ⟨_valueTyped, middleTyped, headExtends⟩ := expression_value wellFormed
+            runtime covers locals heap expressionTyped child
+          obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+            runtime covers (locals.mono headExtends) middleTyped tailTyped next
+          exact ⟨afterTyped, headExtends.trans tailExtends⟩
+  | @ifConditionFault testSize mode scope context environment before after id rest node condition thenBody elseBody failure
+      contains form test =>
+      obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | ifWithoutElse conditionTyped _ | ifWithElse conditionTyped _ _ =>
+          exact expressionIH testSize (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap conditionTyped test
+  | @ifFault testSize branchSize mode scope context innerContext environment before middle after
+      id rest node condition thenBody elseBody truth failure contains form test branch =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      have conditionTyped : ExpressionHasType scope.source context condition .bool := by
+        cases formTyped <;> assumption
+      have branchTyped : ∃ final facts, StatementsHaveType scope.source control context
+          (if truth then thenBody else elseBody.getD []) final facts := by
+        cases formTyped with
+        | ifWithoutElse _ yes =>
+            cases truth with
+            | true => exact ⟨_, _, yes⟩
+            | false => exact ⟨_, _, .nil _ _⟩
+        | ifWithElse _ yes no =>
+            cases truth with
+            | true => exact ⟨_, _, yes⟩
+            | false => exact ⟨_, _, no⟩
+      obtain ⟨branchFinal, branchFacts, branchTyped⟩ := branchTyped
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      obtain ⟨afterTyped, branchExtends⟩ := statementsIH branchSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono testExtends) middleTyped branchTyped branch
+      exact ⟨afterTyped, testExtends.trans branchExtends⟩
+  | @ifFallthrough testSize branchSize nextSize mode scope context innerContext finalContext environment innerEnvironment
+      before middle branchHeap after id rest node condition thenBody elseBody truth outcome contains form test branch next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) branchHeap :=
+        StatementsPlain.if_execute contains form test.sound.value_plain branch.sound.fallthrough_scoped
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before branchHeap [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
+  | @letUninitialized nextSize mode scope context middleContext finalContext environment before bound after id rest node
       binder location outcome contains form monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -129,7 +186,7 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           exact ⟨afterTyped.transportClosed fields.signatures.symm middleClosed runtime.closed
             (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             allocationExtends.trans tailExtends⟩
-  | @letInitialized childSize nextSize scope context middleContext finalContext environment before middle bound after
+  | @letInitialized childSize nextSize mode scope context middleContext finalContext environment before middle bound after
       id rest node binder expression value location outcome contains form child monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form

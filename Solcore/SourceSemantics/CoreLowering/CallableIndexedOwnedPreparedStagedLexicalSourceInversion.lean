@@ -50,6 +50,8 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifFallthrough actual same _ _ _
   | letInitialized actual same _ _ _ _ _ | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -90,6 +92,8 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
       cases impossible
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -124,6 +128,8 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | returnUnit actual same => exact ⟨rfl, rfl, rfl⟩
   | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
+  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same

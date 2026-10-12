@@ -6,7 +6,9 @@ unchanged through lexical scopes and call returns, with exact prefix heaps.
 
 The initial profile covers atomic forms, groups, ordered tuples of every arity, uncoerced primitive unary/binary operators, conditionals,
 indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discard, and returns. It deliberately has no plain
+containing monomorphic lets, bare plain assignments, discards, conditional statements, and returns.
+Conditional arms use scoped fallthrough: their local bindings are restored while
+heap changes remain visible to the following statements. The profile has no plain
 Dynamic fallback for unsupported expressions or bodies. Direct declaration/method calls,
 evidence-selected operator methods, coercion paths, projected or compound assignments, and loops require later recursive rules. These
 judgments do not assert coverage of the full current compiler. -/
@@ -219,7 +221,7 @@ mutual
         (selected : registry.Closure (globalView bodyInstance function.evidence roots) child)
         (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
         (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
-        (body : Statements program registry child bodyContext environment bound roots finalContext outcome after)
+        (body : StatementsIn program registry true child bodyContext environment bound roots finalContext outcome after)
         (resultRule : BodyResult bodyInstance.resultType outcome result) :
         Applies program registry scope context before (.global function) arguments result after
     | closure {scope context before bound after function arguments environment parameterTypes bodyContext finalContext child outcome result}
@@ -227,40 +229,71 @@ mutual
         (valid : ClosureFrame program function)
         (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes bodyContext)
         (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
-        (body : Statements program registry child bodyContext environment bound function.body finalContext outcome after)
+        (body : StatementsIn program registry true child bodyContext environment bound function.body finalContext outcome after)
         (resultRule : BodyResult function.resultType outcome result) :
         Applies program registry scope context before (.closure function) arguments result after
 
-  inductive Statements (program : Program) (registry : Registry) :
-      Scope → Context → Environment → Heap → List StatementId → Context → BodyOutcome → Heap → Prop where
-    | nil {scope context environment heap} :
-        Statements program registry scope context environment heap [] context (.fallthrough environment) heap
-    | returnUnit {scope context environment heap id rest node}
+  inductive StatementsIn (program : Program) (registry : Registry) :
+      Bool → Scope → Context → Environment → Heap → List StatementId → Context → BodyOutcome → Heap → Prop where
+    | nil {mode scope context environment heap} :
+        StatementsIn program registry mode scope context environment heap [] context (.fallthrough environment) heap
+    | returnUnit {mode scope context environment heap id rest node}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt none) :
-        Statements program registry scope context environment heap (id :: rest) context (.returned .unit) heap
-    | returnValue {scope context environment before after id rest node expression value}
+        StatementsIn program registry mode scope context environment heap (id :: rest) context (.returned .unit) heap
+    | returnValue {mode scope context environment before after id rest node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry scope context environment before expression (.value value) after) :
-        Statements program registry scope context environment before (id :: rest) context (.returned value) after
-    | returnFault {scope context environment before after id rest node expression failure}
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | returnFault {mode scope context environment before after id rest node expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
-        Statements program registry scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
     | tail {scope context environment before after id node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression false)
         (child : Expression program registry scope context environment before expression (.value value) after) :
-        Statements program registry scope context environment before [id] context (.returned value) after
-    | discard {scope context finalContext environment before middle after id rest node expression value outcome}
+        StatementsIn program registry true scope context environment before [id] context (.returned value) after
+    | discard {mode scope context finalContext environment before middle after id rest node expression value outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression true)
         (child : Expression program registry scope context environment before expression (.value value) middle)
-        (next : Statements program registry scope context environment middle rest finalContext outcome after) :
-        Statements program registry scope context environment before (id :: rest) finalContext outcome after
-    | expressionFault {scope context environment before after id rest node expression semicolon failure}
+        (next : StatementsIn program registry mode scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | expressionFault {mode scope context environment before after id rest node expression semicolon failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression semicolon)
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
-        Statements program registry scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    /-- A non-tail branch expression discards its value even at the end of its arm. -/
+    | discardValue {scope context finalContext environment before middle after id rest node expression value outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression false)
+        (child : Expression program registry scope context environment before expression (.value value) middle)
+        (next : StatementsIn program registry false scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry false scope context environment before (id :: rest) finalContext outcome after
+    | ifConditionFault {mode scope context environment before after id rest node condition thenBody elseBody failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | ifReturned {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.returned value) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | ifFault {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    /-- Branch-local bindings leave scope; all writes and allocations remain in its reached heap. -/
+    | ifFallthrough {mode scope context innerContext finalContext environment innerEnvironment before middle branchHeap after
+          id rest node condition thenBody elseBody truth outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.fallthrough innerEnvironment) branchHeap)
+        (next : StatementsIn program registry mode scope context environment branchHeap rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
-    | assignBare {scope context finalContext environment before middle written after
+    | assignBare {mode scope context finalContext environment before middle written after
           id rest node assignment rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
@@ -269,51 +302,59 @@ mutual
         (write : ResolvedPlaceWrites
           (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
           middle target updated written)
-        (next : Statements program registry scope context environment written rest finalContext outcome after) :
-        Statements program registry scope context environment before (id :: rest) finalContext outcome after
-    | assignBareFault {scope context environment before after id rest node assignment rhs target failure}
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | assignBareFault {mode scope context environment before after id rest node assignment rhs target failure}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry scope context environment before rhs (.fault failure) after) :
-        Statements program registry scope context environment before (id :: rest) context (.fault failure) after
-    | assignBareUnbound {scope context environment heap id rest node assignment rhs}
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | assignBareUnbound {mode scope context environment heap id rest node assignment rhs}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
-        Statements program registry scope context environment heap (id :: rest) context
+        StatementsIn program registry mode scope context environment heap (id :: rest) context
           (.fault (.semantic (.unboundLocal assignment.target.root))) heap
-    | assignBareDangling {scope context environment heap id rest node assignment rhs location}
+    | assignBareDangling {mode scope context environment heap id rest node assignment rhs location}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (bare : assignment.target.projections = [])
         (lookup : Environment.LooksUp environment assignment.target.root location)
         (missing : heap.Dangling location) :
-        Statements program registry scope context environment heap (id :: rest) context
+        StatementsIn program registry mode scope context environment heap (id :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
-    | letUninitialized {scope context middleContext finalContext environment before bound after id rest node binder location outcome}
+    | letUninitialized {mode scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
         (allocate : Heap.Allocates before binder.scheme.body none location bound)
-        (next : Statements program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
-        Statements program registry scope context environment before (id :: rest) finalContext outcome after
-    | letInitialized {scope context middleContext finalContext environment before middle bound after id rest node binder expression value location outcome}
+        (next : StatementsIn program registry mode scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | letInitialized {mode scope context middleContext finalContext environment before middle bound after id rest node binder expression value location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (child : Expression program registry scope context environment before expression (.value value) middle)
         (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
-        (next : Statements program registry scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
-        Statements program registry scope context environment before (id :: rest) finalContext outcome after
-    | letFault {scope context environment before after id rest node binder expression failure}
+        (next : StatementsIn program registry mode scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | letFault {mode scope context environment before after id rest node binder expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (monomorphic : binder.scheme.quantified = [])
         (child : Expression program registry scope context environment before expression (.fault failure) after) :
-        Statements program registry scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
 
 
 end
+
+/-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
+abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
+namespace Statements
+export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
+  assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  ifConditionFault ifReturned ifFault ifFallthrough)
+end Statements
 
 end Solcore.SourceSemantics.Staging.Recursive

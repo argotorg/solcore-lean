@@ -45,7 +45,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     induction trace using Expression.rec
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
-      (motive_4 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -60,10 +60,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
-    all_goals intro s c r same
-    all_goals cases same
-    all_goals dsimp only [ExpressionOrigin, ValuesOrigin, BodyOrigin] at *
-    all_goals solve_by_elim
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
 theorem Expressions.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -76,7 +73,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
     induction trace using Expressions.rec
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
-      (motive_4 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -91,10 +88,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
-    all_goals intro s c r same
-    all_goals cases same
-    all_goals dsimp only [ExpressionOrigin, ValuesOrigin, BodyOrigin] at *
-    all_goals solve_by_elim
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
 theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -107,7 +101,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
     induction trace using Applies.rec
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
-      (motive_4 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -122,21 +116,18 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
-    all_goals intro s c r same
-    all_goals cases same
-    all_goals dsimp only [ExpressionOrigin, ValuesOrigin, BodyOrigin] at *
-    all_goals solve_by_elim
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
 
-theorem Statements.stage_origin {program : Program} {registry : Registry} {scope : Scope}
+theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : Registry} {scope : Scope}
     {context finalContext : Context} {environment : Environment} {before after : Heap}
     {statements : List StatementId} {outcome : BodyOutcome}
-    (trace : Statements program registry scope context environment before statements finalContext outcome after)
+    (trace : StatementsIn program registry mode scope context environment before statements finalContext outcome after)
     {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
     (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
   have origin : BodyOrigin outcome := by
     clear failed
-    induction trace using Statements.rec
+    induction trace using StatementsIn.rec
       (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
       (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
@@ -154,11 +145,12 @@ theorem Statements.stage_origin {program : Program} {registry : Registry} {scope
     case closure selected valid parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
-    all_goals intro s c r same
-    all_goals cases same
-    all_goals dsimp only [ExpressionOrigin, ValuesOrigin, BodyOrigin] at *
-    all_goals solve_by_elim
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin]
   exact origin originScope call reason failed
+
+namespace Statements
+export StatementsIn (stage_origin)
+end Statements
 
 /-- Successful argument traversal retains source arity without a separate
 assumption about a runtime argument evaluator. -/

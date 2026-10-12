@@ -218,7 +218,7 @@ mutual
         (selected : registry.Closure (globalView bodyInstance function.evidence roots) child)
         (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
         (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
-        (body : Statements program registry bodySize child bodyContext environment bound roots finalContext outcome after)
+        (body : StatementsIn program registry true bodySize child bodyContext environment bound roots finalContext outcome after)
         (resultRule : BodyResult bodyInstance.resultType outcome result) :
         Applies program registry (stepSize [bodySize]) scope context before (.global function) arguments result after
     | closure {bodySize : Nat} {scope context before bound after function arguments environment parameterTypes bodyContext finalContext child outcome result}
@@ -226,40 +226,71 @@ mutual
         (valid : ClosureFrame program function)
         (parameters : MonoBindersExtend function.source.owner function.context function.parameters parameterTypes bodyContext)
         (allocate : BindersAllocate function.captured before function.parameters arguments environment bound)
-        (body : Statements program registry bodySize child bodyContext environment bound function.body finalContext outcome after)
+        (body : StatementsIn program registry true bodySize child bodyContext environment bound function.body finalContext outcome after)
         (resultRule : BodyResult function.resultType outcome result) :
         Applies program registry (stepSize [bodySize]) scope context before (.closure function) arguments result after
 
-  inductive Statements (program : Program) (registry : Registry) :
-      Nat → Scope → Context → Environment → Heap → List StatementId → Context → BodyOutcome → Heap → Prop where
-    | nil {scope context environment heap} :
-        Statements program registry (stepSize []) scope context environment heap [] context (.fallthrough environment) heap
-    | returnUnit {scope context environment heap id rest node}
+  inductive StatementsIn (program : Program) (registry : Registry) :
+      Bool → Nat → Scope → Context → Environment → Heap → List StatementId → Context → BodyOutcome → Heap → Prop where
+    | nil {mode scope context environment heap} :
+        StatementsIn program registry mode (stepSize []) scope context environment heap [] context (.fallthrough environment) heap
+    | returnUnit {mode scope context environment heap id rest node}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt none) :
-        Statements program registry (stepSize []) scope context environment heap (id :: rest) context (.returned .unit) heap
-    | returnValue {childSize : Nat} {scope context environment before after id rest node expression value}
+        StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context (.returned .unit) heap
+    | returnValue {childSize : Nat} {mode scope context environment before after id rest node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry childSize scope context environment before expression (.value value) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.returned value) after
-    | returnFault {childSize : Nat} {scope context environment before after id rest node expression failure}
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.returned value) after
+    | returnFault {childSize : Nat} {mode scope context environment before after id rest node expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
     | tail {childSize : Nat} {scope context environment before after id node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression false)
         (child : Expression program registry childSize scope context environment before expression (.value value) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before [id] context (.returned value) after
-    | discard {childSize nextSize : Nat} {scope context finalContext environment before middle after id rest node expression value outcome}
+        StatementsIn program registry true (stepSize [childSize]) scope context environment before [id] context (.returned value) after
+    | discard {childSize nextSize : Nat} {mode scope context finalContext environment before middle after id rest node expression value outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression true)
         (child : Expression program registry childSize scope context environment before expression (.value value) middle)
-        (next : Statements program registry nextSize scope context environment middle rest finalContext outcome after) :
-        Statements program registry (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | expressionFault {childSize : Nat} {scope context environment before after id rest node expression semicolon failure}
+        (next : StatementsIn program registry mode nextSize scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | expressionFault {childSize : Nat} {mode scope context environment before after id rest node expression semicolon failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression semicolon)
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+    /-- A non-tail branch expression discards its value even at the end of its arm. -/
+    | discardValue {childSize nextSize : Nat} {scope context finalContext environment before middle after id rest node expression value outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .expression expression false)
+        (child : Expression program registry childSize scope context environment before expression (.value value) middle)
+        (next : StatementsIn program registry false nextSize scope context environment middle rest finalContext outcome after) :
+        StatementsIn program registry false (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | ifConditionFault {testSize : Nat} {mode scope context environment before after id rest node condition thenBody elseBody failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [testSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | ifReturned {testSize branchSize : Nat} {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth value}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.returned value) after) :
+        StatementsIn program registry mode (stepSize [testSize, branchSize]) scope context environment before (id :: rest) context (.returned value) after
+    | ifFault {testSize branchSize : Nat} {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [testSize, branchSize]) scope context environment before (id :: rest) context (.fault failure) after
+    /-- Branch-local bindings leave scope; all writes and allocations remain in its reached heap. -/
+    | ifFallthrough {testSize branchSize nextSize : Nat} {mode scope context innerContext finalContext environment innerEnvironment before middle branchHeap after
+          id rest node condition thenBody elseBody truth outcome}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.fallthrough innerEnvironment) branchHeap)
+        (next : StatementsIn program registry mode nextSize scope context environment branchHeap rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [testSize, branchSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
     /-- The target snapshot precedes the RHS; the write uses its actual final heap. -/
-    | assignBare {childSize nextSize : Nat} {scope context finalContext environment before middle written after
+    | assignBare {childSize nextSize : Nat} {mode scope context finalContext environment before middle written after
           id rest node assignment rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
@@ -268,51 +299,58 @@ mutual
         (write : ResolvedPlaceWrites
           (fun _ replacement => AssignmentValueApplies .equal target.selected value replacement)
           middle target updated written)
-        (next : Statements program registry nextSize scope context environment written rest finalContext outcome after) :
-        Statements program registry (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | assignBareFault {childSize : Nat} {scope context environment before after id rest node assignment rhs target failure}
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | assignBareFault {childSize : Nat} {mode scope context environment before after id rest node assignment rhs target failure}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (snapshot : BareTarget environment before assignment.target target)
         (child : Expression program registry childSize scope context environment before rhs (.fault failure) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
-    | assignBareUnbound {scope context environment heap id rest node assignment rhs}
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+    | assignBareUnbound {mode scope context environment heap id rest node assignment rhs}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (bare : assignment.target.projections = [])
         (missing : environment.Unbound assignment.target.root) :
-        Statements program registry (stepSize []) scope context environment heap (id :: rest) context
+        StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context
           (.fault (.semantic (.unboundLocal assignment.target.root))) heap
-    | assignBareDangling {scope context environment heap id rest node assignment rhs location}
+    | assignBareDangling {mode scope context environment heap id rest node assignment rhs location}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment .equal rhs)
         (bare : assignment.target.projections = [])
         (lookup : Environment.LooksUp environment assignment.target.root location)
         (missing : heap.Dangling location) :
-        Statements program registry (stepSize []) scope context environment heap (id :: rest) context
+        StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
-    | letUninitialized {nextSize : Nat} {scope context middleContext finalContext environment before bound after id rest node binder location outcome}
+    | letUninitialized {nextSize : Nat} {mode scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
         (allocate : Heap.Allocates before binder.scheme.body none location bound)
-        (next : Statements program registry nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
-        Statements program registry (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | letInitialized {childSize nextSize : Nat} {scope context middleContext finalContext environment before middle bound after id rest node binder expression value location outcome}
+        (next : StatementsIn program registry mode nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | letInitialized {childSize nextSize : Nat} {mode scope context middleContext finalContext environment before middle bound after id rest node binder expression value location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (child : Expression program registry childSize scope context environment before expression (.value value) middle)
         (monomorphic : binder.scheme.quantified = [])
         (extension : BinderExtends scope.source.owner context binder middleContext)
         (allocate : Heap.Allocates middle binder.scheme.body (some value) location bound)
-        (next : Statements program registry nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
-        Statements program registry (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
-    | letFault {childSize : Nat} {scope context environment before after id rest node binder expression failure}
+        (next : StatementsIn program registry mode nextSize scope middleContext ((binder.id, location) :: environment) bound rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [childSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | letFault {childSize : Nat} {mode scope context environment before after id rest node binder expression failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder (some expression))
         (monomorphic : binder.scheme.quantified = [])
         (child : Expression program registry childSize scope context environment before expression (.fault failure) after) :
-        Statements program registry (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
+        StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
 
 end
+
+abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
+namespace Statements
+export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
+  assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  ifConditionFault ifReturned ifFault ifFallthrough)
+end Statements
 
 
 /-! The four mutually recursive projections use the same rule handlers. -/
@@ -354,20 +392,25 @@ local macro "erase_stage_grade" : tactic =>
     case globalArity => apply Recursive.Applies.globalArity <;> assumption
     case global => apply Recursive.Applies.global <;> assumption
     case closure => apply Recursive.Applies.closure <;> assumption
-    case nil => apply Recursive.Statements.nil <;> assumption
-    case returnUnit => apply Recursive.Statements.returnUnit <;> assumption
-    case returnValue => apply Recursive.Statements.returnValue <;> assumption
-    case returnFault => apply Recursive.Statements.returnFault <;> assumption
-    case tail => apply Recursive.Statements.tail <;> assumption
-    case discard => apply Recursive.Statements.discard <;> assumption
-    case expressionFault => apply Recursive.Statements.expressionFault <;> assumption
-    case assignBare => apply Recursive.Statements.assignBare <;> assumption
-    case assignBareFault => apply Recursive.Statements.assignBareFault <;> assumption
-    case assignBareUnbound => apply Recursive.Statements.assignBareUnbound <;> assumption
-    case assignBareDangling => apply Recursive.Statements.assignBareDangling <;> assumption
-    case letUninitialized => apply Recursive.Statements.letUninitialized <;> assumption
-    case letInitialized => apply Recursive.Statements.letInitialized <;> assumption
-    case letFault => apply Recursive.Statements.letFault <;> assumption
+    case nil => apply Recursive.StatementsIn.nil <;> assumption
+    case returnUnit => apply Recursive.StatementsIn.returnUnit <;> assumption
+    case returnValue => apply Recursive.StatementsIn.returnValue <;> assumption
+    case returnFault => apply Recursive.StatementsIn.returnFault <;> assumption
+    case tail => apply Recursive.StatementsIn.tail <;> assumption
+    case discard => apply Recursive.StatementsIn.discard <;> assumption
+    case discardValue => apply Recursive.StatementsIn.discardValue <;> assumption
+    case ifConditionFault => apply Recursive.StatementsIn.ifConditionFault <;> assumption
+    case ifReturned => apply Recursive.StatementsIn.ifReturned <;> assumption
+    case ifFault => apply Recursive.StatementsIn.ifFault <;> assumption
+    case ifFallthrough => apply Recursive.StatementsIn.ifFallthrough <;> assumption
+    case expressionFault => apply Recursive.StatementsIn.expressionFault <;> assumption
+    case assignBare => apply Recursive.StatementsIn.assignBare <;> assumption
+    case assignBareFault => apply Recursive.StatementsIn.assignBareFault <;> assumption
+    case assignBareUnbound => apply Recursive.StatementsIn.assignBareUnbound <;> assumption
+    case assignBareDangling => apply Recursive.StatementsIn.assignBareDangling <;> assumption
+    case letUninitialized => apply Recursive.StatementsIn.letUninitialized <;> assumption
+    case letInitialized => apply Recursive.StatementsIn.letInitialized <;> assumption
+    case letFault => apply Recursive.StatementsIn.letFault <;> assumption
   ))
 
 local macro "construct_stage_grade" : tactic =>
@@ -501,6 +544,26 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       obtain ⟨nextSize, graded_next⟩ := ih_next
       exact ⟨_, .discard contains form graded_child graded_next⟩
+    case discardValue contains form child next ih_child ih_next =>
+      obtain ⟨childSize, graded_child⟩ := ih_child
+      obtain ⟨nextSize, graded_next⟩ := ih_next
+      exact ⟨_, .discardValue contains form graded_child graded_next⟩
+    case ifConditionFault contains form test ih =>
+      obtain ⟨testSize, graded⟩ := ih
+      exact ⟨_, .ifConditionFault contains form graded⟩
+    case ifReturned contains form test branch testIH branchIH =>
+      obtain ⟨testSize, gradedTest⟩ := testIH
+      obtain ⟨branchSize, gradedBranch⟩ := branchIH
+      exact ⟨_, .ifReturned contains form gradedTest gradedBranch⟩
+    case ifFault contains form test branch testIH branchIH =>
+      obtain ⟨testSize, gradedTest⟩ := testIH
+      obtain ⟨branchSize, gradedBranch⟩ := branchIH
+      exact ⟨_, .ifFault contains form gradedTest gradedBranch⟩
+    case ifFallthrough contains form test branch next testIH branchIH nextIH =>
+      obtain ⟨testSize, gradedTest⟩ := testIH
+      obtain ⟨branchSize, gradedBranch⟩ := branchIH
+      obtain ⟨nextSize, gradedNext⟩ := nextIH
+      exact ⟨_, .ifFallthrough contains form gradedTest gradedBranch gradedNext⟩
     case expressionFault contains form child ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .expressionFault contains form graded_child⟩
@@ -535,7 +598,7 @@ theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
   induction trace using Expression.rec
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
-    (motive_4 := fun _ scope context environment before roots finalContext outcome after _ => Recursive.Statements program registry scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
   erase_stage_grade
 
 theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
@@ -546,7 +609,7 @@ theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
   induction trace using Expressions.rec
     (motive_1 := fun _ scope context environment before id outcome after _ => Recursive.Expression program registry scope context environment before id outcome after)
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
-    (motive_4 := fun _ scope context environment before roots finalContext outcome after _ => Recursive.Statements program registry scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
   erase_stage_grade
 
 theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
@@ -557,15 +620,15 @@ theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
   induction trace using Applies.rec
     (motive_1 := fun _ scope context environment before id outcome after _ => Recursive.Expression program registry scope context environment before id outcome after)
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
-    (motive_4 := fun _ scope context environment before roots finalContext outcome after _ => Recursive.Statements program registry scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
   erase_stage_grade
 
-theorem Statements.sound {program : Program} {registry : Registry} {size : Nat}
+theorem StatementsIn.sound {mode : Bool} {program : Program} {registry : Registry} {size : Nat}
     {scope : Scope} {context finalContext : Context} {environment : Environment} {before after : Heap}
     {roots : List StatementId} {outcome : BodyOutcome}
-    (trace : Statements program registry size scope context environment before roots finalContext outcome after) :
-    Recursive.Statements program registry scope context environment before roots finalContext outcome after := by
-  induction trace using Statements.rec
+    (trace : StatementsIn program registry mode size scope context environment before roots finalContext outcome after) :
+    Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after := by
+  induction trace using StatementsIn.rec
     (motive_1 := fun _ scope context environment before id outcome after _ => Recursive.Expression program registry scope context environment before id outcome after)
     (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
     (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
@@ -579,7 +642,7 @@ theorem Expression.of_trace {program : Program} {registry : Registry}
   induction trace using Recursive.Expression.rec
     (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
-    (motive_4 := fun scope context environment before roots finalContext outcome after _ => ∃ size, Statements program registry size scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
   construct_stage_grade
 
 theorem Expressions.of_trace {program : Program} {registry : Registry}
@@ -590,7 +653,7 @@ theorem Expressions.of_trace {program : Program} {registry : Registry}
   induction trace using Recursive.Expressions.rec
     (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
     (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
-    (motive_4 := fun scope context environment before roots finalContext outcome after _ => ∃ size, Statements program registry size scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
   construct_stage_grade
 
 theorem Applies.of_trace {program : Program} {registry : Registry}
@@ -601,18 +664,33 @@ theorem Applies.of_trace {program : Program} {registry : Registry}
   induction trace using Recursive.Applies.rec
     (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
     (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
-    (motive_4 := fun scope context environment before roots finalContext outcome after _ => ∃ size, Statements program registry size scope context environment before roots finalContext outcome after)
+    (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
   construct_stage_grade
+
+theorem StatementsIn.of_trace {mode : Bool} {program : Program} {registry : Registry}
+    {scope : Scope} {context finalContext : Context} {environment : Environment} {before after : Heap}
+    {roots : List StatementId} {outcome : BodyOutcome}
+    (trace : Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after) :
+    ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after := by
+  induction trace using Recursive.StatementsIn.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
+    (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
+  construct_stage_grade
+
+/-- Preserve the original true-mode field-notation API. -/
+theorem Statements.sound {program : Program} {registry : Registry} {size : Nat}
+    {scope : Scope} {context finalContext : Context} {environment : Environment} {before after : Heap}
+    {roots : List StatementId} {outcome : BodyOutcome}
+    (trace : Statements program registry size scope context environment before roots finalContext outcome after) :
+    Recursive.Statements program registry scope context environment before roots finalContext outcome after :=
+  StatementsIn.sound trace
 
 theorem Statements.of_trace {program : Program} {registry : Registry}
     {scope : Scope} {context finalContext : Context} {environment : Environment} {before after : Heap}
     {roots : List StatementId} {outcome : BodyOutcome}
     (trace : Recursive.Statements program registry scope context environment before roots finalContext outcome after) :
-    ∃ size, Statements program registry size scope context environment before roots finalContext outcome after := by
-  induction trace using Recursive.Statements.rec
-    (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
-    (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
-    (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
-  construct_stage_grade
+    ∃ size, Statements program registry size scope context environment before roots finalContext outcome after :=
+  StatementsIn.of_trace trace
 
 end Solcore.SourceSemantics.Staging.Recursive.Size
