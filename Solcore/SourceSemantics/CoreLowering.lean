@@ -1407,6 +1407,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableFlexibleSubstitutionAgreemen
 import Solcore.SourceSemantics.CoreLowering.CallableAppliedRuntimeMaterialization
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBootstrapRootState
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstrapInitialization
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleArgumentReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedInitializedPublicBounds
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
