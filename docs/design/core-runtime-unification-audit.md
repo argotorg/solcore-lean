@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Lexical allocation and body-reachable reads (2026-10-13)
+
+Commits `8537c3c2` and `a0cd0dba` extend the existing public proof route to lexical named bodies. Review checked genuine compiler acceptance, actual local allocation, context extension, strict recursive child bounds, native frame restoration and full returned heap/pool conditions. The static body packet contains compiler evidence; it does not assume a body execution law. Terminal callers use an explicit compatibility adapter.
+
+Read-policy and metadata obligations are restricted to expressions reached from the actual body. Structural reachability through groups, tuples and calls comes from original metadata. This removes the earlier global single-read-table restriction while preserving diagnostic identity for actual reads.
+
+The closed fixture in `a20e0891` checks and compiles a factory with `let local = seed`, returns a closure over that allocated local, then invokes the same handle twice through successive public sessions. The Source proof identifies the allocated location, its captured environment lookup and Word `10` in the factory's actual final heap. Both direct results are Word `10`; every returned History uses the corresponding actual session and heap.
+
+The generic first-failure seed theorem derives the final typed heap from Source fault preservation and retains the reached failure session. Its closed failure continuation fixture is still being assembled. Lexical declarations inside closure bodies also remain separate work at this checkpoint.
+
+Validation: full build (6108 jobs), all registered tests and kernel policy pass. Independent production reviews found no blockers. Twelve production and three fixture endpoints use only `propext`, `Classical.choice` and `Quot.sound`. This checkpoint does not establish general imperative statements, general forward public result export, suspended/export-error continuations or the all-pass theorem.
+
 ## Direct output collection and forward public Word execution (2026-10-13)
 
 Commit `af456bf5` connects direct-call outputs to subsequent calls. The actual fixture creates a closure capturing `10`, issues the named `make` handle, directly invokes it with `20`, remembers that newly exported closure, then invokes the original, new and original closures. The Source results are exactly `10 / 20 / 10`; the two closure handles are distinct, and every step retains all entries at the actual returned session and heap.

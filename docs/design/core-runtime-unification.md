@@ -4,6 +4,18 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Lexical named bodies and actual captured locals (2026-10-13)
+
+Commits `8537c3c2` and `a0cd0dba` connect straight-line named bodies with local declarations to the recursive semantic family and public execution. The supported statements are initialized and uninitialized monomorphic `let`, initializer failure, discarded expressions, return and Unit fallthrough. The Source context may grow during the body. The proof retains the actual allocated cells and restores the native caller frame, including the complete heap, function pool and returned History.
+
+Read conditions now cover expressions reachable from the selected body. Unrelated reads in the original source table no longer require the same lexical scope. Compiler receipts construct these conditions from the original metadata and actual reached contexts.
+
+Commit `a20e0891` supplies a closed public example: `make(seed)` initializes `local` from `seed` and returns a closure reading `local`. Actual compilation and `make(10)` derive the local allocation, its capture in the closure environment and the cell containing Word `10`. Two later direct calls use the successive returned sessions and prove Source results `10 / 10`, with reusable histories. The fixture supplies no body meaning or input representation assumption.
+
+An initial failed public execution can also seed a History at its actual reached state. The generic theorem derives final heap typing from Source fault preservation. A closed failure-then-continuation example and lexical declarations inside closure bodies are the next integration work.
+
+Validation: full build (6108 jobs), all registered tests and kernel policy pass. Twelve production endpoints and three new fixture endpoints were audited; each uses only `propext`, `Classical.choice` and `Quot.sound`. Core instructions and runtime behavior are unchanged. General imperative bodies, general forward public result export, constructor/mapping output selection, suspended/export-error continuations, model changes and final composition across all compiler passes remain open.
+
 ## Direct output collection and forward public Word execution (2026-10-13)
 
 Commit `af456bf5` connects direct-call outputs to subsequent calls. The actual fixture creates a closure capturing `10`, issues the named `make` handle, directly invokes it with `20`, remembers that newly exported closure, then invokes the original, new and original closures. The Source results are exactly `10 / 20 / 10`; the two closure handles are distinct, and every step retains all entries at the actual returned session and heap.
@@ -58,11 +70,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `af456bf5`: direct outputs join current histories and are reused with distinct captures; successful Source closure applications derive sufficient public execution and Word export fuel. |
-| Latest completed verification | Strict Lean, closed direct-output and forward Word fixtures, full build (6072 jobs), all registered tests, kernel policy and independent reviews pass. Ten audited endpoints use only the standard three axioms. |
-| Working implementation | Successful and failed public calls return reusable histories at their actual reached states. Product outputs can add selected function leaves. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
-| Latest proof scope | Actual captured closures are created, exported and called through later public executions with exact Word results and continuous histories. The concrete fixture derives all static and metadata conditions. The generic model and registries stay fixed; mutable assignment/match coverage remains runtime-only. |
-| Current implementation priority | Connect packed arguments and nonzero lambda parameters through direct public execution, then broaden genuine compiler/body coverage. Suspended/export-error continuations, non-product output collection, model/registry changes and all-pass composition remain open. |
+| Latest verified implementation | `a20e0891`, following `8537c3c2` and `a0cd0dba`: lexical named bodies reach public execution; an actual locally allocated capture is exported and reused with exact Source results and continuous histories. |
+| Latest completed verification | Strict Lean, full build (6108 jobs), all registered tests and kernel policy pass. Production review and fifteen endpoint audits pass with only the standard three axioms. |
+| Working implementation | Supported successful and failed public calls return reusable histories at their actual reached states. Named lexical bodies can allocate locals and form closures over them. Product outputs can add selected function leaves. |
+| Latest proof scope | Actual captured closures, including a captured named-body local, are created, exported and called through later public executions with exact Word results and continuous histories. Static conditions come from authentic compiler receipts. The generic model and registries stay fixed. |
+| Current implementation priority | Connect lexical closure bodies and closed failure continuations, then widen forward public preservation and actual compiler/body coverage. Imperative statements, suspended/export-error continuations, non-product output collection, model changes and all-pass composition remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Lexical bodies connected to the public proof route (2026-10-13)
+
+- `8537c3c2`: restrict read policy, original metadata and diagnostic conditions to expressions reachable from the selected body. The authentic compiler derives those conditions; captured-read closures can coexist with unrelated reads and lexical scopes in the source table.
+- `a0cd0dba`: connect initialized/uninitialized monomorphic local declarations, initializer faults, discard, return and Unit fallthrough through named invocation, recursive dispatch and public execution. Static terminal/lexical body receipts replace the terminal-only public premise. Source contexts may grow; native caller restoration and full heap/pool/history conditions remain explicit. Initial public failure can seed the actual returned History, with heap typing derived from Source fault preservation.
+- `a20e0891`: register the closed captured-local factory example. Actual `make(10)` allocates a local initialized from its parameter and exports a closure over that cell. Two successive direct invocations return Word `10`. The theorem identifies the captured allocated cell and connects all three Source applications to actual public sessions and histories.
+
+Verification completed: full build (6108 jobs), all registered tests, kernel policy, independent production review, twelve production endpoint audits and three fixture endpoint audits. All audited axioms are the standard three. The prior unrelated working-tree changes were left untouched.
+
+Work continues on lexical declarations inside closure bodies and a closed initial-failure/continuation example. Forward public preservation still needs wider callable and output coverage. Imperative control flow, non-product output selection, suspended/export-error continuations, receiving-model changes and final composition across all compiler passes remain unfinished. The historical work estimates are unchanged; the completed connections above are the progress measure for this checkpoint.
+
 ## Direct output collection and forward public Word execution (2026-10-13)
 
 Commit `af456bf5` connects direct-call outputs to subsequent calls. The actual fixture creates a closure capturing `10`, issues the named `make` handle, directly invokes it with `20`, remembers that newly exported closure, then invokes the original, new and original closures. The Source results are exactly `10 / 20 / 10`; the two closure handles are distinct, and every step retains all entries at the actual returned session and heap.

@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Lexical body support and captured-local public execution (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedNamedBodies.Body` is the static named-body input to the public semantic endpoints. It keeps the actual prepared header, layout and either a terminal or lexical compiler receipt. Existing terminal consumers use `Body.of_terminal`. The endpoint argument name `namedTerminals` is retained for compatibility, but its type is now `Body`; `namedSupport` uses `NamedBodiesSupport.Support` for either branch.
+
+`PreparedNamedLexicalCollectors.of_compiler` builds lexical support from the accepted compiler action, original Source typing and children at their actual contexts. `PreparedNamedLexicalLambdaFormation.of_expression` supports lambda formation after local declarations. Body preservation and reflection retain an arbitrary final Source context while restoring the native caller scope. `SingleReadSequence.sequence_on` and reached-only metadata conditions admit a captured read without constraining unrelated source nodes.
+
+`InitializedHistoryFailures.public_run_failed_seeds` connects actual initialization, input encoding and an initial failed public call to a reusable empty-entry History at the returned failure session. Final heap typing follows from the reflected Source fault trace.
+
+`Tests.SourceCoreCapturedLocal.sequence_meaning` closes the real compiler and public API route for `let local = seed; return lam() { return local; };`, followed by two direct invocations. It includes the allocated capture cell containing Word `10`, exact Source outcomes and successive returned histories. Production changes are `8537c3c2` and `a0cd0dba`; the fixture is `a20e0891`.
+
+Full build (6108 jobs), registered tests and kernel policy pass. The twelve production and three fixture endpoints audited at this checkpoint use only the standard three axioms. Closure-body lexical support, a closed failure continuation, general forward result export, broader statements and final compiler composition remain in progress. Earlier dated sections describe their own checkpoints.
+
 ## Direct output collection and forward public Word execution (2026-10-13)
 
 Commit `af456bf5` connects direct-call outputs to subsequent calls. The actual fixture creates a closure capturing `10`, issues the named `make` handle, directly invokes it with `20`, remembers that newly exported closure, then invokes the original, new and original closures. The Source results are exactly `10 / 20 / 10`; the two closure handles are distinct, and every step retains all entries at the actual returned session and heap.
