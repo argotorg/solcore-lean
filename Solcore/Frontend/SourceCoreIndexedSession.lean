@@ -3052,3 +3052,177 @@ theorem Recipe.BuiltinCallableAt.prepared
   · contradiction
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem named_factory_shape {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {templates : SourceCoreCallableIndexedTemplates.Cache compiled.indexed}
+    {named : List (Key × CallableFactory compiled)}
+    (prepared : prepareNamed compiled templates = .ok named)
+    {key : Key} {row : Key × CallableFactory compiled}
+    (selected : named.find? (fun row => decide (row.1 = key)) = some row) :
+    ∃ (signature : SourceCoreCalls.Signature) (index : Nat)
+      (specialized : SourceSpecialization.SpecializedFunction)
+      (location : Nat) (closure : Core.Value) (identity : Core.Word)
+      (descriptor : SourceCoreCallableContracts.Descriptor
+        compiled.indexed.ancestry.graph.inputs.callable.table (.named key)),
+      compiled.indexed.base.globals[index]? = some signature ∧ signature.key = key ∧
+      SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan key = .ok specialized ∧
+      row.2.sourceType = specialized.function.type ∧
+      templates.nativeGlobals[index]? = some (location, .inRight .unit closure) ∧
+      Core.Word.ofNat? (index + 1) = some identity ∧
+      row.2.value = .pair (.pair (.inRight .unit (.word identity)) closure) (.word descriptor.id) ∧
+      compiled.compatible.checked.catalog.project row.2.sourceType = .ok row.2.value.type := by
+  have rowKey : row.1 = key := by simpa using List.find?_some selected
+  obtain ⟨⟨signature, index⟩, member, produced⟩ :=
+    root_factory_mapM_member prepared (List.mem_of_find?_eq_some selected)
+  obtain ⟨specialized, specializedAt, produced⟩ := root_factory_bind_ok produced
+  have exactSpecialized : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan signature.key =
+      .ok specialized := by
+    cases actual : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan signature.key with
+    | error error => simp [actual, Except.mapError] at specializedAt
+    | ok actualSpecialized =>
+        have same : actualSpecialized = specialized := by simpa [actual, Except.mapError] using specializedAt
+        exact same ▸ rfl
+  cases slot : templates.nativeGlobals[index]? with
+  | none => simp [slot, throw, throwThe, bind, Except.bind] at produced
+  | some pair =>
+      rcases pair with ⟨location, installed⟩
+      simp only [slot, bind, Except.bind, pure, Except.pure] at produced
+      split at produced
+      · rename_i closure
+        obtain ⟨identity, number, produced⟩ := root_factory_bind_ok produced
+        obtain ⟨id, descriptorAt, produced⟩ := root_factory_bind_ok produced
+        obtain ⟨factory, callable, produced⟩ := root_factory_bind_ok produced
+        cases produced
+        change signature.key = key at rowKey
+        subst key
+        have globalAt : compiled.indexed.base.globals[index]? = some signature :=
+          List.mk_mem_zipIdx_iff_getElem?.mp member
+        have identityFound : Core.Word.ofNat? (index + 1) = some identity := by
+          unfold callableIdentity at number
+          split at number
+          · cases number; assumption
+          · contradiction
+        obtain ⟨descriptor, identifier⟩ := builtin_factory_descriptor descriptorAt
+        unfold prepareCallable at callable
+        split at callable
+        · contradiction
+        · rename_i projectedType projection
+          dsimp only at callable
+          split at callable
+          · rename_i actualType
+            cases callable
+            refine ⟨signature, index, specialized, location, closure, identity, descriptor,
+              globalAt, rfl, exactSpecialized, rfl, ?_, identityFound, ?_, ?_⟩
+            · exact slot
+            · rw [identifier]
+            · simpa only [actualType] using projection
+          · contradiction
+      · contradiction
+
+/-- A named handle's cached factory retains the exact original global slot,
+accepted specialization, installed native value, identity and descriptor. -/
+theorem Recipe.NamedCallableAt.prepared
+    {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
+    (prepared : Recipe.prepare compiled = .ok recipe)
+    {key : Key} {expected : Ty} {native : Core.Value}
+    (factory : recipe.NamedCallableAt key expected native) :
+    ∃ (signature : SourceCoreCalls.Signature) (index : Nat)
+      (specialized : SourceSpecialization.SpecializedFunction)
+      (location : Nat) (closure : Core.Value) (identity : Core.Word)
+      (descriptor : SourceCoreCallableContracts.Descriptor
+        compiled.indexed.ancestry.graph.inputs.callable.table (.named key)),
+      compiled.indexed.base.globals[index]? = some signature ∧ signature.key = key ∧
+      SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan key = .ok specialized ∧
+      expected = specialized.function.type ∧
+      recipe.templates.nativeGlobals[index]? = some (location, .inRight .unit closure) ∧
+      Core.Word.ofNat? (index + 1) = some identity ∧
+      native = .pair (.pair (.inRight .unit (.word identity)) closure) (.word descriptor.id) ∧
+      compiled.compatible.checked.catalog.project expected = .ok native.type := by
+  unfold Recipe.prepare at prepared
+  obtain ⟨roots, _roots, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨templates, _templates, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨named, namedPrepared, prepared⟩ := root_factory_bind_ok prepared
+  obtain ⟨builtins, _builtins, prepared⟩ := root_factory_bind_ok prepared
+  dsimp only at prepared
+  split at prepared
+  · cases prepared
+    obtain ⟨row, selected, sourceType, nativeValue⟩ := factory
+    obtain ⟨signature, index, specialized, location, closure, identity, descriptor,
+      globalAt, keyAt, specializedAt, actualType, slot, number, shape, projection⟩ := named_factory_shape namedPrepared selected
+    exact ⟨signature, index, specialized, location, closure, identity, descriptor,
+      globalAt, keyAt, specializedAt, sourceType.symm.trans actualType, slot, number, nativeValue.symm.trans shape,
+      by simpa only [sourceType, nativeValue] using projection⟩
+  · contradiction
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+private theorem named_factory_mapM_at {α β ε : Type} {action : α → Except ε β}
+    {inputs : List α} {outputs : List β} {index : Nat} {output : β}
+    (accepted : inputs.mapM action = .ok outputs) (found : outputs[index]? = some output) :
+    ∃ input, inputs[index]? = some input ∧ action input = .ok output := by
+  induction inputs generalizing outputs index with
+  | nil =>
+      simp only [List.mapM_nil, pure, Except.pure, Except.ok.injEq] at accepted
+      subst outputs
+      simp at found
+  | cons first rest ih =>
+      rw [List.mapM_cons] at accepted
+      obtain ⟨head, headEq, accepted⟩ := root_factory_bind_ok accepted
+      obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+      cases accepted
+      cases index with
+      | zero =>
+          have same : head = output := Option.some.inj found
+          exact ⟨first, rfl, same ▸ headEq⟩
+      | succ index =>
+          obtain ⟨input, selected, actual⟩ := ih tailEq found
+          exact ⟨input, selected, actual⟩
+
+/-- The original indexed slot generator fixes every physical location. Its
+output position is retained through mapM, rather than inferred from a native
+type or from membership at an unspecified position. -/
+theorem Recipe.native_global_location (recipe : Recipe)
+    {index location : Nat} {value : Core.Value}
+    (slot : recipe.templates.nativeGlobals[index]? = some (location, value)) :
+    location = 1 + recipe.compiled.indexed.base.globals.length - 1 - index := by
+  have generated := recipe.templates.nativeGlobalsGenerated
+  change SourceCoreCallableNativeSlots.expectedGlobals
+    (recipe.compiled.indexed.base.globals.map (fun signature => (signature.parameterType, signature.resultType)))
+    (recipe.compiled.indexed.secondPass.closures.zipIdx.map (fun (code, index) => SourceCoreLambdaTemplates.installedTemplate index code))
+    (SourceCoreCallableIndexedTemplates.globalEnvironment recipe.compiled.indexed) 1 =
+      .ok recipe.templates.nativeGlobals at generated
+  unfold SourceCoreCallableNativeSlots.expectedGlobals at generated
+  split at generated
+  · cases generated
+  · obtain ⟨⟨⟨parameter, result⟩, actualIndex⟩, atIndex, emitted⟩ := named_factory_mapM_at generated slot
+    have indexEq : actualIndex = index := by
+      simp only [List.getElem?_zipIdx] at atIndex
+      cases selected : (recipe.compiled.indexed.base.globals.map
+          (fun signature => (signature.parameterType, signature.resultType)))[index]? with
+      | none => simp [selected] at atIndex
+      | some actual =>
+          simp only [selected, Option.map_some] at atIndex
+          have same := (Prod.mk.inj (Option.some.inj atIndex)).2
+          simpa only [Nat.zero_add] using same.symm
+    cases found : (recipe.compiled.indexed.secondPass.closures.zipIdx.map
+        (fun (code, index) => SourceCoreLambdaTemplates.installedTemplate index code))[actualIndex]? with
+    | none => simp [found, bind, Except.bind, throw] at emitted
+    | some code =>
+        simp only [found, pure, Except.pure, bind, Except.bind] at emitted
+        cases code <;> try cases emitted
+        rename_i actualParameter actualResult body
+        by_cases header : (actualParameter != parameter ||
+            actualResult != Core.LanguageResult.resultType result) = true
+        · simp [header, throw, throwThe, MonadExceptOf.throw] at emitted
+        · simp [header] at emitted
+          obtain ⟨locationEq, _valueEq⟩ := emitted
+          simp only [indexEq] at locationEq
+          omega
+
+end Solcore.Frontend.SourceCoreIndexedSession
