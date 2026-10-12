@@ -68,7 +68,8 @@ end BootResult
 namespace Session
 export SourceCoreExecution.Session
   (heapSize functionCount start startHandlePacked Authenticates authenticate
-   diagnostic handleDiagnostic named builtin run runWithReceipt RunAt IndexedAt start_indexed
+   diagnostic handleDiagnostic named namedWithReceipt NamedIssuedAt builtin builtinWithReceipt BuiltinIssuedAt
+   SameRuntime run runWithReceipt RunAt IndexedAt start_indexed
    invokePacked snapshot restoreSnapshot)
 end Session
 
@@ -81,7 +82,7 @@ export SourceCoreExecution.Authentication (typed)
 end Authentication
 
 namespace Completion
-export SourceCoreExecution.Completion (value sourceType session boundaryFuel typed)
+export SourceCoreExecution.Completion (value sourceType session boundaryFuel typed IndexedAt)
 end Completion
 
 namespace Outcome

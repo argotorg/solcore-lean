@@ -119,10 +119,14 @@ def run : IO Unit := do
   let resumed ← match finished.val with
     | .succeeded result => pure result | _ => throw (IO.userError "public call did not resume")
   require (resumed.value == word 19) "public checkpoint lost capture"
-  let named ← get "public named handle" (← resumed.session.named (← key 2))
+  let namedReceipt ← get "public named handle" (← resumed.session.namedWithReceipt (← key 2))
+  let named := namedReceipt.val
+  have _preservedNamed : resumed.session.SameRuntime named.session := namedReceipt.property.same_runtime
   let namedResult ← execute named.session (← key 1) [named.value, word 4]
   require (namedResult.value == word 31) "public named handle lost cached code"
-  let builtin ← get "public builtin handle" (← namedResult.session.builtin .wordToInteger)
+  let builtinReceipt ← get "public builtin handle" (← namedResult.session.builtinWithReceipt .wordToInteger)
+  let builtin := builtinReceipt.val
+  have _preservedBuiltin : namedResult.session.SameRuntime builtin.session := builtinReceipt.property.same_runtime
   discard <| get "public builtin authentication"
     (builtin.session.authenticate 1024 (.function .word .integer) builtin.value)
   let afterFault ← match ← builtin.session.run (← key 7) [] {executionFuel := 300000} with

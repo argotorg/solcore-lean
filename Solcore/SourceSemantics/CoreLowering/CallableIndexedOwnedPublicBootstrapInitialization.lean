@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBootstrapGlobals
 
 /-! The original public fresh bootstrap and the public root startup share one
-actual indexed Session. Successful bootstrap identifies its exact initialized
-store/world, and startup retains those same indices. Any finite sequence of
+actual native state, including sessions extended by handle issuance. Successful
+bootstrap identifies its exact initialized store/world, and startup retains those same indices. Any finite sequence of
 actual bootstrap suspensions may precede completion. The proof does not replay
 native execution or assume an initial owned pool, source heap or argument relation. -/
 set_option autoImplicit false
@@ -11,14 +11,14 @@ namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicBootstr
 open Core Frontend SourceInference
 open SourceCoreIndexedSession RecursiveNamedPublicStartMeaning
 
-/-- The same facade Session ties actual bootstrap completion to the native
+/-- The facade runtime-preservation receipt ties bootstrap completion to the native
 StartAt used by the public root consumer. The completion is returned for the
 owned initialization producer, rather than replaced by a hypothetical store. -/
 theorem at_started {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : Recipe}
     (prepared : Recipe.prepare compiled = .ok recipe)
     {publicCompiled : SourceCoreExecution.Compiled} {publicArtifact : SourceCoreExecution.Artifact}
     {publicBootstrap : SourceCoreExecution.Bootstrap publicArtifact}
-    {publicSession : SourceCoreExecution.Session publicArtifact}
+    {bootstrapSession publicSession : SourceCoreExecution.Session publicArtifact}
     {nativeArtifact : Artifact} {nativeSession : Session nativeArtifact}
     {nativeCheckpoint : Checkpoint nativeArtifact} {root : Root recipe.compiled}
     {key : Key} {publicArguments : List SourceCorePublicValues.Value} {inputFuel bootstrapFuel : Nat}
@@ -26,7 +26,8 @@ theorem at_started {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : 
     {encodedValues : SourceCoreCompatibleValues.Context}
     (opened : publicArtifact.IndexedAt publicCompiled recipe nativeArtifact)
     (fresh : publicBootstrap.FreshAt)
-    (ready : publicBootstrap.ReadyAt bootstrapFuel publicSession)
+    (ready : publicBootstrap.ReadyAt bootstrapFuel bootstrapSession)
+    (sameRuntime : bootstrapSession.SameRuntime publicSession)
     (atSession : publicSession.IndexedAt nativeSession)
     (started : StartAt nativeSession key publicArguments inputFuel nativeCheckpoint recipe root
       world store payloads encodedValues) :
@@ -44,14 +45,13 @@ theorem at_started {compiled : SourceCoreUnifiedCompilation.Compiled} {recipe : 
         (RecursiveNamedCatalogPreparedInitialization.store compiled) payloads encodedValues := by
   obtain ⟨indexedBootstrap, indexedSession, value, finalStore, _atBootstrap, initial, sessionAt, completed, booted⟩ :=
     ready.indexed opened fresh
-  have sameSession : indexedSession = nativeSession := sessionAt.unique atSession
-  subst indexedSession
+  have unchanged := sameRuntime.indexed sessionAt atSession
   have actualCompletion := initial.native_done completed
   have initialized := RecursiveNamedCatalogPreparedInitialization.completed_store prepared actualCompletion
   rw [initialized.2] at actualCompletion
-  have nativeAt := booted.native_at
+  have nativeAt := unchanged.native_at booted.native_at
   rw [initialized.2] at nativeAt
-  have registryAt := booted.registry_at initial
+  have registryAt := unchanged.registry_at (booted.registry_at initial)
   rw [Recipe.prepare_compiled prepared] at registryAt
   have sameState :
       world = (RecursiveNamedCatalogPreparedInitialization.store compiled).map Core.Value.type ∧

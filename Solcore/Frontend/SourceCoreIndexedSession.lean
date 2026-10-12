@@ -882,21 +882,52 @@ private def issueCallable {artifact : Artifact} (session : Session artifact)
       exact validated.typed⟩,
     session, .refl _⟩
 
-/-- Import a named function from this artifact's exact cached installation.
-The specialized key chooses code, identity and descriptor together. -/
+/-- Proof-only provenance of the one selected cached named factory and the
+single generation minted by this actual issuance operation. -/
+def Session.NamedIssuedAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (fuel : Nat) (completion : Completion artifact) : Prop :=
+  ∃ (row : Key × CallableFactory artifact.recipe.compiled) (generation : ExportGeneration),
+    artifact.recipe.named.find? (fun row => decide (row.1 = key)) = some row ∧
+    issueCallable session row.2 generation fuel = .ok completion
+
+/-- Builtin issuance retains the same compiler-owned factory selection. -/
+def Session.BuiltinIssuedAt {artifact : Artifact} (session : Session artifact)
+    (function : BuiltinFunctionId) (fuel : Nat) (completion : Completion artifact) : Prop :=
+  ∃ (row : BuiltinFunctionId × CallableFactory artifact.recipe.compiled) (generation : ExportGeneration),
+    artifact.recipe.builtins.find? (fun row => decide (row.1 = function)) = some row ∧
+    issueCallable session row.2 generation fuel = .ok completion
+
+/-- The original issuance path mints once; retaining its proof does not replay IO. -/
+def Session.namedWithReceipt {artifact : Artifact} (session : Session artifact) (key : Key)
+    (boundaryFuel : Nat := 1024) :
+    IO (Except Error {completion : Completion artifact // session.NamedIssuedAt key boundaryFuel completion}) := do
+  match selected : artifact.recipe.named.find? (fun row => decide (row.1 = key)) with
+  | none => pure (.error ⟨[], .missingEntry key⟩)
+  | some row =>
+      let generation ← SourceCorePublicValues.ExportGeneration.mint
+      match issued : issueCallable session row.2 generation boundaryFuel with
+      | .error error => pure (.error error)
+      | .ok completion => pure (.ok ⟨completion, row, generation, selected, issued⟩)
+
 def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
     (boundaryFuel : Nat := 1024) : IO (Except Error (Completion artifact)) := do
-  match artifact.recipe.named.find? (fun row => decide (row.1 = key)) with
-  | none => pure (.error ⟨[], .missingEntry key⟩)
-  | some (_, factory) => pure (issueCallable session factory (← SourceCorePublicValues.ExportGeneration.mint) boundaryFuel)
+  pure ((← session.namedWithReceipt key boundaryFuel).map Subtype.val)
 
-/-- Import a closed builtin template owned by the artifact's callable table.
-No caller-supplied native closure is accepted. -/
+/-- The builtin wrapper retains the one minted generation and its real result. -/
+def Session.builtinWithReceipt {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
+    (boundaryFuel : Nat := 1024) :
+    IO (Except Error {completion : Completion artifact // session.BuiltinIssuedAt function boundaryFuel completion}) := do
+  match selected : artifact.recipe.builtins.find? (fun row => decide (row.1 = function)) with
+  | none => pure (.error ⟨[], .missingBuiltin function⟩)
+  | some row =>
+      let generation ← SourceCorePublicValues.ExportGeneration.mint
+      match issued : issueCallable session row.2 generation boundaryFuel with
+      | .error error => pure (.error error)
+      | .ok completion => pure (.ok ⟨completion, row, generation, selected, issued⟩)
+
 def Session.builtin {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
     (boundaryFuel : Nat := 1024) : IO (Except Error (Completion artifact)) := do
-  match artifact.recipe.builtins.find? (fun row => decide (row.1 = function)) with
-  | none => pure (.error ⟨[], .missingBuiltin function⟩)
-  | some (_, factory) => pure (issueCallable session factory (← SourceCorePublicValues.ExportGeneration.mint) boundaryFuel)
+  pure ((← session.builtinWithReceipt function boundaryFuel).map Subtype.val)
 
 inductive Outcome (artifact : Artifact) where
   | succeeded (completion : Completion artifact)
@@ -2671,5 +2702,238 @@ theorem Checkpoint.SucceededResultAt.word_value {artifact : Artifact}
     simp [decodeRaw, TypeSystem.Ty.word, SourceCoreRawMetadata.runtimeType,
       pure, Except.pure] at decode
     exact decode.1.symm
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+open SourceInference TypeSystem
+
+/-- Issuance changes physical handle slots only. Native memory, authority,
+metadata and the inert source prefix retain their actual values. -/
+structure Session.SameRuntime {artifact : Artifact} (before after : Session artifact) : Prop where
+  authority : before.authority = after.authority
+  world : before.world = after.world
+  store : before.store = after.store
+  metadata : before.values = after.values
+  sourcePrefix : before.sourcePrefix = after.sourcePrefix
+
+theorem Session.SameRuntime.refl {artifact : Artifact} (session : Session artifact) :
+    session.SameRuntime session := ⟨rfl, rfl, rfl, rfl, rfl⟩
+
+theorem Session.SameRuntime.trans {artifact : Artifact} {first second third : Session artifact}
+    (left : first.SameRuntime second) (right : second.SameRuntime third) : first.SameRuntime third :=
+  ⟨left.authority.trans right.authority, left.world.trans right.world, left.store.trans right.store,
+    left.metadata.trans right.metadata, left.sourcePrefix.trans right.sourcePrefix⟩
+
+theorem Session.SameRuntime.native_at {artifact : Artifact} {before after : Session artifact}
+    (same : before.SameRuntime after) {world : Core.StoreTyping} {store : Core.Store}
+    (initial : before.NativeAt world store) : after.NativeAt world store :=
+  ⟨same.world.symm.trans initial.1, same.store.symm.trans initial.2⟩
+
+theorem Session.SameRuntime.registry_at {artifact : Artifact} {before after : Session artifact}
+    (same : before.SameRuntime after) {registry : SourceCoreRawMetadata.Registry}
+    (initial : before.RegistryAt registry) : after.RegistryAt registry := by
+  change after.values.registry = registry
+  rw [← same.metadata]
+  exact initial
+
+/-- Exact accepted input bytes, retaining the real encoder and session slots. -/
+def Session.EncodesAt {artifact : Artifact} (session : Session artifact) (fuel : Nat)
+    (expected : Ty) (value : Value) (native : Core.Value) : Prop :=
+  ∃ encoded, encodeRaw session.authority session.registry fuel session.values.registry expected value = .ok encoded ∧
+    encoded.value = native
+
+/-- Static provenance remains the selected cached named factory. -/
+def Recipe.NamedCallableAt (recipe : Recipe) (key : Key) (expected : Ty) (native : Core.Value) : Prop :=
+  ∃ row, recipe.named.find? (fun row => decide (row.1 = key)) = some row ∧
+    row.2.sourceType = expected ∧ row.2.value = native
+
+/-- Static provenance remains the selected cached builtin factory. -/
+def Recipe.BuiltinCallableAt (recipe : Recipe) (function : BuiltinFunctionId)
+    (expected : Ty) (native : Core.Value) : Prop :=
+  ∃ row, recipe.builtins.find? (fun row => decide (row.1 = function)) = some row ∧
+    row.2.sourceType = expected ∧ row.2.value = native
+
+private theorem issue_callable_receipt {artifact : Artifact} {session : Session artifact}
+    {factory : CallableFactory artifact.recipe.compiled} {generation : ExportGeneration}
+    {fuel : Nat} {completion : Completion artifact}
+    (issued : issueCallable session factory generation fuel = .ok completion) :
+    session.SameRuntime completion.session ∧ completion.sourceType = factory.sourceType ∧
+      completion.boundaryFuel = fuel ∧
+      completion.session.EncodesAt fuel factory.sourceType completion.value factory.value := by
+  unfold issueCallable at issued
+  obtain ⟨_globals, _checked, issued⟩ := root_factory_bind_ok issued
+  cases slot : factory.slot with
+  | none =>
+      simp only [slot] at issued
+      obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+      obtain ⟨exported, _exported, issued⟩ := root_factory_bind_ok issued
+      cases issued
+      exact ⟨⟨rfl, rfl, rfl, rfl, rfl⟩, rfl, rfl,
+        exported.encoded, exported.reencoded, exported.recovered⟩
+  | some pair =>
+      rcases pair with ⟨location, expected⟩
+      simp only [slot] at issued
+      split at issued
+      ·
+        obtain ⟨validated, _validated, issued⟩ := root_factory_bind_ok issued
+        obtain ⟨exported, _exported, issued⟩ := root_factory_bind_ok issued
+        cases issued
+        exact ⟨⟨rfl, rfl, rfl, rfl, rfl⟩, rfl, rfl,
+          exported.encoded, exported.reencoded, exported.recovered⟩
+      · simp [bind, Except.bind, throw, throwThe] at issued
+
+theorem Session.NamedIssuedAt.receipt {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion) :
+    ∃ expected native, session.SameRuntime completion.session ∧
+      completion.sourceType = expected ∧ completion.boundaryFuel = fuel ∧
+      completion.session.EncodesAt fuel expected completion.value native ∧
+      artifact.recipe.NamedCallableAt key expected native := by
+  obtain ⟨row, generation, selected, accepted⟩ := issued
+  obtain ⟨same, sourceType, boundaryFuel, encoded⟩ := issue_callable_receipt accepted
+  exact ⟨row.2.sourceType, row.2.value, same, sourceType, boundaryFuel, encoded,
+    row, selected, rfl, rfl⟩
+
+theorem Session.BuiltinIssuedAt.receipt {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.BuiltinIssuedAt function fuel completion) :
+    ∃ expected native, session.SameRuntime completion.session ∧
+      completion.sourceType = expected ∧ completion.boundaryFuel = fuel ∧
+      completion.session.EncodesAt fuel expected completion.value native ∧
+      artifact.recipe.BuiltinCallableAt function expected native := by
+  obtain ⟨row, generation, selected, accepted⟩ := issued
+  obtain ⟨same, sourceType, boundaryFuel, encoded⟩ := issue_callable_receipt accepted
+  exact ⟨row.2.sourceType, row.2.value, same, sourceType, boundaryFuel, encoded,
+    row, selected, rfl, rfl⟩
+
+theorem Session.NamedIssuedAt.same_runtime {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion) : session.SameRuntime completion.session := by
+  obtain ⟨_, _, same, _⟩ := issued.receipt
+  exact same
+
+theorem Session.BuiltinIssuedAt.same_runtime {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.BuiltinIssuedAt function fuel completion) : session.SameRuntime completion.session := by
+  obtain ⟨_, _, same, _⟩ := issued.receipt
+  exact same
+
+private theorem resolved_slot {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    {expected : Ty} {handle : Handle} {native : Core.Value}
+    (accepted : resolve authority slots expected handle = .ok native) :
+    ∃ slot, slots.find? (fun slot => decide (slot.handle = handle)) = some slot ∧ slot.value = native := by
+  by_cases belongsArtifact : handle.belongsToArtifact artifact.authority = true
+  · by_cases belongsSession : handle.belongsToSession authority = true
+    · cases found : slots.find? (fun slot => decide (slot.handle = handle)) with
+      | none => simp [resolve, belongsArtifact, belongsSession, found, bind, Except.bind, pure, Except.pure, throw, throwThe] at accepted
+      | some slot =>
+          by_cases sameType : SourceCoreRawMetadata.runtimeType expected =
+              SourceCoreRawMetadata.runtimeType handle.sourceType
+          · refine ⟨slot, rfl, ?_⟩
+            simpa [resolve, belongsArtifact, belongsSession, found, sameType, bind, Except.bind, pure, Except.pure, throw, throwThe] using accepted
+          · simp [resolve, belongsArtifact, belongsSession, found, sameType, bind, Except.bind, pure, Except.pure, throw, throwThe] at accepted
+    · simp [resolve, belongsArtifact, belongsSession, bind, Except.bind, pure, Except.pure, throw, throwThe] at accepted
+  · simp [resolve, belongsArtifact, bind, Except.bind, pure, Except.pure, throw, throwThe] at accepted
+
+private theorem resolve_unique {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world}
+    {firstType secondType : Ty} {handle : Handle} {first second : Core.Value}
+    (left : resolve authority slots firstType handle = .ok first)
+    (right : resolve authority slots secondType handle = .ok second) : first = second := by
+  obtain ⟨a, foundA, valueA⟩ := resolved_slot left
+  obtain ⟨b, foundB, valueB⟩ := resolved_slot right
+  have same := Option.some.inj (foundA.symm.trans foundB)
+  subst b
+  exact valueA.symm.trans valueB
+
+private theorem encoded_function_resolves {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {registry : SourceCoreRawMetadata.Registry} {expected : Ty} {handle : Handle}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : encodeRaw authority slots fuel registry expected (.function handle) = .ok encoded) :
+    resolve authority slots expected handle = .ok encoded.value := by
+  cases fuel with
+  | zero => cases accepted
+  | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin => cases builtin <;> cases accepted
+      case function parameter result =>
+        obtain ⟨native, resolved, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        exact resolved
+
+private theorem arguments_function_at {artifact : Artifact} {world : Core.StoreTyping}
+    {authority : SessionAuthority} {slots : Registry artifact world} {fuel : Nat}
+    {values : Values} {owner : values.checked = artifact.recipe.compiled.compatible.checked}
+    {sourceTypes : List Ty} {types : List Core.Ty} {arguments : List Value}
+    {encoded : Arguments artifact world types} {index : Nat} {handle : Handle}
+    {expected : Ty} {native : Core.Value}
+    (resolved : resolve authority slots expected handle = .ok native)
+    (found : arguments[index]? = some (.function handle))
+    (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
+    encoded.native[index]? = some native := by
+  induction sourceTypes generalizing types arguments values encoded index with
+  | nil =>
+      cases types <;> cases arguments <;> try (solve | cases accepted)
+      cases found
+  | cons sourceType rest ih =>
+      cases types with
+      | nil => cases accepted
+      | cons type types =>
+          cases arguments with
+          | nil => cases found
+          | cons argument arguments =>
+              simp only [encodeArguments] at accepted
+              cases projected : artifact.recipe.compiled.compatible.checked.catalog.project sourceType with
+              | error error => simp [projected, bind, Except.bind, throw, throwThe] at accepted
+              | ok actual =>
+                  simp only [projected, bind, Except.bind] at accepted
+                  split at accepted
+                  · rename_i same
+                    subst actual
+                    obtain ⟨raw, rawEq, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨validated, _validated, accepted⟩ := root_factory_bind_ok accepted
+                    obtain ⟨tail, tailEq, accepted⟩ := root_factory_bind_ok accepted
+                    cases accepted
+                    cases index with
+                    | zero =>
+                        have sameArgument : argument = .function handle := Option.some.inj found
+                        subst argument
+                        have sameNative := resolve_unique resolved (encoded_function_resolves rawEq)
+                        simpa only [List.getElem?_cons_zero] using congrArg some sameNative.symm
+                    | succ index =>
+                        exact ih (types := types) (arguments := arguments) (encoded := tail)
+                          (index := index) (by simpa using found) tailEq
+                  · simp [throw, throwThe] at accepted
+
+/-- The actual start used the same authenticated handle and therefore the
+same native callable bytes issued earlier. This says nothing about source
+meaning until the cached factory's provenance has been interpreted. -/
+def Checkpoint.ImportedFunctionAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (index : Nat) (nativeValue : Core.Value) (checkpoint : Checkpoint artifact) : Prop :=
+  ∃ (root : Root artifact.recipe.compiled) (native : Core.Environment),
+    artifact.recipe.roots.find? (fun root => decide (root.key = key)) = some root ∧
+    native[index]? = some nativeValue ∧
+    checkpoint.state = .initial root.body (native.reverse ++ environment artifact) session.store
+
+theorem Checkpoint.RootStart.imported_function {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (started : checkpoint.RootStart session key arguments fuel)
+    {issuanceFuel : Nat} {expected : Ty} {handle : Handle} {native : Core.Value}
+    (imported : session.EncodesAt issuanceFuel expected (.function handle) native)
+    {index : Nat} (found : arguments[index]? = some (.function handle)) :
+    checkpoint.ImportedFunctionAt session key index native := by
+  obtain ⟨issued, issuedEq, recovered⟩ := imported
+  have resolved := encoded_function_resolves issuedEq
+  rw [recovered] at resolved
+  obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, _⟩ := started
+  exact ⟨root, encoded.native, selected, arguments_function_at resolved found accepted, initial⟩
 
 end Solcore.Frontend.SourceCoreIndexedSession

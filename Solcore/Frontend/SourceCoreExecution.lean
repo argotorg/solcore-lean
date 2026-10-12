@@ -573,31 +573,139 @@ inductive Outcome (artifact : Artifact) where
   | outOfFuel (checkpoint : Checkpoint artifact)
   | exportError (error : SourceCoreIndexedSession.Error) (session : Session artifact)
 
-def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
-    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := by
+/-- The exact indexed completion remains attached to its public value/session. -/
+def Completion.IndexedAt {artifact : Artifact} (completion : Completion artifact)
+    {native : SourceCoreIndexedSession.Artifact}
+    (actual : SourceCoreIndexedSession.Completion native) : Prop :=
+  completion.value = actual.value ∧ completion.sourceType = actual.sourceType ∧
+    completion.boundaryFuel = actual.boundaryFuel ∧ completion.session.IndexedAt actual.session
+
+/-- Public issuance preserves the exact native memory, authority and metadata.
+The indexed handle registry may grow through the original registration path. -/
+def Session.SameRuntime {artifact : Artifact} (before after : Session artifact) : Prop :=
+  match artifact, before, after with
+  | ⟨_, .empty _⟩, ⟨_⟩, ⟨_⟩ => True
+  | ⟨_, .indexed _ _ _ _⟩, ⟨left⟩, ⟨right⟩ => left.SameRuntime right
+
+theorem Session.SameRuntime.refl {artifact : Artifact} (session : Session artifact) :
+    session.SameRuntime session := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => trivial
+  | indexed recipe selected native atRecipe =>
+      rcases session with ⟨actual⟩
+      exact SourceCoreIndexedSession.Session.SameRuntime.refl actual
+
+theorem Session.SameRuntime.trans {artifact : Artifact} {first second third : Session artifact}
+    (left : first.SameRuntime second) (right : second.SameRuntime third) : first.SameRuntime third := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => trivial
+  | indexed recipe selected native atRecipe =>
+      rcases first with ⟨a⟩
+      rcases second with ⟨b⟩
+      rcases third with ⟨c⟩
+      exact SourceCoreIndexedSession.Session.SameRuntime.trans left right
+
+theorem Session.SameRuntime.indexed {artifact : Artifact} {before after : Session artifact}
+    (same : before.SameRuntime after) {native : SourceCoreIndexedSession.Artifact}
+    {left right : SourceCoreIndexedSession.Session native}
+    (first : before.IndexedAt left) (second : after.IndexedAt right) : left.SameRuntime right := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim first
+  | indexed recipe selected actual atRecipe =>
+      rcases before with ⟨a⟩
+      rcases after with ⟨b⟩
+      rcases first with ⟨rfl, sameA⟩
+      have aEq : a = left := eq_of_heq sameA
+      have bEq : b = right := eq_of_heq second.2
+      cases aEq
+      cases bEq
+      exact same
+
+theorem Session.SameRuntime.of_indexed {artifact : Artifact} {before after : Session artifact}
+    {native : SourceCoreIndexedSession.Artifact} {left right : SourceCoreIndexedSession.Session native}
+    (first : before.IndexedAt left) (second : after.IndexedAt right)
+    (same : left.SameRuntime right) : before.SameRuntime after := by
+  rcases artifact with ⟨compiled, opened⟩
+  cases opened with
+  | empty selected => exact False.elim first
+  | indexed recipe selected actual atRecipe =>
+      rcases before with ⟨a⟩
+      rcases after with ⟨b⟩
+      rcases first with ⟨rfl, sameA⟩
+      have aEq : a = left := eq_of_heq sameA
+      have bEq : b = right := eq_of_heq second.2
+      cases aEq
+      cases bEq
+      exact same
+
+/-- The public named result retains its actual indexed issuer and completion. -/
+def Session.NamedIssuedAt {artifact : Artifact} (session : Session artifact)
+    (key : Key) (fuel : Nat) (completion : Completion artifact) : Prop :=
+  ∃ (native : SourceCoreIndexedSession.Artifact) (before : SourceCoreIndexedSession.Session native)
+    (actual : SourceCoreIndexedSession.Completion native),
+    session.IndexedAt before ∧ before.NamedIssuedAt key fuel actual ∧ completion.IndexedAt actual
+
+def Session.BuiltinIssuedAt {artifact : Artifact} (session : Session artifact)
+    (function : BuiltinFunctionId) (fuel : Nat) (completion : Completion artifact) : Prop :=
+  ∃ (native : SourceCoreIndexedSession.Artifact) (before : SourceCoreIndexedSession.Session native)
+    (actual : SourceCoreIndexedSession.Completion native),
+    session.IndexedAt before ∧ before.BuiltinIssuedAt function fuel actual ∧ completion.IndexedAt actual
+
+theorem Session.NamedIssuedAt.same_runtime {artifact : Artifact} {session : Session artifact}
+    {key : Key} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.NamedIssuedAt key fuel completion) : session.SameRuntime completion.session := by
+  obtain ⟨native, before, actual, first, issued, result⟩ := issued
+  exact Session.SameRuntime.of_indexed first result.2.2.2 issued.same_runtime
+
+theorem Session.BuiltinIssuedAt.same_runtime {artifact : Artifact} {session : Session artifact}
+    {function : BuiltinFunctionId} {fuel : Nat} {completion : Completion artifact}
+    (issued : session.BuiltinIssuedAt function fuel completion) : session.SameRuntime completion.session := by
+  obtain ⟨native, before, actual, first, issued, result⟩ := issued
+  exact Session.SameRuntime.of_indexed first result.2.2.2 issued.same_runtime
+
+/-- This is the original named issuance operation, retaining its erased receipt. -/
+def Session.namedWithReceipt {artifact : Artifact} (session : Session artifact) (key : Key)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error
+      {completion : Completion artifact // session.NamedIssuedAt key boundaryFuel completion}) := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure (.error ⟨[], .missingEntry key⟩)
-  | indexed recipe selected native _atRecipe =>
+  | indexed recipe selected native atRecipe =>
       rcases session with ⟨session⟩
       exact do
-        match ← session.named key boundaryFuel with
+        match ← session.namedWithReceipt key boundaryFuel with
         | .error error => pure (.error error)
-        | .ok completion => pure (.ok ⟨completion.value, completion.sourceType,
-            ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
+        | .ok completion => pure (.ok ⟨⟨completion.val.value, completion.val.sourceType,
+            ⟨completion.val.session⟩, completion.val.boundaryFuel, completion.val.authenticated⟩,
+            native, session, completion.val, ⟨rfl, HEq.rfl⟩, completion.property,
+            rfl, rfl, rfl, ⟨rfl, HEq.rfl⟩⟩)
 
-def Session.builtin {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
-    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := by
+def Session.named {artifact : Artifact} (session : Session artifact) (key : Key)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := do
+  pure ((← session.namedWithReceipt key boundaryFuel).map Subtype.val)
+
+def Session.builtinWithReceipt {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error
+      {completion : Completion artifact // session.BuiltinIssuedAt function boundaryFuel completion}) := by
   rcases artifact with ⟨compiled, opened⟩
   cases opened with
   | empty selected => exact pure (.error ⟨[], .missingBuiltin function⟩)
-  | indexed recipe selected native _atRecipe =>
+  | indexed recipe selected native atRecipe =>
       rcases session with ⟨session⟩
       exact do
-        match ← session.builtin function boundaryFuel with
+        match ← session.builtinWithReceipt function boundaryFuel with
         | .error error => pure (.error error)
-        | .ok completion => pure (.ok ⟨completion.value, completion.sourceType,
-            ⟨completion.session⟩, completion.boundaryFuel, completion.authenticated⟩)
+        | .ok completion => pure (.ok ⟨⟨completion.val.value, completion.val.sourceType,
+            ⟨completion.val.session⟩, completion.val.boundaryFuel, completion.val.authenticated⟩,
+            native, session, completion.val, ⟨rfl, HEq.rfl⟩, completion.property,
+            rfl, rfl, rfl, ⟨rfl, HEq.rfl⟩⟩)
+
+def Session.builtin {artifact : Artifact} (session : Session artifact) (function : BuiltinFunctionId)
+    (boundaryFuel : Nat := 1024) : IO (Except SourceCoreIndexedSession.Error (Completion artifact)) := do
+  pure ((← session.builtinWithReceipt function boundaryFuel).map Subtype.val)
 
 private def wrapCompletion {compiled : Compiled} {recipe : SourceCoreIndexedSession.Recipe}
     {selected : compiled.recipe = some recipe} {native : SourceCoreIndexedSession.Artifact}

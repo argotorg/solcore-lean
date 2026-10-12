@@ -63,7 +63,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     (program := Program.ofChecked compiled.sourceProgram) (headers rows) root header)
   {publicCompiled : SourceCoreExecution.Compiled} {publicArtifact : SourceCoreExecution.Artifact}
   {publicBootstrap : SourceCoreExecution.Bootstrap publicArtifact}
-  {publicSession : SourceCoreExecution.Session publicArtifact}
+  {bootstrapSession publicSession : SourceCoreExecution.Session publicArtifact}
   {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
   {nativeArtifact : SourceCoreIndexedSession.Artifact}
   {nativeSession : SourceCoreIndexedSession.Session nativeArtifact}
@@ -74,7 +74,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {encodedValues : SourceCoreCompatibleValues.Context}
   (opened : publicArtifact.IndexedAt publicCompiled recipe nativeArtifact)
   (fresh : publicBootstrap.FreshAt)
-  (ready : publicBootstrap.ReadyAt bootstrapFuel publicSession)
+  (ready : publicBootstrap.ReadyAt bootstrapFuel bootstrapSession)
+  (sameRuntime : bootstrapSession.SameRuntime publicSession)
   (atSession : publicSession.IndexedAt nativeSession)
   (atCheckpoint : publicCheckpoint.IndexedAt nativeCheckpoint)
   (started : RecursiveNamedPublicStartMeaning.StartAt nativeSession key publicArguments
@@ -98,9 +99,9 @@ local notation "rootFunctions" => CallableIndexedOwnedContextualCellOrigins.func
 local notation "rootModel" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry rootFunctions
 local notation "rootFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include distinct wellFormed prepared selected opened fresh ready atSession started metadata inputTypes meanings in
+include distinct wellFormed prepared selected opened fresh ready sameRuntime atSession started metadata inputTypes meanings in
 /-- This proof is consumed immediately by the public endpoints below. The
-same actual Session fixes the initial store/world; the argument producer uses
+runtime-preservation receipt fixes the initial store/world; the argument producer uses
 the caller's receiving metadata without identifying two registries. -/
 private theorem initial_arguments :
     ∃ caller : State rootHeaders rootKeys
@@ -117,7 +118,7 @@ private theorem initial_arguments :
   have sameCompiled := SourceCoreIndexedSession.Recipe.prepare_compiled prepared
   cases sameCompiled
   obtain ⟨value, booted, worldEq, storeEq, _nativeAt, _registryAt, _initializedStart⟩ :=
-    CallableIndexedOwnedPublicBootstrapInitialization.at_started prepared opened fresh ready atSession started
+    CallableIndexedOwnedPublicBootstrapInitialization.at_started prepared opened fresh ready sameRuntime atSession started
   subst world
   subst store
   obtain ⟨_result, _storeEq, caller, stable, heaps, globals, heapTyped⟩ :=
@@ -133,9 +134,9 @@ private theorem initial_arguments :
   exact ⟨caller, stable, globals header selected.member, heaps,
     heapTyped header.function.context, represented, argumentsTyped⟩
 
-include distinct wellFormed prepared selected opened fresh ready atSession started metadata inputTypes in
+include distinct wellFormed prepared selected opened fresh ready sameRuntime atSession started metadata inputTypes in
 /-- This proof is consumed immediately by the public endpoints below. The
-same actual Session fixes the initial store/world; the argument producer uses
+runtime-preservation receipt fixes the initial store/world; the argument producer uses
 the caller's receiving metadata without identifying two registries. -/
 private theorem initial_arguments_existential :
     ∃ arguments : List Dynamic.Value,
@@ -154,7 +155,7 @@ private theorem initial_arguments_existential :
   have sameCompiled := SourceCoreIndexedSession.Recipe.prepare_compiled prepared
   cases sameCompiled
   obtain ⟨value, booted, worldEq, storeEq, _nativeAt, _registryAt, _initializedStart⟩ :=
-    CallableIndexedOwnedPublicBootstrapInitialization.at_started prepared opened fresh ready atSession started
+    CallableIndexedOwnedPublicBootstrapInitialization.at_started prepared opened fresh ready sameRuntime atSession started
   subst world
   subst store
   obtain ⟨_result, _storeEq, caller, stable, heaps, globals, heapTyped⟩ :=
@@ -171,7 +172,7 @@ private theorem initial_arguments_existential :
     heapTyped header.function.context, represented, argumentsTyped⟩
 
 include distinct receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
-  prepared selected opened fresh ready atSession atCheckpoint started metadata inputTypes sourceAt supports in
+  prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes sourceAt supports in
 /-- Actual bootstrap and actual public input encoding construct every initial
 state premise before the existing public success endpoint is invoked. -/
 theorem public_run_succeeded_reflects
@@ -203,7 +204,7 @@ theorem public_run_succeeded_reflects
   obtain ⟨arguments, inputMeanings, caller, stable, globalReference, heaps, heapTyped, represented, argumentsTyped⟩ :=
     initial_arguments_existential (inputs := inputs) (rows := rows) (distinct := distinct)
       (profile := profile) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
-      (opened := opened) (fresh := fresh) (ready := ready) (atSession := atSession)
+      (opened := opened) (fresh := fresh) (ready := ready) (sameRuntime := sameRuntime) (atSession := atSession)
       (started := started) (metadata := metadata) (inputTypes := inputTypes)
   refine ⟨arguments, inputMeanings, caller, ?_⟩
   exact CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.public_run_succeeded_reflects
@@ -218,7 +219,7 @@ theorem public_run_succeeded_reflects
       publicStart atCheckpoint publicRun descriptor
 
 include distinct receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
-  prepared selected opened fresh ready atSession atCheckpoint started metadata inputTypes sourceAt supports in
+  prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes sourceAt supports in
 /-- Actual public failure uses the same produced initial pool and input
 relation. Staged failures retain their original nested scope and token. -/
 theorem public_run_failed_reflects
@@ -247,7 +248,7 @@ theorem public_run_failed_reflects
   obtain ⟨arguments, inputMeanings, caller, stable, globalReference, heaps, heapTyped, represented, argumentsTyped⟩ :=
     initial_arguments_existential (inputs := inputs) (rows := rows) (distinct := distinct)
       (profile := profile) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
-      (opened := opened) (fresh := fresh) (ready := ready) (atSession := atSession)
+      (opened := opened) (fresh := fresh) (ready := ready) (sameRuntime := sameRuntime) (atSession := atSession)
       (started := started) (metadata := metadata) (inputTypes := inputTypes)
   refine ⟨arguments, inputMeanings, caller, ?_⟩
   exact CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.public_run_failed_reflects
@@ -262,7 +263,7 @@ theorem public_run_failed_reflects
       publicStart atCheckpoint publicRun descriptor
 
 include distinct receiver observations extension semantic family namedTerminals namedSupport acceptedPlan wellFormed
-  prepared selected opened fresh ready atSession atCheckpoint started metadata inputTypes meanings sourceAt supports in
+  prepared selected opened fresh ready sameRuntime atSession atCheckpoint started metadata inputTypes meanings sourceAt supports in
 /-- A supported staged Word result reaches the original public checkpoint
 at sufficient native fuel. Input and export budgets remain independent. -/
 theorem public_word_preserved
@@ -286,7 +287,7 @@ theorem public_word_preserved
   obtain ⟨caller, stable, globalReference, heaps, heapTyped, represented, argumentsTyped⟩ :=
     initial_arguments (inputs := inputs) (rows := rows) (distinct := distinct)
       (profile := profile) (wellFormed := wellFormed) (prepared := prepared) (selected := selected)
-      (opened := opened) (fresh := fresh) (ready := ready) (atSession := atSession)
+      (opened := opened) (fresh := fresh) (ready := ready) (sameRuntime := sameRuntime) (atSession := atSession)
       (started := started) (metadata := metadata) (inputTypes := inputTypes) (meanings := meanings)
   refine ⟨caller, ?_⟩
   exact CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.public_word_preserved
