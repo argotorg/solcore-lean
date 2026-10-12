@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Recursive mapping operands and retained failures (2026-10-13)
+
+`6a73f02f` adds independently graded Source index rules and their erasure and fault-typing proofs. `544751f6` connects both recursive index operands to the shared numeric proof. The actual compiler occurrence and diagnostic issuer establish missing-default behavior in the current receiving registry.
+
+`f517e1cd` proves nine consecutive public calls: create A from `10`, create B from `20`, select A through `echo(table)[choose(key)]`, invoke A, create C from `30`, select B, invoke B, fail a lookup of the missing key, and invoke A using the actual failed returned session. The results `10 / 20 / 10` retain the corresponding captures. All nine events have Source meaning and public sufficient-fuel bounds; failure accepts every output fuel, including zero.
+
+Validation: all 760 affected modules pass coherent checks. The full build (6,565 jobs), all registered tests (13,000 build jobs and the final pass marker), kernel policy and 91 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is canonical direct and index expressions inside named and ordinary scoped bodies, including local allocation, assignment and finite loops. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct calls inside retained closure bodies (2026-10-13)
 
 `2b9fbd92` connects direct declaration calls inside retained ordinary closure bodies to the shared numeric expression/body proof. The actual parameter entry supplies its binding spine and captured global slots. Original body typing, compiler-view equality, read diagnostics and the complete named Header inventory produce canonical roots internally.

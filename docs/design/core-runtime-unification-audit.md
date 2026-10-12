@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Recursive mapping operands and retained failures (2026-10-13)
+
+Commits `6a73f02f`, `544751f6` and `f517e1cd` connect independent recursive indexing to actual public execution. The base runs before the key; each strict child uses its actual reached heap and current owned pool. Lookup suffix allocations restore the same physical caller while retaining the complete ordered record history.
+
+The fault proof obtains authority from the actual named or ordinary compiler occurrence. It carries the genuine issuer into the current receiving registry, without assuming diagnostic token injectivity. The failure adapter identifies the token through the original native result decode and retains the actual returned session.
+
+The fixture checks all nine real events and all nine forward bounds. After the missing-key failure, the older closure is invoked from that returned session. No expected output or body execution law is a public premise.
+
+Validation: all 760 affected modules pass coherent checks. The full build (6,565 jobs), all registered tests (13,000 build jobs and the final pass marker), kernel policy and 91 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is canonical direct and index expressions inside named and ordinary scoped bodies, including local allocation, assignment and finite loops. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct calls inside retained closure bodies (2026-10-13)
 
 Commits `2b9fbd92` and `8d5bb1e6` connect retained closure captures, canonical body roots, the shared recursive proof and the actual public sequence. The body producer derives its packet, original Source typing, ledger coverage, read diagnostics and complete direct-call authority from the retained compiler record. The parameter-entry spine identifies the actual frame after installation; the proof retains the exact reached caller and its full record lists when restoring the outer call.

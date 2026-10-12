@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Recursive mapping operands and retained failures (2026-10-13)
+
+`Staging.Recursive.IndexOutcome` records the independent terminal index behavior. `CallableIndexedOwnedPreparedStagedIndexSourceInversion` and `IndexHeadBounds` connect strict base/key children to the actual lookup suffix. `IndexDiagnosticAuthority.Port.missing` uses the actual receiving registry and diagnostics; named and ordinary producers derive `IndexReady` from the original compiler receipt and reached Source occurrence.
+
+`CanonicalRecursiveCallerBounds` consumes that authority inside the common numeric family. The older recursive interfaces retain explicit `NoIndexes` restrictions, derived by their existing producers.
+
+The public endpoints are `Tests.SourceCoreRecursiveIndex.closed_sequence_meaning` and `closed_forward_meaning`. `RetainedState.select_failure` keeps the exact failed returned session and history. `forward_failure` derives a sufficient execution fuel while quantifying over every output fuel. `ObservedFailure.exportsReady` derives the next-call authority from the original failed native receipt.
+
+Validation: all 760 affected modules pass coherent checks. The full build (6,565 jobs), all registered tests (13,000 build jobs and the final pass marker), kernel policy and 91 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection is canonical direct and index expressions inside named and ordinary scoped bodies, including local allocation, assignment and finite loops. Wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct calls inside retained closure bodies (2026-10-13)
 
 `CallableIndexedOwnedPreparedStagedClosureInvocationSpineBounds` retains the actual parameter binding spine. `CanonicalTerminalLambdaBodyBounds` and `CanonicalTerminalLambdaApplicationBounds` use the reached capture, globals and caller restoration. `MixedBodyStaticSupport.Packet.canonicalTerminal` connects these bodies to the shared recursive family.
