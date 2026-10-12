@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Verified cached-root and public outcome connection (2026-10-12)
+
+Commits `6199f27d` and `a3d8877f` connect real public execution receipts to cached-root proofs. The supported ordinary sequence family constructs its strict recursive body laws internally and reaches the actual named root selected by public startup. Public success/failure reflection retains the native result/store, staged Source application, complete returned heap/caller relation and exact export session. Word preservation reaches successful public export with sufficient native fuel and a positive output budget.
+
+Review checked that each facade operation executes once, the compiled facade's existing constructor remains unchanged, receipt fields are erased, and no body execution law replaces the recursive proof. The proof keeps actual argument packing and optional-cell lookup, exact startup/checkpoint identity, separate body/export metadata receipts, and original staged rejection. The existing named Dynamic evidence path retains its Source admission prerequisites; it is distinct from the staged path.
+
+Strict Lean checks, full build (5948 jobs), all registered tests and kernel policy pass. Independent reviews found no outstanding issue. Checked facade, root and public semantic endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
+
+This closes a supported public consumer connection. Initialized owned state/global slots, represented inputs/heaps and genuine static support remain premises. Complete initialization, wider grammar, unrestricted methods/generalized-local bodies and the final theorem across all compiler passes remain open. The 70% / 85% estimates are unchanged; proof counts do not measure this integration.
+
 ## Connected ordinary sequence callers (2026-10-12)
 
 Committed in `80a41cf5`. `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` now connect actual preparation and retained compiler recipes to the existing recursive caller/body proof.
@@ -16,7 +26,7 @@ For ordinary closure Associations, the consumer obtains its scope from the actua
 
 Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
 
-Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+The cached-root and public outcome connection is recorded above. Further work prioritizes initialization and compiler coverage for that same family. Generalized-cell drafts remain deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
 
 Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
 

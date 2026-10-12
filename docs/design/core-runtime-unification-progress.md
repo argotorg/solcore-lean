@@ -25,10 +25,20 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Partial proofs and connections to actual compiler receipts have progressed. The final main theorem covering general function values and call bodies, all passes, and actual public entry points is incomplete. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches cached roots and actual public outcomes. Complete initialization, compiler-grammar coverage and composition across all passes remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Connected cached roots and public outcomes (2026-10-12)
+
+`6199f27d` retains the original public open/start/resume receipts and connects the existing named Source semantics to public outcomes. `a3d8877f` consumes the mixed recursive body proof at actual cached roots and connects the supported ordinary family to the same public API.
+
+The new endpoints cover both directions at the cached root, reflection of actual public success and failure, and preservation of Word results through public export at sufficient execution fuel. The native result/store, complete returned heap/caller relation and exact returned session are retained. Staged rejection remains a staged failure, and export metadata keeps its own receipt rather than assuming it equals the body model's metadata.
+
+Validation passes: strict Lean checks, full build (5948 jobs), all registered tests, repository kernel policy and independent review. The checked facade, root and public semantic endpoints depend only on `propext`, `Classical.choice` and `Quot.sound`.
+
+Next, derive the initial owned pool/global slots, represented inputs/heaps and static family support from actual initialization and compilation. These conditions are still premises of the connected theorems. Broader grammar, unrestricted method/generalized-local bodies and the final theorem across specialization, evidence and comptime remain incomplete. Helper work is driven by these consumers; the percentage estimates remain unchanged.
 
 ### Connected ordinary sequence callers (2026-10-12)
 
@@ -38,7 +48,7 @@ For ordinary closure Associations, the consumer obtains its scope from the actua
 
 Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
 
-Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+The cached-root and public outcome connection is recorded above. Further work prioritizes initialization and compiler coverage for that same family. Generalized-cell drafts remain deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
 
 Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
 

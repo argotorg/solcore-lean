@@ -10,13 +10,21 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commit | `80a41cf5`. Actual preparation and retained recipes now feed the supported ordinary caller/body preservation and reflection proofs. |
-| Latest completed normal verification | Strict Lean, full build, registered tests, kernel policy and independent review pass. Both new endpoints use only the standard three axioms. |
-| Working implementation | Ordinary sequence packets and exact caller/child readiness are constructed and consumed internally. Principal and named static support remain explicit. Public execution outcome integration is next. |
-| Latest proof scope | Supported ordinary callers and recursive sequence bodies, with actual compilation provenance and combined named/anonymous staging. |
-| Current implementation priority | Connect existing proof producers to actual public execution consumers. Defer generalized-cell helper expansion until a consumer needs it. |
+| Latest normally verified implementation commits | `6199f27d` and `a3d8877f`. Public execution receipts connect recursive body proofs to cached roots and actual public outcomes. |
+| Latest completed normal verification | Strict Lean, full build (5948 jobs), registered tests, kernel policy and independent review pass. The checked endpoints use only the standard three axioms. |
+| Working implementation | Supported ordinary sequence packets and caller/child readiness feed cached-root preservation/reflection, public success/failure reflection, and public Word preservation. |
+| Latest proof scope | Supported ordinary callers and recursive sequence bodies, actual named roots, and their public outcomes. Initial owned state, represented inputs and static family support remain prerequisites. |
+| Current implementation priority | Derive these prerequisites from actual initialization and compiler output, then extend the same connected family. Add helpers when a concrete consumer needs them. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
+
+### Cached roots and public execution outcomes (2026-10-12)
+
+Commits `6199f27d` and `a3d8877f` extend the ordinary caller connection to the actual cached named body and public execution API. The public facade retains proof receipts for the original open, start and resume actions. Each action executes once; the existing API delegates to the receipt-producing operation and returns its value.
+
+`preserves_root` and `reflects_root` consume the mixed recursive body proof internally. `public_run_succeeded_reflects` and `public_run_failed_reflects` connect the actual public result to that same body, staged Source application, native result/store, full returned heap/caller relation and exact indexed export session. `public_word_preserved` proves that a Source Word result exports successfully with sufficient execution fuel and a positive output budget. Input and output budgets remain independent. Stage rejection retains its staged outcome.
+
+The final staged endpoints do not assume a body execution law. They still require genuine initialized owned-pool/global-slot receipts, represented arguments and heaps, named/principal static support, compiler policy and diagnostics. Constructing these conditions from complete initialization and compiler output is the next integration task. Broader grammar, unrestricted methods/generalized-local bodies and composition across specialization, evidence and comptime remain unfinished. The progress estimates are unchanged.
 
 ### Connected ordinary sequence callers (2026-10-12)
 
@@ -26,7 +34,7 @@ For ordinary closure Associations, the consumer obtains its scope from the actua
 
 Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
 
-Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+The cached-root and public outcome connection is recorded above. Further work prioritizes initialization and compiler coverage for that same family. Generalized-cell drafts remain deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
 
 Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
 

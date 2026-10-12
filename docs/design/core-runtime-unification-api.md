@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest connection is `80a41cf5`: `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` construct ordinary sequence packets and caller/child readiness before invoking the existing recursive compiler bounds. Principal and named static support remain explicit.
+The latest connections are `6199f27d` and `a3d8877f`: actual public execution receipts now consume cached-root preservation/reflection for the supported ordinary family. The preceding caller connection is `80a41cf5`. Initialization and static family support remain explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -41,6 +41,24 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
 
+## Public execution receipts and semantic consumers (2026-10-12)
+
+`SourceCompiler` exports `Compiled.openWithReceipt`, `Session.runWithReceipt` and `Checkpoint.resumeWithReceipt`. Their subtype results retain erased proofs about the original action. Existing `open`, `run` and `resume` delegate to those operations and return their values. They do not replay execution or mint a second artifact authority.
+
+`Artifact.CompiledAt`/`IndexedAt`, `Session.IndexedAt` and `Checkpoint.IndexedAt` retain exact facade/indexed correspondence. `Session.start_indexed` derives the indexed startup from accepted public startup. `Session.RunAt` and `Checkpoint.ResumeAt` describe the actual returned outcomes; success and failure retain the exact returned indexed session.
+
+`RecursiveNamedPublicExecutionMeaning.actual_start` combines successful public compilation, opening and startup to recover the actual recipe preparation, original checked Source program and `StartAt` receipt. Its named evidence endpoints also carry the existing Source program outcome and heap relations through public success/failure and Word export.
+
+In `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds`:
+
+- `preserves_root` and `reflects_root` connect the existing mixed recursive body proof to the literal cached named root.
+- `public_run_succeeded_reflects` and `public_run_failed_reflects` retain the same staged Source application, native result/store, complete returned caller relation and actual public export session.
+- `public_word_preserved` gives successful public Word export at sufficient execution fuel and a positive output budget.
+
+The staged endpoints construct body execution proofs internally. They require exact startup, actual root selection, initialized owned state, represented arguments/heaps and authentic static family support. They preserve staged failures without converting rejection to a Dynamic semantic fault. Public export metadata and the receiving body's metadata retain separate receipts. Complete initialization and compiler-grammar coverage remain integration obligations.
+
+Strict Lean checks, full build, registered tests, kernel policy and independent review pass. The checked semantic endpoints use only the standard three axioms. Committed in `6199f27d` and `a3d8877f`.
+
 ## Connected ordinary sequence callers (2026-10-12)
 
 Committed in `80a41cf5`. `CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.preserves_compiled` and `reflects_compiled` now connect actual preparation and retained compiler recipes to the existing recursive caller/body proof.
@@ -49,7 +67,7 @@ For ordinary closure Associations, the consumer obtains its scope from the actua
 
 Principal Associations retain their original dependent packet/support pair, so method owners are not incorrectly treated as ordinary function owners. Named support, supported sequence grammar, original typing and metadata, retained compiler policy, diagnostic interpretation, and heap/admission conditions remain explicit. This closes a supported caller connection; it does not establish all-program coverage.
 
-Further work prioritizes consumers: connect the actual public start/resume path to Source outcomes, then extend the same connected family where needed. Generalized-cell drafts are deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
+The cached-root and public outcome connection is recorded above. Further work prioritizes initialization and compiler coverage for that same family. Generalized-cell drafts remain deferred until a concrete consumer needs them. New helper counts are not used to increase the progress estimate.
 
 Validation: strict Lean compilation, full build, registered tests, repository kernel policy, and independent review pass. Both final theorem axiom lists contain only `propext`, `Classical.choice` and `Quot.sound`.
 
