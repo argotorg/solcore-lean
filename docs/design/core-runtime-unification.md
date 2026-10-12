@@ -10,12 +10,32 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest normally verified implementation commits | `9181cd2b` and `708e3f8b`. Nested named and builtin handles connect to public semantics. |
-| Latest completed normal verification | Strict Lean, full build (5971 jobs), the focused public runtime regression, all registered tests, kernel policy and independent review passed. Axiom checks: The eleven checked encoding, leaf, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
-| Working implementation | Public success/failure reflection and Word preservation derive the initial owned state, stable rows, global references, heap relations and argument typing/representation internally. |
-| Latest proof scope | Supported ordinary bodies after finite bootstrap resumption and state-preserving issuance. Arbitrary finite argument lists may contain named/builtin handles inside products, constructor payloads and ordered mapping keys or values. Exact raw types, original order, duplicates and the genuine receiving registry extension remain explicit. |
-| Current implementation priority | Connect closure inputs; extend the initial-state connection to restored or previously executed sessions; derive remaining static body coverage from compiler output. Add helpers when a concrete consumer needs them. |
+| Latest normally verified implementation commits | `62001b99` and `f950c96c`. Returned closure inputs connect to public semantics with their reached captures and heap. |
+| Latest completed normal verification | Strict Lean, full build (5978 jobs), all registered tests, kernel policy and independent review passed. Twelve checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
+| Working implementation | Public success/failure reflection and Word preservation derive caller, heap and input conditions from fresh initialization or the preceding successful semantic result. Returned closures retain their complete capture and reached state. |
+| Latest proof scope | Supported ordinary bodies. Fresh sessions admit nested named/builtin inputs. A preceding proved success admits the same returned closure at any finite number of positions inside data and argument lists, after optional state-preserving issuance. Both calls use the same receiving model/registry and retain exact raw input certificates. |
+| Current implementation priority | Retain several earlier exported handles across intervening executions and combine them with issued functions; connect restored sessions and receiving-model changes; derive remaining static body coverage from compiler output. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Returned closure inputs (2026-10-12)
+
+Code commits: `62001b99` and `f950c96c`.
+
+The public semantic connection now continues from a preceding successful call that returns a function handle. The next call can receive arbitrary finite lists of independently typed data and repeated occurrences of that same returned function. Those occurrences may appear inside products, constructor payload vectors and ordered mapping keys or values. Exact raw types, comptime wrappers, proxy annotations, payload order and duplicate mapping keys are retained.
+
+The preceding call supplies both its actual native success receipt and full semantic `ResultAt`. `SucceededResultAt.reimports`, `reimports_payload` and `reimports_function_after` recover the original exported payload with its actual handle registry and complete captured references. `RecursiveNamedPublicReturnedValues.returned_value` extracts Source meaning, the reached owned caller, stable histories, heap typing and representation from the same returned semantic result. `header_context_supports` derives transport between the actual Source declaration contexts. `RecursiveNamedPublicReturnedSessionInputs.StartAt.after_succeeded` identifies the next startup with the preceding returned store and world.
+
+`RecursiveNamedPublicReturnedInputs` describes the ordered arguments independently of their native representations. The argument producer combines those descriptions with the previous result and the actual nested encoder. `CallableIndexedOwnedPreparedStagedReturnedFunctionPublicBounds` consumes the produced arguments in public success/failure reflection and Word preservation. The endpoints retain the reached Source heap, location map, native store, caller relation and complete resulting `ResultAt`. Initialization is not replayed. The immutable global references come from genuine finite inventory membership and the fixed prepared environment.
+
+Both calls currently use the same function model, body registry and receiving registry. The next encoder's genuine extension to that registry remains explicit for metadata-bearing arguments. The exact prior success and semantic result, raw input certificates, valid constructor metadata and supported static body family also remain premises. Between the returned completion and the next startup, the connection permits a finite sequence of actual state-preserving named/builtin issuances.
+
+The returned-input certificate covers one returned function identity, reused any finite number of times alongside data. It does not yet combine several independently exported old handles or mix that returned handle with additional issued function inputs. Arbitrary intervening executions, restored sessions, changes of receiving model/registry, complete static body coverage, broader compiler grammar and final all-pass composition remain unfinished. Progress estimates are unchanged.
+
+The public runtime regression exercises broader behavior: it allocates an independent closure, mutates an older closure, then issues named and builtin handles before passing them together in nested carriers. Two occurrences of the older closure share its current captured state, and duplicate mapping keys select the first entry. The call returns `81`; subsequent calls observe the original capture at `29` and the independent capture at `101`. These are runtime checks for preserved mutation and aliasing. They do not instantiate the narrower theorem for multiple independent handles and arbitrary intervening execution.
+
+Validation: Strict Lean, full build (5978 jobs), all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The twelve checked reimport, returned-state, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
 ### Nested named and builtin inputs (2026-10-12)
 

@@ -25,10 +25,30 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes with initial state derived from actual fresh bootstrap and finite resumption. Finite input lists support named/builtin handles inside products, constructor payloads and ordered mapping keys or values under exact raw typing and the genuine receiving metadata extension. Closure inputs, restored/used sessions, complete static coverage, broader grammar and all-pass composition remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | The supported ordinary family reaches public outcomes from fresh bootstrap or a preceding proved success. The latter admits repeated/nested uses of one returned closure with its reached captures and heap, after optional issuance and under the same receiving model/registry. Several old handles, arbitrary intervening execution, restored sessions, full static coverage, broader grammar and all-pass composition remain unfinished. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Returned closure input connection (2026-10-12)
+
+Code commits: `62001b99` and `f950c96c`.
+
+The public semantic connection now continues from a preceding successful call that returns a function handle. The next call can receive arbitrary finite lists of independently typed data and repeated occurrences of that same returned function. Those occurrences may appear inside products, constructor payload vectors and ordered mapping keys or values. Exact raw types, comptime wrappers, proxy annotations, payload order and duplicate mapping keys are retained.
+
+The preceding call supplies both its actual native success receipt and full semantic `ResultAt`. `SucceededResultAt.reimports`, `reimports_payload` and `reimports_function_after` recover the original exported payload with its actual handle registry and complete captured references. `RecursiveNamedPublicReturnedValues.returned_value` extracts Source meaning, the reached owned caller, stable histories, heap typing and representation from the same returned semantic result. `header_context_supports` derives transport between the actual Source declaration contexts. `RecursiveNamedPublicReturnedSessionInputs.StartAt.after_succeeded` identifies the next startup with the preceding returned store and world.
+
+`RecursiveNamedPublicReturnedInputs` describes the ordered arguments independently of their native representations. The argument producer combines those descriptions with the previous result and the actual nested encoder. `CallableIndexedOwnedPreparedStagedReturnedFunctionPublicBounds` consumes the produced arguments in public success/failure reflection and Word preservation. The endpoints retain the reached Source heap, location map, native store, caller relation and complete resulting `ResultAt`. Initialization is not replayed. The immutable global references come from genuine finite inventory membership and the fixed prepared environment.
+
+Both calls currently use the same function model, body registry and receiving registry. The next encoder's genuine extension to that registry remains explicit for metadata-bearing arguments. The exact prior success and semantic result, raw input certificates, valid constructor metadata and supported static body family also remain premises. Between the returned completion and the next startup, the connection permits a finite sequence of actual state-preserving named/builtin issuances.
+
+The returned-input certificate covers one returned function identity, reused any finite number of times alongside data. It does not yet combine several independently exported old handles or mix that returned handle with additional issued function inputs. Arbitrary intervening executions, restored sessions, changes of receiving model/registry, complete static body coverage, broader compiler grammar and final all-pass composition remain unfinished. Progress estimates are unchanged.
+
+The public runtime regression exercises broader behavior: it allocates an independent closure, mutates an older closure, then issues named and builtin handles before passing them together in nested carriers. Two occurrences of the older closure share its current captured state, and duplicate mapping keys select the first entry. The call returns `81`; subsequent calls observe the original capture at `29` and the independent capture at `101`. These are runtime checks for preserved mutation and aliasing. They do not instantiate the narrower theorem for multiple independent handles and arbitrary intervening execution.
+
+Validation: Strict Lean, full build (5978 jobs), all registered tests, kernel policy and independent review passed.
+
+Axiom checks: The twelve checked reimport, returned-state, argument and public endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
 ### Nested named and builtin input connection (2026-10-12)
 

@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Latest verified proof interfaces (2026-10-12)
 
-The latest nested-input connection, `9181cd2b` and `708e3f8b`, extends mixed input lists to named and builtin handles inside arbitrary finite products, constructor payload vectors and ordered mapping keys or values. It consumes the same public success/failure and Word endpoints as the mixed-input connection. Exact raw input types, actual issuance provenance, the genuine receiving metadata extension and supported static body facts remain explicit.
+The latest returned-closure connection, `62001b99` and `f950c96c`, uses a preceding successful public execution and its complete semantic result to admit repeated or nested uses of the same returned function. Its captured environment and reached heap feed all three public endpoints. The earlier fresh-session connection (`9181cd2b`, `708e3f8b`) continues to admit nested named/builtin inputs. Exact raw types, genuine metadata extensions and supported static body facts remain explicit.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,28 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Returned closure inputs (2026-10-12)
+
+Code commits: `62001b99` and `f950c96c`.
+
+The connection consumes the preceding public success's `SucceededResultAt` and full `CallableIndexedOwnedPreparedStagedTerminalNamedInvocationBounds.ResultAt`. The earlier public success endpoint returns both receipts for the same native result and store. Use its Source invocation context as that Header's `function.context`; `header_context_supports first first` derives the required body-to-declaration support. The previous raw request is retained through `Checkpoint.ResultTypeAt`, obtainable from the original `StartAt.original.result_type_at` and `RecursiveNamedPublicRootSourceSignature.inputs_and_result`.
+
+The receipts are consumed in this order:
+
+1. `SucceededResultAt.reimports_payload` recovers the complete exported native payload at the exact raw result type. `reimports_function_after` carries it through an actual `Session.IssuanceChain`, independently of the next input-validation budget.
+2. `RecursiveNamedPublicReturnedValues.returned_value` obtains the corresponding Source value, value/heap representation, actual returned caller, caller relation, stable histories and deep Source typing. Captured environments come from this semantic result.
+3. `header_context_supports` derives transport into the next Header's Source context. `StartAt.after_succeeded` fixes the next startup's store/world to the returned native state. The location map and Source heap remain the previous result's values.
+4. `RecursiveNamedPublicReturnedInputs.Inputs` describes the new ordered public arguments. Its `returned` leaf reuses the exact prior public/Source value; `data` keeps independent raw typing and interpretation. Products, constructor vectors, ordered mappings and comptime wrappers recurse over those leaves.
+5. `RecursiveNamedPublicReturnedEncoding.Input.meaning` and `StartAt.returned_arguments_receiving` follow the actual encoder and construct the whole argument relation and Source typing at the current heap. No arbitrary leaf-meaning callback is required by the final producer.
+
+`CallableIndexedOwnedPreparedStagedReturnedFunctionPublicBounds` exposes `public_run_succeeded_reflects`, `public_run_failed_reflects` and `public_word_preserved`. Its input certificate has the form `∀ source, previousOutcome = .value source → Inputs ... (arguments source)`: the argument description may place the actual returned Source closure at several positions without choosing a different capture. Each conclusion retains that same argument list, the relation from the prior caller, and the complete next `ResultAt`. Successful and failed public runs retain their real returned public sessions. Word preservation retains independent input/output budgets and a sufficient native fuel bound.
+
+Both executions currently use the same function model, body registry and receiving registry. The next startup's `Extends encodedValues.registry receiving` remains explicit. The previous full semantic result, actual success, exact raw request/input certificates, valid constructor metadata and supported body family are required. The current continuation accepts one returned function identity, reused alongside data, with optional actual issuance steps before startup. Several independently exported old functions, mixing with additional issued function inputs, arbitrary intervening execution, restored sessions and changes of receiving model/registry remain open.
+
+The runtime regression is broader: it checks old and independently allocated closures together with named/builtin handles after intervening mutation. Results `81`, `29` and `101` check shared capture, returned mutation, duplicate-key selection and independent allocation. These runtime checks do not prove the still-open multi-handle continuation case.
+
+Validation: Strict Lean, full build (5978 jobs), all registered tests, kernel policy and independent review passed. The twelve checked proof endpoints use only `propext`, `Classical.choice` and `Quot.sound`.
 
 ## Nested function inputs (2026-10-12)
 
