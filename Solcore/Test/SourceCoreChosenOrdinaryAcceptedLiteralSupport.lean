@@ -59,14 +59,15 @@ original Produced value and its original diagnostic issuer. -/
 theorem body_inputs_at_produced
     (diagnosticsEq : produced.diagnostics = effectiveDiagnostics fixture.packet.compiled fixture.packet.diagnostics)
     (samePolicy : produced.site.code.policy = root.root.selected.policy)
-    (sameView : produced.site.code.view = source caller.named) :
+    (sameView : produced.site.code.view = source caller.named)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named) :
     Nonempty (PlaceDiagnosticBodyInputs produced root) := by
   obtain ⟨sameParameters, sameResult, sameStatements⟩ := produced_shape fixture atHeader produced
   subst parameters
   subst result
   subst statements
   exact SourceCoreChosenOrdinaryAcceptedIssuedShell.body_inputs fixture atHeader shape metadata inventory
-    root produced diagnosticsEq samePolicy sameView
+    root produced diagnosticsEq samePolicy sameView bodyReasons
 
 include atHeader in
 /-- Every genuine singleton return input identifies the same approved literal. -/
@@ -110,7 +111,7 @@ theorem domain_at_support (environment : Dynamic.Environment)
       (receipt.formation.support environment).body.readFuel currentContext [] currentScope
       (SourceCoreChosenOrdinaryAcceptedCatalogFacts.headers caller) := by
   obtain ⟨inputs⟩ := body_inputs_at_produced fixture atHeader receipt.formation.produced shape metadata inventory
-    root receipt.diagnostics_eq samePolicy sameView
+    root receipt.diagnostics_eq samePolicy sameView receipt.formation.bodyReasons
   have literal := approved_is_literal fixture atHeader receipt.formation.produced root inputs
   have domain := SourceCoreChosenOrdinaryAcceptedLiteralDomainGlobals.domain_at fixture atHeader selected checked
     inventory root receipt.formation.produced inputs currentContext currentScope runtime.signatures

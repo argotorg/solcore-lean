@@ -2,7 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambda
 
 /-! The original outer contextual bind fixes the full policy and body recipe.
 The same named Compilation witness remains inside Prop at the actual Code.
-Compatible reads use prepared.fuel; the special callback uses Code.fuel.
+Compatible reads use prepared.fuel; the special callback keeps its original
+root fuel when a nested child is compiled at a smaller budget.
 No execution law or second accepted-policy selection is an input. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -83,27 +84,28 @@ structure PolicyRecipe
   leafLowerer : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer
     (SourceCoreCompatibleValues.Context.initial checked)
 
-/-- The body and complete policy use one witness, at the same Code and root fuel. -/
+/-- The body and complete policy use one original compilation. The policy keeps
+its own root fuel when the same callback compiles a child at a smaller budget. -/
 def Retained (named : Named) (code : Code prepared function scope administrative) : Prop :=
   ∃ (diagnostics : SourceCoreDataPlaceFaultSites.Program) (namedCode : Expr)
-    (compilation : Compilation prepared named diagnostics namedCode),
+    (compilation : Compilation prepared named diagnostics namedCode) (rootFuel : Nat),
     CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation code ∧
-      PolicyRecipe compilation code.fuel code.policy ∧ code.compilation = context prepared named
+      PolicyRecipe compilation rootFuel code.policy ∧ code.compilation = context prepared named
 
 /-- Retain only the actual witness passed by the producer. -/
 theorem Retained.of_recipes
     (compilation : Compilation prepared named diagnostics namedCode)
-    {code : Code prepared function scope administrative}
+    {code : Code prepared function scope administrative} {rootFuel : Nat}
     (body : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation code)
-    (policy : PolicyRecipe compilation code.fuel code.policy)
+    (policy : PolicyRecipe compilation rootFuel code.policy)
     (sameCompilation : code.compilation = context prepared named) : Retained named code :=
-  ⟨diagnostics, namedCode, compilation, body, policy, sameCompilation⟩
+  ⟨diagnostics, namedCode, compilation, rootFuel, body, policy, sameCompilation⟩
 
 /-- Existing body-recipe consumers can forget the additional policy equations. -/
 theorem Retained.body_recipe {code : Code prepared function scope administrative}
     (retained : Retained named code) :
     CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code := by
-  obtain ⟨diagnostics, namedCode, compilation, body, _policy, _sameCompilation⟩ := retained
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, body, _policy, _sameCompilation⟩ := retained
   exact CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation body
 
 /-- The compatible read profile is global and keeps the original prepared fuel. -/
@@ -111,7 +113,7 @@ theorem Retained.lowerRead {code : Code prepared function scope administrative}
     (retained : Retained named code) :
     code.policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead prepared.fuel
       (SourceCoreCompatibleValues.Context.initial checked) := by
-  obtain ⟨diagnostics, namedCode, compilation, _body, policy, _sameCompilation⟩ := retained
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, policy, _sameCompilation⟩ := retained
   exact policy.lowerRead
 
 /-- The literal compatible leaf callback is retained without choosing another policy. -/
@@ -119,7 +121,7 @@ theorem Retained.leafLowerer {code : Code prepared function scope administrative
     (retained : Retained named code) :
     code.policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer
       (SourceCoreCompatibleValues.Context.initial checked) := by
-  obtain ⟨diagnostics, namedCode, compilation, _body, policy, _sameCompilation⟩ := retained
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, policy, _sameCompilation⟩ := retained
   exact policy.leafLowerer
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes

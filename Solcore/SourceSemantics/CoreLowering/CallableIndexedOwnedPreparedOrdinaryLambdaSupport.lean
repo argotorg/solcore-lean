@@ -30,6 +30,7 @@ structure Produced (named : Named) (parameters : List TypedBinder) (result : Typ
   binderPolicy : BinderPolicy named site.code
 
   recipe : BodyRecipe compilation site.code
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
 
 /-- This calls the original contextual producer once and keeps its exact
 selected Site and policy equation together. -/
@@ -60,10 +61,10 @@ theorem of_contextual
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced (compiled := compiled) named parameters result body sourceContext evidence
       scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, recipe⟩ := CallableIndexedLambdaGeneration.of_contextual_with_body_recipe
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩ := CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
     compiled.indexed compilation record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
     found form owner requirements coercions ordinary read accepted typed
-  exact ⟨⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe⟩⟩
+  exact ⟨⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩⟩
 
 
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
@@ -163,6 +164,11 @@ inductive PreparedAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
       (body : JointBody compilation site.code (Program.ofChecked compiled.sourceProgram) expressionSyntax certificates
         diagnosticPolicy issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault)
       (binderPolicy : BinderPolicy caller.named site.code)
+      (compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code)
+      (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView site.code)
+      (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons site.code caller.named)
+      (declarations : CompatibleExpressionReads.ScopeDeclarations
+        (CallableIndexedNamedGeneration.source caller.named) scope context)
       (environment : Dynamic.Environment) :
       PreparedAt (RecursiveNamedLambdaFormationHeads.recaptureCode (values := .initial compiled.compatible.checked)
         (indexed := compiled.indexed) site.code environment)
@@ -173,7 +179,7 @@ theorem PreparedAt.projected_bindings (receipt : PreparedAt code support) :
     ∀ binding ∈ code.receipt.loweredParameters,
       compiled.compatible.checked.catalog.project binding.1.scheme.body = .ok binding.2 := by
   cases receipt with
-  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy environment =>
+  | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy body binderPolicy compilerPolicy bodyView bodyReasons declarations environment =>
     exact CallableIndexedOwnedLambdaBinderProjections.Site.projected_bindings site binderPolicy body.extended
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryLambdaSupport

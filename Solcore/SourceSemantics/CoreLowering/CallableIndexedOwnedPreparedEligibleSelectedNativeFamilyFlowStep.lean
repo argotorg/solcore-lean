@@ -171,7 +171,7 @@ theorem preserves_flow (budget : Nat)
   cases captured with
   | mk administrative canonical actualContext embedding represented agrees respects typed =>
     cases qualified with
-    | @actual caller member index selected rootFuel rootSource rootScope rootId rootReasonAt rootLowered root expressionSyntax sourceContext evidence scope id lowered node parameters result statements reported childFuel certificate receipt sameIssuer factory environment =>
+    | @actual caller member index selected rootFuel rootSource rootScope rootId rootReasonAt rootLowered root expressionSyntax sourceContext evidence scope id lowered node parameters result statements reported childFuel certificate receipt bodyReasons declarations sameIssuer factory environment =>
         obtain ⟨table, rebuilt, operands, unaries, interprets⟩ := receiving
         apply CallableIndexedOwnedPreparedNativeFamilyFlowStep.preserves_flow
           selected.compilation root expressionSyntax (some evidence)
@@ -210,7 +210,7 @@ theorem reflects_flow (budget : Nat)
   cases captured with
   | mk administrative canonical actualContext embedding represented agrees respects typed =>
     cases qualified with
-    | @actual caller member index selected rootFuel rootSource rootScope rootId rootReasonAt rootLowered root expressionSyntax sourceContext evidence scope id lowered node parameters result statements reported childFuel certificate receipt sameIssuer factory environment =>
+    | @actual caller member index selected rootFuel rootSource rootScope rootId rootReasonAt rootLowered root expressionSyntax sourceContext evidence scope id lowered node parameters result statements reported childFuel certificate receipt bodyReasons declarations sameIssuer factory environment =>
         obtain ⟨table, rebuilt, operands, unaries, interprets⟩ := receiving
         apply CallableIndexedOwnedPreparedNativeFamilyFlowStep.reflects_flow
           selected.compilation root expressionSyntax (some evidence)

@@ -76,12 +76,13 @@ theorem body_inputs
     (diagnosticsEq : produced.diagnostics =
       effectiveDiagnostics fixture.packet.compiled fixture.packet.diagnostics)
     (samePolicy : produced.site.code.policy = root.root.selected.policy)
-    (sameView : produced.site.code.view = source caller.named) :
+    (sameView : produced.site.code.view = source caller.named)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named) :
     Nonempty (PlaceDiagnosticBodyInputs produced root) := by
   obtain ⟨issued, assignments, places⟩ :=
     issued_at_produced fixture atHeader inventory produced diagnosticsEq
   exact SourceCoreChosenOrdinaryAcceptedLiteralInputs.body_inputs
-    fixture atHeader shape metadata root produced issued assignments places samePolicy sameView
+    fixture atHeader shape metadata root produced issued assignments places samePolicy sameView bodyReasons
 
 include atHeader shape metadata inventory in
 /-- One original issuer and the actual static inputs construct the same body's shell. -/
@@ -90,12 +91,13 @@ theorem shell
       effectiveDiagnostics fixture.packet.compiled fixture.packet.diagnostics)
     (samePolicy : produced.site.code.policy = root.root.selected.policy)
     (sameView : produced.site.code.view = source caller.named)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
     (readFuel : Nat) :
     ∃ inputs : PlaceDiagnosticBodyInputs produced root,
       Nonempty (CallableIndexedOwnedPreparedMixedBodyCompilerFactory.SiteShell
         (approved produced root inputs) produced) := by
   obtain ⟨inputs⟩ := body_inputs fixture atHeader shape metadata inventory root produced
-    diagnosticsEq samePolicy sameView
+    diagnosticsEq samePolicy sameView bodyReasons
   exact ⟨inputs, literal_shell produced root inputs readFuel⟩
 
 end Tests.SourceCoreChosenOrdinaryAcceptedIssuedShell

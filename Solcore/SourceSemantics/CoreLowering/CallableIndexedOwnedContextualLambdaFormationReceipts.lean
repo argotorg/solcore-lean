@@ -22,6 +22,11 @@ structure OrdinaryFormation
       (registry := registry) (faults := faults) caller context evidence scope id lowered where
   binderPolicy : BinderPolicy caller.named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code
+  bodyView : BodyView site.code
+  bodyReasons : BodyReasons site.code caller.named
+  declarations : CompatibleExpressionReads.ScopeDeclarations
+    (CallableIndexedNamedGeneration.source caller.named) scope context
   syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
     (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
     (.statements true statements) result
@@ -35,6 +40,8 @@ structure PrincipalFormation {method : ExecutableImplMethods.CheckedMethod}
       (registry := registry) (faults := faults) principal context scope id lowered where
   binderPolicy : BinderPolicy principal.named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained principal.named site.code
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained principal.named site.code
+  bodyView : BodyView site.code
 
 theorem OrdinaryFormation.at
     {caller : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
@@ -44,7 +51,7 @@ theorem OrdinaryFormation.at
     (environment : Dynamic.Environment) :
     OrdinaryAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured caller receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment
 
 theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     {principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method}
@@ -54,7 +61,7 @@ theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     (environment : Dynamic.Environment) :
     PrincipalAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured principal receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.syntaxTree environment
 
 /-- Actual producer selection and independently accepted same-Site body
 receipts construct the ordinary certificate without choosing another head. -/
@@ -70,6 +77,10 @@ def ordinary_of_producer
     (certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate)
     (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
       expressionSyntax certificates produced.site.code (Program.ofChecked compiled.sourceProgram) registry faults)
+    (bodyView : BodyView produced.site.code)
+    (bodyReasons : BodyReasons produced.site.code caller.named)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations
+      (CallableIndexedNamedGeneration.source caller.named) scope context)
     (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
       (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
       (.statements true statements) result)
@@ -92,6 +103,10 @@ def ordinary_of_producer
   coercions := coercions
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
+  compilerPolicy := produced.compilerPolicy
+  bodyView := bodyView
+  bodyReasons := bodyReasons
+  declarations := declarations
   syntaxTree := syntaxTree
 
 /-- The principal certificate keeps its own Source dictionary and exact
@@ -107,6 +122,7 @@ def principal_of_producer {method : ExecutableImplMethods.CheckedMethod}
     (certificates : Nat → TypedSource → SourceSemantics.Context → GenericExpressionMeaning.Certificate)
     (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
       expressionSyntax certificates produced.site.code (Program.ofChecked compiled.sourceProgram) registry faults)
+    (bodyView : BodyView produced.site.code)
     (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source principal.named)
       (expressionSyntax (CallableIndexedNamedGeneration.source principal.named)) body.context
       (.statements true statements) result)
@@ -129,6 +145,8 @@ def principal_of_producer {method : ExecutableImplMethods.CheckedMethod}
   coercions := coercions
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
+  compilerPolicy := produced.compilerPolicy
+  bodyView := bodyView
   syntaxTree := syntaxTree
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts

@@ -39,9 +39,10 @@ variable {caller : Header compiled (Program.ofChecked compiled.sourceProgram)} {
   (covers : evidence.Covers context)
   (ownership : LocalIdentityOwnership (source caller.named))
   (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope context)
+  (sameReason : rootReasonAt = selected.diagnostics.program.reasonAt caller.named.signature.key)
   (sameLedger : context.solvedRequirements = (CallableIndexedNamedGeneration.context compiled.indexed caller.named).solvedRequirements)
 
-include profile runtime covers ownership declarations sameLedger in
+include profile runtime covers ownership declarations sameReason sameLedger in
 /-- The compiler creates the Receipt once. The static factory is selected only
 at that literal generated Receipt and exact selected issuer identity. -/
 theorem of_compiler {children : GenericExpressionMeaning.Certificate}
@@ -69,7 +70,8 @@ theorem of_compiler {children : GenericExpressionMeaning.Certificate}
     selected root expressionSyntax profile runtime covers ownership declarations sameLedger
     certificate found form sourceTyped coercions accepted raw finite
   exact .actual allowed found form certificate accepted sourceTyped metadata raw finite
-    receipt sameIssuer (occurrences receipt sameIssuer)
+    receipt (CallableIndexedOwnedContextualLambdaProvenance.BodyReasons.of_issued selected.found
+      (receipt.reason.trans sameReason)) declarations sameIssuer (occurrences receipt sameIssuer)
 end Ordinary
 
 namespace Principal

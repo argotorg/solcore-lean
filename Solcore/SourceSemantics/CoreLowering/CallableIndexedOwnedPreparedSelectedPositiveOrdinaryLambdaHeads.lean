@@ -61,6 +61,8 @@ inductive Lambdas (children : GenericExpressionMeaning.Certificate) : GenericExp
       (finite : FiniteBodyReceipts (source caller.named) (expressionSyntax (source caller.named))
         context parameters result statements)
       (receipt : Receipt root expressionSyntax certificate (sourceContext := context) (evidence := evidence))
+      (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons receipt.site.code caller.named)
+      (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope context)
       (sameIssuer : receipt.shell.issued =
         CallableIndexedOwnedPreparedNativeSiteShellReceipts.issued_at_site selected receipt.site)
       (factory : CallableIndexedOwnedPreparedNativeFamilyStaticQualification.OccurrenceFactory
@@ -79,7 +81,7 @@ theorem Lambdas.to_native_heads
         (SourceCoreLocalCell.coreContext childScope ++ CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix»
           (compiled := compiled) caller.named) lowered.expression compiled.indexed.layouts.definitions := by
   cases head with
-  | actual allowed found form certificate accepted typed metadata raw finite receipt sameIssuer factory =>
+  | actual allowed found form certificate accepted typed metadata raw finite receipt bodyReasons sourceDeclarations sameIssuer factory =>
       exact ⟨.lambda allowed found form certificate accepted typed metadata, ⟨_, raw⟩⟩
 
 variable
@@ -156,7 +158,7 @@ theorem preserves_at (size : Nat) :
   intro childScope id lowered certified node found sourceTyped mapping world administrative environment canonical actual actualContext
     before store ξ outcome after environments heaps locals agrees typed initial admitted trace
   cases certified with
-  | @actual childFuel id lowered actualNode parameters sourceResult statements reported nativeType allowed actualFound form certificate accepted parentTyped metadata raw finite receipt sameIssuer factory =>
+  | @actual childFuel id lowered actualNode parameters sourceResult statements reported nativeType allowed actualFound form certificate accepted parentTyped metadata raw finite receipt bodyReasons sourceDeclarations sameIssuer factory =>
     let captured := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Ordinary.captured
       owner complete environments agrees typed caller initial.1 initial.2
     have sameEmbedding : captured.embedding = ξ := rfl
@@ -167,7 +169,7 @@ theorem preserves_at (size : Nat) :
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) caller.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
     have qualified : (nativeFacet).ordinary code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt sameIssuer factory environment
+      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory environment
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=
@@ -225,7 +227,7 @@ theorem reflects_at (size : Nat) :
   intro childScope id lowered certified node found sourceTyped mapping world administrative environment canonical actual actualContext
     before store ξ result finalStore environments heaps locals agrees typed initial admitted completed
   cases certified with
-  | @actual childFuel id lowered actualNode parameters sourceResult statements reported nativeType allowed actualFound form certificate accepted parentTyped metadata raw finite receipt sameIssuer factory =>
+  | @actual childFuel id lowered actualNode parameters sourceResult statements reported nativeType allowed actualFound form certificate accepted parentTyped metadata raw finite receipt bodyReasons sourceDeclarations sameIssuer factory =>
     let captured := CallableIndexedOwnedPreparedCanonicalCaptureReceipts.Ordinary.captured
       owner complete environments agrees typed caller initial.1 initial.2
     have sameEmbedding : captured.embedding = ξ := rfl
@@ -236,7 +238,7 @@ theorem reflects_at (size : Nat) :
         (CallableIndexedOwnedPreparedCanonicalCaptureReceipts.«prefix» (compiled := compiled) caller.named))
       receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body).recapture environment
     have qualified : (nativeFacet).ordinary code support :=
-      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt sameIssuer factory environment
+      CallableIndexedOwnedPreparedSelectedNativeFamilyQualification.Ordinary.actual (compiled := compiled) member selected root expressionSyntax certificate receipt bodyReasons sourceDeclarations sameIssuer factory environment
     have identifier : code.id = id := receipt.identifier
     have emitted : code.lowered = lowered := receipt.emitted
     have sameNode : code.sourceNode = node :=

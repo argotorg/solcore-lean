@@ -21,6 +21,7 @@ structure Produced (named : Named) (parameters : List TypedBinder) (result : Typ
   emitted : site.code.lowered = lowered
   binderPolicy : BinderPolicy named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named site.code
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
 
 /-- The policy proof is attached to the same already selected producer Site. -/
 structure ProducedWithPolicy (named : Named) (parameters : List TypedBinder) (result : TypeSystem.Ty)
@@ -69,10 +70,11 @@ theorem of_contextual_with_policy
     identifier := identifier
     emitted := emitted
     binderPolicy := binderPolicy
-    recipe := CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.body_recipe policyRecipe }
+    recipe := CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.body_recipe policyRecipe
+    compilerPolicy := policyRecipe }
   exact ⟨{ produced := produced, policyRecipe := policyRecipe }⟩
 
-/-- The original producer interface forgets only its extra policy proof. -/
+/-- The original producer interface now retains its actual expression policy. -/
 theorem of_contextual
     {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation compiled.indexed named diagnostics namedCode)

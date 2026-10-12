@@ -111,11 +111,11 @@ theorem plain_provenance (prepared : PreparedAt code support) :
       (plain support actualSites sites) := by
   cases prepared with
   | recaptured caller compilation site expressionSyntax certificates issued diagnosticPolicy
-      body binderPolicy environment =>
+      body binderPolicy compilerPolicy bodyView bodyReasons declarations environment =>
     exact .recaptured caller site expressionSyntax certificates
       (bodyWith body actualSites sites) binderPolicy
       (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation body.recipe)
-      body.syntaxTree environment
+      compilerPolicy bodyView bodyReasons declarations body.syntaxTree environment
 
 section Flow
 variable

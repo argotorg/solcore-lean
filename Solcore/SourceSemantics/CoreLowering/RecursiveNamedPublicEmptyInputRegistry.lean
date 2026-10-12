@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSimpleInputRegistry
 
 /-! Empty public argument encoding preserves the original session's metadata
 registry. The receipt uses the actual startup encoder and retains its exact
@@ -18,20 +18,7 @@ theorem StartAt.empty_registry
     (started : RecursiveNamedPublicStartMeaning.StartAt session key [] fuel checkpoint recipe root
       world store native encodedValues)
     (atRegistry : session.RegistryAt registry) : encodedValues.registry = registry := by
-  obtain ⟨actualRoot, _found, _key, arity, encoded, accepted, _origin, _request, _world,
-    _initial, _slots, values⟩ := started.original
-  have noSource : actualRoot.inputs = [] := List.length_eq_zero_iff.mp arity
-  generalize nativeTypes : actualRoot.types = types at encoded accepted _initial values
-  cases types with
-  | nil =>
-    rw [noSource] at accepted
-    cases accepted
-    cases checkpoint
-    cases session
-    exact (congrArg SourceCoreCompatibleValues.Context.registry (started.values.symm.trans values)).trans atRegistry
-  | cons head tail =>
-    rw [noSource] at accepted
-    cases accepted
+  exact started.simple_registry atRegistry (by intro argument member; cases member)
 
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicStartMeaning

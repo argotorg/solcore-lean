@@ -120,6 +120,7 @@ structure PlaceDiagnosticBodyInputs where
   placeReasons : PlaceReasonsEq issued.diagnostics.program produced.diagnostics
   samePolicy : produced.site.code.policy = root.root.selected.policy
   canonical : produced.site.code.view = source caller.named
+  bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named
   typed : ExpressionHasType (source caller.named) sourceContext id produced.site.code.sourceNode.type
   lambdaCoercions : produced.site.code.sourceNode.coercions = []
   signatures : sourceContext.signatures = compiled.compatible.checked.signatures
@@ -229,6 +230,8 @@ theorem literal_shell (readFuel : Nat) : Nonempty (SiteShell (approved produced 
     frame := frame
     readFuel := readFuel
     canonical := canonical
+    bodyReasons := inputs.bodyReasons
+    declarations := inputs.declarations
     unique := unique
     sameLedger := ?_
     syntaxTree := syntaxTree

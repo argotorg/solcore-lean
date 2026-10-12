@@ -41,6 +41,7 @@ variable {caller : Header compiled (Program.ofChecked compiled.sourceProgram)} {
   (covers : evidence.Covers context)
   (ownership : LocalIdentityOwnership (source caller.named))
   (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope context)
+  (sameReason : rootReasonAt = selected.diagnostics.program.reasonAt caller.named.signature.key)
   (sameLedger : context.solvedRequirements = (CallableIndexedNamedGeneration.context compiled.indexed caller.named).solvedRequirements)
   {childFuel : Nat} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
   {parameters : List TypedBinder} {result : TypeSystem.Ty} {statements : List StatementId}
@@ -78,7 +79,7 @@ local notation "bridge" => CallableIndexedOwnedOrdinaryLambdaEntries.bridge (hea
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
   (CallableIndexedOwnedPreparedPositiveFunctionOrigins.functions nativeFacet headers keys bodyRegistry faults profile)
 
-include profile runtime covers ownership declarations sameLedger allowed found form certificate accepted sourceTyped
+include profile runtime covers ownership declarations sameReason sameLedger allowed found form certificate accepted sourceTyped
   metadata coercions raw finite occurrences member complete wellFormed owners in
 /-- One static Receipt construction precedes one genuine preserves runtime leaf. -/
 theorem preserves_at (size : Nat) :
@@ -87,7 +88,7 @@ theorem preserves_at (size : Nat) :
   have compiled : CallableIndexedOwnedPreparedSelectedPositiveOrdinaryLambdaHeads.Lambdas selected root expressionSyntax headers
       (context := context) (evidence := evidence) (scope := scope) (fun _ _ _ => False) scope id lowered :=
     CallableIndexedOwnedPreparedSelectedPositiveLambdaPackets.Ordinary.of_compiler selected root expressionSyntax headers profile runtime covers
-      ownership declarations sameLedger allowed found form certificate accepted sourceTyped metadata coercions raw finite occurrences
+      ownership declarations sameReason sameLedger allowed found form certificate accepted sourceTyped metadata coercions raw finite occurrences
   intro current expression code certified currentNode
   obtain ⟨rfl, rfl, rfl⟩ := certified
   exact CallableIndexedOwnedPreparedSelectedPositiveOrdinaryLambdaHeads.preserves_at
@@ -95,7 +96,7 @@ theorem preserves_at (size : Nat) :
     (wellFormed := wellFormed) (runtime := runtime) (covers := covers)
     selected root expressionSyntax headers owner size compiled (node := currentNode)
 
-include profile runtime covers ownership declarations sameLedger allowed found form certificate accepted sourceTyped
+include profile runtime covers ownership declarations sameReason sameLedger allowed found form certificate accepted sourceTyped
   metadata coercions raw finite occurrences member complete wellFormed owners in
 /-- One static Receipt construction precedes one genuine reflects runtime leaf. -/
 theorem reflects_at (size : Nat) :
@@ -104,7 +105,7 @@ theorem reflects_at (size : Nat) :
   have compiled : CallableIndexedOwnedPreparedSelectedPositiveOrdinaryLambdaHeads.Lambdas selected root expressionSyntax headers
       (context := context) (evidence := evidence) (scope := scope) (fun _ _ _ => False) scope id lowered :=
     CallableIndexedOwnedPreparedSelectedPositiveLambdaPackets.Ordinary.of_compiler selected root expressionSyntax headers profile runtime covers
-      ownership declarations sameLedger allowed found form certificate accepted sourceTyped metadata coercions raw finite occurrences
+      ownership declarations sameReason sameLedger allowed found form certificate accepted sourceTyped metadata coercions raw finite occurrences
   intro current expression code certified currentNode
   obtain ⟨rfl, rfl, rfl⟩ := certified
   exact CallableIndexedOwnedPreparedSelectedPositiveOrdinaryLambdaHeads.reflects_at

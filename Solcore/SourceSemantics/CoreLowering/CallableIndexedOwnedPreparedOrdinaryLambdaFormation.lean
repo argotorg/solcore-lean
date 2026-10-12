@@ -35,6 +35,10 @@ structure Formation (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
   body : CallableIndexedOwnedContextualLambdaJointStaticReceipts.JointBody produced.compilation produced.site.code
     (Program.ofChecked compiled.sourceProgram) expressionSyntax certificates diagnosticPolicy
     issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault
+  bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code
+  bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named
+  declarations : CompatibleExpressionReads.ScopeDeclarations
+    (CallableIndexedNamedGeneration.source caller.named) scope context
   sourceType : produced.site.code.sourceNode.type = FunctionValues.sourceType
     (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence [])
   ordinary : Dynamic.OrdinaryRequirementLayout produced.site.code.sourceNode.requirements produced.site.code.sourceNode.coercions []
@@ -60,7 +64,7 @@ def Formation.support {scope id lowered} (head : Formation caller context eviden
 theorem Formation.prepared {scope id lowered} (head : Formation caller context evidence scope id lowered)
     (environment : Dynamic.Environment) : PreparedAt (head.code environment) (head.support environment) :=
   .recaptured caller head.produced.compilation head.produced.site head.expressionSyntax head.certificates
-    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy environment
+    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy head.produced.compilerPolicy head.bodyView head.bodyReasons head.declarations environment
 end Seed
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}

@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedMethodLambdaSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaBinderProjections
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaBodyRecipes
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
 
 /-! Contextual provenance retains the original chosen Site, its real binder
 policy, production recipe and independent body Syntax. Constructor indices describe exactly the
@@ -22,6 +22,63 @@ def BinderPolicy {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope
   code.policy.lowerBinder = SourceCoreGeneralFunctions.contextualBinder
     ((CallableIndexedNamedGeneration.representation compiled.indexed).atContext named.signature.key [])
     compiled.indexed.base.locals named.signature.key []
+
+/-- Metadata for every expression reached from the original body is retained
+verbatim. Edits elsewhere in the source remain allowed. -/
+def BodyView {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} (code : Code compiled.indexed function scope administrative) : Prop :=
+  ∀ id, CallableLambdaBodyReachability.Reaches function.source
+    (function.body.map NodeId.statement) (.expression id) →
+    function.source.lookupExpression? id = code.view.lookupExpression? id
+
+theorem BodyView.of_eq {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    (same : code.view = function.source) : BodyView code := by
+  intro id _reached
+  rw [same]
+
+theorem BodyView.of_empty {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    (empty : function.body = []) : BodyView code := by
+  intro id reached
+  have none {node : NodeId} (path : CallableLambdaBodyReachability.Reaches function.source
+      (function.body.map NodeId.statement) node) : False := by
+    induction path with
+    | root member => simp only [empty, List.map_nil, List.not_mem_nil] at member
+    | expression _ _ _ ih => exact ih
+    | statement _ _ _ ih => exact ih
+  exact False.elim (none reached)
+
+/-- Reached reads keep the original token from the compiler's actual issuer. -/
+def BodyReasons {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} (code : Code compiled.indexed function scope administrative)
+    (named : CallableIndexedNamedGeneration.Named) : Prop :=
+  ∀ id, CallableLambdaBodyReachability.Reaches function.source
+    (function.body.map NodeId.statement) (.expression id) →
+    ∃ diagnostics : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked),
+      compiled.indexed.base.diagnostics = some diagnostics ∧
+      code.reasonAt id = diagnostics.program.reasonAt named.signature.key id
+
+theorem BodyReasons.of_issued {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {named : CallableIndexedNamedGeneration.Named}
+    {diagnostics : SourceCoreCompatibleDataPlaceFaultSites.Program (.initial compiled.compatible.checked)}
+    (issued : compiled.indexed.base.diagnostics = some diagnostics)
+    (same : code.reasonAt = diagnostics.program.reasonAt named.signature.key) : BodyReasons code named := by
+  intro id _reached
+  exact ⟨diagnostics, issued, congrFun same id⟩
+
+theorem BodyReasons.of_empty {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context} {code : Code compiled.indexed function scope administrative}
+    {named : CallableIndexedNamedGeneration.Named} (empty : function.body = []) : BodyReasons code named := by
+  intro id reached
+  have none {node : NodeId} (path : CallableLambdaBodyReachability.Reaches function.source
+      (function.body.map NodeId.statement) node) : False := by
+    induction path with
+    | root member => simp only [empty, List.map_nil, List.not_mem_nil] at member
+    | expression _ _ _ ih => exact ih
+    | statement _ _ _ ih => exact ih
+  exact False.elim (none reached)
 
 /-- This is the same complete principal support record used at formation. -/
 def principal_support {method : ExecutableImplMethods.CheckedMethod}
@@ -63,6 +120,11 @@ inductive OrdinaryAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
         expressionSyntax certificates site.code (Program.ofChecked compiled.sourceProgram) registry faults)
       (binderPolicy : BinderPolicy caller.named site.code)
       (recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code)
+      (compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code)
+      (bodyView : BodyView site.code)
+      (bodyReasons : BodyReasons site.code caller.named)
+      (declarations : CompatibleExpressionReads.ScopeDeclarations
+        (CallableIndexedNamedGeneration.source caller.named) scope context)
       (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
         (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
         (.statements true statements) result)
@@ -87,6 +149,8 @@ inductive PrincipalAt : {function : Dynamic.Closure} → {scope : SourceCoreLoca
         expressionSyntax certificates site.code (Program.ofChecked compiled.sourceProgram) registry faults)
       (binderPolicy : BinderPolicy principal.named site.code)
       (recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained principal.named site.code)
+      (compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained principal.named site.code)
+      (bodyView : BodyView site.code)
       (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source principal.named)
         (expressionSyntax (CallableIndexedNamedGeneration.source principal.named)) body.context
         (.statements true statements) result)
@@ -103,7 +167,7 @@ theorem OrdinaryAt.binder_policy
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
     (receipt : OrdinaryAt code support) : BinderPolicy support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact binderPolicy
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment => exact binderPolicy
 
 theorem OrdinaryAt.syntax
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
@@ -111,13 +175,13 @@ theorem OrdinaryAt.syntax
     GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
       support.body.context (.statements true function.body) function.resultType := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact syntaxTree
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment => exact syntaxTree
 
 theorem PrincipalAt.binder_policy
     {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
     (receipt : PrincipalAt code support) : BinderPolicy support.principal.named code := by
   cases receipt with
-  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact binderPolicy
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView syntaxTree environment => exact binderPolicy
 
 theorem PrincipalAt.syntax
     {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
@@ -125,7 +189,7 @@ theorem PrincipalAt.syntax
     GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
       support.body.context (.statements true function.body) function.resultType := by
   cases receipt with
-  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment => exact syntaxTree
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView syntaxTree environment => exact syntaxTree
 
 /-- The same original production recipe survives recapture at the ordinary seed. -/
 theorem OrdinaryAt.body_recipe
@@ -133,7 +197,7 @@ theorem OrdinaryAt.body_recipe
     (receipt : OrdinaryAt code support) :
     CallableIndexedOwnedContextualLambdaBodyRecipes.Retained support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
       exact recipe
 
 /-- Method provenance retains its own principal and the same production recipe. -/
@@ -142,7 +206,57 @@ theorem PrincipalAt.body_recipe
     (receipt : PrincipalAt code support) :
     CallableIndexedOwnedContextualLambdaBodyRecipes.Retained support.principal.named code := by
   cases receipt with
-  | recaptured principal site expressionSyntax certificates body binderPolicy recipe syntaxTree environment =>
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView syntaxTree environment =>
       exact recipe
+
+/-- The original actual expression policy remains attached to this same Code
+when captures are installed. It is not recovered from body compilation. -/
+theorem OrdinaryAt.policy_recipe
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained support.caller.named code := by
+  cases receipt with
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+      exact compilerPolicy
+
+theorem PrincipalAt.policy_recipe
+    {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
+    (receipt : PrincipalAt code support) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained support.principal.named code := by
+  cases receipt with
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView syntaxTree environment =>
+      exact compilerPolicy
+
+/-- Recapture preserves the exact original body lookups. -/
+theorem OrdinaryAt.body_view
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) : BodyView code := by
+  cases receipt with
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+      exact bodyView
+
+/-- Recapture retains the original named diagnostic tokens on all used reads. -/
+theorem OrdinaryAt.body_reasons
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) : BodyReasons code support.caller.named := by
+  cases receipt with
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+      exact bodyReasons
+
+/-- The captured scope retains its original Source binder declarations. -/
+theorem OrdinaryAt.scope_declarations
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) :
+    CompatibleExpressionReads.ScopeDeclarations function.source scope function.context := by
+  cases receipt with
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+      exact declarations
+
+theorem PrincipalAt.body_view
+    {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
+    (receipt : PrincipalAt code support) : BodyView code := by
+  cases receipt with
+  | recaptured principal site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView syntaxTree environment =>
+      exact bodyView
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaProvenance

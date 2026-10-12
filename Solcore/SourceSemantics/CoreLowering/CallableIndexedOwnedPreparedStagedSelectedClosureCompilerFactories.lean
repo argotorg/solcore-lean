@@ -59,6 +59,11 @@ def ordinary_support (environment : Dynamic.Environment) :
   (CallableIndexedOwnedOrdinaryLambdaSupport.Support.of_site
     caller produced.site expressionSyntax certificates body).recapture environment
 
+variable (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code)
+  (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
+  (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext)
+
+include bodyView bodyReasons declarations in
 /-- Source Syntax and the real binder policy remain original seed receipts. -/
 theorem provenance
     (syntaxTree : GenericImperativeMatch.Syntax (source caller.named)
@@ -68,7 +73,7 @@ theorem provenance
     OrdinaryAt (code produced environment) (ordinary_support produced body environment) :=
   .recaptured caller produced.site expressionSyntax certificates body produced.binder
     (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation produced.recipe)
-    syntaxTree environment
+    produced.compilerPolicy bodyView bodyReasons declarations syntaxTree environment
 
 /-- The retained compiler recipe survives recapture without an equality cast
 between different Codes or an assumption about a BodyWith expression callback. -/
@@ -238,6 +243,11 @@ variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProg
     (values := .initial compiled.compatible.checked) expressionSyntax certificates
     produced.site.code (Program.ofChecked compiled.sourceProgram) bodyRegistry semanticFaults)
 
+variable (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code)
+  (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
+  (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext)
+
+include bodyView bodyReasons declarations in
 /-- The ordinary Association is constructed on the literal recaptured Code,
 history and support. Its callback recipe remains available beside this object;
 the usual runtime capture and formation fields are not reconstructed from a
@@ -267,7 +277,7 @@ def association
     (function (caller := caller) (parameters := parameters) (result := result)
       (statements := statements) (sourceContext := sourceContext) (evidence := evidence) environment)
     scope actual owner captured (code produced environment) history (ordinary_support produced body environment)
-    origin prefixContext globals referenceIndex typed (provenance produced body syntaxTree environment)
+    origin prefixContext globals referenceIndex typed (provenance produced body bodyView bodyReasons declarations syntaxTree environment)
 
 variable {stages : Staging.Recursive.Registry}
   (owner : OwnedKey keys) (history : CallableIndexedLambdaValues.History (code produced environment))
@@ -290,7 +300,7 @@ closure with equal emitted payload. The Code and context reduce literally. -/
 def authority_for (choice : Choice produced environment stages)
     (conditions : Conditions produced body choice) :
     CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.ClosureAuthorityFor
-      (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
       choice.packet :=
   authority produced body choice conditions
 
@@ -300,15 +310,15 @@ def support_for (choice : Choice produced environment stages)
     (conditions : Conditions produced body choice)
     (ready : Ready produced body choice conditions) :
     CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.ClosureSupportFor
-      (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
       stages
       (CallableIndexedOwnedPreparedStagedSelectedTerminalCertificates.closureFor
-        (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+        (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
         choice.packet) :=
   CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.closure_support_for
-    (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+    (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
     choice.packet
-    (authority_for captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree choice conditions)
+    (authority_for captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree choice conditions)
     ready
 end Association
 

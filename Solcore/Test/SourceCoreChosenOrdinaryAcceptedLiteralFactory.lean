@@ -66,7 +66,8 @@ theorem inputs_syntax
 include atHeader shape metadata inventory in
 /-- One actual accepted action chooses its Site and builds the raw factory.
 No Produced, native typing, body input package or execution law is supplied. -/
-theorem chosen_at_root :
+theorem chosen_at_root
+    (originalReasons : reasonAt = fixture.packet.diagnostics.program.reasonAt fixture.packet.named.signature.key) :
     ∃ receipt : CallableIndexedOwnedPreparedOrdinaryLambdaCompilerReceipts.Receipt caller
         (effectiveDiagnostics fixture.packet.compiled fixture.packet.diagnostics) fixture.packet.namedCode compilation
         (runtimeContext fixture.packet) [] (initialScope fixture.packet) (expressionId fixture.packet 1) lowered,
@@ -114,8 +115,12 @@ theorem chosen_at_root :
       (fun produced inputs => InputProperty root.root (literalSyntax fixture) produced inputs ∧
         inputs.readFuel = fixture.packet.compiled.indexed.fuel)
       (fun produced diagnosticsEq _codeEq _compilationEq policyEq bodyEq _fuelEq viewEq reasonEq => by
+        have bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named := by
+          apply CallableIndexedOwnedContextualLambdaProvenance.BodyReasons.of_issued fixture.packet.diagnosticsFound
+          exact (reasonEq.trans originalReasons).trans
+            (congrArg (fun named : Named => fixture.packet.diagnostics.program.reasonAt named.signature.key) atHeader.named.symm)
         obtain ⟨bodyInputs, ⟨shell⟩⟩ := SourceCoreChosenOrdinaryAcceptedIssuedShell.shell
-          fixture atHeader shape metadata inventory root produced diagnosticsEq policyEq viewEq fixture.packet.compiled.indexed.fuel
+          fixture atHeader shape metadata inventory root produced diagnosticsEq policyEq viewEq bodyReasons fixture.packet.compiled.indexed.fuel
         have syntaxEq := inputs_syntax fixture atHeader root produced bodyInputs
         have shell : SiteShell (literalSyntax fixture) produced := syntaxEq ▸ shell
         let fixed : SiteShell (literalSyntax fixture) produced := {shell with readFuel := fixture.packet.compiled.indexed.fuel}
@@ -160,6 +165,7 @@ theorem chosen_initializer :
         ((effectiveDiagnostics fixture.packet.compiled fixture.packet.diagnostics).reasonAt fixture.packet.named.signature.key)
         fixture.calls.initializer)
     originalRoot atHeader.named.symm
-  exact ⟨actualCompilation, actualRoot, chosen_at_root fixture atHeader shape metadata inventory actualRoot⟩
+  exact ⟨actualCompilation, actualRoot, chosen_at_root fixture atHeader shape metadata inventory actualRoot
+    (by unfold effectiveDiagnostics; split <;> rfl)⟩
 
 end Tests.SourceCoreChosenOrdinaryAcceptedLiteralFactory

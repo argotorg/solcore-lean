@@ -23,8 +23,8 @@ theorem retained_recapture {code : Code prepared function scope administrative}
     CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named
       (RecursiveNamedLambdaFormationHeads.recaptureCode
         (values := .initial checked) (indexed := prepared) code environment) := by
-  obtain ⟨diagnostics, namedCode, compilation, body, policy, sameCompilation⟩ := retained
-  exact ⟨diagnostics, namedCode, compilation, body, policy, sameCompilation⟩
+  obtain ⟨diagnostics, namedCode, compilation, rootFuel, body, policy, sameCompilation⟩ := retained
+  exact ⟨diagnostics, namedCode, compilation, rootFuel, body, policy, sameCompilation⟩
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -91,6 +91,9 @@ def ordinary_of_produced_with_policy
     (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
       expressionSyntax certificates produced.produced.site.code
       (Program.ofChecked compiled.sourceProgram) registry faults)
+    (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.produced.site.code)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.produced.site.code caller.named)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope context)
     (syntaxTree : GenericImperativeMatch.Syntax (source caller.named)
       (expressionSyntax (source caller.named)) body.context (.statements true statements) result)
     (sourceType : produced.produced.site.code.sourceNode.type = FunctionValues.sourceType
@@ -99,7 +102,7 @@ def ordinary_of_produced_with_policy
       produced.produced.site.code.sourceNode.coercions [])
     (coercions : produced.produced.site.code.sourceNode.coercions = []) :
     OrdinaryWithPolicy (registry := registry) (faults := faults) caller context evidence scope id lowered where
-  toOrdinaryFormation := ordinary_of_producer caller produced.produced expressionSyntax certificates body
+  toOrdinaryFormation := ordinary_of_producer caller produced.produced expressionSyntax certificates body bodyView bodyReasons declarations
     syntaxTree sourceType ordinary coercions
   policyRecipe := produced.policyRecipe
 
@@ -118,6 +121,7 @@ def principal_of_produced_with_policy {method : ExecutableImplMethods.CheckedMet
     (body : CallableIndexedLambdaStaticBodySupport.BodyWith (values := .initial compiled.compatible.checked)
       expressionSyntax certificates produced.produced.site.code
       (Program.ofChecked compiled.sourceProgram) registry faults)
+    (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.produced.site.code)
     (syntaxTree : GenericImperativeMatch.Syntax (source principal.named)
       (expressionSyntax (source principal.named)) body.context (.statements true statements) result)
     (sourceType : produced.produced.site.code.sourceNode.type = FunctionValues.sourceType
@@ -127,7 +131,7 @@ def principal_of_produced_with_policy {method : ExecutableImplMethods.CheckedMet
       produced.produced.site.code.sourceNode.coercions [])
     (coercions : produced.produced.site.code.sourceNode.coercions = []) :
     PrincipalWithPolicy (registry := registry) (faults := faults) principal context scope id lowered where
-  toPrincipalFormation := principal_of_producer principal produced.produced expressionSyntax certificates body
+  toPrincipalFormation := principal_of_producer principal produced.produced expressionSyntax certificates body bodyView
     syntaxTree sourceType ordinary coercions
   policyRecipe := produced.policyRecipe
 

@@ -78,6 +78,8 @@ structure SiteInputs
   changed : List ExpressionId
   edited : LocalView (source caller.named) produced.site.code.view changed
   avoids : Avoids (source caller.named) (statements.map NodeId.statement) changed
+  bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named
+  declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext
   unique : NodeOccurrencesUnique (source caller.named)
   sameLedger : sourceContext.solvedRequirements = produced.site.code.compilation.solvedRequirements
   syntaxTransport : ∀ id, Reaches (source caller.named) (statements.map NodeId.statement) (.expression id) →
@@ -165,12 +167,12 @@ theorem receipt_of_contextual
       produced.diagnostics = diagnostics → produced.namedCode = namedCode → HEq produced.compilation compilation →
       Nonempty (SiteInputs caller produced)) :
     Nonempty (Receipt caller diagnostics namedCode compilation sourceContext evidence scope id lowered) := by
-  obtain ⟨site, identifier, emitted, binderPolicy, recipe⟩ := CallableIndexedLambdaGeneration.of_contextual_with_body_recipe
+  obtain ⟨site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩ := CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe
     compiled.indexed compilation record sourceContext evidence [] profile viewOfSource sourceFound sourceForm
     found form owner requirements coercions ordinary read accepted typed
   let produced : Produced (compiled := compiled) caller.named parameters result statements sourceContext evidence scope
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) id lowered :=
-    ⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe⟩
+    ⟨diagnostics, namedCode, compilation, site, identifier, emitted, binderPolicy, recipe, compilerPolicy⟩
   obtain ⟨inputs⟩ := siteInputs produced rfl rfl (HEq.refl compilation)
   obtain ⟨body, _entry, _readFuel⟩ := at_site produced.compilation produced.site produced.recipe
     (Program.ofChecked compiled.sourceProgram) inputs.entry inputs.frame inputs.expressionSyntax inputs.certificates
@@ -183,6 +185,9 @@ theorem receipt_of_contextual
     parameters := parameters, result := result, statements := statements, produced := produced
     expressionSyntax := inputs.expressionSyntax, certificates := inputs.certificates, issued := inputs.issued
     diagnosticPolicy := inputs.diagnosticPolicy, body := body
+    bodyView := fun _ reached => expression_lookup inputs.edited inputs.avoids reached
+    bodyReasons := inputs.bodyReasons
+    declarations := inputs.declarations
     sourceType := nodeEq ▸ rawType, ordinary := nodeEq ▸ rawOrdinary, coercions := nodeEq ▸ rawCoercions }
   exact ⟨⟨formation, rfl, rfl, HEq.refl compilation⟩⟩
 

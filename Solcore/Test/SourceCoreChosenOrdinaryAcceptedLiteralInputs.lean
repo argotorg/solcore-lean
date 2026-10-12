@@ -63,7 +63,8 @@ theorem body_inputs
     (sameAssignments : issued.assignments = produced.compilation.own.assignments)
     (samePlaces : PlaceReasonsEq issued.diagnostics.program produced.diagnostics)
     (samePolicy : produced.site.code.policy = root.root.selected.policy)
-    (sameView : produced.site.code.view = source caller.named) :
+    (sameView : produced.site.code.view = source caller.named)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named) :
     Nonempty (PlaceDiagnosticBodyInputs produced root) := by
   have sameNode := source_node fixture atHeader produced
   refine ⟨{
@@ -72,6 +73,7 @@ theorem body_inputs
     placeReasons := samePlaces
     samePolicy := samePolicy
     canonical := sameView
+    bodyReasons := bodyReasons
     typed := ?_
     lambdaCoercions := ?_
     signatures := signatures fixture
@@ -133,11 +135,12 @@ theorem shell
     (samePlaces : PlaceReasonsEq issued.diagnostics.program produced.diagnostics)
     (samePolicy : produced.site.code.policy = root.root.selected.policy)
     (sameView : produced.site.code.view = source caller.named)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
     (readFuel : Nat) :
     ∃ inputs : PlaceDiagnosticBodyInputs produced root,
       Nonempty (CallableIndexedOwnedPreparedMixedBodyCompilerFactory.SiteShell
         (approved produced root inputs) produced) := by
-  obtain ⟨inputs⟩ := body_inputs fixture atHeader shape metadata root produced issued sameAssignments samePlaces samePolicy sameView
+  obtain ⟨inputs⟩ := body_inputs fixture atHeader shape metadata root produced issued sameAssignments samePlaces samePolicy sameView bodyReasons
   exact ⟨inputs, literal_shell produced root inputs readFuel⟩
 
 end Tests.SourceCoreChosenOrdinaryAcceptedLiteralInputs

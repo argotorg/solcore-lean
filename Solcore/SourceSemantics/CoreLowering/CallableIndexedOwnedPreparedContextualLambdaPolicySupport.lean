@@ -3,8 +3,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedQualifie
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaPolicyRecipes
 
 /-! Prepared compiler packets retain the complete policy at their one actual Site.
-The input named Compilation remains concrete; the old prepared producer, Support
-and PreparedAt interfaces are unchanged. An existing qualification Facet carries
+The input named Compilation remains concrete. Prepared provenance retains
+the same policy and body view. An existing qualification Facet carries
 the policy proof through qualified payloads and heaps. Raw body preparation,
 catalog Sites, current packet authority and original policy metadata remain
 independent static inputs. -/
@@ -35,7 +35,7 @@ structure ProducedWithPolicy {named : Named}
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation site.code
   policyRecipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
 
-/-- Forget the policy proof without selecting another Site or Compilation. -/
+/-- Forward the policy proof without selecting another Site or Compilation. -/
 def ProducedWithPolicy.forget {named : Named}
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     {compilation : Compilation compiled.indexed named diagnostics namedCode}
@@ -55,6 +55,7 @@ def ProducedWithPolicy.forget {named : Named}
   emitted := produced.emitted
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
+  compilerPolicy := produced.policyRecipe
 
 /-- Eliminate one accepted outer bind and keep all proofs at its same chosen Site. -/
 theorem ProducedWithPolicy.of_contextual
@@ -107,8 +108,8 @@ theorem retained_recapture {named : Named} {function : Dynamic.Closure}
     CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named
       (RecursiveNamedLambdaFormationHeads.recaptureCode
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed) code environment) := by
-  obtain ⟨diagnostics, namedCode, compilation, body, policy, sameCompilation⟩ := retained
-  exact ⟨diagnostics, namedCode, compilation, body, policy, sameCompilation⟩
+  obtain ⟨diagnostics, namedCode, compilation, rootFuel, body, policy, sameCompilation⟩ := retained
+  exact ⟨diagnostics, namedCode, compilation, rootFuel, body, policy, sameCompilation⟩
 
 /-- A companion proof belongs to the existing complete prepared ordinary Formation. -/
 structure OrdinaryWithPolicy
@@ -137,6 +138,9 @@ def ordinary_of_produced
     (body : JointBody compilation produced.site.code (Program.ofChecked compiled.sourceProgram)
       expressionSyntax certificates diagnosticPolicy
       issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault)
+    (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code)
+    (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope context)
     (sourceType : produced.site.code.sourceNode.type = FunctionValues.sourceType
       (closure caller.named parameters result statements context evidence []))
     (ordinary : Dynamic.OrdinaryRequirementLayout produced.site.code.sourceNode.requirements
@@ -147,7 +151,7 @@ def ordinary_of_produced
     parameters := parameters, result := result, statements := statements
     produced := produced.forget, expressionSyntax := expressionSyntax, certificates := certificates
     issued := issued, diagnosticPolicy := diagnosticPolicy, body := body
-    sourceType := sourceType, ordinary := ordinary, coercions := coercions }
+    bodyView := bodyView, bodyReasons := bodyReasons, declarations := declarations, sourceType := sourceType, ordinary := ordinary, coercions := coercions }
   policyRecipe := produced.policyRecipe
 
 /-- Preparation and policy qualification refer to the same ordinary Code and Support. -/
@@ -179,6 +183,7 @@ structure PrincipalWithPolicy {method : ExecutableImplMethods.CheckedMethod}
   body : JointBody principal.cached.compilation produced.site.code (Program.ofChecked compiled.sourceProgram)
     expressionSyntax certificates diagnosticPolicy
     issued.invalidOperand issued.invalidUnary issued.invalidProjection issued.missingDefault
+  bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code
   sourceType : produced.site.code.sourceNode.type = FunctionValues.sourceType
     (closure principal.named parameters result statements context principal.dictionary [])
   ordinary : Dynamic.OrdinaryRequirementLayout produced.site.code.sourceNode.requirements
@@ -223,7 +228,7 @@ theorem PrincipalWithPolicy.prepared_at {method : ExecutableImplMethods.CheckedM
     (policyFacet compiled).principal (head.code environment) (head.support environment) := by
   refine ⟨?_, retained_recapture head.produced.policyRecipe environment⟩
   exact .recaptured principal head.produced.site head.expressionSyntax head.certificates
-    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy environment
+    head.issued head.diagnosticPolicy head.body head.produced.binderPolicy head.produced.policyRecipe head.bodyView environment
 
 /-- Normalize only the genuine administrative equality; all capture data is copied. -/
 def capture_at {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}

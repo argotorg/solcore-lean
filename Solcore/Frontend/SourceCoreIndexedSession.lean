@@ -1684,12 +1684,13 @@ private theorem simple_arguments {artifact : Artifact} {world : Core.StoreTyping
     (simple : ∀ argument ∈ arguments, SimplePublic argument)
     (accepted : encodeArguments authority slots fuel values owner sourceTypes types arguments = .ok encoded) :
     SimpleInputs sourceTypes arguments encoded.native ∧
-      sourceTypes.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok types := by
+      sourceTypes.mapM artifact.recipe.compiled.compatible.checked.catalog.project = .ok types ∧
+      encoded.values.registry = values.registry := by
   induction sourceTypes generalizing types arguments values encoded with
   | nil =>
     cases types <;> cases arguments <;> try (solve | cases accepted)
     cases accepted
-    exact ⟨.nil, rfl⟩
+    exact ⟨.nil, rfl, rfl⟩
   | cons expected rest ih =>
     cases types with
     | nil => cases accepted
@@ -1712,9 +1713,11 @@ private theorem simple_arguments {artifact : Artifact} {world : Core.StoreTyping
             obtain ⟨validated, _, accepted⟩ := root_factory_bind_ok accepted
             obtain ⟨encodedTail, tailEq, accepted⟩ := root_factory_bind_ok accepted
             cases accepted
-            obtain ⟨related, _⟩ := simple_raw_input head rawEq
-            obtain ⟨relatedTail, projectedTail⟩ := ih tail tailEq
-            exact ⟨.cons related relatedTail, by simp [List.mapM_cons, projected, projectedTail, bind, Except.bind]⟩
+            obtain ⟨related, rawRegistry⟩ := simple_raw_input head rawEq
+            obtain ⟨relatedTail, projectedTail, tailRegistry⟩ := ih tail tailEq
+            exact ⟨.cons related relatedTail,
+              by simp [List.mapM_cons, projected, projectedTail, bind, Except.bind],
+              tailRegistry.trans rawRegistry⟩
           · simp [throw, throwThe] at accepted
 
 /-- This proof-only view fixes the exact prefix chosen by startup. It does not
@@ -1734,8 +1737,19 @@ theorem Checkpoint.RootStart.simple_inputs {artifact : Artifact} {session : Sess
     (receipt : checkpoint.RootStart session key arguments fuel)
     (simple : ∀ argument ∈ arguments, SimplePublic argument) : checkpoint.SimpleInputs session key arguments := by
   obtain ⟨root, selected, _, _, encoded, accepted, _, _, _, initial, _, _⟩ := receipt
-  obtain ⟨related, projected⟩ := simple_arguments simple accepted
+  obtain ⟨related, projected, _registry⟩ := simple_arguments simple accepted
   exact ⟨root, encoded.native, selected, related, projected, initial⟩
+
+/-- Actual scalar and product argument encoding leaves metadata unchanged. -/
+theorem Checkpoint.RootStart.simple_registry {artifact : Artifact} {session : Session artifact}
+    {key : Key} {arguments : List Value} {fuel : Nat} {checkpoint : Checkpoint artifact}
+    (receipt : checkpoint.RootStart session key arguments fuel)
+    (simple : ∀ argument ∈ arguments, SimplePublic argument) :
+    checkpoint.values.registry = session.values.registry := by
+  obtain ⟨root, _selected, _key, _arity, encoded, accepted, _origin, _request,
+    _world, _initial, _slots, values⟩ := receipt
+  rw [values]
+  exact (simple_arguments simple accepted).2.2
 
 end Solcore.Frontend.SourceCoreIndexedSession
 

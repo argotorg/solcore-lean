@@ -107,6 +107,8 @@ structure SiteShell (expressionSyntax : TypedSource → ExpressionId → Prop)
     (closure caller.named parameters result statements sourceContext evidence [])
   readFuel : Nat
   canonical : produced.site.code.view = source caller.named
+  bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named
+  declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext
   unique : NodeOccurrencesUnique (source caller.named)
   sameLedger : sourceContext.solvedRequirements = produced.site.code.compilation.solvedRequirements
   syntaxTree : Syntax (source caller.named) (expressionSyntax (source caller.named))

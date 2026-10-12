@@ -94,6 +94,7 @@ theorem ordinary {caller : Header compiled (Program.ofChecked compiled.sourcePro
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context (source caller.named))
     (covers : evidence.Covers context)
+    (sameReason : rootReasonAt = selected.diagnostics.program.reasonAt caller.named.signature.key)
     (inputs : CompilerInputs (headers := headers) selected root expressionSyntax evidence
       (context := context) (compilerScope := compilerScope) scope id lowered)
     (children : GenericExpressionMeaning.Certificate) :
@@ -102,7 +103,7 @@ theorem ordinary {caller : Header compiled (Program.ofChecked compiled.sourcePro
   cases inputs with
   | actual allowed found form certificate accepted sourceTyped metadata coercions raw finite ownership declarations sameLedger occurrences =>
     exact CallableIndexedOwnedPreparedSelectedPositiveLambdaPackets.Ordinary.of_compiler
-      selected root expressionSyntax headers profile runtime covers ownership declarations sameLedger
+      selected root expressionSyntax headers profile runtime covers ownership declarations sameReason sameLedger
       allowed found form certificate accepted sourceTyped metadata coercions raw finite occurrences
 
 /-- The principal producer retains the complete literal method dictionary. -/
@@ -188,6 +189,7 @@ theorem of_ordinary_inputs {caller : Header compiled (Program.ofChecked compiled
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context (source caller.named))
     (covers : evidence.Covers context)
+    (sameReason : rootReasonAt = selected.diagnostics.program.reasonAt caller.named.signature.key)
     (inputs : ∀ {compilerScope scope id lowered},
       RawLambda selected root expressionSyntax (context := context) (compilerScope := compilerScope) scope id lowered →
       CompilerInputs (headers := headers) selected root expressionSyntax evidence
@@ -195,7 +197,7 @@ theorem of_ordinary_inputs {caller : Header compiled (Program.ofChecked compiled
     Recipes (headers := headers) selected root expressionSyntax context callerEvidence evidence (.ordinary caller) := by
   apply Recipes.ordinary member selected root expressionSyntax context callerEvidence evidence sameEvidence
   intro compilerScope scope id lowered raw
-  exact CompilerInputs.ordinary selected root expressionSyntax profile runtime covers (inputs raw) (fun _ _ _ => False)
+  exact CompilerInputs.ordinary selected root expressionSyntax profile runtime covers sameReason (inputs raw) (fun _ _ _ => False)
 
 /-- The selected principal and full dictionary are retained by the same static
 compiler-input producer; no earlier weak qualification is inverted. -/

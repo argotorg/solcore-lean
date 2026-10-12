@@ -62,7 +62,7 @@ theorem compiler_receipt
       receipt.formation.produced (expressionId fixture.packet 3)) := by
   obtain ⟨inputs⟩ := SourceCoreChosenOrdinaryAcceptedLiteralSupport.body_inputs_at_produced
     fixture atHeader receipt.formation.produced shape metadata inventory root
-    receipt.diagnostics_eq samePolicy sameView
+    receipt.diagnostics_eq samePolicy sameView receipt.formation.bodyReasons
   have literal := SourceCoreChosenOrdinaryAcceptedLiteralSupport.approved_is_literal
     fixture atHeader receipt.formation.produced root inputs
   have sameExpression : inputs.expression = expressionId fixture.packet 3 := by

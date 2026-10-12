@@ -87,6 +87,9 @@ inductive Ordinary (headers : List (Header compiled (Program.ofChecked compiled.
         (context compiled.indexed caller.named) (source caller.named) scope id node parameters result statements
         reported rootReasonAt lowered)
       (receipt : Receipt root expressionSyntax certificate (sourceContext := sourceContext) (evidence := evidence))
+      (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons receipt.site.code caller.named)
+      (declarations : CompatibleExpressionReads.ScopeDeclarations
+        (source caller.named) scope sourceContext)
       (factory : OccurrenceFactory root expressionSyntax (some evidence) headers receipt.body.readFuel)
       (environment : Dynamic.Environment) :
       Ordinary headers
@@ -141,10 +144,16 @@ theorem ordinary_prepared {headers : List (Header compiled (Program.ofChecked co
     (qualified : Ordinary headers code support) :
     CallableIndexedOwnedPreparedOrdinaryLambdaSupport.PreparedAt code support := by
   cases qualified with
-  | actual member root expressionSyntax certificate receipt factory environment =>
+  | actual member root expressionSyntax certificate receipt bodyReasons declarations factory environment =>
       exact .recaptured _ _ receipt.site expressionSyntax
         (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax («prefix» (compiled := compiled) _))
-        receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body receipt.binderPolicy environment
+        receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body receipt.binderPolicy
+        (by
+          have policy := root.compilerPolicy
+          rw [← receipt.policy] at policy
+          exact CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes _
+            (receipt.lowerBody.trans root.selected.recipe) policy receipt.site.compilation)
+        (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_eq receipt.view) bodyReasons declarations environment
 
 theorem principal_prepared {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
@@ -156,7 +165,13 @@ theorem principal_prepared {headers : List (Header compiled (Program.ofChecked c
   | actual principal root expressionSyntax certificate receipt factory environment =>
       exact .recaptured principal receipt.site expressionSyntax
         (CallableIndexedOwnedPreparedNativeCompilerChildren.certificates root expressionSyntax («prefix» (compiled := compiled) principal.named))
-        receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body receipt.binderPolicy environment
+        receipt.shell.issued receipt.shell.diagnosticPolicy receipt.body receipt.binderPolicy
+        (by
+          have policy := root.compilerPolicy
+          rw [← receipt.policy] at policy
+          exact CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes _
+            (receipt.lowerBody.trans root.selected.recipe) policy receipt.site.compilation)
+        (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_eq receipt.view) environment
 
 /-- Forward compiler qualification preserves exactly the same Code/body.
 There is no projection back from the broad native facet. -/
@@ -167,8 +182,8 @@ theorem ordinary_native {headers : List (Header compiled (Program.ofChecked comp
     (qualified : Ordinary headers code support) :
     CallableIndexedOwnedPreparedNativeCollectedQualification.Ordinary headers code support := by
   cases qualified with
-  | actual member root expressionSyntax certificate receipt factory environment =>
-      exact .actual member root expressionSyntax certificate receipt environment
+  | actual member root expressionSyntax certificate receipt bodyReasons declarations factory environment =>
+      exact .actual member root expressionSyntax certificate receipt bodyReasons declarations environment
 
 theorem principal_native {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}

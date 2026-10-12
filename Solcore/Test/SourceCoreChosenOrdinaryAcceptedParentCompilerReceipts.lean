@@ -144,6 +144,7 @@ theorem at_original_root (atHeader : HeaderAt fixture caller)
     (transported_parent fixture originalCompilation caller.named atHeader.named.symm)
   obtain ⟨chosen, policy, body, fuel, view, reason, factory, readFuel⟩ :=
     SourceCoreChosenOrdinaryAcceptedLiteralFactory.chosen_at_root fixture atHeader shape metadata inventory actualRoot
+      (by unfold parentReason effectiveDiagnostics; split <;> rfl)
   exact ⟨actualCompilation, actualRoot, ⟨⟨parent, chosen, policy, body, fuel, view, reason, factory, readFuel⟩⟩⟩
 
 end Tests.SourceCoreChosenOrdinaryAcceptedParentCompilerReceipts

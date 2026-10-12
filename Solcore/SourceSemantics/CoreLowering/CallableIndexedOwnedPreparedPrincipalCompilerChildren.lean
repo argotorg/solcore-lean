@@ -74,6 +74,7 @@ structure SiteShell where
     (closure principal.named parameters result statements sourceContext principal.dictionary [])
   readFuel : Nat
   canonical : site.code.view = source principal.named
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained principal.named site.code
   unique : NodeOccurrencesUnique (source principal.named)
   sameLedger : sourceContext.solvedRequirements = site.code.compilation.solvedRequirements
   syntaxTree : Syntax (source principal.named) (expressionSyntax (source principal.named))
@@ -240,7 +241,8 @@ theorem Collected.prepared
   cases collected with
   | recaptured shell body policyEq bodyEq reasonEq entryEq readFuelEq binderPolicy environment =>
     exact .recaptured principal site expressionSyntax (certificates root expressionSyntax)
-      shell.issued shell.diagnosticPolicy body binderPolicy environment
+      shell.issued shell.diagnosticPolicy body binderPolicy shell.compilerPolicy
+      (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_eq shell.canonical) environment
 
 end Principal
 

@@ -256,6 +256,9 @@ variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProg
   (body : CallableIndexedLambdaStaticBodySupport.BodyWith
     (values := .initial compiled.compatible.checked) expressionSyntax certificates
     produced.site.code (Program.ofChecked compiled.sourceProgram) bodyRegistry semanticFaults)
+  (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView produced.site.code)
+  (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named)
+  (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext)
   {stages : Staging.Recursive.Registry}
   (owner : OwnedKey keys) (history : CallableIndexedLambdaValues.History (code produced environment))
   (origin : CallableIndexedOwnedOrdinaryLambdaSupport.SourceOrigin
@@ -275,7 +278,7 @@ variable {headers : List (Header compiled (Program.ofChecked compiled.sourceProg
 /-- This ordinary Association reduces to the same recaptured Code. -/
 def packet_for (choice : Choice produced (environment := environment) (stages := stages)) :
     PacketFor
-      (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
       stages := .discard choice.packet
 
 /-- No callback or body law is supplied for arbitrary Associations. This
@@ -284,9 +287,9 @@ def support_for (choice : Choice produced (environment := environment) (stages :
     (conditions : Conditions produced body choice)
     (ready : Ready produced body choice conditions) :
     SupportFor
-      (association captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree)
       stages
-      (packet_for captured produced body owner history origin prefixContext globals referenceIndex typed syntaxTree choice) :=
+      (packet_for captured produced body bodyView bodyReasons declarations owner history origin prefixContext globals referenceIndex typed syntaxTree choice) :=
   support produced body choice conditions ready
 end Association
 

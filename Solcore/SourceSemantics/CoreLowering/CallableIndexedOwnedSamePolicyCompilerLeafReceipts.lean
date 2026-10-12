@@ -84,11 +84,16 @@ theorem lambda_of_accepted_with_inputs
       _sameNode, sameCertificate⟩ :=
     of_certificate compiled.indexed sourceContext evidence [] certificate accepted profile viewOfSource sourceFound
       sourceForm found form root.sourceCells root.rawLambdaBody root.rawLambdaExpression root.callables root.projectType typed
+  have compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code := by
+    apply CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained.of_recipes (rootFuel := rootFuel) compilation
+      (sameBody.trans root.selected.recipe) _ site.compilation
+    rw [samePolicy]
+    exact root.compilerPolicy
   let produced : Produced (compiled := compiled) caller.named parameters result statements sourceContext evidence scope
       (RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial compiled.compatible.checked) caller) id lowered :=
     ⟨diagnostics, namedCode, compilation, site, identifier, emitted,
       (congrArg SourceCoreFunctions.Policy.lowerBinder samePolicy).trans root.selected.binder,
-      sameBody.trans root.selected.recipe⟩
+      sameBody.trans root.selected.recipe, compilerPolicy⟩
   obtain ⟨inputs, chosen⟩ := siteInputs produced rfl rfl (HEq.refl compilation) samePolicy sameBody sameFuel sameView sameReason
   obtain ⟨body, entryEq, readFuelEq⟩ := at_site produced.compilation produced.site produced.recipe
     (Program.ofChecked compiled.sourceProgram) inputs.entry inputs.frame inputs.expressionSyntax inputs.certificates
@@ -100,6 +105,9 @@ theorem lambda_of_accepted_with_inputs
     parameters := parameters, result := result, statements := statements, produced := produced
     expressionSyntax := inputs.expressionSyntax, certificates := inputs.certificates, issued := inputs.issued
     diagnosticPolicy := inputs.diagnosticPolicy, body := body
+    bodyView := fun _ reached => CallableLambdaBodyReachability.expression_lookup inputs.edited inputs.avoids reached
+    bodyReasons := inputs.bodyReasons
+    declarations := inputs.declarations
     sourceType := sameSourceNode ▸ rawType, ordinary := sameSourceNode ▸ rawOrdinary, coercions := sameSourceNode ▸ rawCoercions }
   let receipt : CallableIndexedOwnedPreparedOrdinaryLambdaCompilerReceipts.Receipt caller diagnostics namedCode compilation
       sourceContext evidence scope id lowered := ⟨formation, rfl, rfl, HEq.refl compilation⟩

@@ -78,6 +78,8 @@ def SiteShell.to_inputs (shell : SiteShell expressionSyntax produced)
   changed := []
   edited := shell.canonical.symm ▸ LocalView.refl (source caller.named)
   avoids := by intro id member; cases member
+  bodyReasons := shell.bodyReasons
+  declarations := shell.declarations
   unique := shell.unique
   sameLedger := shell.sameLedger
   syntaxTransport := by intro id reached allowed; simpa only [shell.canonical] using allowed

@@ -87,7 +87,7 @@ def LiteralRootReceipt.of_accepted
     |>.mapError SourceCoreBasic.Error.callPreparation) >>= _ = .ok lowered at accepted
   rw [record] at accepted
   simp only [Except.mapError, bind, Except.bind] at accepted
-  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl⟩, rfl, rfl⟩
+  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, ⟨rfl, rfl, rfl, rfl⟩⟩, rfl, rfl⟩
 
 section Root
 variable {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
@@ -233,6 +233,7 @@ structure LiteralBodyInputs where
   sameDiagnostics : issued.diagnostics.program = produced.diagnostics
   samePolicy : produced.site.code.policy = root.root.selected.policy
   canonical : produced.site.code.view = source caller.named
+  bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons produced.site.code caller.named
   typed : ExpressionHasType (source caller.named) sourceContext id produced.site.code.sourceNode.type
   lambdaCoercions : produced.site.code.sourceNode.coercions = []
   signatures : sourceContext.signatures = compiled.compatible.checked.signatures
@@ -342,6 +343,8 @@ theorem literal_shell (readFuel : Nat) : Nonempty (SiteShell (approved produced 
     frame := frame
     readFuel := readFuel
     canonical := canonical
+    bodyReasons := inputs.bodyReasons
+    declarations := inputs.declarations
     unique := unique
     sameLedger := ?_
     syntaxTree := syntaxTree

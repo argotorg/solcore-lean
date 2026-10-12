@@ -82,6 +82,7 @@ structure Produced (compiled : SourceCoreUnifiedCompilation.Compiled)
     ((representation compiled.indexed).atContext named.signature.key [])
     compiled.indexed.base.locals named.signature.key []
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.BodyRecipe compilation site.code
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named site.code
   callback : site.code.lowerBody
       (FunctionCode.children site.code.policy site.code.lowerBody site.code.fuel site.code.compilation) =
     SourceCoreLoops.lowerStatementsWithPolicy
@@ -118,8 +119,8 @@ theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
       (LanguageResult.resultType lowered.type) compiled.indexed.layouts.definitions) :
     Nonempty (Produced compiled named diagnostics namedCode compilation parameters result statements
       sourceContext evidence captured scope administrative id lowered) := by
-  obtain ⟨site, identifier, emitted, binder, recipe⟩ :=
-    CallableIndexedLambdaGeneration.of_contextual_with_body_recipe compiled.indexed
+  obtain ⟨site, identifier, emitted, binder, recipe, compilerPolicy⟩ :=
+    CallableIndexedLambdaGeneration.of_contextual_with_policy_recipe compiled.indexed
       compilation record sourceContext evidence captured profile viewOfSource sourceFound sourceForm
       found form owner requirements coercions ordinary read accepted typed
   refine ⟨{
@@ -128,6 +129,7 @@ theorem of_contextual {compiled : SourceCoreUnifiedCompilation.Compiled}
     emitted := emitted
     binder := binder
     recipe := recipe
+    compilerPolicy := compilerPolicy
     callback := ?_ }⟩
   have applied := congrArg
     (fun body : SourceCoreFunctions.BodyLowerer =>

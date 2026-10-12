@@ -46,6 +46,8 @@ inductive Ordinary (headers : List (Header compiled (Program.ofChecked compiled.
         (context compiled.indexed caller.named) (source caller.named) scope id node parameters result statements
         reported rootReasonAt lowered)
       (receipt : Receipt root expressionSyntax certificate (sourceContext := sourceContext) (evidence := evidence))
+      (bodyReasons : CallableIndexedOwnedContextualLambdaProvenance.BodyReasons receipt.site.code caller.named)
+      (declarations : CompatibleExpressionReads.ScopeDeclarations (source caller.named) scope sourceContext)
       (sameIssuer : receipt.shell.issued =
         CallableIndexedOwnedPreparedNativeSiteShellReceipts.issued_at_site selected receipt.site)
       (factory : OccurrenceFactory root expressionSyntax (some evidence) headers receipt.body.readFuel)
@@ -106,8 +108,8 @@ theorem ordinary_family {headers : List (Header compiled (Program.ofChecked comp
     (qualified : Ordinary headers code support) :
     CallableIndexedOwnedPreparedNativeFamilyStaticQualification.Ordinary headers code support := by
   cases qualified with
-  | actual member selected root expressionSyntax certificate receipt sameIssuer factory environment =>
-      exact .actual member root expressionSyntax certificate receipt factory environment
+  | actual member selected root expressionSyntax certificate receipt bodyReasons declarations sameIssuer factory environment =>
+      exact .actual member root expressionSyntax certificate receipt bodyReasons declarations factory environment
 
 theorem principal_family {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
     {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}

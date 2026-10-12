@@ -26,6 +26,7 @@ structure RootPolicyReceipt (named : Named)
   rawLambdaExpression : selected.policy.rawLambdaExpression = SourceCoreCallableIndexedAncestry.expressionHook
     compiled.indexed.ancestry named.signature.key []
   projectType : selected.policy.projectType = SourceCoreCompatibleDataExpressions.projectType compiled.compatible.checked
+  compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation fuel selected.policy
 
 /-- Unwrap the actual outer bind once and construct the selected receipt and
 all its profiles together. No child contextual acceptance is selected. -/
@@ -47,7 +48,7 @@ theorem RootPolicyReceipt.of_accepted
     |>.mapError SourceCoreBasic.Error.callPreparation) >>= _ = .ok lowered at accepted
   rw [record] at accepted
   simp only [Except.mapError, bind, Except.bind] at accepted
-  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl⟩⟩
+  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, ⟨rfl, rfl, rfl, rfl⟩⟩⟩
 
 section Pointwise
 variable

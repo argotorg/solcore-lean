@@ -189,7 +189,7 @@ theorem retained_policy_for
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.PolicyFor code.policy code.compilation
       prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt := by
-  obtain ⟨diagnostics, namedCode, compilation, _body, recipe, sameCompilation⟩ := retained
+  obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_for recipe metadata scope reasonAt
 

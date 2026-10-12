@@ -145,8 +145,16 @@ theorem of_terminal
   obtain ⟨body, _sameInputs⟩ := CallableIndexedOwnedPreparedEmptyLambdaBodySupport.of_empty produced.site.code
     (expressionSyntax := fun _ _ => False) (certificates := fun _ _ _ _ _ _ => False)
     produced.recipe inputs frame ledger profile rfl rfl
+  have declarations := RecursiveNamedHeaderScopeDeclarations.header_scope
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+    (prepared := compiled.indexed.ancestry) (program := Program.ofChecked compiled.sourceProgram) header
+  rw [header.agreement.source] at declarations
   exact ⟨CallableIndexedOwnedContextualLambdaFormationReceipts.ordinary_of_producer header produced
     (fun _ _ => False) (fun _ _ _ _ _ _ => False) body
+    (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_empty rfl)
+    (CallableIndexedOwnedContextualLambdaProvenance.BodyReasons.of_empty rfl)
+    declarations
     (.body (.nil (.inr rfl))) facts.sourceType facts.ordinary facts.coercions⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEmptyLambdaFormation
