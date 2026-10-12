@@ -25,10 +25,24 @@ In the progress response to the user on 2026-10-05, the second objective was est
 | Target | Estimate by amount of work | Current boundary |
 | --- | --- | --- |
 | First objective: remove direct evaluation at runtime and unify public paths | 100% | Complete at `a3168382`, including replacement of the old API and migration to the shared carrier and session. |
-| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Used-session issuance and ready snapshot restoration now feed retained histories into public success/failure reflection and Word preservation. The current adapters derive executable-plan preparation from compiled records. Full build and registered tests pass. Exact input/metadata and supported body conditions remain explicit; the mutable runtime fixture's assignment/match statements are outside that grammar. Full body/all-pass coverage, failed continuations, suspended snapshot histories, nested output collection and model/registry changes remain unfinished. |
+| Second objective: preserve and reflect execution semantics across the entire transformation | About 70% | Public success now derives actual startup and Source selection from the public start and current history. Product-output collection extends histories, and named terminal lambda formation uses actual parameter captures. Strict Lean, full build (5997 jobs), all registered tests, kernel policy and the twenty-one-endpoint axiom audit pass. The empty-body helper is included in the full build and axiom audit. Static body coverage and the closed public fixture remain incomplete, as do failed continuations, suspended snapshots, non-product output collection, model/registry changes and all-pass composition. |
 | Overall (both objectives weighted equally) | About 85% | The second objective is being implemented. |
 
 The percentages retain the 2026-10-05 estimate. They are not proportions of files, tests, or remaining time.
+
+### Actual startup, product-output histories and terminal lambda formation (2026-10-12)
+
+Validation: strict Lean, full build (5997 jobs), all registered tests and kernel policy pass. Independent reviews found no issues in output collection, public startup recovery or the lambda state connection. The twenty-one checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The empty-body certificate helper also passes the full build and axiom audit.
+
+The public history success adapters now derive their own `StartAt`, selected root and exact `NamedSourceAt`. `RecursiveNamedPublicHistoryFrontdoor.Started` retains these facts together with the original native argument vector and encoded metadata. The accepted public start supplies checkpoint provenance; complete inventory supplies the Source function; `History.current` identifies the real initial world and store. Full Source application, native result, caller relation and `ResultAt` remain in the conclusions.
+
+The new `public_run_succeeded_collects` endpoints seed or extend a history from selected function leaves in a product result. Selection contains no representation premise. Actual successful export and independent Source meaning determine the entries and their original recursive encoding budgets. The result records exactly the selected handles in order and appends them to every earlier entry. Direct function remembering and data-only retention remain available.
+
+The named-body support now has `.recursive` and `.formation` alternatives. The latter consumes one actual ordinary lambda compiler occurrence, its same-code static body receipt, complete headers and zero capture prefixes. Header typing derives runtime validity and evidence coverage. The actual named parameter receipt constructs the nested state; formation derives the closure and its captures at that state. All twelve public-facing adapters use the new support type, preserving the existing recursive branch.
+
+Complete inventory, authentic compiler/body certificates, exact raw structural inputs, the actual encoder-to-receiving metadata extension and one fixed function model and registries remain explicit. The new lambda branch requires an ordinary terminal lambda and zero capture prefixes. Output collection currently traverses products; constructor, mapping and raw comptime-wrapped product outputs remain separate work. Reusable failed continuations, suspended snapshots, model/registry changes, full statement grammar and all-pass composition remain open.
+
+The mutable runtime fixture still uses assignment and match outside the admitted body grammar; its results do not instantiate these public semantic theorems. A closed unit-lambda Source certificate and `ProgramWellFormed` proof have been checked, but the exact Header/body support and complete public fixture remain unfinished. Estimates stay at 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
 
 ### Used-session issuance, snapshots and compiled plan evidence (2026-10-12)
 

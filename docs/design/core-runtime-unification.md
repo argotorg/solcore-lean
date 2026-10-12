@@ -10,12 +10,28 @@ Created: 2026-09-30. Updated: 2026-10-12.
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The estimate based on work completed is about 70%. The final theorem connecting general function values, call bodies, and all passes to the public entry point is incomplete. |
-| Latest verified implementation | `9092656b`: used-session issuance, ready snapshot restoration and compiled-plan evidence derivation. |
-| Latest completed verification | Strict Lean, full build (5991 jobs), all registered tests and kernel policy pass. Independent snapshot review found no issues. The eighteen checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. |
-| Working implementation | Used-session named/builtin issuance joins retained function histories. Authentic ready snapshots transport the captured history to restoration, then to public success/failure reflection and Word preservation. The current adapters derive executable-plan preparation from the actual compiled certificate. |
-| Latest proof scope | Finite retained and issued handles may be combined in exact nested inputs. Ready restoration preserves the saved branch's state and handles. The function model and registries stay fixed; raw input, metadata and static body conditions remain explicit. The mutable regression uses assignment and match outside the current supported body grammar. |
-| Current implementation priority | Derive broader static body coverage from compiler output. Reusable failed continuations, suspended snapshot histories, nested output collection and model/registry changes remain open. |
+| Latest verified implementation | Current working tree: actual public startup recovery, product-output history collection and direct terminal lambda support. The preceding committed checkpoint is `9092656b`. |
+| Latest completed verification | Strict Lean, full build (5997 jobs), all registered tests, kernel policy and independent reviews pass. Twenty-one checked endpoints use only the standard three axioms. The empty-body helper is included in the full build and axiom audit. |
+| Working implementation | Public success derives its actual startup, selected Source function and current state from the public start and retained history. Successful product outputs can add selected function leaves to that history. Named terminal bodies can form ordinary lambdas from their actual parameter state. |
+| Latest proof scope | Retained and issued functions support nested inputs, ready restoration and selected product outputs. Direct terminal lambda formation uses actual compiler receipts and captures. The model and registries stay fixed; raw input, metadata and static body conditions remain explicit. The mutable assignment/match regression is runtime coverage, not a closed semantic fixture. |
+| Current implementation priority | Close the concrete compiler-to-public lambda fixture and broaden body coverage. Reusable failed continuations, suspended snapshot histories, non-product output collection and model/registry changes remain open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
+
+### Public startup, product outputs and terminal lambda formation (2026-10-12)
+
+Validation: strict Lean, full build (5997 jobs), all registered tests and kernel policy pass. Independent reviews found no issues in output collection, public startup recovery or the lambda state connection. The twenty-one checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The empty-body certificate helper also passes the full build and axiom audit.
+
+`RecursiveNamedPublicHistoryFrontdoor` derives the real indexed checkpoint, `StartAt`, selected root and `NamedSourceAt` from an accepted public `Session.start`, complete inventory and the current history. That history fixes the starting world and store. Its successful endpoints return the same recovered packet with the complete Source trace, native result, caller `ResultAt` and reusable returned history. Input descriptions and metadata coverage remain structural boundary conditions.
+
+A successful call may now collect selected function leaves from its product output. `RecursiveNamedPublicOutputSelections.Selection` specifies positions only. The actual output encoding and Source result derive each entry's raw type, native payload, Source typing and recursive validation fuel. Ordered concatenation preserves duplicates and earlier entries. Both initialized history seeds and subsequent public calls consume this producer.
+
+`CallableIndexedOwnedPreparedStagedNamedBodySupport.Support` keeps the existing recursive alternative and adds an ordinary lambda at the exact named terminal expression. `Formation.of_actual` retains the compiler Site and same-code body certificate, deriving runtime validity and evidence coverage from the Header. The actual parameter receipt supplies the nested state and current captures. Existing recursive clients wrap their previous certificate in `.recursive`.
+
+Complete inventory, authentic compiler/body certificates, exact raw structural inputs, the actual encoder-to-receiving metadata extension and one fixed function model and registries remain explicit. The new lambda branch requires an ordinary terminal lambda and zero capture prefixes. Output collection currently traverses products; constructor, mapping and raw comptime-wrapped product outputs remain separate work. Reusable failed continuations, suspended snapshots, model/registry changes, full statement grammar and all-pass composition remain open.
+
+The mutable runtime fixture still uses assignment and match outside the admitted body grammar; its results do not instantiate these public semantic theorems. A closed unit-lambda Source certificate and `ProgramWellFormed` proof have been checked, but the exact Header/body support and complete public fixture remain unfinished. Estimates stay at 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+The dated sections below retain their original scope and verification records.
 
 ### Used-session issuance and ready snapshot restoration (2026-10-12)
 

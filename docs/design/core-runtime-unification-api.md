@@ -6,7 +6,7 @@ Runtime unification and removal of the old typed-source evaluator were completed
 
 ## Current proof interfaces (2026-10-12)
 
-The current connection adds used-session named/builtin issuance and ready snapshot restoration to function histories. Public success/failure reflection and Word preservation consume the resulting histories. The current adapters also derive executable-plan preparation from compiled records. Strict Lean, full build (5991 jobs), all registered tests and kernel policy pass. The preceding fully verified history checkpoint is `1bf7248d` / `b5be3856`. Exact raw types, metadata extensions and supported static body facts remain explicit; the mutable runtime fixture has assignment/match statements outside that body grammar.
+The current connection derives actual public startup and Source selection for history-based successful calls, collects selected function leaves from product outputs, and supports ordinary lambda formation at a named terminal expression. Earlier issuance, restoration and nested-input interfaces remain available. Validation: strict Lean, full build (5997 jobs), all registered tests and kernel policy pass. Independent reviews found no issues in output collection, public startup recovery or the lambda state connection. The twenty-one checked endpoints use only `propext`, `Classical.choice` and `Quot.sound`. The empty-body certificate helper also passes the full build and axiom audit. Exact raw types, metadata extensions and supported static body certificates remain explicit. The mutable assignment/match regression is runtime coverage; a closed compiler-to-public lambda fixture remains unfinished.
 
 Applied source and runtime materialization is committed in `f0f6a910`: four modules, 84 new declarations and sixteen interfaces. All 18449 preceding declarations remain exact.
 
@@ -40,6 +40,33 @@ Contextual compiler policy retention is committed in `806e809c`: three modules e
 - `MixedCoveredCallerCompilerBounds` accepts propositional packet/support coverage and invokes the existing compiler bounds with one theorem-local dependent choice. Coverage is still a static obligation. The sequence body/application ports below consume the same packet and support.
 
 These ports keep genuine compiler policy/read conditions, original typing and call readiness explicit. Complete formation factories, wider Source grammar and the final public all-pass theorem remain incomplete. The seven static witness replacements at `87b08905` expose 47 checked interfaces. Seed and Inventory indices are intentional proof-interface changes; profile constructors return proposition-valued existence. Complete private/normal TYPE/AXIOMS and API logs agree, and registered tests and the repository policy checker pass with zero findings. The full public semantics theorem remains incomplete.
+
+## Actual public startup and returned product functions (2026-10-12)
+
+| Interface | Role |
+| --- | --- |
+| `RecursiveNamedPublicHistoryFrontdoor.Started` | Retains the actual indexed checkpoint, root, Header, native arguments, encoded metadata, `StartAt`, `RootSelection` and exact `NamedSourceAt`. |
+| `RecursiveNamedPublicHistoryFrontdoor.public_run_succeeded_retains` / `public_run_succeeded_remembers` / `public_run_succeeded_collects` | Derive that packet from actual public startup, complete inventory and current history, then return full Source/native meaning and reusable history. |
+| `RecursiveNamedPublicOutputSelections.Selection` / `Selected` | Describe selected output positions and their exact Source/native shapes and recursive fuel, without representation or execution premises. |
+| `Session.RawEncodedAt.reimports_function` | Reimports an actually encoded function leaf with its full raw Source type and that leaf's validation fuel. |
+| `RecursiveNamedPublicFunctionHistory.first_collected` / `History.collect_success` | Derive selected entry meaning from the actual successful export and full `ResultAt`, then seed or extend history. |
+| `CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_collects` / `CallableIndexedOwnedPreparedStagedHistoryPublicContinuations.public_run_succeeded_collects` | Connect product-output selection to initialized public execution or the next successful history step. |
+
+The frontdoor replaces caller-supplied `started`, `selected`, `atCheckpoint` and `sourceAt` with authentic public start/session/recipe correspondence and complete inventory. `inputsFor`, `metadataFor` and `descriptors` describe the recovered request's structural inputs, actual metadata extension and static descriptor. `outputSelections` chooses positions in the observed output for that request. Conclusions retain the exact recovered packet; the semantic trace uses its Source function and original argument vector. No argument or closure representation is supplied at this boundary.
+
+Output selection has `skip`, `function` and `product` constructors. Product children keep their own original raw types and one-less recursive codec fuel. `added.map Entry.handle = selection.handles` retains order and repeated handles. The next history contains `entries ++ added`, so earlier exports remain usable at the real returned heap. This does not yet select inside constructor, mapping or raw comptime-wrapped product outputs.
+
+## Named terminal lambda support (2026-10-12)
+
+`CallableIndexedOwnedPreparedStagedNamedBodySupport.Support headers keys bodyRegistry header stages terminal semanticFaults` replaces the public adapters' former `NamedSupport` parameter. `.recursive oldSupport` preserves that existing branch. `.formation static` supports the exact terminal ordinary lambda.
+
+`Formation.of_actual` consumes its original compiler Site/body receipt, complete headers, zero capture prefixes and `ProgramWellFormed`. It derives runtime validity and evidence coverage from Header typing. `CallableIndexedOwnedPreparedStagedNamedChildBounds` uses the nested state constructed by the genuine named parameter receipt. `CallableIndexedOwnedPreparedStagedLambdaFormationHeads` derives native formation, Source closure meaning and the unchanged body heap at that current state. Both directions retain full caller restoration and postconditions.
+
+Complete inventory, authentic compiler/body certificates, exact raw structural inputs, the actual encoder-to-receiving metadata extension and one fixed function model and registries remain explicit. The new lambda branch requires an ordinary terminal lambda and zero capture prefixes. Output collection currently traverses products; constructor, mapping and raw comptime-wrapped product outputs remain separate work. Reusable failed continuations, suspended snapshots, model/registry changes, full statement grammar and all-pass composition remain open.
+
+The mutable runtime fixture still uses assignment and match outside the admitted body grammar; its results do not instantiate these public semantic theorems. A closed unit-lambda Source certificate and `ProgramWellFormed` proof have been checked, but the exact Header/body support and complete public fixture remain unfinished. Estimates stay at 100% for runtime unification, about 70% for meaning preservation and about 85% overall.
+
+The following dated interface sections retain the scope and validation of their earlier checkpoints.
 
 ## Issuance and restoration in retained histories (2026-10-12)
 
