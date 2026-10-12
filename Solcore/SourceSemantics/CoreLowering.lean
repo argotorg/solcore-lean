@@ -1483,6 +1483,11 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedScopeCoherence
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionInputRegistry
 
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedApplicationBounds
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedInputMeaning
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedPublicHistory
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectPackedHistory
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

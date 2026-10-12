@@ -4,8 +4,10 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReturnLa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedTerminalChildReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedOrdinaryLambdaSourceFacts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLiteralReturnLambdaStaticFacts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 
-/-! Actual named compilation retains the same nullary lambda and its single
+/-! Actual named compilation retains the same lambda and its single
 return child. Original checked Source typing supplies the captured context;
 no child execution law or body certificate is supplied by callers. -/
 set_option autoImplicit false
@@ -24,7 +26,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
 
 /-- Finite shape observations are at the original successfully lowered nodes. -/
-theorem of_terminal
+theorem of_terminal_parameters
     (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
@@ -34,9 +36,10 @@ theorem of_terminal
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
     (member : entry ∈ compiled.indexed.entries)
     {node : ExpressionNode} {reported : Ty} {result : TypeSystem.Ty}
+    {parameters : List TypedBinder}
     {statement : StatementId} {returnNode : StatementNode} {expression : ExpressionId}
     (found : header.function.source.lookupExpression? terminal.expression = some node)
-    (form : node.form = .lambda [] result [statement])
+    (form : node.form = .lambda parameters result [statement])
     (owner : terminal.expression.occurrence.owner = header.function.source.owner)
     (requirements : node.requirements = []) (coercions : node.coercions = [])
     (ordinary : compiled.indexed.base.locals.bindings.find? (fun binding =>
@@ -60,7 +63,7 @@ theorem of_terminal
     CallableIndexedOwnedPreparedStagedNamedTerminalChildReceipts.source_child terminal.receipt selected wellFormed
   have typedSame : typedNode = produced.site.code.sourceNode := Option.some.inj (typedFound.symm.trans actualFound)
   cases typedSame
-  let function := closure header.named [] result [statement] header.context header.function.evidence []
+  let function := closure header.named parameters result [statement] header.context header.function.evidence []
   have facts : CallableIndexedOwnedOrdinaryLambdaSourceFacts.Facts function terminal.expression produced.site.code.sourceNode :=
     CallableIndexedOwnedOrdinaryLambdaSourceFacts.of_typed
       (by simpa only [function, closure, source, header.agreement.source] using header.unique)
@@ -80,18 +83,22 @@ theorem of_terminal
     change header.function.evidence.Covers header.context
     exact RecursiveNamedInitialContextValidity.covers header.frame header.extended
   have frame := facts.frame runtime covers
-  have parametersEmpty : produced.site.code.receipt.loweredParameters = [] := by
-    have same := CallableIndexedLambdaEntryPrefix.parameters (values := .initial compiled.compatible.checked) produced.site.code
-    exact List.map_eq_nil_iff.mp same.symm
-  let inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) produced.site.code := {
-    context := header.context
-    types := []
-    extended := .nil _
-    kinds := by simp only [parametersEmpty, List.not_mem_nil, false_implies, implies_true]
-    referenceIndex := by
-      change SourceCoreCallableIndexedAncestry.creationReferenceIndex produced.site.code.compilation _ = _
-      rw [produced.site.compilation]
-      rfl }
+  have ownership : LocalIdentityOwnership function.source := by
+    change LocalIdentityOwnership (source header.named)
+    change LocalIdentityOwnership header.named.specialized.function.typedBody
+    rw [← header.agreement.source, header.frame.source]
+    exact certificate.local_identity_ownership
+  have kinds := CallableIndexedOwnedLocalIdentityFreshness.lowered_parameter_kinds
+    (values := .initial compiled.compatible.checked) produced.site.code ownership facts.contains facts.form
+  have referenceIndex : produced.site.code.referenceIndex =
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))).length + 1 +
+        compiled.indexed.base.globals.length := by
+    change SourceCoreCallableIndexedAncestry.creationReferenceIndex produced.site.code.compilation _ = _
+    rw [produced.site.compilation]
+    rfl
+  obtain ⟨inputs, _finalContext, _bodyFacts, _bodyTyped, _completes⟩ :=
+    CallableIndexedOwnedLiteralReturnLambdaStaticFacts.entry_of_source_facts
+      (values := .initial compiled.compatible.checked) produced.site.code facts kinds referenceIndex
   have ledger : function.context.solvedRequirements = produced.site.code.compilation.solvedRequirements := by
     rw [produced.site.compilation]
     exact header.valid.ledger.trans (terminal.aligned.solved.trans (by rw [terminal.aligned.named]; rfl))
@@ -123,5 +130,36 @@ theorem of_terminal
     (CallableIndexedOwnedContextualLambdaReadDiagnostics.of_prepared terminal.prepared diagnostic terminal.aligned reason)
     declarations
     syntaxTree facts.sourceType facts.ordinary facts.coercions⟩
+
+/-- The nullary entry point keeps its original API. -/
+theorem of_terminal
+    (prepared : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
+    (selected : stages.Closure header.function child)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    {node : ExpressionNode} {reported : Ty} {result : TypeSystem.Ty}
+    {statement : StatementId} {returnNode : StatementNode} {expression : ExpressionId}
+    (found : header.function.source.lookupExpression? terminal.expression = some node)
+    (form : node.form = .lambda [] result [statement])
+    (owner : terminal.expression.occurrence.owner = header.function.source.owner)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (ordinary : compiled.indexed.base.locals.bindings.find? (fun binding =>
+      decide (binding.caller = (context compiled.indexed terminal.prepared.named).owner ∧
+        binding.initializer = terminal.expression)) = none)
+    (read : SourceCoreCompatibleDataExpressions.readExpression compiled.compatible.checked
+      header.function.source terminal.expression = .ok (node, reported))
+    (returnFound : header.function.source.lookupStatement? statement = some returnNode)
+    (returnForm : returnNode.form = .returnStmt (some expression))
+    (returnType : returnNode.type = result) :
+    Nonempty (OrdinaryFormation (registry := registry) (faults := faults)
+      header header.context header.function.evidence
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child) :=
+  of_terminal_parameters terminal prepared diagnostic wellFormed profile selected member
+    found form owner requirements coercions ordinary read returnFound returnForm returnType
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedReturnLambdaFormation

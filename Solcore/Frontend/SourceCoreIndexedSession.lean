@@ -4823,3 +4823,62 @@ theorem Checkpoint.SucceededResultAt.function_source_type {artifact : Artifact}
       exact (registered_source_type registered).trans requested
 
 end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Scalars, retained handles and their products do not register raw metadata. -/
+inductive FunctionTreeSimple : Value → Prop where
+  | simple {value : Value} (valueIsSimple : SimplePublic value) : FunctionTreeSimple value
+  | function (handle : Handle) : FunctionTreeSimple (.function handle)
+  | product {left right : Value} (first : FunctionTreeSimple left) (second : FunctionTreeSimple right) :
+      FunctionTreeSimple (.product left right)
+
+/-- The actual recursive encoder leaves metadata unchanged for every such
+input tree, including repeated handles at any product depth. -/
+theorem Session.RawEncodedAt.function_tree_registry {artifact : Artifact} {session : Session artifact}
+    {value : Value} (simple : FunctionTreeSimple value)
+    {fuel : Nat} {registry : SourceCoreRawMetadata.Registry} {expected : TypeSystem.Ty}
+    {encoded : SourceCoreCompatibleValues.Extended registry Core.Value}
+    (accepted : session.RawEncodedAt fuel registry expected value encoded) : encoded.registry = registry := by
+  induction simple generalizing fuel registry expected encoded with
+  | simple simple => exact (simple_raw_input simple accepted).2
+  | function handle => exact encoded_function_registry accepted
+  | product left right first second =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      cases view : SourceCoreRawMetadata.runtimeType expected <;>
+        (unfold RawEncodedAt encodeRaw at accepted; rw [view] at accepted)
+      all_goals try (solve | cases accepted)
+      case constructor constructor =>
+        cases constructor with
+        | declaration => cases accepted
+        | builtin builtin => cases builtin <;> cases accepted
+      case product leftType rightType =>
+        obtain ⟨a, acceptedA, accepted⟩ := root_factory_bind_ok accepted
+        obtain ⟨b, acceptedB, accepted⟩ := root_factory_bind_ok accepted
+        cases accepted
+        exact (second (simple_mapError_ok acceptedB)).trans (first (simple_mapError_ok acceptedA))
+
+end Solcore.Frontend.SourceCoreIndexedSession
+
+namespace Solcore.Frontend.SourceCoreIndexedSession
+
+/-- Accepted function import checks runtime type compatibility with the actual
+handle. Nested product codecs may erase annotations before issuing a leaf. -/
+theorem Session.EncodesAt.function_type {artifact : Artifact} {session : Session artifact}
+    {fuel : Nat} {expected : TypeSystem.Ty} {handle : Handle} {native : Core.Value}
+    (accepted : session.EncodesAt fuel expected (.function handle) native) :
+    SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType handle.sourceType := by
+  obtain ⟨encoded, encodedAt, _value⟩ := accepted
+  have resolved := encoded_function_resolves encodedAt
+  by_cases same : SourceCoreRawMetadata.runtimeType expected = SourceCoreRawMetadata.runtimeType handle.sourceType
+  · exact same
+  · by_cases artifactOwner : handle.belongsToArtifact artifact.authority = true
+    · by_cases sessionOwner : handle.belongsToSession session.authority = true
+      · cases found : session.registry.find? (fun slot => decide (slot.handle = handle)) <;>
+          simp [resolve, artifactOwner, sessionOwner, found, same, bind, Except.bind, pure, Except.pure, throw, throwThe] at resolved
+      · simp [resolve, artifactOwner, sessionOwner, bind, Except.bind, throw, throwThe] at resolved
+    · simp [resolve, artifactOwner, bind, Except.bind, throw, throwThe] at resolved
+
+end Solcore.Frontend.SourceCoreIndexedSession
