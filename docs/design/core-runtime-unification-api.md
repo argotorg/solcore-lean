@@ -4,6 +4,28 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Common public session meaning from static program support (2026-10-13)
+
+`4c919424` connects the existing physical body family to common production theorems for initial and later public calls. `bb4ad577` moves the existing seven-call retained-closure sequence onto those theorems.
+
+A single `PhysicalProgramSupport.Support` supplies actual named, closure and method packets, original Source well-formedness and authentic registry diagnostics. It contains no body execution law. The shared numeric family derives preservation and reflection at the actual receiving registry. The public session theorems then derive argument and heap correspondence, exact scalar results or authenticated function exports, and the next retained session/history.
+
+The forward direction takes an accepted public start and independent Source execution. It does not require an earlier successful public execution. It establishes separate execution and output-fuel bounds for all larger budgets; function returns append the handle actually exported by each resume. Initial input/heap conditions come from the genuine fresh bootstrap and its finite resume history.
+
+All seven existing Source/public checkpoints and sufficient-fuel guarantees pass. Results remain `41 / 7 / 41 / 7`, with three distinct retained handles and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. The outer sequence theorem declarations remain unchanged.
+
+Validation: coherent checks for 25 affected modules, the full build (7,152 jobs), registered tests (14,174 build jobs and final pass marker), kernel policy and 337 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This is a common theorem for the current supported families. Constructing the static support package still requires authentic coverage; compilation success alone does not provide it. Initial arguments use the existing data/simple-input boundary. Later calls require input encoding to retain the current receiving registry. These endpoints cover successful Word, Bool and function results; broader inputs/results, prescribed failures, all Source syntax and composition across every actual pass remain unfinished.
+
+- `PhysicalProgramSupport.Support` stores static coverage; `preserves_bodies` and `reflects_bodies` derive semantic body ports at a genuine reached receiver.
+- `PhysicalSessionState.StartedCall` contains only a checkpoint and successful startup. `Call` adds actual public completion; `FunctionCall` adds its returned handle. Forward theorems use `StartedCall`.
+- `PhysicalSessionState.State` retains the exact public/indexed session, Source/native heaps, receiving registry and positive function history.
+- `PhysicalSessionInitial.first_function` constructs the first returned history from real bootstrap and input admission. `PhysicalSessionInitialForward.first_function` gives uniform public fuel bounds from Source success.
+- `PhysicalSessionScalarStep.State.finished_call` and `PhysicalSessionFunctionStep.State.make_typed_handle` reflect actual public success. Their forward counterparts preserve Source success and produce the next retained state.
+
+Names above abbreviate the `CallableIndexedOwnedPrepared` or `RecursiveNamedPublic` module prefixes. The executable compiler/runtime API is unchanged.
+
 ## Generated factory formation through retained public closures (2026-10-13)
 
 `15231c91` adds `NamedFactoryAdmission`, which checks a returned lambda in the actual cached Source. `82441690` replaces the existing factory's hand-written formation conditions with that certificate.

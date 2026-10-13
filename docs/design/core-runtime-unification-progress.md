@@ -6,6 +6,22 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Common public session meaning from static program support (2026-10-13)
+
+`4c919424` connects the existing physical body family to common production theorems for initial and later public calls. `bb4ad577` moves the existing seven-call retained-closure sequence onto those theorems.
+
+A single `PhysicalProgramSupport.Support` supplies actual named, closure and method packets, original Source well-formedness and authentic registry diagnostics. It contains no body execution law. The shared numeric family derives preservation and reflection at the actual receiving registry. The public session theorems then derive argument and heap correspondence, exact scalar results or authenticated function exports, and the next retained session/history.
+
+The forward direction takes an accepted public start and independent Source execution. It does not require an earlier successful public execution. It establishes separate execution and output-fuel bounds for all larger budgets; function returns append the handle actually exported by each resume. Initial input/heap conditions come from the genuine fresh bootstrap and its finite resume history.
+
+All seven existing Source/public checkpoints and sufficient-fuel guarantees pass. Results remain `41 / 7 / 41 / 7`, with three distinct retained handles and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. The outer sequence theorem declarations remain unchanged.
+
+Validation: coherent checks for 25 affected modules, the full build (7,152 jobs), registered tests (14,174 build jobs and final pass marker), kernel policy and 337 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This is a common theorem for the current supported families. Constructing the static support package still requires authentic coverage; compilation success alone does not provide it. Initial arguments use the existing data/simple-input boundary. Later calls require input encoding to retain the current receiving registry. These endpoints cover successful Word, Bool and function results; broader inputs/results, prescribed failures, all Source syntax and composition across every actual pass remain unfinished.
+
+Nine production modules provide static support, scalar correspondence, retained state, initial reflection/forward and later scalar/function reflection/forward. Twelve existing fixture modules now use the common definitions and proofs. The initial receiver, captured environments, original coercion/evidence metadata and physical method slots are preserved. Package existence is proved as `Nonempty Support` and selected only inside proofs.
+
 ## Generated factory formation through retained public closures (2026-10-13)
 
 `15231c91` adds `NamedFactoryAdmission`, which checks a returned lambda in the actual cached Source. `82441690` replaces the existing factory's hand-written formation conditions with that certificate.
