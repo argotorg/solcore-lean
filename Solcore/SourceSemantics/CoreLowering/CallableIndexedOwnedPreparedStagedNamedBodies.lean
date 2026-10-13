@@ -3,9 +3,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 
 /-! A named body's static coverage retains the actual prepared Header and its
-accepted compiler action. Terminal, lexical and branching statement receipts share named
-entry, application and caller restoration. Neither alternative stores body
-meaning or an expected execution result. -/
+accepted compiler action. Terminal, lexical and branching statement receipts
+share named entry, application and caller restoration. Branching receipts can
+select canonical recursive expression support at the same original body. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
@@ -27,6 +27,7 @@ inductive Compilation (header : Header compiled (Program.ofChecked compiled.sour
         certificate (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) expression child)
   | lexical (receipt : CallableIndexedOwnedPreparedStagedNamedLexicalReceipts.Receipt header)
   | branching (receipt : CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.Receipt header)
+  | canonicalBranching (receipt : CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.Receipt header)
 
 structure Body (header : Header compiled (Program.ofChecked compiled.sourceProgram)) where
   row : SourceSpecialization.SpecializedFunction

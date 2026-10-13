@@ -160,6 +160,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {administrative : Core.Context}
     (code : Code compiled.indexed function scope administrative)
     (stages : Staging.Recursive.Registry) where
+  | canonicalBranching (packet : Branching code stages)
   | canonicalTerminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | discard (packet : Discard code stages)
@@ -294,6 +295,45 @@ abbrev BranchingSupport.tree {compiled function scope administrative code inputs
     (support.tree child selected).CatalogSites .reachable registry faults :=
   (support.collected child selected).sites registry faults
 
+/-- The original general expression root keeps the exact retained Code policy,
+compiler context and diagnostic function at every actual lexical child. -/
+structure CanonicalBranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Branching code stages)
+    (semanticFaults : FunctionCalls.FaultRep) : Type where
+  frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function
+  projection : compiled.compatible.checked.catalog.project function.resultType = .ok code.receipt.resultCore
+  readFuel : Nat
+  «prefix» : code.compilation.administrativePrefix = 1
+  collected : ∀ child, stages.Closure function child →
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+      compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
+      (.initial compiled.compatible.checked) child.source (fun _ => True)
+      (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
+        (fun context scope id lowered => Nonempty (Σ rawType,
+          CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.CanonicalRoot compiled
+            code.policy code.lowerBody code.compilation readFuel context child code.reasonAt
+            scope id lowered rawType semanticFaults headers)))
+      compiled.indexed.layouts.definitions administrative
+      inputs.context (parameterScope code) (.statements true function.body) function.resultType code.receipt.resultCore packet.flow
+
+abbrev CanonicalBranchingSupport.tree {compiled function scope administrative headers code inputs stages packet semanticFaults}
+    (support : @CanonicalBranchingSupport compiled function scope administrative headers code inputs stages packet semanticFaults)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :=
+  (support.collected child selected).tree
+
+theorem CanonicalBranchingSupport.sites {compiled function scope administrative headers code inputs stages packet semanticFaults}
+    (support : @CanonicalBranchingSupport compiled function scope administrative headers code inputs stages packet semanticFaults)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
+    (support.tree child selected).CatalogSites .reachable registry faults :=
+  (support.collected child selected).sites registry faults
+
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -306,6 +346,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
     (stages : Staging.Recursive.Registry) (packet : Packet code stages)
     (semanticFaults : FunctionCalls.FaultRep) : Type :=
   match packet with
+  | .canonicalBranching branching => CanonicalBranchingSupport headers code inputs stages branching semanticFaults
   | .canonicalTerminal terminal =>
       CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.SelectedCanonicalBody
         (headers := headers) code inputs stages terminal semanticFaults

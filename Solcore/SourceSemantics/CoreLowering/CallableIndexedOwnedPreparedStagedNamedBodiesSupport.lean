@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalSupport
@@ -33,6 +34,9 @@ def Support
           expression, receipt, certificate, certifies⟩ semanticFaults
   | .lexical receipt =>
       CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Support
+        headers keys bodyRegistry header stages receipt semanticFaults
+  | .canonicalBranching receipt =>
+      CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport.NamedSupport
         headers keys bodyRegistry header stages receipt semanticFaults
   | .branching receipt =>
       CallableIndexedOwnedPreparedStagedNamedBranchingSupport.Support
@@ -93,6 +97,9 @@ theorem Support.preserves
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.preserves
         static aligned.globals profile selected extension layouts children
+    | canonicalBranching receipt =>
+      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.preserves
+        static aligned.globals profile selected extension layouts children canonicalChildren
 
 include static wellFormed selected in
 theorem Support.reflects
@@ -133,5 +140,8 @@ theorem Support.reflects
     | branching receipt =>
       exact CallableIndexedOwnedPreparedStagedNamedBranchingSupport.reflects
         static aligned.globals profile selected extension layouts children
+    | canonicalBranching receipt =>
+      exact CallableIndexedOwnedPreparedStagedCanonicalNamedBranchingSupport.reflects
+        static aligned.globals profile selected extension layouts children canonicalChildren
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodiesSupport
