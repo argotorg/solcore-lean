@@ -1951,6 +1951,7 @@ import Solcore.Test.SourceCoreEvidenceMethodSequenceForward
 import Solcore.Test.SourceCoreMethodClosureSequenceForward
 import Solcore.Test.SourceCoreMethodScopedSequenceForward
 import Solcore.Test.SourceCoreMethodNamedScopedSequenceForward
+import Solcore.Test.SourceCoreMethodImplementationScopedSequenceForward
 set_option autoImplicit false
 
 open Solcore
@@ -3170,6 +3171,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodClosure.runForward
   SourceCoreMethodScoped.runForward
   SourceCoreMethodNamedScoped.runForward
+  SourceCoreMethodImplementationScoped.runForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
