@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreCoercionPublicSource
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedScopedAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedFinalPlanOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableSpecializationEquality
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
@@ -430,6 +431,23 @@ def observeSelectedIdentity (function : CheckedFunction) (type : TypeSystem.Ty) 
   let ⟨statementType⟩ ← observed (statement.type = type) "identity statementType"
   return {binder, read, statement, inputs, binderScheme, binderRequirements, roots, statementFound, statementForm, statementType}
 
+private structure CheckedSourceAdmission (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (statements : List StatementId) (expected : TypeSystem.Ty) : Prop where
+  admission : CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission
+    compiled named source statements expected []
+  accepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource
+    compiled named source statements expected [] 64 = some ⟨admission⟩
+
+private def observeSourceAdmission (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (statements : List StatementId) (expected : TypeSystem.Ty) :
+    IO (PLift (CheckedSourceAdmission compiled named source statements expected)) := do
+  match accepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource
+      compiled named source statements expected [] 64 with
+  | none => throw (IO.userError "actual named Source admission failed")
+  | some receipt => return ⟨⟨receipt.down, accepted⟩⟩
+
 structure ObservedProgram (fixture : CompiledFixture) where
   makeRow : ObservedRoot fixture fixture.makeSignature
   useRow : ObservedRoot fixture fixture.useSignature
@@ -437,6 +455,14 @@ structure ObservedProgram (fixture : CompiledFixture) where
   makeShape : FactoryShape makeRow.row.function fixture.makeSignature fixture.keepSignature fixture.parameter fixture.mark fixture.coercion
   useShape : UseShape useRow.row.function fixture.useSignature .word
   keepShape : SelectedIdentityShape keepRow.row.function .bool
+  useAdmission : CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission
+    fixture.recipe.compiled useRow.named useRow.row.function.typedBody [useShape.body.statement.id] .word []
+  useAdmissionAccepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource fixture.recipe.compiled
+    useRow.named useRow.row.function.typedBody [useShape.body.statement.id] .word [] 64 = some ⟨useAdmission⟩
+  keepAdmission : CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission
+    fixture.recipe.compiled keepRow.named keepRow.row.function.typedBody [keepShape.statement.id] .bool []
+  keepAdmissionAccepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource fixture.recipe.compiled
+    keepRow.named keepRow.row.function.typedBody [keepShape.statement.id] .bool [] 64 = some ⟨keepAdmission⟩
   makeInputScheme : makeShape.binder.scheme = .mono .bool
   useInputScheme : useShape.body.binder.scheme = .mono (closureType .word)
   makeNodes : makeRow.row.function.typedBody.nodes = makeShape.nodeList
@@ -465,6 +491,14 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
   let makeShape ← observeFactory makeRow.row.function fixture.makeSignature fixture.keepSignature fixture.parameter fixture.mark fixture.coercion
   let useShape ← observeUse useRow.row.function fixture.useSignature .word
   let keepShape ← observeSelectedIdentity keepRow.row.function .bool
+  let ⟨useChecked⟩ ← observeSourceAdmission fixture.recipe.compiled useRow.named
+    useRow.row.function.typedBody [useShape.body.statement.id] .word
+  let useAdmission := useChecked.admission
+  let useAdmissionAccepted := useChecked.accepted
+  let ⟨keepChecked⟩ ← observeSourceAdmission fixture.recipe.compiled keepRow.named
+    keepRow.row.function.typedBody [keepShape.statement.id] .bool
+  let keepAdmission := keepChecked.admission
+  let keepAdmissionAccepted := keepChecked.accepted
   let ⟨makeInputScheme⟩ ← observed (makeShape.binder.scheme = .mono .bool) "actual coercion fixture makeInputScheme"
   let ⟨useInputScheme⟩ ← observed (useShape.body.binder.scheme = .mono (closureType .word)) "actual coercion fixture useInputScheme"
   let ⟨makeNodes⟩ ← observed (makeRow.row.function.typedBody.nodes = makeShape.nodeList) "actual coercion fixture makeNodes"
@@ -485,6 +519,6 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
   let ⟨entryKeys⟩ ← observed (fixture.recipe.compiled.indexed.entries.map (·.key) = [makeRow.row.key, useRow.row.key]) "actual coercion fixture entryKeys"
   let ⟨noLocals⟩ ← observed (fixture.recipe.compiled.indexed.base.locals.bindings = []) "actual coercion fixture noLocals"
   let ⟨profile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true) "actual coercion fixture profile"
-  return {makeRow, useRow, keepRow, makeShape, useShape, keepShape, makeInputScheme, useInputScheme, makeNodes, useNodes, keepNodes, makeResultType, useResultType, keepResultType, makeKey, useKey, keepKey, keepInstantiation, makeKeepInstantiation, ordinarySlotsDistinct, globalsLength, entryKeys, noLocals, profile}
+  return {makeRow, useRow, keepRow, makeShape, useShape, keepShape, useAdmission, useAdmissionAccepted, keepAdmission, keepAdmissionAccepted, makeInputScheme, useInputScheme, makeNodes, useNodes, keepNodes, makeResultType, useResultType, keepResultType, makeKey, useKey, keepKey, keepInstantiation, makeKeepInstantiation, ordinarySlotsDistinct, globalsLength, entryKeys, noLocals, profile}
 
 end Tests.SourceCoreCoercionPublic

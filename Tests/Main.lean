@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreOrdinarySyntaxTable
 import Solcore.Test.SourceCoreFinalCatalogLateRows
 import Solcore.Test.SourceCoreClosedReadyNamedWhile
 import Solcore.Test.SourceCoreClosedAdmittedWhile
@@ -3181,6 +3182,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodOriginEvidence.runForward
   SourceCoreCoercionPublic.runForward
   SourceCoreFinalCatalogLateRows.runLateRows
+  SourceCoreOrdinarySyntaxTable.run
   SourceCoreMethodOwnEvidence.runForward
   SourceCoreMethodGenericSubstitution.runForward
   SourceCoreMethodDirectEvidence.runForward

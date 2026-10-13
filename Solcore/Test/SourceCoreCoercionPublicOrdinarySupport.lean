@@ -1,15 +1,11 @@
-import Solcore.Test.SourceCoreCoercionPublicMetadata
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCatalogAdmission
 import Solcore.Test.SourceCoreCoercionPublicCatalog
 import Solcore.Test.SourceCoreCoercionPublicCommon
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCoercionPublic
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
-open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport (Support)
-open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Supported)
 
 variable {fixture : CompiledFixture}
   {inputs : List (Input fixture.recipe.compiled)} (rows : Inventory inputs)
@@ -21,57 +17,76 @@ variable {fixture : CompiledFixture}
 local notation "actualRegistry" => RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture)
 local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
 
+/- The actual finite Source checker supplies the complete metadata and body
+syntax for use. Only authentic Header/source alignment is transported here. -/
 include rows receiver methods in
-theorem ActualHeader.use_support {signature : ProgramFunctionSignature} {type : TypeSystem.Ty}
-    (row : ObservedRow fixture signature)
-    (shape : UseShape row.row.function signature type)
-    (nodes : row.row.function.typedBody.nodes = shape.nodeList)
-    (noLocals : fixture.recipe.compiled.indexed.base.locals.bindings = [])
-    (actual : ActualHeader fixture row.row) :
-    ∃ terminal : Terminal actual.header,
-      Nonempty (Support (headers := headers rows) (stages := actualRegistry) (semanticFaults := faults)
-        actual.header terminal) := by
-  obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal shape.value.node.id
-    shape.body.statement shape.body.roots shape.body.statementFound
-    shape.body.statementForm
-  have metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
-      fixture.recipe.compiled.indexed terminal.prepared.named actual.header.function.source
-      (fun _ => False) := by
-    rw [actual.source]
-    exact shape.policy_metadata nodes terminal.prepared.named noLocals
+theorem ActualHeader.use_admitted_support (observed : ObservedProgram fixture)
+    (actual : ActualHeader fixture observed.useRow.row)
+    {bodyRegistry : SourceCoreRawMetadata.Registry} :
+    Nonempty (Σ body : CallableIndexedOwnedPreparedStagedNamedBodies.Body actual.header,
+      CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+        (headers := headers rows) (bodyRegistry := bodyRegistry)
+        (stages := actualRegistry) (semanticFaults := faults) actual.header body) := by
+  have indexEq := (observed.useRow.prepared_slot actual.prepared).2
+  have selected : fixture.recipe.compiled.indexed.base.functions[observed.useRow.index]? =
+      some actual.prepared.named := indexEq ▸ actual.prepared.selected
+  have namedEq : actual.prepared.named = observed.useRow.named :=
+    Option.some.inj (selected.symm.trans observed.useRow.cached)
+  have bodyEq : actual.header.function.body = [observed.useShape.body.statement.id] := by
+    rw [actual.aligned.function]
+    change actual.prepared.compilation.statements = [observed.useShape.body.statement.id]
+    have accepted := actual.prepared.compilation.roots
+    change (actual.prepared.named.specialized.function.typedBody.roots.mapM _) = _ at accepted
+    rw [actual.prepared.same, observed.useShape.body.roots] at accepted
+    exact (Except.ok.inj accepted).symm
+  have resultEq : actual.header.function.resultType = .word := by
+    rw [actual.header.agreement.result, actual.aligned.named, actual.prepared.same]
+    exact observed.useResultType
+  have admission : CallableIndexedOwnedPreparedNamedScopedAdmission.Admission actual.prepared actual.header [] := by
+    change CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission fixture.recipe.compiled
+      actual.prepared.named actual.header.function.source actual.header.function.body actual.header.function.resultType []
+    rw [namedEq, actual.source, bodyEq, resultEq]
+    exact observed.useAdmission
   obtain ⟨loaded, checked⟩ := fixture.loaded
-  refine ⟨terminal, CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport.of_actual_with_catalog
-    terminal diagnostic receiver fixture.source_wellFormed (fun _ impossible => impossible.elim) metadata
-    (by rw [expression, actual.source]; exact shape.syntax) rows
-    (fun _ impossible => impossible.elim) checked ?_ (.generic ⟨methods.formed, methods.assumptions⟩)
-    (actualStagePrepared fixture) point⟩
-  rw [fixture.sameProgram]
-  exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked
+  exact CallableIndexedOwnedPreparedNamedCatalogAdmission.of_empty_actual rows actual.prepared actual.aligned admission
+    fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed checked
+    (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)
+    (.generic ⟨methods.formed, methods.assumptions⟩) observed.makeRow.entryMember (actualStagePrepared fixture)
 
+/- The actual finite Source checker supplies the complete metadata and body
+syntax for keep. Only authentic Header/source alignment is transported here. -/
 include rows receiver methods in
-theorem ActualHeader.identity_support {signature : ProgramFunctionSignature} {type : TypeSystem.Ty}
-    (row : ObservedRow fixture signature)
-    (shape : SelectedIdentityShape row.row.function type)
-    (nodes : row.row.function.typedBody.nodes = shape.nodeList)
-    (noLocals : fixture.recipe.compiled.indexed.base.locals.bindings = [])
-    (actual : ActualHeader fixture row.row) :
-    ∃ terminal : Terminal actual.header,
-      Nonempty (Support (headers := headers rows) (stages := actualRegistry) (semanticFaults := faults)
-        actual.header terminal) := by
-  obtain ⟨terminal, diagnostic, expression, point⟩ := actual.terminal shape.read.node.id
-    shape.statement shape.roots shape.statementFound shape.statementForm
-  have metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
-      fixture.recipe.compiled.indexed terminal.prepared.named actual.header.function.source
-      (fun _ => False) := by
-    rw [actual.source]
-    exact shape.metadata nodes terminal.prepared.named noLocals
+theorem ActualHeader.keep_admitted_support (observed : ObservedProgram fixture)
+    (actual : ActualHeader fixture observed.keepRow.row)
+    {bodyRegistry : SourceCoreRawMetadata.Registry} :
+    Nonempty (Σ body : CallableIndexedOwnedPreparedStagedNamedBodies.Body actual.header,
+      CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+        (headers := headers rows) (bodyRegistry := bodyRegistry)
+        (stages := actualRegistry) (semanticFaults := faults) actual.header body) := by
+  have indexEq := (observed.keepRow.prepared_slot actual.prepared).2
+  have selected : fixture.recipe.compiled.indexed.base.functions[observed.keepRow.index]? =
+      some actual.prepared.named := indexEq ▸ actual.prepared.selected
+  have namedEq : actual.prepared.named = observed.keepRow.named :=
+    Option.some.inj (selected.symm.trans observed.keepRow.cached)
+  have bodyEq : actual.header.function.body = [observed.keepShape.statement.id] := by
+    rw [actual.aligned.function]
+    change actual.prepared.compilation.statements = [observed.keepShape.statement.id]
+    have accepted := actual.prepared.compilation.roots
+    change (actual.prepared.named.specialized.function.typedBody.roots.mapM _) = _ at accepted
+    rw [actual.prepared.same, observed.keepShape.roots] at accepted
+    exact (Except.ok.inj accepted).symm
+  have resultEq : actual.header.function.resultType = .bool := by
+    rw [actual.header.agreement.result, actual.aligned.named, actual.prepared.same]
+    exact observed.keepResultType
+  have admission : CallableIndexedOwnedPreparedNamedScopedAdmission.Admission actual.prepared actual.header [] := by
+    change CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission fixture.recipe.compiled
+      actual.prepared.named actual.header.function.source actual.header.function.body actual.header.function.resultType []
+    rw [namedEq, actual.source, bodyEq, resultEq]
+    exact observed.keepAdmission
   obtain ⟨loaded, checked⟩ := fixture.loaded
-  refine ⟨terminal, CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport.of_actual_with_catalog
-    terminal diagnostic receiver fixture.source_wellFormed (fun _ impossible => impossible.elim) metadata
-    (by rw [expression, actual.source]; exact shape.syntax) rows
-    (fun _ impossible => impossible.elim) checked ?_ (.generic ⟨methods.formed, methods.assumptions⟩)
-    (actualStagePrepared fixture) point⟩
-  rw [fixture.sameProgram]
-  exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked
+  exact CallableIndexedOwnedPreparedNamedCatalogAdmission.of_empty_actual rows actual.prepared actual.aligned admission
+    fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed checked
+    (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)
+    (.generic ⟨methods.formed, methods.assumptions⟩) observed.makeRow.entryMember (actualStagePrepared fixture)
 
 end Tests.SourceCoreCoercionPublic

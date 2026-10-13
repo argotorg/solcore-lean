@@ -47,10 +47,10 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
     (registry := completion.result.context.registry)
     (faults := CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)
     (stages := RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture))
-  obtain ⟨useTerminal, ⟨useSupport⟩⟩ := ActualHeader.use_support given.rows receiver methods
-    observed.useRow.toObservedRow observed.useShape observed.useNodes observed.noLocals given.useHeader
-  obtain ⟨keepTerminal, ⟨keepSupport⟩⟩ := ActualHeader.identity_support given.rows receiver methods
-    observed.keepRow observed.keepShape observed.keepNodes observed.noLocals given.keepHeader
+  obtain ⟨useBody, useSupport⟩ := ActualHeader.use_admitted_support given.rows receiver methods
+    observed given.useHeader (bodyRegistry := completion.result.context.registry)
+  obtain ⟨keepBody, keepSupport⟩ := ActualHeader.keep_admitted_support given.rows receiver methods
+    observed given.keepHeader (bodyRegistry := completion.result.context.registry)
   let property := fun header => Σ body : Body header,
     NamedSupport (headers given.rows) completion.result.context.registry
       (RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture))
@@ -62,8 +62,8 @@ theorem static_supports (fixture : CompiledFixture) (observed : ObservedProgram 
     simp only [List.mem_cons, List.not_mem_nil, or_false] at member
     rcases member with rfl | rfl | rfl
     · exact ⟨⟨of_terminal makeTerminal, .formation makeTerminal makeSupport given.makeHeader.aligned.globals⟩⟩
-    · exact ⟨⟨of_terminal useTerminal, .terminal useTerminal useSupport⟩⟩
-    · exact ⟨⟨of_terminal keepTerminal, .terminal keepTerminal keepSupport⟩⟩
+    · exact ⟨⟨useBody, useSupport⟩⟩
+    · exact ⟨⟨keepBody, keepSupport⟩⟩
   let choose := fun header member => Classical.choice (present header member)
   exact ⟨{
     toOrdinaryInventory := given
