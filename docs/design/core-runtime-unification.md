@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Accepted indirect calls supply retained closure execution (2026-10-14)
+
+`375099a2` derives indirect-call structure from actual accepted compiler actions. `f7f43e37` connects the original `useWord` and `useBool` callers to the same complete certificate as the two evidence-bearing entry roots.
+
+The indirect receipt retains the original callee first, followed by every argument in order, with each accepted child action and its actual compilation budget. The expression proof constructs the indirect-call grammar from those children and the original lookup. It does not require an independently supplied recursive grammar. Unsupported special actions remain attached to their actual compiler trace.
+
+Success of the existing metadata-only check now supplies raw facts for each original supported node. The two caller proofs transport that exact success to the genuine Header, close the remaining indirect branch conditions, and derive body admission before the shared program certificate is completed. The original twelve cache rows, ten direct-table rows, captured closures, reached heaps and seven Source/public operations remain. The same public preservation and reflection endpoints retain outputs `33 / true / 33 / 55` and sufficient-fuel guarantees.
+
+Validation: 30 affected modules checked together, full build (7,225 jobs), registered tests (14,282 build jobs), kernel policy and 636 endpoint audits pass. The original six-call relay and earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Four actual cached roots now derive admission from accepted compilation. The remaining roots, closure bodies, methods, catalog formation and global metadata retain their explicit checks. General compiler coverage and meaning preservation across all actual compiler passes remain unfinished.
+
+The next connection covers the original relay functions containing overloaded operators, mutable assignments and a while loop, using their accepted compiler actions in the same public program.
+
 ## Compiler evidence roots complete shared public support (2026-10-14)
 
 `670dd39f` connects accepted returning expressions to a certificate with several selected cache positions. `795ad95e` uses it for both original evidence-bearing three-argument entry roots.
@@ -612,11 +626,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `670dd39f` / `795ad95e`: both original evidence-bearing roots derive admission from actual compilation before shared public support is issued. |
-| Latest completed verification | Full build (7222 jobs), registered tests, kernel policy and 619 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `375099a2` / `f7f43e37`: both indirect callers join the two evidence entry roots in compiler-derived public support. |
+| Latest completed verification | Full build (7225 jobs), registered tests, kernel policy and 636 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | The original seven-operation evidence program obtains both three-argument entry roots from compiler receipts, retaining its captures and all public fuel conclusions. |
-| Current implementation priority | Connect original indirect caller roots to the same compiler-derived admission and extend complete compiler coverage. |
+| Latest proof scope | Four actual cached roots derive body and expression admission from accepted compilation; original closure captures and all seven public operations remain connected. |
+| Current implementation priority | Connect overloaded operators, assignments and while loops from actual compilation, then extend full compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

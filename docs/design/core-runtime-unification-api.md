@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Accepted indirect calls supply retained closure execution (2026-10-14)
+
+`375099a2` derives indirect-call structure from actual accepted compiler actions. `f7f43e37` connects the original `useWord` and `useBool` callers to the same complete certificate as the two evidence-bearing entry roots.
+
+The indirect receipt retains the original callee first, followed by every argument in order, with each accepted child action and its actual compilation budget. The expression proof constructs the indirect-call grammar from those children and the original lookup. It does not require an independently supplied recursive grammar. Unsupported special actions remain attached to their actual compiler trace.
+
+Success of the existing metadata-only check now supplies raw facts for each original supported node. The two caller proofs transport that exact success to the genuine Header, close the remaining indirect branch conditions, and derive body admission before the shared program certificate is completed. The original twelve cache rows, ten direct-table rows, captured closures, reached heaps and seven Source/public operations remain. The same public preservation and reflection endpoints retain outputs `33 / true / 33 / 55` and sufficient-fuel guarantees.
+
+Validation: 30 affected modules checked together, full build (7,225 jobs), registered tests (14,282 build jobs), kernel policy and 636 endpoint audits pass. The original six-call relay and earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Four actual cached roots now derive admission from accepted compilation. The remaining roots, closure bodies, methods, catalog formation and global metadata retain their explicit checks. General compiler coverage and meaning preservation across all actual compiler passes remain unfinished.
+
+`AcceptedIndirectExpressionReceipt.of_head` extracts an indirect receipt from the actual selected compiler head. `AcceptedNamedExpressionMetadata.at_of_accepted` projects facts from successful metadata checking at an original supported node. `AcceptedNamedBodyExpressionAdmission.of_returning_calls` uses the accepted callee and ordered argument tree to supply the existing named-body admission. Runtime APIs are unchanged.
+
 ## Compiler evidence roots complete shared public support (2026-10-14)
 
 `670dd39f` connects accepted returning expressions to a certificate with several selected cache positions. `795ad95e` uses it for both original evidence-bearing three-argument entry roots.

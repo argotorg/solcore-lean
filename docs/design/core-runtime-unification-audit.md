@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Accepted indirect calls supply retained closure execution (2026-10-14)
+
+`375099a2` derives indirect-call structure from actual accepted compiler actions. `f7f43e37` connects the original `useWord` and `useBool` callers to the same complete certificate as the two evidence-bearing entry roots.
+
+The indirect receipt retains the original callee first, followed by every argument in order, with each accepted child action and its actual compilation budget. The expression proof constructs the indirect-call grammar from those children and the original lookup. It does not require an independently supplied recursive grammar. Unsupported special actions remain attached to their actual compiler trace.
+
+Success of the existing metadata-only check now supplies raw facts for each original supported node. The two caller proofs transport that exact success to the genuine Header, close the remaining indirect branch conditions, and derive body admission before the shared program certificate is completed. The original twelve cache rows, ten direct-table rows, captured closures, reached heaps and seven Source/public operations remain. The same public preservation and reflection endpoints retain outputs `33 / true / 33 / 55` and sufficient-fuel guarantees.
+
+Validation: 30 affected modules checked together, full build (7,225 jobs), registered tests (14,282 build jobs), kernel policy and 636 endpoint audits pass. The original six-call relay and earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Four actual cached roots now derive admission from accepted compilation. The remaining roots, closure bodies, methods, catalog formation and global metadata retain their explicit checks. General compiler coverage and meaning preservation across all actual compiler passes remain unfinished.
+
+Independent reviews cover exact frozen sources for indirect extraction, ordered expression recursion, metadata projection, residual exclusion and the four-root consumer. Child extraction uses the actual indirect callee, not a declaration reference. Actual metadata-check success is retained through Header transport. No completed program certificate is used to justify one of its own pending roots.
+
 ## Compiler evidence roots complete shared public support (2026-10-14)
 
 `670dd39f` connects accepted returning expressions to a certificate with several selected cache positions. `795ad95e` uses it for both original evidence-bearing three-argument entry roots.
