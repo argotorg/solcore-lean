@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## All ordinary roots in the evidence program use compiler receipts (2026-10-14)
+
+`646f46e7` derives factory admission from actual outer-return and lambda compilation. `c2817faf` connects both original factory functions, completing all ten ordinary roots in the existing evidence program.
+
+The factory receipt retains the original returned lambda, parameter allocation, captured scope, body, production hooks and emitted callable. Its inner return action comes from the actual lambda body equation and selected body compiler. Original Source typing supplies the declared return type; equality of native representations is insufficient. Cache transport retains the exact selected position and compiled roots.
+
+All ten ordinary roots now enter the common program certificate through accepted compiler actions. The original program still has twelve cache rows, ten direct-table rows and the same seven Source/public operations, with results `33 / true / 33 / 55`, three retained closures, identical reached heaps and all public fuel conclusions. The program still checks every closure and method. Both selected factory rows reject a zero closure budget; deferring their roots does not bypass that obligation.
+
+Validation: 11 affected modules checked together, full build (7,234 jobs), registered tests (14,302 build jobs), kernel policy and 674 endpoint audits pass. Earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This completes root admission for this original program. Independent Source well-formedness, finite metadata and catalog checks, closure and method certification, broader compiler syntax and preservation across all actual passes remain explicit work.
+
+The two new factory roots join the existing four call roots, two mutable relay roots and two identity roots. The twelve unrelated workspace changes remain excluded.
+
 ## Compiler receipts cover mutable relay bodies (2026-10-14)
 
 `1d90a8c7` extracts actual method-operator, assignment and while-loop actions. `77d9e3c8` connects both original relay functions and both identity functions to the existing public execution certificate.
