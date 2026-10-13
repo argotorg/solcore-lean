@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
 
 /-! The original indirect parent stops at a real argument failure. Its strict
@@ -22,6 +23,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context}
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
@@ -45,7 +50,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -63,10 +68,11 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (unique : NodeOccurrencesUnique invocation.source)
   (parentTyped : ExpressionHasType invocation.source context id compiler.original.type)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 include guardFrame in
+omit positive in
 /-- The real original row supplies first-gate success at the callee store.
 No native acceptance or verdict is added to a compiler certificate. -/
 theorem first_gate {sourceValue : Dynamic.Value} {carrier : Value}
@@ -92,7 +98,7 @@ theorem first_gate {sourceValue : Dynamic.Value} {carrier : Value}
   | builtin receipt =>
       exact receipt.first_gate compiled.indexed.ancestry.graph.inputs.callable.diagnostics.unknown actual calleeStore
 
-include prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
+include positive prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
   caller view originalUnique guardFrame sourceParent tree unique parentTyped in
 /-- Strict Source descent constructs the callee and argument computations.
 The argument fold runs after the accepted first gate and its actual effects
@@ -182,11 +188,12 @@ theorem preserves_argument_fault (budget : Nat)
         calleeMaps.trans maps, calleeWorlds.trans worlds, calleeFrame.trans frame,
         calleeMetadata.trans heapMetadata, reached, callerProtocol.trans calleeRelated related, parentAdmission⟩
 
+omit positive in
 /-- The constructive whole argument-prefix reflection already contains the
 actual parent trace and reached failure receipt. This branch exposes the
 independent Source grade without rebuilding or relabeling the child failure. -/
 theorem reflects_argument_fault_prefix {value : Value} {finalStore : Store}
-    (reflected : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ArgumentFaultPrefix
+    (reflected : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ArgumentFaultPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry)
       (faults := faults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore) :

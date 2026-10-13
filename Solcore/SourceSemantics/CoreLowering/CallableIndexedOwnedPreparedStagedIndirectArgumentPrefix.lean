@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectNativePrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedCallBoundaryReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence
@@ -22,6 +23,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context}
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
@@ -46,7 +51,7 @@ variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyL
   {canonical actual : Environment} {ξ : Renaming}
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
-  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+  (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -54,7 +59,7 @@ variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyL
   (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
   (admitted : Admission bridge context initial)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 
@@ -133,7 +138,7 @@ private theorem value_is_function {context : SourceSemantics.Context} {heap : Dy
     · cases impossible
   | unit | bool | word | integer | product | proxy | mapping => cases typed
 
-include caller view originalUnique sourceEq found sourceParent tree unique parentTyped in
+include positive caller view originalUnique sourceEq found sourceParent tree unique parentTyped in
 /-- The actual callee payload comes from the positive receiving model. Its
 Source function type and reached admission supply genuine callable shape;
 the original scoped boundary factory then runs at that same payload. -/
@@ -152,7 +157,7 @@ theorem scoped_boundary {sourceValue : Dynamic.Value} {after : Dynamic.Heap}
   obtain ⟨reached, _related, admitted⟩ := post.2.2.2.2.2.2.2
   have typedSource := CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission.at_value admitted |>.1
   rw [calleeFunction] at typedSource
-  have positive := CallableIndexedOwnedContextualCalleeOriginReadReceipts.callable_at profile post.2.1
+  have positive := CallableIndexedOwnedContextualCalleeOriginReadReceipts.callable_at profile (post.2.1.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile)))
     (value_is_function typedSource)
   exact CallableIndexedOwnedPreparedScopedCallBoundaryReceipts.boundary_at_source_view compiler prepared
     caller view originalUnique (CallableIndexedOwnedContextualCalleeStageReceipts.callee_origin positive)
@@ -233,7 +238,7 @@ private theorem argument_fault_post {failure : Staging.Recursive.Failure} {type 
   | semantic reason => exact ⟨post.rows, by intro _ impossible; cases impossible⟩
   | stage origin call reason => exact post.rows
 
-include prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
+include positive prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
   caller view originalUnique guardFrame sourceParent tree unique parentTyped in
 /-- Whole-parent native reflection uses the strict staged callee IH once and
 the actual scoped boundary. An accepted gate then invokes the concrete staged
@@ -248,13 +253,13 @@ theorem reflects_arguments (budget : Nat)
       (registry := registry) (faults := faults) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual) (ξ := ξ)
       bridge functions compiler initial budget value finalStore ∨
-    StageRejectedPrefix (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (context := context) (stages := stages) (invocation := invocation)
+    StageRejectedPrefix (functionModel := functionModel) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial budget value finalStore ∨
-    ArgumentFaultPrefix (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (faults := faults) (context := context) (stages := stages)
+    ArgumentFaultPrefix (functionModel := functionModel) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (faults := faults) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual) (ξ := ξ)
       bridge profile compiler initial value finalStore ∨
-    ApplicationPrefix (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (context := context) (stages := stages) (invocation := invocation)
+    ApplicationPrefix (functionModel := functionModel) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults) (registry := registry) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial budget value finalStore := by

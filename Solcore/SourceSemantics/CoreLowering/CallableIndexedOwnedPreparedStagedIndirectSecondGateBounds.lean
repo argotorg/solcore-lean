@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingCallRejectionPosts
@@ -133,6 +134,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -153,11 +158,12 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {sidecar : SourceCoreStageContracts.Sidecar}
   (caller : SourceCoreStageContracts.prepareSidecar compiled.indexed.base.plan prepared.site.caller = .ok sidecar)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "publicFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
 include caller occurrence sourceParent preparedStages receiver in
+omit positive in
 /-- The actual selected count decides the branch internally. Successful
 arguments already carry their real independent grades and reached admission.
 The mismatch constructs Source arity, its literal receiver lookup and the same
@@ -165,7 +171,7 @@ whole-parent fault post. The equal-count alternative retains only that actual
 row fact for the separate application producer. -/
 theorem classify_application_prefix {budget size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
-    («prefix» : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ApplicationPrefix
+    («prefix» : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ApplicationPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (registry := completion.result.context.registry) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual)

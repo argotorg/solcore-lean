@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectValuesPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinParentPreservation
@@ -25,6 +26,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -41,8 +46,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {sourceTypes : List TypeSystem.Ty} {calleeNode : ExpressionNode}
   {sidecar : SourceCoreStageContracts.Sidecar}
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
@@ -75,9 +79,9 @@ variable (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (functionModel) identities)
 
-include sourceParent occurrence preparedStages receiver actualFunctionType observations in
+include positive sourceParent occurrence preparedStages receiver actualFunctionType observations in
 /-- The authentic prefix is classified once. Successful builtin execution
 uses its original primitive; physical mismatch uses the actual receiving
 arity word. Both branches construct the whole native parent without replay. -/
@@ -92,18 +96,18 @@ theorem preserves_builtin_or_user
       invocation context environment calleeHeap ids (.values sources) argumentsHeap)
     (called : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages applicationSize
       invocation context argumentsHeap sourceValue sources outcome after)
-    (prefixResult : CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix
+    (prefixResult : CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix (functionModel := functionModel)
       (registry := completion.result.context.registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial sourceValue calleeHeap argumentsHeap sources) :
     (Staging.CallBoundary.UserCallable sourceValue ∧
-      CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix
+      CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix (functionModel := functionModel)
         (registry := completion.result.context.registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
         (context := context) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
         (calleeNode := calleeNode) (sidecar := sidecar)
         bridge profile compiler prepared initial sourceValue calleeHeap argumentsHeap sources) ∨
-    ParentAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentAt (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial
       (Staging.Recursive.Size.stepSize [calleeSize, argumentsSize, applicationSize]) outcome after := by
@@ -153,7 +157,7 @@ theorem preserves_builtin_or_user
             (outcome := outcome) (after := after) (calleeStore := calleeStore)
             bridge compiler prepared sourceParent occurrence initial reached related admitted
             finalHeaps maps worlds frame heapMetadata observations receipt count actualFunctionType
-            valueTyped representedCallee representedValues bundle resultType calleeTrace argumentsTrace
+            valueTyped (representedCallee.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile))) representedValues bundle resultType calleeTrace argumentsTrace
             called calleePost.1 argumentsNative
         obtain ⟨parentSource, value, native, representation, sameHeap, heaps,
           keptMaps, keptWorlds, keptFrame, keptMetadata, keptRelated, post⟩ := completeParent

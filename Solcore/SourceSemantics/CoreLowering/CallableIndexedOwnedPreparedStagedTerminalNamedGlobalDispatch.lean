@@ -108,7 +108,7 @@ theorem reflects_global
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) :
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore := by
   have originalTree : DataExpressionSequence.Tree source certificate scope ids sourceTypes compiler.codes := by
@@ -219,7 +219,7 @@ theorem preserves_global
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial
       calleeSize argumentsSize applicationSize sourceValue calleeHeap argumentsHeap sources outcome after)
     (within : applicationSize ≤ budget) :
-    ParentAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial
       (Staging.Recursive.Size.stepSize [calleeSize, argumentsSize, applicationSize]) outcome after := by

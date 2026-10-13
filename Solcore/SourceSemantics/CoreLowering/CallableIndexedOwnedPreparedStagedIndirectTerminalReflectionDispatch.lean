@@ -113,7 +113,7 @@ theorem reflects_parent_or_global (budget : Nat)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore ∨
     GlobalApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
@@ -121,6 +121,7 @@ theorem reflects_parent_or_global (budget : Nat)
       (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial budget value finalStore := by
   rcases CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeFaultDispatch.reflects_fault_or_application
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       bridge receiver compiler prepared stagePrepared sourceEq occurrence initial view guardFrame profile
       certified found sourceTyped environments heaps locals agrees typed admitted caller originalUnique
       sourceParent tree unique parentTyped budget children completed within with fault | application
@@ -131,6 +132,7 @@ theorem reflects_parent_or_global (budget : Nat)
     exact .inl ⟨sourceSize, .fault failure, after, finalMap, finalWorld, trace, native,
       represented, finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
   · rcases CallableIndexedOwnedPreparedStagedIndirectBuiltinApplicationDispatch.reflects_builtin_or_user
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations completed application with user | parent
     · exact CallableIndexedOwnedPreparedStagedTerminalClosureUserDispatch.reflects_closure_or_global

@@ -117,7 +117,7 @@ theorem preserves_parent_or_global (budget : Nat)
     (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
       invocation context environment before id outcome after)
     (within : size ≤ budget) :
-    ParentAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial size outcome after ∨
     GlobalAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
@@ -125,6 +125,7 @@ theorem preserves_parent_or_global (budget : Nat)
       (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge (profile := profile) compiler prepared initial budget size outcome after := by
   rcases CallableIndexedOwnedPreparedStagedIndirectSourcePrefixDispatch.preserves_fault_or_application
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       bridge profile compiler prepared sourceEq occurrence certified found sourceTyped
       environments heaps locals agrees typed initial admitted caller view originalUnique guardFrame
       sourceParent tree unique parentTyped stagePrepared receiver budget children trace within with fault | application
@@ -133,6 +134,7 @@ theorem preserves_parent_or_global (budget : Nat)
       sources, sizeEq, strict, calleeTrace, accepted, argumentsTrace, called, constructedPrefix⟩ := application
     cases sizeEq
     rcases CallableIndexedOwnedPreparedStagedIndirectBuiltinPreservationDispatch.preserves_builtin_or_user
+      (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
         bridge profile compiler prepared initial sourceParent occurrence stagePrepared receiver
         actualFunctionType observations calleeTrace accepted argumentsTrace called constructedPrefix with user | parent
     · rcases CallableIndexedOwnedPreparedStagedFiniteClosureUserPreservationDispatch.preserves_closure_or_global

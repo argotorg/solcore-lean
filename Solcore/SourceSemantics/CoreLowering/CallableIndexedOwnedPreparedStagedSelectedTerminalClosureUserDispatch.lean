@@ -90,11 +90,11 @@ theorem reflects_closure_or_global
       ReflectsBelowFor (registry := completion.result.context.registry) (faults := callFaults)
         association (terminals association) functions budget)
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
-    (user : UserApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
+    (user : UserApplicationPrefix (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry)
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) :
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore ∨
     GlobalApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)

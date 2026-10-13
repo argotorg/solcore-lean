@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinArgumentRows
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectApplicationSuffix
 
@@ -17,6 +18,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry registry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   {profile : compiled.compatible.checked.catalog.callableContracts = true}
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
@@ -40,19 +45,18 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (admitted : Admission bridge context reached)
   (heaps : GenericHeap.HeapRepresents
     (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile))
+      (functionModel))
     finalMap finalWorld argumentsHeap argumentsStore)
   (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
   (frame : AdministrativePreserved mapping store finalMap argumentsStore)
   (heapMetadata : Dynamic.HeapMetadataExtend before argumentsHeap)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 variable {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (functionModel) identities)
   {function : Dynamic.BuiltinFunction} {carrier : Value} {sources : List Dynamic.Value} {values : List Value}
   {sourceTypes : List TypeSystem.Ty} {parameter result : TypeSystem.Ty}
   {sidecar : SourceCoreStageContracts.Sidecar} {originalNode : ExpressionNode}
@@ -67,13 +71,14 @@ variable {identities : Dynamic.Value → Word → Prop}
     (.function parameter result) (.builtin function) carrier compiler.calleeCode.type)
   (represented : DataExpressionSequence.Values
     (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-      (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)) finalMap finalWorld
+      (functionModel)) finalMap finalWorld
     sourceTypes (compiler.codes.map (·.type)) sources values)
   (bundle : TypeSystem.Ty.productMany sourceTypes = parameter)
   (originalResult : compiler.original.type = result)
 
 include bridge compiler prepared sourceParent occurrence related admitted heaps maps worlds frame heapMetadata
   observations builtinAt count actualFunctionType calleeTyped calleeRelated represented bundle originalResult in
+omit positive in
 /-- The real primitive supplies the accepted native application once. The
 literal callee and ordered argument computations are the strict child outputs;
 their original binds complete at the same reached caller state. -/

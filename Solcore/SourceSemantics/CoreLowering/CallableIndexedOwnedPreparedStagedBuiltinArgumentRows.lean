@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStoredArgumentAlignment
@@ -97,6 +98,7 @@ private theorem values_represents
   | cons head _ ih => exact .cons head ih
 
 section Arguments
+variable {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving headers keys bodyRegistry faults profile}
 variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
   {compilation : SourceCoreFunctions.Context} {source : TypedSource} {scope : SourceCoreLocalCell.Scope}
   {id callee : ExpressionId} {ids : List ExpressionId} {metadata : IndirectCallResolution}
@@ -120,7 +122,7 @@ structure Rows : Prop where
   builtin : CallableIndexedBuiltinValues.Represents compiled.indexed world
     function.id.type (.builtin function) carrier compiler.calleeCode.type
   represented : ValuesRep compiled.compatible.checked registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile)
+    (functionModel)
     mapping world function.id.parameterTypes sources values
     (CompatibleBuiltinMeaning.argumentTypes function.id)
 
@@ -142,11 +144,11 @@ theorem at_arguments
       (.function parameter result) (.builtin function) carrier compiler.calleeCode.type)
     (represented : DataExpressionSequence.Values
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
+        (functionModel))
       mapping world sourceTypes (compiler.codes.map (·.type)) sources values)
     (bundle : TypeSystem.Ty.productMany sourceTypes = parameter)
     (originalResult : compiler.original.type = result) :
-    Rows (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
+    Rows (functionModel := functionModel) (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
       (registry := registry) (faults := faults) (profile := profile)
       (mapping := mapping) (world := world) (function := function) (carrier := carrier)
       (sourceTypes := sourceTypes) (sources := sources) (values := values)
@@ -212,11 +214,11 @@ theorem at_callee_post
       calleeNode.type (.builtin function) carrier compiler.calleeCode.type)
     (represented : DataExpressionSequence.Values
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry
-        (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry faults profile))
+        (functionModel))
       mapping world sourceTypes (compiler.codes.map (·.type)) sources values)
     (bundle : TypeSystem.Ty.productMany sourceTypes = parameter)
     (originalResult : compiler.original.type = result) :
-    Rows (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
+    Rows (functionModel := functionModel) (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry)
       (registry := registry) (faults := faults) (profile := profile)
       (mapping := mapping) (world := world) (function := function) (carrier := carrier)
       (sourceTypes := sourceTypes) (sources := sources) (values := values)

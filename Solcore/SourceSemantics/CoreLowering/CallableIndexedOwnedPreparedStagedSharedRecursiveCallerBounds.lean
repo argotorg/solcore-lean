@@ -45,40 +45,30 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 variable {readFuel : Nat}
 
+section Generic
+
 variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
-  (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
   (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
-    (fun index => CallableIndexedOwnedExpressionHeads.Globals (headers := headers)
-      owner compilation.administrativePrefix index.scope index.canonical) callerProtocol)
+    (fun _ => True) callerProtocol)
   (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
     completion.result.extension completion.result.diagnostics)
   {stages : Staging.Recursive.Registry}
-  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled
-    compiled.indexed.ancestry.graph.inputs.callable)
-  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
-  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {semanticFaults : FunctionCalls.FaultRep}
+  (functions : FunctionModel compiled.compatible.checked.catalog
+    (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
   (covers : invocation.evidence.Covers context)
   (unique : NodeOccurrencesUnique invocation.source)
-  (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
   {identities : Dynamic.Value → Word → Prop}
-  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry
     completion.result.context.registry)
   (semantic : ∀ reason token, semanticFaults reason token →
     CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
-  (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
-    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-      bindings parameterCore resultCore), PacketFor association stages)
-  (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
-    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
-      bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
-  (namedTerminals : ∀ header, header ∈ headers → Body header)
 
 variable
   (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
@@ -96,22 +86,20 @@ variable
     Reaches invocation.source [.expression faultRoot] (.expression child) →
     ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
 
-local notation "bridge" => callerBridge.forgetSlots
+local notation "bridge" => callerBridge
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge (headers := headers) (keys := keys)
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
 
-include callerBridge receiver profile wellFormed runtime covers unique
+include callerBridge receiver functions wellFormed runtime covers unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every strict Source child is supplied by structural recursion at its actual
 reached state. The numeric family supplies only the chosen called-body laws below the fixed
 budget; all caller child laws are constructed here. -/
-theorem preserves_reached
+theorem preserves_reached_with_functions
     (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
     (root : Certificate policy body compilation readFuel
@@ -488,11 +476,11 @@ theorem preserves_reached
       intro current child code point
       exact indirectHeads compiler (.here sequence children) sequence size within childMeaning point
 
-include callerBridge receiver profile wellFormed runtime covers unique
+include callerBridge receiver functions wellFormed runtime covers unique
   observations extension semantic sameLedger runtimeLedger uninitializedOn in
 /-- Every child native grade comes from structural recursion. The returned
 Source grade is independent, including exact nested stage failure scope. -/
-theorem reflects_reached
+theorem reflects_reached_with_functions
     (budget : Nat)
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     {rootCode : SourceCoreBasic.LoweredExpr}
@@ -869,5 +857,108 @@ theorem reflects_reached
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize (Nat.le_trans (Nat.le_of_lt _smaller) within) ⟨rfl, rfl, rfl⟩
       intro current child code point
       exact indirectHeads compiler (.here sequence children) sequence size within childMeaning point
+
+end Generic
+
+section Compatibility
+
+variable {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+  (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
+    (fun index => CallableIndexedOwnedExpressionHeads.Globals (headers := headers)
+      owner compilation.administrativePrefix index.scope index.canonical) callerProtocol)
+  (receiver : IssuedAt compiled.indexed completion.entry completion.result.context.registry
+    completion.result.extension completion.result.diagnostics)
+  {stages : Staging.Recursive.Registry}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled
+    compiled.indexed.ancestry.graph.inputs.callable)
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+  (covers : invocation.evidence.Covers context)
+  (unique : NodeOccurrencesUnique invocation.source)
+  (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
+  {identities : Dynamic.Value → Word → Prop}
+  (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
+    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+  (extension : SourceCoreRawMetadata.Extends
+    (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry
+    completion.result.context.registry)
+  (semantic : ∀ reason token, semanticFaults reason token →
+    CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics (.semantic reason) token)
+  (closurePackets : ∀ {mapping world function native bindings parameterCore resultCore}
+    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore), PacketFor association stages)
+  (closureSupport : ∀ {mapping world function native bindings parameterCore resultCore}
+    (association : Association headers keys bodyRegistry semanticFaults mapping world function native
+      bindings parameterCore resultCore), SupportFor association stages (closurePackets association))
+  (namedTerminals : ∀ header, header ∈ headers → Body header)
+
+variable
+  (sameLedger : context.solvedRequirements = compilation.solvedRequirements)
+  (runtimeLedger : RuntimeRequirementLedgerValid context)
+  (uninitialized : ∀ current child code,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt current child code →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
+  {faultRoot : ExpressionId}
+  (uninitializedOn : ∀ current child code,
+    CompatibleExpressionReads.LoweredRead readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt current child code →
+    Reaches invocation.source [.expression faultRoot] (.expression child) →
+    ∀ location, semanticFaults (.uninitializedLocation location) (reasonAt child))
+
+local notation "bridge" => callerBridge.forgetSlots
+
+local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
+  bodyRegistry semanticFaults profile
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
+  completion.result.context.registry functions
+local notation "poolBridge" => CallableIndexedOwnedBodyRestorationAdmission.bridge (headers := headers) (keys := keys)
+local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
+  completion.result.diagnostics
+
+
+include callerBridge receiver profile wellFormed runtime covers unique
+  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+theorem preserves_reached
+    (budget : Nat) {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode)
+    (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
+    PreservesDirect bridge model stages callFaults budget root →
+    PreservesMethod bridge model stages callFaults budget root → IndexReady root →
+    PreservesIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
+      PreservesAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  exact preserves_reached_with_functions callerBridge.forgetSlots receiver functions wellFormed runtime covers unique
+    observations extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
+
+include callerBridge receiver profile wellFormed runtime covers unique
+  observations extension semantic sameLedger runtimeLedger uninitializedOn in
+theorem reflects_reached
+    (budget : Nat)
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    (root : Certificate policy body compilation readFuel
+      (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
+      invocation.source context reasonAt rootScope rootId rootCode)
+    (reached : Reaches invocation.source [.expression faultRoot] (.expression rootId)) :
+    ReflectsDirect bridge model stages callFaults budget root →
+    ReflectsMethod bridge model stages callFaults budget root → IndexReady root →
+    ReflectsIndirect bridge model stages callFaults budget root → ∀ size, size ≤ budget →
+      ReflectsAt bridge context model stages invocation
+        (Point rootScope rootId rootCode) callFaults size := by
+  exact reflects_reached_with_functions callerBridge.forgetSlots receiver functions wellFormed runtime covers unique
+    observations extension semantic sameLedger runtimeLedger uninitializedOn budget root reached
+
+end Compatibility
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds

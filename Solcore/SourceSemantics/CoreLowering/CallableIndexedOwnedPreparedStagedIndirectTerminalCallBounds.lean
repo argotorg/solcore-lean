@@ -124,7 +124,7 @@ theorem reflects_parent
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore := by
   rcases CallableIndexedOwnedPreparedStagedIndirectTerminalReflectionDispatch.reflects_parent_or_global
@@ -164,7 +164,7 @@ theorem preserves_parent (budget : Nat)
     (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
       invocation context environment before id outcome after)
     (within : size ≤ budget) :
-    ParentAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial size outcome after := by
   rcases CallableIndexedOwnedPreparedStagedIndirectTerminalPreservationDispatch.preserves_parent_or_global

@@ -110,12 +110,12 @@ theorem preserves_closure_or_global
     (called : Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages applicationSize
       invocation context argumentsHeap sourceValue sources outcome after)
     (within : applicationSize ≤ budget)
-    (prefixResult : CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix
+    (prefixResult : CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix (functionModel := functions)
       (registry := completion.result.context.registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial sourceValue calleeHeap argumentsHeap sources) :
-    ParentAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentAt (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial
       (Staging.Recursive.Size.stepSize [calleeSize, argumentsSize, applicationSize]) outcome after ∨
@@ -234,11 +234,11 @@ theorem reflects_closure_or_global
         (CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions)
         stages semanticFaults callFaults childSize)
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
-    (user : UserApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
+    (user : UserApplicationPrefix (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry)
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) :
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functions) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore ∨
     GlobalApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)

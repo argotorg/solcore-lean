@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBuiltinParentBounds
@@ -26,6 +27,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry}
   {invocation : Staging.Recursive.Scope}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -42,8 +47,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {sourceTypes : List TypeSystem.Ty} {calleeNode : ExpressionNode}
   {sidecar : SourceCoreStageContracts.Sidecar}
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
@@ -84,14 +88,15 @@ def UserApplicationPrefix (budget : Nat) (value : Value) (finalStore : Store) : 
           compiled.indexed.ancestry.graph.inputs.callable.diagnostics.unknown (.second (.var 2)))
         (.apply (.second (.first (.var 3))) (.var 1))) value finalStore ∧ suffixSize < budget
 
+omit positive in
 /-- Forgetting only the positive user classification keeps the original full
 retained callee post and every transient argument effect. -/
 theorem UserApplicationPrefix.to_retained {budget : Nat} {value : Value} {finalStore : Store}
-    (user : UserApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
+    (user : UserApplicationPrefix (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry)
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore) :
-    CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeArgumentPrefix.ApplicationPrefix
+    CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeArgumentPrefix.ApplicationPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (registry := completion.result.context.registry) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual) (ξ := ξ)
@@ -131,25 +136,25 @@ variable (sourceParent : CallableIndexedOwnedIndirectSourceAdapters.SourceParent
   (actualFunctionType : policy.callables.functionType = CallableContract.functionType)
   {identities : Dynamic.Value → Word → Prop}
   (observations : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile) identities)
+    (functionModel) identities)
 
-include sourceParent occurrence preparedStages receiver actualFunctionType observations in
+include positive sourceParent occurrence preparedStages receiver actualFunctionType observations in
 /-- No callee or argument is replayed. The genuine prefix's selected BoundaryAt
 either retains its user suffix, or decides builtin physical arity internally.
 An accepted builtin uses the original complete parent reflection once. -/
 theorem reflects_builtin_or_user {budget size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
-    (retained : CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeArgumentPrefix.ApplicationPrefix
+    (retained : CallableIndexedOwnedPreparedStagedIndirectRetainedCalleeArgumentPrefix.ApplicationPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (registry := completion.result.context.registry) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual) (ξ := ξ)
       (sourceTypes := sourceTypes) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial budget value finalStore) :
-    UserApplicationPrefix (completion := completion) (bodyRegistry := bodyRegistry)
+    UserApplicationPrefix (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry)
       (semanticFaults := semanticFaults) (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial budget value finalStore ∨
-    ParentResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ParentResult (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) bridge profile compiler initial value finalStore := by
   obtain ⟨rawParameter, rawResult, functionType, bundle, resultType, calleeSize, argumentsSize,
@@ -176,7 +181,7 @@ theorem reflects_builtin_or_user {budget size : Nat} {value : Value} {finalStore
         CallableIndexedOwnedPreparedStagedBuiltinParentBounds.reflects_suffix
           bridge compiler prepared sourceParent occurrence initial reached related admitted
           finalHeaps maps worlds frame heapMetadata observations receipt count actualFunctionType
-          valueTyped representedCallee representedValues bundle resultType child arguments suffix (Nat.le_of_lt strict)
+          valueTyped (representedCallee.map_functions (CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual.erase (headers := headers) (keys := keys) (bodyRegistry := bodyRegistry) (faults := semanticFaults) (profile := profile))) representedValues bundle resultType child arguments suffix (Nat.le_of_lt strict)
       cases sameStore
       exact .inr ⟨Staging.Recursive.Size.stepSize [calleeSize, argumentsSize, Staging.Recursive.Size.stepSize []],
         .value sourceResult, argumentsHeap, finalMap, finalWorld, parentTrace, completed.sound, resultRep,

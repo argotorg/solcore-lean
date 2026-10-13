@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentFaultBounds
 
 /-! Source preservation constructs the callee and ordered argument prefix
@@ -22,6 +23,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context}
   {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
@@ -44,7 +49,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -62,7 +67,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (unique : NodeOccurrencesUnique invocation.source)
   (parentTyped : ExpressionHasType invocation.source context id compiler.original.type)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
 
 
@@ -99,7 +104,7 @@ def ValuesPrefix (sourceValue : Dynamic.Value) (calleeHeap argumentsHeap : Dynam
     ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, argumentsHeap, argumentsStore, canonical⟩,
       callerProtocol.Relates initial reached ∧ Admission bridge context reached
 
-include prepared sourceEq certified found sourceTyped environments heaps locals agrees typed admitted
+include positive prepared sourceEq certified found sourceTyped environments heaps locals agrees typed admitted
   caller view originalUnique guardFrame sourceParent tree unique parentTyped in
 /-- Strict callee preservation and the real ordered argument fold construct
 the full prefix once. The returned admission belongs to the argument endpoint. -/
@@ -114,7 +119,7 @@ theorem preserves_values (budget : Nat)
     (argumentsTrace : Staging.Recursive.Size.Expressions (Program.ofChecked compiled.sourceProgram) stages argumentsSize
       invocation context environment calleeHeap ids (.values sources) argumentsHeap)
     (within : Staging.Recursive.Size.stepSize [calleeSize, argumentsSize] ≤ budget) :
-    ValuesPrefix (registry := registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ValuesPrefix (functionModel := functionModel) (registry := registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (actual := actual) (ξ := ξ)
       (sourceTypes := sourceTypes) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial sourceValue calleeHeap argumentsHeap sources := by

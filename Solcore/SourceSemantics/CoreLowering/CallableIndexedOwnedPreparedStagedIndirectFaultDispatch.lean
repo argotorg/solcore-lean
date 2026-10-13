@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectFirstGateBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingFirstCallGateRejection
@@ -51,6 +52,10 @@ variable {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyL
 section PositiveModel
 variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {certificate : GenericExpressionMeaning.Certificate}
   (certified : certificate scope callee compiler.calleeCode)
   (found : source.lookupExpression? callee = some calleeNode)
@@ -59,7 +64,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -73,8 +78,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (unique : NodeOccurrencesUnique invocation.source)
   (parentTyped : ExpressionHasType invocation.source context id compiler.original.type)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
@@ -92,7 +96,7 @@ def FaultResult (value : Value) (finalStore : Store) : Prop :=
       (actual := actual) (ξ := ξ) bridge functions compiler initial
       failure after token finalStore finalMap finalWorld
 
-include receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
+include positive receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
   sourceParent tree unique parentTyped in
 /-- The actual whole parent is inverted once. Every reached callee, first-gate
@@ -104,11 +108,11 @@ theorem reflects_fault_or_application (budget : Nat)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store (lowered.expression.rename ξ) value finalStore)
     (within : size ≤ budget) :
-    FaultResult (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    FaultResult (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation)
       (environment := environment) (actual := actual) (ξ := ξ)
       bridge compiler initial profile value finalStore ∨
-    CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ApplicationPrefix
+    CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.ApplicationPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (registry := completion.result.context.registry) (context := context)
       (stages := stages) (invocation := invocation) (environment := environment)

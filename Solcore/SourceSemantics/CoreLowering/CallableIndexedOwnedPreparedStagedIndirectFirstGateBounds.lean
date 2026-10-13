@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReceivingFirstCallGateRejection
@@ -126,6 +127,10 @@ end Constructor
 section PositiveModel
 variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
   (certified : certificate scope callee compiler.calleeCode)
   (found : source.lookupExpression? callee = some calleeNode)
@@ -134,7 +139,7 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -148,14 +153,13 @@ variable {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : Funct
   (unique : NodeOccurrencesUnique invocation.source)
   (parentTyped : ExpressionHasType invocation.source context id compiler.original.type)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys
-  bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked
   completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults
   completion.result.diagnostics
 
-include receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
+include positive receiver prepared stagePrepared sourceEq occurrence certified found sourceTyped
   environments heaps locals agrees typed admitted caller view originalUnique guardFrame
   sourceParent tree unique parentTyped in
 /-- Strict Source descent supplies the actual successful callee post. Positive
@@ -210,11 +214,12 @@ theorem preserves_rejected (budget : Nat)
             (.builtin function) rejected)
 
 include receiver prepared stagePrepared sourceEq occurrence view guardFrame in
+omit positive in
 /-- The real reflected first-gate prefix already retains its strict native
 callee and independent Source grade. Its literal selected row supplies the
 receiving token, completing this branch at the same final store and witness. -/
 theorem reflects_rejected_prefix (budget : Nat) {value : Value} {finalStore : Store}
-    (rejectedPrefix : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.StageRejectedPrefix
+    (rejectedPrefix : CallableIndexedOwnedPreparedStagedIndirectArgumentPrefix.StageRejectedPrefix (functionModel := functionModel)
       (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (registry := completion.result.context.registry) (context := context) (stages := stages)
       (invocation := invocation) (environment := environment) (actual := actual) (ξ := ξ)

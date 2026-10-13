@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectValuesPrefix
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectFirstGateBounds
@@ -124,6 +125,10 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
   (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
   (profile : compiled.compatible.checked.catalog.callableContracts = true)
+  {functionModel : CallableIndexedOwnedPositiveFunctionModels.Receiving
+    headers keys bodyRegistry semanticFaults profile}
+  [positive : CallableIndexedOwnedPositiveFunctionModels.ErasesToContextual
+    headers keys bodyRegistry semanticFaults profile functionModel]
   {context : SourceSemantics.Context} {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
   {certificate : GenericExpressionMeaning.Certificate}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -146,7 +151,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (environments : DataHeap.EnvRepresents (CompatibleEquality.storageCatalog compiled.compatible.checked.catalog)
     mapping world administrative scope environment canonical compiled.indexed.layouts.definitions)
   (heaps : CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked completion.result.context.registry
-    (CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile)
+    (functionModel)
     mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : EnvironmentsAgree ξ canonical actual)
@@ -168,7 +173,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
     completion.result.context.registry completion.result.extension completion.result.diagnostics)
 
-local notation "functions" => CallableIndexedOwnedContextualCellOrigins.functions headers keys bodyRegistry semanticFaults profile
+local notation "functions" => functionModel
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
@@ -201,13 +206,13 @@ def ApplicationAt (budget size : Nat) (outcome : Staging.Recursive.Outcome) (aft
       invocation context environment calleeHeap ids (.values sources) argumentsHeap ∧
     Staging.Recursive.Size.Applies (Program.ofChecked compiled.sourceProgram) stages applicationSize
       invocation context argumentsHeap sourceValue sources outcome after ∧
-    CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix
+    CallableIndexedOwnedPreparedStagedIndirectValuesPrefix.ValuesPrefix (functionModel := functionModel)
       (registry := completion.result.context.registry) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes)
       (calleeNode := calleeNode) (sidecar := sidecar) bridge profile compiler prepared initial
       sourceValue calleeHeap argumentsHeap sources
 
-include prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
+include positive prepared sourceEq occurrence certified found sourceTyped environments heaps locals agrees typed admitted
   caller view originalUnique guardFrame sourceParent tree unique parentTyped stagePrepared receiver in
 /-- The literal original Source trace selects a branch once. Its three prefix
 failure constructors produce the complete native parent. The actual successful
@@ -219,9 +224,9 @@ theorem preserves_fault_or_application (budget : Nat)
     (trace : Staging.Recursive.Size.Expression (Program.ofChecked compiled.sourceProgram) stages size
       invocation context environment before id outcome after)
     (within : size ≤ budget) :
-    NativeResultAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    NativeResultAt (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (actual := actual) (ξ := ξ) bridge profile compiler initial outcome after ∨
-    ApplicationAt (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
+    ApplicationAt (functionModel := functionModel) (completion := completion) (bodyRegistry := bodyRegistry) (semanticFaults := semanticFaults)
       (context := context) (stages := stages) (invocation := invocation) (environment := environment)
       (actual := actual) (ξ := ξ) (sourceTypes := sourceTypes) (calleeNode := calleeNode) (sidecar := sidecar)
       bridge profile compiler prepared initial budget size outcome after := by
