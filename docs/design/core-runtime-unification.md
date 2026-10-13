@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Generated direct-call certificates through public execution (2026-10-13)
+
+`a0cabf84` derives evidence-aware scoped support from executable certificates on the original cached Source. `cd13d9d5` connects it to the existing `relay(value) { let local = identity(value); return local; }` public proof.
+
+The actual three-row cache supplies the nonempty direct-call table. Complete ordinary inventory coverage identifies each physical row and derives table alignment internally. Authentic Header transport preserves the complete cached function, original Source, ordered statement roots and result type. Independent Header typing supplies lexical contexts; accepted compilation supplies the body receipt. No caller supplies a child execution law.
+
+The existing sequence `make10 / make20 / A10 / make30 / B20 / A11` retains all six Source/public meaning and sufficient-fuel endpoints. The checker success is observed before any classical Header selection.
+
+Validation: coherent checks for 23 affected modules, the full build (7,142 jobs), registered tests (14,154 build jobs and final pass marker), kernel policy and 307 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Certification remains an additional static condition, with the current let/return and expression grammar. This connection uses the existing complete ordinary inventory; it does not establish that every compilation is certifiable. Factory formation, retained coerced bodies, broader syntax and preservation across all actual passes remain unfinished.
+
+The next connection should derive returned-lambda factory formation from actual cached Source, then move the shared public session proof into a reusable production interface.
+
 ## Executable named Source admission in public proofs (2026-10-13)
 
 `c76aef63` adds executable certification of original named Source and actual cached direct callees. `edab7dac` connects the generated body support to the existing seven-call public proof.

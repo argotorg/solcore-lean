@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Generated direct-call certificates through public execution (2026-10-13)
+
+`a0cabf84` derives evidence-aware scoped support from executable certificates on the original cached Source. `cd13d9d5` connects it to the existing `relay(value) { let local = identity(value); return local; }` public proof.
+
+The actual three-row cache supplies the nonempty direct-call table. Complete ordinary inventory coverage identifies each physical row and derives table alignment internally. Authentic Header transport preserves the complete cached function, original Source, ordered statement roots and result type. Independent Header typing supplies lexical contexts; accepted compilation supplies the body receipt. No caller supplies a child execution law.
+
+The existing sequence `make10 / make20 / A10 / make30 / B20 / A11` retains all six Source/public meaning and sufficient-fuel endpoints. The checker success is observed before any classical Header selection.
+
+Validation: coherent checks for 23 affected modules, the full build (7,142 jobs), registered tests (14,154 build jobs and final pass marker), kernel policy and 307 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Certification remains an additional static condition, with the current let/return and expression grammar. This connection uses the existing complete ordinary inventory; it does not establish that every compilation is certifiable. Factory formation, retained coerced bodies, broader syntax and preservation across all actual passes remain unfinished.
+
+Review confirmed full cache-row identity, complete original metadata checking (including unused expression nodes), genuine Header typing and accepted compilation. The requirements refinement rejects operator evidence outside the evidence-scoped grammar; it does not discard those nodes. The public theorem signatures and real predecessor session/history chain remain unchanged.
+
 ## Executable named Source admission in public proofs (2026-10-13)
 
 Commits `c76aef63` and `edab7dac` remove manually assembled Source syntax/metadata support for the ordinary keep/use bodies in the public coercion sequence. The audit checked these boundaries:

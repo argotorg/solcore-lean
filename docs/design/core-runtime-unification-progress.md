@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generated direct-call certificates through public execution (2026-10-13)
+
+`a0cabf84` derives evidence-aware scoped support from executable certificates on the original cached Source. `cd13d9d5` connects it to the existing `relay(value) { let local = identity(value); return local; }` public proof.
+
+The actual three-row cache supplies the nonempty direct-call table. Complete ordinary inventory coverage identifies each physical row and derives table alignment internally. Authentic Header transport preserves the complete cached function, original Source, ordered statement roots and result type. Independent Header typing supplies lexical contexts; accepted compilation supplies the body receipt. No caller supplies a child execution law.
+
+The existing sequence `make10 / make20 / A10 / make30 / B20 / A11` retains all six Source/public meaning and sufficient-fuel endpoints. The checker success is observed before any classical Header selection.
+
+Validation: coherent checks for 23 affected modules, the full build (7,142 jobs), registered tests (14,154 build jobs and final pass marker), kernel policy and 307 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Certification remains an additional static condition, with the current let/return and expression grammar. This connection uses the existing complete ordinary inventory; it does not establish that every compilation is certifiable. Factory formation, retained coerced bodies, broader syntax and preservation across all actual passes remain unfinished.
+
+The relay support route no longer depends on its per-fixture expression-syntax or metadata lemmas. Existing factory and retained-closure semantics are reused unchanged.
+
 ## Executable named Source admission in public proofs (2026-10-13)
 
 `c76aef63` adds four production proof modules. `NamedSyntaxAdmission` scans original expression syntax and all relevant lookupable metadata nodes, including unused nodes. `NamedScopedAdmission` derives the lexical statement certificate from genuine Header typing and issues support from accepted body compilation. `OrdinarySyntaxTable` checks actual cached ordinary rows, including complete raw replacement formation. `NamedCatalogAdmission` combines the table and source scanners and closes the proof transfer into the catalog.

@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generated direct-call certificates through public execution (2026-10-13)
+
+`a0cabf84` derives evidence-aware scoped support from executable certificates on the original cached Source. `cd13d9d5` connects it to the existing `relay(value) { let local = identity(value); return local; }` public proof.
+
+The actual three-row cache supplies the nonempty direct-call table. Complete ordinary inventory coverage identifies each physical row and derives table alignment internally. Authentic Header transport preserves the complete cached function, original Source, ordered statement roots and result type. Independent Header typing supplies lexical contexts; accepted compilation supplies the body receipt. No caller supplies a child execution law.
+
+The existing sequence `make10 / make20 / A10 / make30 / B20 / A11` retains all six Source/public meaning and sufficient-fuel endpoints. The checker success is observed before any classical Header selection.
+
+Validation: coherent checks for 23 affected modules, the full build (7,142 jobs), registered tests (14,154 build jobs and final pass marker), kernel policy and 307 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Certification remains an additional static condition, with the current let/return and expression grammar. This connection uses the existing complete ordinary inventory; it does not establish that every compilation is certifiable. Factory formation, retained coerced bodies, broader syntax and preservation across all actual passes remain unfinished.
+
+`NamedSourceAdmissionTransport.cached_named`, `header_data` and `source_at_header` recover exact cached/Header identity. `table_aligned_of_complete` derives scanned-row membership from the actual cache slots. `NamedEvidenceAdmission.certifySource` combines source admission with a check of the original requirements on every expression. `receipt` and `of_receipt` issue the accepted body receipt and existing evidence-scoped support.
+
 ## Executable named Source admission in public proofs (2026-10-13)
 
 Commits `c76aef63` and `edab7dac` add static certification without changing the public runtime API.
