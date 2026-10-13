@@ -111,7 +111,8 @@ theorem calls_ready {named : CallableIndexedNamedGeneration.Named}
     (typed : ExpressionHasType invocation.source context rootId rootType)
     (root : Certificate code.policy code.lowerBody code.compilation compiled.indexed.fuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
-      invocation.source context code.reasonAt rootScope rootId rootCode) :
+      invocation.source context code.reasonAt rootScope rootId rootCode)
+    (rootSyntax : GeneralSyntax invocation.source rootId) :
     CallsReady (compiled := compiled) (invocation := invocation) root := by
   rcases invocation with ⟨origin, actualSource, owned, invocationContext, evidence, guards⟩
   have sameSource : actualSource = function.source := ((RecursiveNamedPreparedStageScopes.registry stagePrepared)).source selected
@@ -121,7 +122,7 @@ theorem calls_ready {named : CallableIndexedNamedGeneration.Named}
   have guardFrame := RecursiveNamedPreparedScopeCoherence.selected_frame stagePrepared accepted wellFormed signatureMember sourceOwner
     issued sourceReceipt selected
   intro callFuel callScope callId callee ids callMetadata lowered compiler path
-  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax path
+  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax_of path rootSyntax
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.retained_policy_for_native
     retained metadata callScope code.reasonAt
   have parentTyped := CallableIndexedOwnedPreparedStagedRecursiveCallerRawTyping.parent_typed

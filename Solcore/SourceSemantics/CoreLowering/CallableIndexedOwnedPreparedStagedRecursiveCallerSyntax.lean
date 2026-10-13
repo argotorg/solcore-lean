@@ -9,7 +9,7 @@ set_option Elab.async false
 set_option maxRecDepth 8192
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax
 open Core Frontend SourceInference
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls DirectCalls Indexes Syntax GeneralSyntax NoDirect NoIndexes)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls DirectCalls Indexes Syntax GeneralSyntax OrdinarySyntax NoDirect NoIndexes)
 
 theorem syntax_child {source : TypedSource} {id child : ExpressionId}
     {node : ExpressionNode} (tree : Syntax source id)
@@ -149,7 +149,7 @@ The physical argument rows are retained; no occurrence set replaces them. -/
 theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (tree : Certificate policy body compilation readFuel values source context reasonAt scope id lowered) :
-    GeneralSyntax source id := by
+    OrdinarySyntax compilation.plan source id := by
   induction tree with
   | leaf tree =>
     obtain ⟨product, _literalSites⟩ := tree
@@ -172,7 +172,7 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
     obtain ⟨code, paired⟩ := zip_member (sequence_length sequence) member
     exact ih child code paired
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children ih =>
-    refine .direct compiler.metadata.found compiler.form compiler.monomorphic ?_
+    refine .direct compiler.metadata.found compiler.form compiler.ordinary ?_
     intro child member
     obtain ⟨code, paired⟩ := zip_member (sequence_length sequence) member
     exact ih child code paired
@@ -207,7 +207,7 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
     {rootCode : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel values source context
       reasonAt rootScope rootId rootCode}
-    (path : Calls compiler root) : GeneralSyntax source callId := by
+    (path : Calls compiler root) : OrdinarySyntax compilation.plan source callId := by
   induction path with
   | here sequence children => exact certificate_syntax (.call compiler sequence children)
   | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
@@ -228,7 +228,7 @@ theorem direct_calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Sc
     {rootCode : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel values source context
       reasonAt rootScope rootId rootCode}
-    (path : DirectCalls compiler root) : GeneralSyntax source callId := by
+    (path : DirectCalls compiler root) : OrdinarySyntax compilation.plan source callId := by
   induction path with
   | here calleeTyped application sequence children => exact certificate_syntax (.direct compiler calleeTyped application sequence children)
   | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
@@ -390,7 +390,7 @@ theorem indexes_syntax
     {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId} {rootCode : SourceCoreBasic.LoweredExpr}
     {root : Certificate policy body compilation readFuel values source context reasonAt rootScope rootId rootCode}
     (path : Indexes (indexScope := indexScope) indexed keyFound form sourceType scalar root) :
-    GeneralSyntax source indexId := by
+    OrdinarySyntax compilation.plan source indexId := by
   induction path with
   | here firstTree secondTree => exact certificate_syntax (.index indexed keyFound form sourceType scalar firstTree secondTree)
   | group _inside ih | index_base _inside ih | index_key _inside ih => exact ih
@@ -455,5 +455,56 @@ theorem indexes_reached
   | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
   | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
     exact ih (.expression reached header.metadata.found (by simp [form, ExpressionForm.references]))
+
+theorem calls_syntax_of {directSites : DeclarationInstantiation → Prop} {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
+    {callId callee : ExpressionId} {ids : List ExpressionId}
+    {metadata : IndirectCallResolution} {lowered : SourceCoreBasic.LoweredExpr}
+    {compiler : CallableIndirectCallCertificates.Receipt policy body callFuel compilation
+      source callScope callId callee ids metadata reasonAt lowered}
+    {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
+    {rootCode : SourceCoreBasic.LoweredExpr}
+    {root : Certificate policy body compilation readFuel values source context
+      reasonAt rootScope rootId rootCode}
+    (path : Calls compiler root) (tree : GeneralSyntax source rootId directSites) : GeneralSyntax source callId directSites := by
+  induction path with
+  | here sequence children => exact tree
+  | @group scope id node inner innerNode code actual form found sourceType child inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree actual.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @tuple_child scope id node tupleIds types codes header sequence children child childCode member inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
+      simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, header.form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @constructor_child scope id node instantiation constructorIds tag headerWord codes header form admissible ranges count nodes sequence children child childCode member inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
+      simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references, (List.of_mem_zip member).1]))
+  | @builtin_child scope id otherCallee otherIds function otherFuel code outer calleeTyped sourceType nativeTypes sequence children child childCode member inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree outer.metadata.found (by
+      simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.form, (List.of_mem_zip member).1]))
+  | @direct_child scope id otherCallee otherIds instantiation otherFuel code types outer calleeTyped application sequence children child childCode member inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree outer.metadata.found (by
+      simp [outer.form, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, (List.of_mem_zip member).1]))
+  | @call_child scope id otherCallee otherIds metadata otherFuel code types outer sequence children child childCode member inside ih =>
+    apply ih
+    apply CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree outer.found
+    rcases List.mem_cons.mp member with same | remaining
+    · cases same
+      simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.originalForm, ExpressionForm.references]
+    · simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
+  | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @conditional_then scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+  | @conditional_else scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
+
+  | @index_base scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih
+  | @index_key scope id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree inside ih =>
+    exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree header.metadata.found (by
+      simp [form, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, ExpressionForm.references]))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax

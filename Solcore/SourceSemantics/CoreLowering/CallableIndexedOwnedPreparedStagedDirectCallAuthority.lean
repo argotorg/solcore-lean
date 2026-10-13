@@ -32,31 +32,9 @@ structure Ready (catalog : List (CallableIndexedOwnedFunctionValues.Header compi
   specialized : header.named.specialized = receipt.specialized
   metadata : instantiation = header.instantiation
 
-private theorem equivalent_empty_left
-    {left right : TypeSystem.ParameterSubstitution}
-    (equivalent : SourceCompilationPlan.parameterSubstitutionsEquivalent left right = true)
-    (empty : right = []) : left = [] := by
-  have length : left.length = right.length := by
-    simp only [SourceCompilationPlan.parameterSubstitutionsEquivalent,
-      Bool.and_eq_true, beq_iff_eq] at equivalent
-    exact equivalent.1.1
-  apply List.length_eq_zero_iff.mp
-  simpa [empty] using length
-
-private theorem equivalent_empty_right
-    {left right : TypeSystem.ParameterSubstitution}
-    (equivalent : SourceCompilationPlan.parameterSubstitutionsEquivalent left right = true)
-    (empty : left = []) : right = [] := by
-  have length : left.length = right.length := by
-    simp only [SourceCompilationPlan.parameterSubstitutionsEquivalent,
-      Bool.and_eq_true, beq_iff_eq] at equivalent
-    exact equivalent.1.1
-  apply List.length_eq_zero_iff.mp
-  simpa [empty] using length.symm
-
-/-- Only the actual successful signature selection is covered. Empty actual
-substitution domains remove permutation ambiguity, without identifying any
-Header or Source graph merely from a declaration key. -/
+/-- The actual matching record and each authentic Header retain the Source
+inference order. Their complete metadata then agrees, including nonempty
+substitutions; declaration keys alone do not determine this equality. -/
 theorem of_complete
     {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
     (complete : RecursiveNamedCatalogNativeContexts.Complete
@@ -64,7 +42,10 @@ theorem of_complete
       (values := .initial compiled.compatible.checked)
       (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) catalog)
     (plan : compilation.plan = compiled.indexed.base.plan)
-    (globals : compilation.globals = compiled.indexed.base.globals) :
+    (globals : compilation.globals = compiled.indexed.base.globals)
+    (ordered : ∀ header, header ∈ catalog →
+      header.instantiation.parameterSubstitution.map Prod.fst =
+        (header.named.specialized.parameterSubstitution.map Prod.fst).reverse) :
     Nonempty (Ready receipt catalog) := by
   have selected := (NamedCalls.selected_signature_target receipt.selected).2
   rw [globals] at selected
@@ -78,10 +59,10 @@ theorem of_complete
   have headerTarget := header.target
   rw [signature, ← plan] at headerTarget
   have headerMatch := CallableNamedMetadata.matches_of_exact headerTarget receipt.record
-  have empty := equivalent_empty_left occurrence.substitution receipt.monomorphic.substitution
-  have headerEmpty := equivalent_empty_right headerMatch.substitution empty
-  have occurrenceEq := occurrence.canonical (by simp [empty, receipt.monomorphic.substitution])
-  have headerEq := headerMatch.canonical (by simp [empty, headerEmpty])
+  have occurrenceEq := occurrence.retained_canonical
+    (receipt.ordinary.ordered _ _ (NamedCalls.selected_signature_target receipt.selected).1 receipt.record)
+  have headerEq := headerMatch.retained_canonical (by
+    simpa only [← specialized] using ordered header member)
   exact ⟨⟨header, member, slot, signature, specialized, occurrenceEq.trans headerEq.symm⟩⟩
 
 /-- Independently typed declaration application fixes the original parameter
@@ -129,6 +110,7 @@ theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
     (globals : compilation.globals = compiled.indexed.base.globals) :
     Nonempty (Port receipt (headers rows)) := by
   obtain ⟨ready⟩ := of_complete receipt complete plan globals
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.ordered rows)
   obtain ⟨input, packet, _retained, same⟩ := rows.mem_headers ready.header ready.member
   have aligned := packet.aligned
   have metadata : (CallableNamedCanonicalOrder.retainedInstantiation input.row) = instantiation :=

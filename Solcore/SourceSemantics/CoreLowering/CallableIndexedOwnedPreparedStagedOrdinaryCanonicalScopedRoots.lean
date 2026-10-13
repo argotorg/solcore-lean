@@ -108,7 +108,7 @@ theorem of_child
     CallableIndexedOwnedPreparedStagedOrdinaryGeneralCallsReady.calls_ready stagePrepared
       code provenance.policy_recipe metadata support.source_receipt support.unique
       (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed signatureMember sourceOwner
-      selected childTyped certificate
+      selected childTyped certificate childTree
   let root : RootData compiled code.policy code.lowerBody code.compilation compiled.indexed.fuel
       context child code.reasonAt current id lowered node.type faults := {
     compilerFuel := fuel

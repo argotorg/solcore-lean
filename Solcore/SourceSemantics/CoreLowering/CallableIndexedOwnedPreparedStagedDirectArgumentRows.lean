@@ -2,8 +2,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDi
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedArgumentRows
 
 /-! Direct declaration calls retain the independently typed Source argument
-row. Empty actual declaration substitution and predicates recover callable
-validity and its exact dictionary; authentic compiler bundles align native
+row. Every raw replacement is closed; original Source admissibility recovers
+its validity. Empty predicates identify the exact dictionary; authentic compiler bundles align native
 arguments only after the Source row supplies physical arity. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -33,10 +33,8 @@ theorem callee_receipt
   cases calleeValid with
   | intro contains form admissible _ requirements coercions =>
     refine ⟨_, ⟨_, contains, form, requirements, coercions⟩,
-      CompatibleSourceInstantiationClosure.declaration_valid admissible runtime.variables_closed ?_⟩
-    intro parameter replacement member
-    rw [receipt.monomorphic.substitution] at member
-    cases member
+      CompatibleSourceInstantiationClosure.declaration_valid admissible runtime.variables_closed
+        receipt.ordinary.ranges⟩
 
 include receipt in
 theorem evidence_eq_empty {evidence : Dynamic.EvidenceEnvironment}
@@ -45,14 +43,14 @@ theorem evidence_eq_empty {evidence : Dynamic.EvidenceEnvironment}
   cases produced with
   | intro _ _ produces =>
     have length := produces.length_eq.2
-    rw [receipt.monomorphic.predicates] at length
+    rw [receipt.ordinary.predicates] at length
     exact List.length_eq_zero_iff.mp length.symm
 
 include receipt in
 theorem empty_evidence (context : SourceSemantics.Context)
     (caller : Dynamic.EvidenceEnvironment) :
     Dynamic.DirectCallProducesEvidence context caller [] [] instantiation.predicates [] := by
-  rw [receipt.monomorphic.predicates]
+  rw [receipt.ordinary.predicates]
   exact .intro (selected := []) (contextual := []) rfl rfl .nil
 
 include receipt port in
@@ -111,7 +109,7 @@ theorem at_successful_arguments
     have portCovers : port.function.evidence.Covers
         ((SourceSemantics.Context.ofSignatures context.signatures).withAssumptions
           port.function.instantiation.predicates) := by
-      rw [port.sourceEvidence, port.sourceInstantiation, receipt.monomorphic.predicates]
+      rw [port.sourceEvidence, port.sourceInstantiation, receipt.ordinary.predicates]
       constructor
       · intro goal evidence found
         cases found

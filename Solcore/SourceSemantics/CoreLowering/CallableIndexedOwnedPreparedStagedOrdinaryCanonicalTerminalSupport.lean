@@ -133,7 +133,7 @@ def at_scope
       (compiled := compiled) (invocation := child) certificate :=
     CallableIndexedOwnedPreparedStagedOrdinaryGeneralCallsReady.calls_ready stagePrepared
       code provenance.policy_recipe metadata support.source_receipt support.unique (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled)
-      wellFormed signatureMember sourceOwner selected properties.2 certificate
+      wellFormed signatureMember sourceOwner selected properties.2 certificate syntaxTree
   let root : RootData compiled code.policy code.lowerBody code.compilation compiled.indexed.fuel
       support.body.toContext.context child code.reasonAt (parameterScope code)
       packet.expression packet.receipt.child function.resultType faults := {

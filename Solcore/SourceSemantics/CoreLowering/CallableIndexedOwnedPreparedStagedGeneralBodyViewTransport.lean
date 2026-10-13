@@ -15,6 +15,8 @@ open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (GeneralSynta
 open CallableIndexedOwnedPreparedStagedGeneralBodyViewSyntax
 open CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport
 
+variable {directSites : DeclarationInstantiation → Prop}
+
 private theorem mapM_eq_of_members {α β ε : Type} {items : List α}
     {left right : α → Except ε β} (same : ∀ item, item ∈ items → left item = right item) :
     items.mapM left = items.mapM right := by
@@ -41,7 +43,7 @@ private inductive FormInFragment : ExpressionForm → Prop where
   | conditional {test yes no} : FormInFragment (.conditional test yes no)
 
 private theorem syntax_form {source : TypedSource} {id : ExpressionId} {node : ExpressionNode}
-    (tree : GeneralSyntax source id) (found : source.lookupExpression? id = some node) :
+    (tree : GeneralSyntax source id directSites) (found : source.lookupExpression? id = some node) :
     FormInFragment node.form := by
   cases tree with
   | leaf finite =>
@@ -127,17 +129,17 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
   {reasonAt : ExpressionId → Word}
   (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
     policy compilation readFuel values source scope reasonAt
-      (fun id => Reaches source roots (.expression id)))
+      (fun id => Reaches source roots (.expression id)) directSites)
   (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
     policy compilation readFuel values view scope reasonAt
-      (fun id => Reaches view roots (.expression id)))
+      (fun id => Reaches view roots (.expression id)) directSites)
   {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
   (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
   (readView : ∀ id, Reaches source roots (.expression id) →
     policy.readExpression source id = policy.readExpression view id)
 include edited avoids sourceProfile viewProfile
 
-private theorem policy_read_eq {id : ExpressionId} (tree : GeneralSyntax source id)
+private theorem policy_read_eq {id : ExpressionId} (tree : GeneralSyntax source id directSites)
     (reached : Reaches source roots (.expression id)) :
     policy.readExpression source id = policy.readExpression view id := by
   rw [sourceProfile.read id reached tree,
@@ -146,7 +148,7 @@ private theorem policy_read_eq {id : ExpressionId} (tree : GeneralSyntax source 
 
 include callables readView in
 private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : ExpressionNode}
-    (tree : GeneralSyntax source id) (reached : Reaches source roots (.expression id))
+    (tree : GeneralSyntax source id directSites) (reached : Reaches source roots (.expression id))
     (found : source.lookupExpression? id = some node)
     (children : ∀ child, RuntimeChild node.form child →
       SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope child reasonAt =
@@ -398,7 +400,7 @@ reached node of the supported recursive grammar. Compiler fuel is identical;
 child equalities follow its real predecessor recursion, including ordered
 vectors. No evaluator, raw-type cast, or arbitrary source-insensitive policy is
 assumed. -/
-theorem compiler_eq_on (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax source id)
+theorem compiler_eq_on (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax source id directSites)
     (reached : Reaches source roots (.expression id)) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt =
       SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope id reasonAt := by
@@ -415,7 +417,7 @@ include callables readView in
 same factory action, after its actual recursive syntax has been transported.
 Raw typing and declaration authority remain original-source issuer inputs. -/
 theorem accepted_original_on (fuel : Nat) {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
-    (tree : GeneralSyntax view id) (reached : Reaches source roots (.expression id))
+    (tree : GeneralSyntax view id directSites) (reached : Reaches source roots (.expression id))
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
       compilation view scope id reasonAt = .ok lowered) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
@@ -432,9 +434,9 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
   {values : SourceCoreCompatibleValues.Context} {scope : SourceCoreLocalCell.Scope}
   {reasonAt : ExpressionId → Word}
   (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor
-    policy compilation readFuel values source scope reasonAt)
+    policy compilation readFuel values source scope reasonAt directSites)
   (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor
-    policy compilation readFuel values view scope reasonAt)
+    policy compilation readFuel values view scope reasonAt directSites)
   {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
   (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
   (readView : ∀ id, Reaches source roots (.expression id) →
@@ -442,7 +444,7 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
 include edited avoids sourceProfile viewProfile callables readView
 
 /-- Existing global policy callers restrict their facts to the actual body. -/
-theorem compiler_eq (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax source id)
+theorem compiler_eq (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax source id directSites)
     (reached : Reaches source roots (.expression id)) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope id reasonAt =
       SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope id reasonAt :=
@@ -450,7 +452,7 @@ theorem compiler_eq (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax sourc
 
 /-- Compatibility wrapper for complete global profiles. -/
 theorem accepted_original (fuel : Nat) {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
-    (tree : GeneralSyntax view id) (reached : Reaches source roots (.expression id))
+    (tree : GeneralSyntax view id directSites) (reached : Reaches source roots (.expression id))
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel
       compilation view scope id reasonAt = .ok lowered) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel

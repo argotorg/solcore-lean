@@ -13,103 +13,10 @@ open CallableIndexedLambdaValues CallableLambdaViewEdits CallableLambdaBodyReach
 open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (GeneralSyntax)
 open CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles (NativeMetadataFor NativeMetadataOn)
 
-/-- Only actual evaluated subexpressions are recursive child obligations. -/
-def RuntimeChild (form : ExpressionForm) (id : ExpressionId) : Prop :=
-  match form with
-  | .call _ ids (.declaration _) | .call _ ids (.builtinFunction _) => id ∈ ids
-  | _ => (.expression id : NodeId) ∈ form.references
+export CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax
+  (RuntimeChild runtime_child_references syntax_found syntax_child)
 
-theorem runtime_child_references {form : ExpressionForm} {id : ExpressionId}
-    (child : RuntimeChild form id) : (.expression id : NodeId) ∈ form.references := by
-  unfold RuntimeChild at child
-  split at child <;> simp_all [ExpressionForm.references]
-
-theorem syntax_found {source : TypedSource} {id : ExpressionId}
-    (tree : GeneralSyntax source id) : ∃ node, source.lookupExpression? id = some node := by
-  cases tree with
-  | leaf finite => cases finite <;> exact ⟨_, ‹source.lookupExpression? id = some _›⟩
-  | group found _ _ => exact ⟨_, found⟩
-  | tuple found _ _ => exact ⟨_, found⟩
-  | constructor found _ _ _ => exact ⟨_, found⟩
-  | builtin found _ _ => exact ⟨_, found⟩
-  | direct found _ _ _ => exact ⟨_, found⟩
-  | call found _ _ _ => exact ⟨_, found⟩
-  | unary found _ _ => exact ⟨_, found⟩
-  | binary found _ _ _ => exact ⟨_, found⟩
-  | index found _ _ _ _ _ => exact ⟨_, found⟩
-  | conditional found _ _ _ _ => exact ⟨_, found⟩
-
-theorem syntax_child {source : TypedSource} {id child : ExpressionId}
-    {node : ExpressionNode} (tree : GeneralSyntax source id)
-    (found : source.lookupExpression? id = some node)
-    (edge : RuntimeChild node.form child) : GeneralSyntax source child := by
-  cases tree with
-  | leaf finite =>
-      cases finite with
-      | literal selected atomic =>
-          cases Option.some.inj (selected.symm.trans found)
-          generalize formEq : node.form = actualForm at atomic
-          cases atomic <;> simp [formEq, RuntimeChild, ExpressionForm.references] at edge
-      | read selected form =>
-          cases Option.some.inj (selected.symm.trans found)
-          simp [form, RuntimeChild, ExpressionForm.references] at edge
-      | @group _ _ inner selected form innerTree =>
-          cases Option.some.inj (selected.symm.trans found)
-          have same : child = inner := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-          exact same.symm ▸ GeneralSyntax.leaf innerTree
-      | @pair _ _ left right selected form first second =>
-          cases Option.some.inj (selected.symm.trans found)
-          have member : child = left ∨ child = right := by
-            simpa [form, RuntimeChild, ExpressionForm.references] using edge
-          rcases member with same | same
-          · exact same.symm ▸ GeneralSyntax.leaf first
-          · exact same.symm ▸ GeneralSyntax.leaf second
-  | @group _ _ inner selected form innerTree =>
-      cases Option.some.inj (selected.symm.trans found)
-      have same : child = inner := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      exact same.symm ▸ innerTree
-  | tuple selected form children =>
-      cases Option.some.inj (selected.symm.trans found)
-      exact children child (by simpa [form, RuntimeChild, ExpressionForm.references] using edge)
-  | constructor selected form _ranges children =>
-      cases Option.some.inj (selected.symm.trans found)
-      exact children child (by simpa [form, RuntimeChild, ExpressionForm.references] using edge)
-  | builtin selected form children =>
-      cases Option.some.inj (selected.symm.trans found)
-      exact children child (by simpa [form, RuntimeChild] using edge)
-  | direct selected form _monomorphic children =>
-      cases Option.some.inj (selected.symm.trans found)
-      exact children child (by simpa [form, RuntimeChild] using edge)
-  | @call _ _ callee ids _ selected form calleeTree children =>
-      cases Option.some.inj (selected.symm.trans found)
-      have member : child = callee ∨ child ∈ ids := by
-        simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      rcases member with same | member
-      · exact same.symm ▸ calleeTree
-      · exact children child member
-  | @unary _ _ operator operand selected form childTree =>
-      cases Option.some.inj (selected.symm.trans found)
-      have same : child = operand := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      exact same.symm ▸ childTree
-  | @binary _ _ left operator right selected form first second =>
-      cases Option.some.inj (selected.symm.trans found)
-      have member : child = left ∨ child = right := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      rcases member with same | same
-      · exact same.symm ▸ first
-      · exact same.symm ▸ second
-  | @index _ _ base key _ selected form _keyFound _scalar first second =>
-      cases Option.some.inj (selected.symm.trans found)
-      have member : child = base ∨ child = key := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      rcases member with same | same
-      · exact same.symm ▸ first
-      · exact same.symm ▸ second
-  | @conditional _ _ test yes no selected form testTree yesTree noTree =>
-      cases Option.some.inj (selected.symm.trans found)
-      have member : child = test ∨ child = yes ∨ child = no := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
-      rcases member with same | same | same
-      · exact same.symm ▸ testTree
-      · exact same.symm ▸ yesTree
-      · exact same.symm ▸ noTree
+variable {directSites : DeclarationInstantiation → Prop}
 
 section Syntax
 variable {source view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
@@ -117,8 +24,8 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
 include edited avoids
 
 /-- Recursive syntax crosses only actual reached, unedited occurrences. -/
-theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id)
-    (reached : Reaches source roots (.expression id)) : GeneralSyntax view id := by
+theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id directSites)
+    (reached : Reaches source roots (.expression id)) : GeneralSyntax view id directSites := by
   revert reached
   induction tree with
   | leaf finite =>
@@ -184,8 +91,8 @@ theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id)
         (elseIH (.expression reached found (by simp [form, ExpressionForm.references])))
 
 /-- Reverse syntax uses the original body's authentic reachability path. -/
-theorem syntax_original {id : ExpressionId} (tree : GeneralSyntax view id)
-    (reached : Reaches source roots (.expression id)) : GeneralSyntax source id := by
+theorem syntax_original {id : ExpressionId} (tree : GeneralSyntax view id directSites)
+    (reached : Reaches source roots (.expression id)) : GeneralSyntax source id directSites := by
   have reverse : LocalView view source changed :=
     ⟨edited.metadata.symm, fun id fresh => (edited.unchanged id fresh).symm⟩
   exact syntax_view reverse (avoids.view edited.metadata) tree (reached.metadata edited.metadata)
@@ -196,13 +103,13 @@ theorem viewed_metadata_native {compiled : SourceCoreUnifiedCompilation.Compiled
     {code : Code compiled.indexed function scope administrative}
     {named : CallableIndexedNamedGeneration.Named}
     (bodyView : CallableIndexedOwnedContextualLambdaProvenance.BodyView code)
-    (original : NativeMetadataFor compiled.indexed named function.source) :
+    (original : NativeMetadataFor compiled.indexed named function.source directSites) :
     NativeMetadataOn compiled.indexed named code.view
-      (fun id => Reaches code.view (function.body.map NodeId.statement) (.expression id)) := by
+      (fun id => Reaches code.view (function.body.map NodeId.statement) (.expression id)) directSites := by
   let edited := CallableIndexedLambdaBodyViewEdits.local_view code.viewOfSource
   have avoids := CallableIndexedLambdaBodyViewEdits.avoids bodyView
   have originalTree : ∀ id, Reaches code.view (function.body.map NodeId.statement) (.expression id) →
-      GeneralSyntax code.view id → GeneralSyntax function.source id := fun id reached tree =>
+      GeneralSyntax code.view id directSites → GeneralSyntax function.source id directSites := fun id reached tree =>
     syntax_original edited avoids tree
       (reached.metadata code.viewOfSource.symm)
   have lookup : ∀ id, Reaches code.view (function.body.map NodeId.statement) (.expression id) →

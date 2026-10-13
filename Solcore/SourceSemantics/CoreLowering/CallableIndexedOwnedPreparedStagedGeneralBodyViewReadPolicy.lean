@@ -46,7 +46,7 @@ theorem lookup_node {source view : TypedSource} (metadata : MetadataView source 
 
 /-- The actual contextual reader skips normalization for these original
 monomorphic local reads. Other references retain the same complete node. -/
-theorem recipe_read_view
+theorem recipe_read_view {directSites : DeclarationInstantiation → Prop}
     {checked : SourceCoreCompatibleCatalog.Checked}
     {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : Named}
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
@@ -55,7 +55,7 @@ theorem recipe_read_view
     (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
     {source view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
     (edited : LocalView source view changed) (avoids : Avoids source roots changed)
-    (metadata : CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.NativeMetadataFor prepared named source)
+    (metadata : CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.NativeMetadataFor prepared named source directSites)
     (id : ExpressionId) (reached : Reaches source roots (.expression id)) :
     policy.readExpression source id = policy.readExpression view id := by
   have same := expression_lookup edited avoids reached

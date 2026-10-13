@@ -100,13 +100,17 @@ private theorem original_unique {original actual : TypedSource}
     change (original.nodes.map Node.occurrenceId).Nodup
     simpa only [TypedSource.applySubstitution_nodeOccurrenceIds] using unique
 
-variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+section Sites
+variable {directSites : DeclarationInstantiation → Prop}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
     completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-  (metadata : NativeMetadataFor compiled.indexed terminal.prepared.named header.function.source)
-  (tree : GeneralSyntax header.function.source terminal.expression)
+  (ordinary : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compiled.indexed.base.plan instantiation)
+  (metadata : NativeMetadataFor compiled.indexed terminal.prepared.named header.function.source directSites)
+  (tree : GeneralSyntax header.function.source terminal.expression directSites)
   {stages : Staging.Recursive.Registry}
 
 variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
@@ -120,10 +124,10 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
 
 local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
 
-include metadata in
+include metadata tree in
 /-- Every reached indirect call uses the same root policy and real sidecar.
 The original parent typing supplies the callee occurrence and raw types. -/
-theorem calls_ready {fuel : Nat}
+theorem calls_ready_sites {fuel : Nat}
     (root : RootPolicyReceipt (compiled := compiled) terminal.prepared.named terminal.prepared.diagnostics
       terminal.prepared.code terminal.prepared.compilation fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
@@ -141,7 +145,8 @@ theorem calls_ready {fuel : Nat}
     CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := invocation) certificate := by
   intro callFuel callScope id callee ids callMetadata lowered compiler path
-  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax path
+  have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax_of path
+    (by simpa only [sameSource] using tree)
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.recipe_policy_for_native
     root.compilerPolicy metadata callScope header.reasonAt
   have readPolicy := profile.read id (by simpa only [sameSource] using syntaxTree)
@@ -170,10 +175,10 @@ theorem calls_ready {fuel : Nat}
     calleeNode := node
     calleeFound := lookupExpression?_complete unique contains }⟩
 
-include diagnostic receiver wellFormed metadata tree rows complete in
+include diagnostic receiver wellFormed ordinary metadata tree rows complete in
 /-- The Source frame and actual selected child derive all runtime-independent
 conditions. No native argument or source heap representation is assumed. -/
-def at_scope {fuel : Nat}
+def at_scope_sites {fuel : Nat}
     (root : RootPolicyReceipt (compiled := compiled) terminal.prepared.named terminal.prepared.diagnostics
       terminal.prepared.code terminal.prepared.compilation fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
@@ -213,28 +218,28 @@ def at_scope {fuel : Nat}
     simpa only [sourceEq] using typed
   have childProfile : GeneralPolicyFor root.selected.policy (context compiled.indexed terminal.prepared.named)
       compiled.indexed.fuel (.initial compiled.compatible.checked) child.source
-      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.reasonAt := by
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.reasonAt directSites := by
     simpa only [sourceEq] using profile
   have childDeclarations : CompatibleExpressionReads.ScopeDeclarations child.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))) header.context := by
     simpa only [sourceEq, RecursiveNamedCatalogNativeContexts.bodyScope] using declarations
-  have coercions : ∀ id actualNode, GeneralSyntax child.source id →
+  have coercions : ∀ id actualNode, GeneralSyntax child.source id directSites →
       child.source.lookupExpression? id = some actualNode → actualNode.coercions = [] := by
     intro id actualNode syntaxTree actualFound
     exact metadata.coercions id (by simpa only [sourceEq] using syntaxTree)
       actualNode (by simpa only [sourceEq] using actualFound)
-  have childTree : GeneralSyntax child.source terminal.expression := by simpa only [sourceEq] using tree
+  have childTree : GeneralSyntax child.source terminal.expression directSites := by simpa only [sourceEq] using tree
   have accepted : SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody
       (fuel + 1) (context compiled.indexed terminal.prepared.named) child.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression header.reasonAt = .ok terminal.receipt.child := by
     simpa only [sourceEq] using root.selected.accepted
-  let certificate := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_general_functions
+  let certificate := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_sites_functions ordinary
     compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     unique childDeclarations childProfile coercions childTree childFound childTyped accepted
   have ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := child) certificate :=
-    calls_ready terminal metadata root sourceEq authority childTyped certificate
+    calls_ready_sites terminal metadata tree root sourceEq authority childTyped certificate
   have runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram)
       header.context child.source := by
     rw [sourceEq]
@@ -244,7 +249,7 @@ def at_scope {fuel : Nat}
       rw [header.frame.context, header.frame.source]
       exact certificate.toBodyInstanceTypingCertificate.sourceRuntimeValid
     exact original.transport (RecursiveNamedInitialContextValidity.mono_fields header.extended)
-  let support := CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.CanonicalRootAt.of_general_compiled
+  let support := CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.CanonicalRootAt.of_sites_compiled ordinary
     compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     unique childDeclarations childProfile coercions childTree childFound childTyped accepted ready rawType
     (header.valid.ledger.trans terminal.aligned.solved)
@@ -259,10 +264,10 @@ def at_scope {fuel : Nat}
       terminal.prepared diagnostic terminal.aligned sourceEq certificate)
   exact ⟨support, rfl, rfl, rfl⟩
 
-include diagnostic receiver wellFormed metadata tree rows complete zero in
+include diagnostic receiver wellFormed ordinary metadata tree rows complete zero in
 /-- Genuine root acceptance produces the finite certificate at every actual
 selected scope. The returned support feeds the existing public body family. -/
-theorem of_terminal_native
+theorem of_terminal_native_sites
     (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child)
@@ -273,13 +278,13 @@ theorem of_terminal_native
   obtain ⟨root⟩ := root
   refine ⟨{ point := point, zero := zero, roots := ?_ }⟩
   intro child selected
-  exact at_scope terminal diagnostic receiver wellFormed metadata tree rows complete root child selected (scopes child selected)
+  exact at_scope_sites terminal diagnostic receiver wellFormed ordinary metadata tree rows complete root child selected (scopes child selected)
 
-include diagnostic receiver wellFormed metadata tree rows complete zero in
+include diagnostic receiver wellFormed ordinary metadata tree rows complete zero in
 /-- The actual named hook supplies its canonical sidecar. Genuine Source
 origins and program typing identify every selected guard frame, without
 excluding lambdas or other specializations of the same declaration. -/
-theorem of_actual_native
+theorem of_actual_native_sites
     (actual : RecursiveNamedPreparedStageContracts.Prepared compiled
       compiled.indexed.ancestry.graph.inputs.callable)
     (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
@@ -299,13 +304,59 @@ theorem of_actual_native
   have sourceOwner : header.function.source.owner = signature.id := by
     rw [header.agreement.source, terminal.aligned.named, terminal.prepared.same]
     exact (congrArg TypedSource.owner body).trans (identities.2.1.trans identities.1.symm)
-  apply of_terminal_native terminal diagnostic receiver wellFormed metadata tree rows complete zero point
+  apply of_terminal_native_sites terminal diagnostic receiver wellFormed ordinary metadata tree rows complete zero point
   intro child selected
   refine { sidecar := sidecar, issued := ?_, view := .inl canonicalSource, guards := ?_ }
   · simpa only [terminal.aligned.named] using issued
   · exact RecursiveNamedPreparedScopeCoherence.selected_frame actual
       (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed
       signatureMember sourceOwner issued sourceReceipt selected
+
+end Sites
+
+variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (metadata : NativeMetadataFor compiled.indexed terminal.prepared.named header.function.source)
+  (tree : GeneralSyntax header.function.source terminal.expression)
+  {stages : Staging.Recursive.Registry}
+
+variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (complete : RecursiveNamedCatalogNativeContexts.Complete
+    (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
+  (zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0)
+
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+include diagnostic receiver wellFormed metadata tree rows complete zero in
+theorem of_terminal_native
+    (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child)
+    (scopes : ∀ child, stages.Closure header.function child → SidecarAt terminal child) :
+    Nonempty (CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.NamedSupport
+      (headers := CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) (keys := keys) stages faults header terminal) := by
+  exact of_terminal_native_sites terminal diagnostic receiver wellFormed
+    (fun _ supported => supported.ordinary compiled.indexed.base.plan) metadata tree rows complete zero point scopes
+
+include diagnostic receiver wellFormed metadata tree rows complete zero in
+theorem of_actual_native
+    (actual : RecursiveNamedPreparedStageContracts.Prepared compiled
+      compiled.indexed.ancestry.graph.inputs.callable)
+    (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child) :
+    Nonempty (CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.NamedSupport
+      (headers := CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) (keys := keys)
+      (RecursiveNamedPreparedStageScopes.registry actual) faults header terminal) := by
+  exact of_actual_native_sites terminal diagnostic receiver wellFormed
+    (fun _ supported => supported.ordinary compiled.indexed.base.plan) metadata tree rows complete zero actual point
 
 include diagnostic receiver wellFormed in
 /-- Ordinary metadata remains a direct specialization of the native-literal

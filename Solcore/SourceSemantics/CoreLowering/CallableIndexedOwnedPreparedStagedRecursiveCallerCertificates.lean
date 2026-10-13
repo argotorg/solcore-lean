@@ -76,50 +76,162 @@ theorem PolicyFor.on {policy : SourceCoreFunctions.Policy} {compilation : Source
     (allowed : ExpressionId → Prop) : PolicyOn policy compilation readFuel values source scope reasonAt allowed :=
   ⟨fun id _ tree => profile.special id tree, fun id _ tree => profile.read id tree, profile.lower, profile.leaf⟩
 
-inductive GeneralSyntax (source : TypedSource) : ExpressionId → Prop where
-  | leaf {id} (tree : CompatibleExpressionProducts.Syntax source id) : GeneralSyntax source id
+inductive GeneralSyntaxFor (directSites : DeclarationInstantiation → Prop) (source : TypedSource) : ExpressionId → Prop where
+  | leaf {id} (tree : CompatibleExpressionProducts.Syntax source id) : GeneralSyntaxFor directSites source id
   | group {id node inner} (found : source.lookupExpression? id = some node)
-      (form : node.form = .group inner) (child : GeneralSyntax source inner) : GeneralSyntax source id
+      (form : node.form = .group inner) (child : GeneralSyntaxFor directSites source inner) : GeneralSyntaxFor directSites source id
   | tuple {id node ids} (found : source.lookupExpression? id = some node)
       (form : node.form = .tuple ids)
-      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | constructor {id node instantiation ids} (found : source.lookupExpression? id = some node)
       (form : node.form = .constructor instantiation ids)
       (ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
-      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | builtin {id node callee ids function} (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.builtinFunction function))
-      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | direct {id node callee ids instantiation}
       (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.declaration instantiation))
-      (monomorphic : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic instantiation)
-      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+      (ordinary : directSites instantiation)
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | call {id node callee ids metadata} (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.indirect metadata))
-      (calleeSyntax : GeneralSyntax source callee)
-      (children : ∀ child, child ∈ ids → GeneralSyntax source child) : GeneralSyntax source id
+      (calleeSyntax : GeneralSyntaxFor directSites source callee)
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | unary {id node operator operand} (found : source.lookupExpression? id = some node)
-      (form : node.form = .unary operator operand) (child : GeneralSyntax source operand) : GeneralSyntax source id
+      (form : node.form = .unary operator operand) (child : GeneralSyntaxFor directSites source operand) : GeneralSyntaxFor directSites source id
   | binary {id node left operator right} (found : source.lookupExpression? id = some node)
       (form : node.form = .binary left operator right)
-      (first : GeneralSyntax source left) (second : GeneralSyntax source right) : GeneralSyntax source id
+      (first : GeneralSyntaxFor directSites source left) (second : GeneralSyntaxFor directSites source right) : GeneralSyntaxFor directSites source id
   | conditional {id node condition yes no} (found : source.lookupExpression? id = some node)
       (form : node.form = .conditional condition yes no)
-      (test : GeneralSyntax source condition) (thenBranch : GeneralSyntax source yes) (elseBranch : GeneralSyntax source no) : GeneralSyntax source id
+      (test : GeneralSyntaxFor directSites source condition) (thenBranch : GeneralSyntaxFor directSites source yes) (elseBranch : GeneralSyntaxFor directSites source no) : GeneralSyntaxFor directSites source id
 
   | index {id node base key keyNode} (found : source.lookupExpression? id = some node)
       (form : node.form = .index base key) (keyFound : source.lookupExpression? key = some keyNode)
       (scalar : CompatibleExpressionIndices.SourceScalar keyNode.type)
-      (first : GeneralSyntax source base) (second : GeneralSyntax source key) : GeneralSyntax source id
+      (first : GeneralSyntaxFor directSites source base) (second : GeneralSyntaxFor directSites source key) : GeneralSyntaxFor directSites source id
+
+/-- The established syntax remains the monomorphic specialization of one grammar. -/
+abbrev GeneralSyntax (source : TypedSource) (id : ExpressionId)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop :=
+  GeneralSyntaxFor directSites source id
+
+namespace GeneralSyntax
+export GeneralSyntaxFor (leaf group tuple constructor builtin direct call unary binary conditional index)
+/-- Only actual evaluated subexpressions are recursive child obligations. -/
+def RuntimeChild (form : ExpressionForm) (id : ExpressionId) : Prop :=
+  match form with
+  | .call _ ids (.declaration _) | .call _ ids (.builtinFunction _) => id ∈ ids
+  | _ => (.expression id : NodeId) ∈ form.references
+
+theorem runtime_child_references {form : ExpressionForm} {id : ExpressionId}
+    (child : RuntimeChild form id) : (.expression id : NodeId) ∈ form.references := by
+  unfold RuntimeChild at child
+  split at child <;> simp_all [ExpressionForm.references]
+
+theorem syntax_found {directSites : DeclarationInstantiation → Prop} {source : TypedSource} {id : ExpressionId}
+    (tree : GeneralSyntax source id directSites) : ∃ node, source.lookupExpression? id = some node := by
+  cases tree with
+  | leaf finite => cases finite <;> exact ⟨_, ‹source.lookupExpression? id = some _›⟩
+  | group found _ _ => exact ⟨_, found⟩
+  | tuple found _ _ => exact ⟨_, found⟩
+  | constructor found _ _ _ => exact ⟨_, found⟩
+  | builtin found _ _ => exact ⟨_, found⟩
+  | direct found _ _ _ => exact ⟨_, found⟩
+  | call found _ _ _ => exact ⟨_, found⟩
+  | unary found _ _ => exact ⟨_, found⟩
+  | binary found _ _ _ => exact ⟨_, found⟩
+  | index found _ _ _ _ _ => exact ⟨_, found⟩
+  | conditional found _ _ _ _ => exact ⟨_, found⟩
+
+theorem syntax_child {directSites : DeclarationInstantiation → Prop} {source : TypedSource} {id child : ExpressionId}
+    {node : ExpressionNode} (tree : GeneralSyntax source id directSites)
+    (found : source.lookupExpression? id = some node)
+    (edge : RuntimeChild node.form child) : GeneralSyntax source child directSites := by
+  cases tree with
+  | leaf finite =>
+      cases finite with
+      | literal selected atomic =>
+          cases Option.some.inj (selected.symm.trans found)
+          generalize formEq : node.form = actualForm at atomic
+          cases atomic <;> simp [formEq, RuntimeChild, ExpressionForm.references] at edge
+      | read selected form =>
+          cases Option.some.inj (selected.symm.trans found)
+          simp [form, RuntimeChild, ExpressionForm.references] at edge
+      | @group _ _ inner selected form innerTree =>
+          cases Option.some.inj (selected.symm.trans found)
+          have same : child = inner := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+          exact same.symm ▸ GeneralSyntax.leaf innerTree
+      | @pair _ _ left right selected form first second =>
+          cases Option.some.inj (selected.symm.trans found)
+          have member : child = left ∨ child = right := by
+            simpa [form, RuntimeChild, ExpressionForm.references] using edge
+          rcases member with same | same
+          · exact same.symm ▸ GeneralSyntax.leaf first
+          · exact same.symm ▸ GeneralSyntax.leaf second
+  | @group _ _ inner selected form innerTree =>
+      cases Option.some.inj (selected.symm.trans found)
+      have same : child = inner := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      exact same.symm ▸ innerTree
+  | tuple selected form children =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact children child (by simpa [form, RuntimeChild, ExpressionForm.references] using edge)
+  | constructor selected form _ranges children =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact children child (by simpa [form, RuntimeChild, ExpressionForm.references] using edge)
+  | builtin selected form children =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact children child (by simpa [form, RuntimeChild] using edge)
+  | direct selected form _monomorphic children =>
+      cases Option.some.inj (selected.symm.trans found)
+      exact children child (by simpa [form, RuntimeChild] using edge)
+  | @call _ _ callee ids _ selected form calleeTree children =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = callee ∨ child ∈ ids := by
+        simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      rcases member with same | member
+      · exact same.symm ▸ calleeTree
+      · exact children child member
+  | @unary _ _ operator operand selected form childTree =>
+      cases Option.some.inj (selected.symm.trans found)
+      have same : child = operand := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      exact same.symm ▸ childTree
+  | @binary _ _ left operator right selected form first second =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = left ∨ child = right := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      rcases member with same | same
+      · exact same.symm ▸ first
+      · exact same.symm ▸ second
+  | @index _ _ base key _ selected form _keyFound _scalar first second =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = base ∨ child = key := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      rcases member with same | same
+      · exact same.symm ▸ first
+      · exact same.symm ▸ second
+  | @conditional _ _ test yes no selected form testTree yesTree noTree =>
+      cases Option.some.inj (selected.symm.trans found)
+      have member : child = test ∨ child = yes ∨ child = no := by simpa [form, RuntimeChild, ExpressionForm.references] using edge
+      rcases member with same | same | same
+      · exact same.symm ▸ testTree
+      · exact same.symm ▸ yesTree
+      · exact same.symm ▸ noTree
+
+end GeneralSyntax
+
+/-- Direct sites retain the exact executable specialization plan. -/
+abbrev OrdinarySyntax (plan : SourceCompilationPlan.Plan) (source : TypedSource) (id : ExpressionId) : Prop :=
+  GeneralSyntax source id (CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary plan)
 
 structure GeneralPolicyFor (policy : SourceCoreFunctions.Policy) (compilation : SourceCoreFunctions.Context)
     (readFuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
-    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) : Prop where
-  special : ∀ id, GeneralSyntax source id → ∀ child budget, (match policy.lowerSpecial? with
+    (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  special : ∀ id, GeneralSyntax source id directSites → ∀ child budget, (match policy.lowerSpecial? with
     | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
     | some lower => lower compilation child budget source scope id reasonAt) = .ok none
-  read : ∀ id, GeneralSyntax source id → policy.readExpression source id =
+  read : ∀ id, GeneralSyntax source id directSites → policy.readExpression source id =
     SourceCoreCompatibleDataExpressions.readExpression values.checked source id
   lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
   leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
@@ -128,20 +240,21 @@ structure GeneralPolicyFor (policy : SourceCoreFunctions.Policy) (compilation : 
 structure GeneralPolicyOn (policy : SourceCoreFunctions.Policy) (compilation : SourceCoreFunctions.Context)
     (readFuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word)
-    (allowed : ExpressionId → Prop) : Prop where
-  special : ∀ id, allowed id → GeneralSyntax source id → ∀ child budget, (match policy.lowerSpecial? with
+    (allowed : ExpressionId → Prop)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  special : ∀ id, allowed id → GeneralSyntax source id directSites → ∀ child budget, (match policy.lowerSpecial? with
     | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
     | some lower => lower compilation child budget source scope id reasonAt) = .ok none
-  read : ∀ id, allowed id → GeneralSyntax source id → policy.readExpression source id =
+  read : ∀ id, allowed id → GeneralSyntax source id directSites → policy.readExpression source id =
     SourceCoreCompatibleDataExpressions.readExpression values.checked source id
   lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
   leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
 
-theorem GeneralPolicyFor.on {policy : SourceCoreFunctions.Policy} {compilation : SourceCoreFunctions.Context}
+theorem GeneralPolicyFor.on {directSites : DeclarationInstantiation → Prop} {policy : SourceCoreFunctions.Policy} {compilation : SourceCoreFunctions.Context}
     {readFuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
     {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
-    (profile : GeneralPolicyFor policy compilation readFuel values source scope reasonAt)
-    (allowed : ExpressionId → Prop) : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed :=
+    (profile : GeneralPolicyFor policy compilation readFuel values source scope reasonAt directSites)
+    (allowed : ExpressionId → Prop) : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed directSites :=
   ⟨fun id _ tree => profile.special id tree, fun id _ tree => profile.read id tree, profile.lower, profile.leaf⟩
 
 inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
@@ -779,8 +892,8 @@ private theorem product_policy_on {scope : SourceCoreLocalCell.Scope} {allowed :
   ⟨fun id admitted tree => policyFor.special id admitted (.leaf tree),
    fun id admitted tree => policyFor.read id admitted (.leaf tree), policyFor.lower, policyFor.leaf⟩
 
-private theorem general_product_policy_on {scope : SourceCoreLocalCell.Scope} {allowed : ExpressionId → Prop}
-    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed) :
+private theorem general_product_policy_on {directSites : DeclarationInstantiation → Prop} {scope : SourceCoreLocalCell.Scope} {allowed : ExpressionId → Prop}
+    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed directSites) :
     CompatibleExpressionProducts.PolicyOn policy compilation readFuel values source scope reasonAt allowed :=
   ⟨fun id admitted tree => policyFor.special id admitted (.leaf tree),
    fun id admitted tree => policyFor.read id admitted (.leaf tree), policyFor.lower, policyFor.leaf⟩
@@ -1178,17 +1291,18 @@ private theorem projected_children
         · cases same; exact child.1
         · exact children other otherCode remaining
 
-theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
+theorem of_sites_functions_on_projected {directSites : DeclarationInstantiation → Prop}
+    (ordinary : ∀ i, directSites i → CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan i) {scope : SourceCoreLocalCell.Scope}
     (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
     (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
     (unique : NodeOccurrencesUnique source)
     (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
     {allowed : ExpressionId → Prop}
-    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed)
+    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed directSites)
     (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
       (.expression child : NodeId) ∈ node.form.references → allowed child)
-    (coercions : ∀ id node, allowed id → GeneralSyntax source id → source.lookupExpression? id = some node → node.coercions = [])
-    {id : ExpressionId} (syntaxTree : GeneralSyntax source id) (admitted : allowed id)
+    (coercions : ∀ id node, allowed id → GeneralSyntax source id directSites → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : GeneralSyntax source id directSites) (admitted : allowed id)
     {node : ExpressionNode} (found : source.lookupExpression? id = some node)
     (typed : ExpressionHasType source context id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
@@ -1293,8 +1407,8 @@ theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
-      obtain ⟨compiler⟩ := CallableIndexedOwnedPreparedStagedDirectCallCertificates.of_functions
-        originalFound form monomorphic
+      obtain ⟨compiler⟩ := CallableIndexedOwnedPreparedStagedDirectCallCertificates.of_ordinary
+        originalFound form (ordinary _ monomorphic)
         (policyFor.special _ admitted (.direct originalFound form monomorphic children))
         (policyFor.read _ admitted (.direct originalFound form monomorphic children)) accepted
       have originalSame := Option.some.inj (compiler.metadata.found.symm.trans originalFound)
@@ -1434,7 +1548,7 @@ theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
-      have syntaxTree : GeneralSyntax source id := .index originalFound form keyFound scalar firstSyntax secondSyntax
+      have syntaxTree : GeneralSyntax source id directSites := .index originalFound form keyFound scalar firstSyntax secondSyntax
       obtain ⟨keyType, baseTyped, keyTyped⟩ := CompatibleExpressionIndices.index_source_types unique originalFound form
         (coercions _ _ admitted syntaxTree originalFound) typed
       obtain ⟨baseNode, baseContains, baseType⟩ := baseTyped.stored_type
@@ -1452,6 +1566,27 @@ theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))).1
         (secondIH keyFound keyTyped secondGenerated
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))).1, header.metadata.projected⟩
+
+theorem of_general_functions_on_projected {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {allowed : ExpressionId → Prop}
+    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed)
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → GeneralSyntax source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : GeneralSyntax source id) (admitted : allowed id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered ∧
+      values.checked.catalog.project node.type = .ok lowered.type := by
+  exact of_sites_functions_on_projected (fun i mono => mono.ordinary compilation.plan)
+    native active callables unique declarations policyFor closed coercions syntaxTree admitted found typed accepted
 
 theorem of_general_functions_on {scope : SourceCoreLocalCell.Scope}
     (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
@@ -1488,6 +1623,84 @@ theorem of_general_functions {scope : SourceCoreLocalCell.Scope}
       source scope id reasonAt = .ok lowered) :
     Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
   exact of_general_functions_on native active callables unique declarations (policyFor.on (fun _ => True))
+    (fun _ _ _ => trivial) (fun id node _ tree found => coercions id node tree found)
+    syntaxTree trivial found typed accepted
+
+theorem of_ordinary_functions_on {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {allowed : ExpressionId → Prop}
+    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed (CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan))
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → OrdinarySyntax compilation.plan source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : OrdinarySyntax compilation.plan source id) (admitted : allowed id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact (of_sites_functions_on_projected (fun _ ordinary => ordinary) native active callables unique declarations policyFor closed coercions
+    syntaxTree admitted found typed accepted).1
+
+theorem of_ordinary_functions {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (policyFor : GeneralPolicyFor policy compilation readFuel values source scope reasonAt (CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan))
+    (coercions : ∀ id node, OrdinarySyntax compilation.plan source id → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : OrdinarySyntax compilation.plan source id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact of_ordinary_functions_on native active callables unique declarations (policyFor.on (fun _ => True))
+    (fun _ _ _ => trivial) (fun id node _ tree found => coercions id node tree found)
+    syntaxTree trivial found typed accepted
+
+theorem of_sites_functions_on {directSites : DeclarationInstantiation → Prop}
+    (ordinary : ∀ i, directSites i → CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan i) {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    {allowed : ExpressionId → Prop}
+    (policyFor : GeneralPolicyOn policy compilation readFuel values source scope reasonAt allowed directSites)
+    (closed : ∀ {parent node child}, allowed parent → source.lookupExpression? parent = some node →
+      (.expression child : NodeId) ∈ node.form.references → allowed child)
+    (coercions : ∀ id node, allowed id → GeneralSyntax source id directSites → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : GeneralSyntax source id directSites) (admitted : allowed id)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact (of_sites_functions_on_projected ordinary native active callables unique declarations policyFor closed coercions
+    syntaxTree admitted found typed accepted).1
+
+theorem of_sites_functions {directSites : DeclarationInstantiation → Prop}
+    (ordinary : ∀ i, directSites i → CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan i) {scope : SourceCoreLocalCell.Scope}
+    (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)
+    (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy (some native) active)
+    (unique : NodeOccurrencesUnique source)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations source scope context)
+    (policyFor : GeneralPolicyFor policy compilation readFuel values source scope reasonAt directSites)
+    (coercions : ∀ id node, GeneralSyntax source id directSites → source.lookupExpression? id = some node → node.coercions = [])
+    {id : ExpressionId} (syntaxTree : GeneralSyntax source id directSites)
+    {node : ExpressionNode} (found : source.lookupExpression? id = some node)
+    (typed : ExpressionHasType source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation
+      source scope id reasonAt = .ok lowered) :
+    Certificate policy body compilation readFuel values source context reasonAt scope id lowered := by
+  exact of_sites_functions_on ordinary native active callables unique declarations (policyFor.on (fun _ => True))
     (fun _ _ _ => trivial) (fun id node _ tree found => coercions id node tree found)
     syntaxTree trivial found typed accepted
 

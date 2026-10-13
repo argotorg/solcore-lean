@@ -30,7 +30,7 @@ actual direct declaration calls. -/
 theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (tree : Certificate policy body compilation readFuel values source context reasonAt scope id lowered) :
-    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id :=
+    CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.OrdinarySyntax compilation.plan source id :=
   CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.certificate_syntax tree
 
 /-- The legacy grammar at a reached call follows its exact original child

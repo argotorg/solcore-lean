@@ -14,6 +14,7 @@ open CallableIndexedNamedGeneration CallableIndexedLambdaValues
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : CallableIndexedNamedGeneration.Prepared checked}
   {named : Named} {source : TypedSource}
+  {directSites : DeclarationInstantiation → Prop}
 
 private inductive SupportedForm : ExpressionForm → Prop where
   | literal {form} (atomic : CompatibleExpressionLiterals.Atomic form) : SupportedForm form
@@ -34,7 +35,7 @@ private inductive SupportedForm : ExpressionForm → Prop where
       SupportedForm (.call callee ids (.indirect metadata))
 
 private theorem syntax_node {id : ExpressionId}
-    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id) :
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites) :
     ∃ node, source.lookupExpression? id = some node ∧ SupportedForm node.form := by
   cases tree with
   | leaf product =>
@@ -96,41 +97,43 @@ private theorem syntax_node {id : ExpressionId}
 
 /-- These exclusions cover every occurrence in the supported global grammar.
 They contain no compiler action, runtime state or child execution law. -/
-structure MetadataFor (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) : Prop where
-  requirements : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+structure MetadataFor (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  requirements : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.requirements = []
-  coercions : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  coercions : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.coercions = []
-  initializer : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  initializer : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     prepared.base.locals.bindings.find? (fun binding =>
       decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none
-  arguments : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  arguments : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids metadata,
       node.form = .call callee ids (.indirect metadata) → metadata.argumentCoercions = []
-  directCaller : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  directCaller : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids instantiation,
       node.form = .call callee ids (.declaration instantiation) → named.specialized.assumptions = []
-  localRead : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  localRead : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ name binder,
       node.form = .reference name (.local binder) →
       prepared.base.locals.bindings.any (fun binding =>
         decide (binding.caller = (context prepared named).owner ∧ binding.binder.id = binder)) = false
 
-structure MetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) (allowed : ExpressionId → Prop) : Prop where
-  requirements : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+structure MetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) (allowed : ExpressionId → Prop)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  requirements : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.requirements = []
-  coercions : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  coercions : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.coercions = []
-  initializer : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  initializer : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     prepared.base.locals.bindings.find? (fun binding =>
       decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none
-  arguments : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  arguments : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids metadata,
       node.form = .call callee ids (.indirect metadata) → metadata.argumentCoercions = []
-  directCaller : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  directCaller : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids instantiation,
       node.form = .call callee ids (.declaration instantiation) → named.specialized.assumptions = []
-  localRead : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  localRead : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ name binder,
       node.form = .reference name (.local binder) →
       prepared.base.locals.bindings.any (fun binding =>
@@ -139,58 +142,60 @@ structure MetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked
 /-- Native literals keep their genuine selected evidence rows. Their compiler
 validator authenticates those rows; other admitted expressions retain empty
 requirements. This is a metadata condition, not an execution premise. -/
-structure NativeMetadataFor (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) : Prop where
-  requirements : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+structure NativeMetadataFor (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  requirements : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.requirements = [] ∨ ∃ literal resolution, node.form = .integerLiteral literal resolution
-  coercions : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  coercions : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.coercions = []
-  initializer : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  initializer : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     prepared.base.locals.bindings.find? (fun binding =>
       decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none
-  arguments : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  arguments : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids metadata,
       node.form = .call callee ids (.indirect metadata) → metadata.argumentCoercions = []
-  directCaller : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  directCaller : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids instantiation,
       node.form = .call callee ids (.declaration instantiation) → named.specialized.assumptions = []
-  localRead : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  localRead : ∀ id, CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ name binder,
       node.form = .reference name (.local binder) →
       prepared.base.locals.bindings.any (fun binding =>
         decide (binding.caller = (context prepared named).owner ∧ binding.binder.id = binder)) = false
 
-structure NativeMetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) (allowed : ExpressionId → Prop) : Prop where
-  requirements : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+structure NativeMetadataOn (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named) (source : TypedSource) (allowed : ExpressionId → Prop)
+    (directSites : DeclarationInstantiation → Prop := CallableIndexedOwnedPreparedStagedDirectCallCertificates.Monomorphic) : Prop where
+  requirements : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.requirements = [] ∨ ∃ literal resolution, node.form = .integerLiteral literal resolution
-  coercions : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  coercions : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → node.coercions = []
-  initializer : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  initializer : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     prepared.base.locals.bindings.find? (fun binding =>
       decide (binding.caller = (context prepared named).owner ∧ binding.initializer = id)) = none
-  arguments : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  arguments : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids metadata,
       node.form = .call callee ids (.indirect metadata) → metadata.argumentCoercions = []
-  directCaller : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  directCaller : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ callee ids instantiation,
       node.form = .call callee ids (.declaration instantiation) → named.specialized.assumptions = []
-  localRead : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id →
+  localRead : ∀ id, allowed id → CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites →
     ∀ node, source.lookupExpression? id = some node → ∀ name binder,
       node.form = .reference name (.local binder) →
       prepared.base.locals.bindings.any (fun binding =>
         decide (binding.caller = (context prepared named).owner ∧ binding.binder.id = binder)) = false
 
-theorem NativeMetadataFor.of_ordinary (metadata : MetadataFor prepared named source) :
-    NativeMetadataFor prepared named source :=
+theorem NativeMetadataFor.of_ordinary (metadata : MetadataFor prepared named source directSites) :
+    NativeMetadataFor prepared named source directSites :=
   ⟨fun id tree node found => .inl (metadata.requirements id tree node found),
     metadata.coercions, metadata.initializer, metadata.arguments, metadata.directCaller, metadata.localRead⟩
 
 theorem NativeMetadataOn.of_ordinary {allowed : ExpressionId → Prop}
-    (metadata : MetadataOn prepared named source allowed) : NativeMetadataOn prepared named source allowed :=
+    (metadata : MetadataOn prepared named source allowed directSites) : NativeMetadataOn prepared named source allowed directSites :=
   ⟨fun id reached tree node found => .inl (metadata.requirements id reached tree node found),
     metadata.coercions, metadata.initializer, metadata.arguments, metadata.directCaller, metadata.localRead⟩
 
-theorem NativeMetadataFor.on (metadata : NativeMetadataFor prepared named source)
-    (allowed : ExpressionId → Prop) : NativeMetadataOn prepared named source allowed :=
+theorem NativeMetadataFor.on (metadata : NativeMetadataFor prepared named source directSites)
+    (allowed : ExpressionId → Prop) : NativeMetadataOn prepared named source allowed directSites :=
   ⟨fun id _ tree => metadata.requirements id tree,
    fun id _ tree => metadata.coercions id tree,
    fun id _ tree => metadata.initializer id tree,
@@ -198,8 +203,8 @@ theorem NativeMetadataFor.on (metadata : NativeMetadataFor prepared named source
    fun id _ tree => metadata.directCaller id tree,
    fun id _ tree => metadata.localRead id tree⟩
 
-theorem MetadataFor.on (metadata : MetadataFor prepared named source)
-    (allowed : ExpressionId → Prop) : MetadataOn prepared named source allowed :=
+theorem MetadataFor.on (metadata : MetadataFor prepared named source directSites)
+    (allowed : ExpressionId → Prop) : MetadataOn prepared named source allowed directSites :=
   ⟨fun id _ tree => metadata.requirements id tree,
    fun id _ tree => metadata.coercions id tree,
    fun id _ tree => metadata.initializer id tree,
@@ -279,9 +284,9 @@ private theorem evidence_none
 private theorem special_none
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation prepared named diagnostics namedCode) (rootFuel : Nat)
-    (metadata : NativeMetadataFor prepared named source)
+    (metadata : NativeMetadataFor prepared named source directSites)
     {id : ExpressionId}
-    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites)
     (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedContextualLambdaPolicyRecipes.special compilation rootFuel
@@ -310,10 +315,10 @@ theorem recipe_policy_for_native
     {compilation : Compilation prepared named diagnostics namedCode}
     {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}
     (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
-    (metadata : NativeMetadataFor prepared named source)
+    (metadata : NativeMetadataFor prepared named source directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor policy (context prepared named)
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt directSites := by
   constructor
   · intro id tree child budget
     rw [recipe.lowerSpecial]
@@ -333,10 +338,10 @@ theorem recipe_policy_for
     {compilation : Compilation prepared named diagnostics namedCode}
     {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}
     (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
-    (metadata : MetadataFor prepared named source)
+    (metadata : MetadataFor prepared named source directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor policy (context prepared named)
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt directSites := by
   exact recipe_policy_for_native recipe (NativeMetadataFor.of_ordinary metadata) scope reasonAt
 
 /-- The full profile is proved from one actual retained production recipe.
@@ -345,10 +350,10 @@ theorem retained_policy_for
     {function : Dynamic.Closure} {parameterScope : SourceCoreLocalCell.Scope}
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
-    (metadata : MetadataFor prepared named source)
+    (metadata : MetadataFor prepared named source directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt directSites := by
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_for recipe metadata scope reasonAt
@@ -357,10 +362,10 @@ theorem retained_policy_for_native
     {function : Dynamic.Closure} {parameterScope : SourceCoreLocalCell.Scope}
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
-    (metadata : NativeMetadataFor prepared named source)
+    (metadata : NativeMetadataFor prepared named source directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt directSites := by
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_for_native recipe metadata scope reasonAt
@@ -370,10 +375,10 @@ private theorem special_none_on
     {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
     (compilation : Compilation prepared named diagnostics namedCode) (rootFuel : Nat)
     {allowed : ExpressionId → Prop}
-    (metadata : NativeMetadataOn prepared named source allowed)
+    (metadata : NativeMetadataOn prepared named source allowed directSites)
     {id : ExpressionId}
     (admitted : allowed id)
-    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id)
+    (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites)
     (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedContextualLambdaPolicyRecipes.special compilation rootFuel
@@ -403,10 +408,10 @@ theorem recipe_policy_on_native
     {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}
     (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
     {allowed : ExpressionId → Prop}
-    (metadata : NativeMetadataOn prepared named source allowed)
+    (metadata : NativeMetadataOn prepared named source allowed directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn policy (context prepared named)
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed directSites := by
   constructor
   · intro id admitted tree child budget
     rw [recipe.lowerSpecial]
@@ -427,10 +432,10 @@ theorem recipe_policy_on
     {rootFuel : Nat} {policy : SourceCoreFunctions.Policy}
     (recipe : CallableIndexedOwnedContextualLambdaPolicyRecipes.PolicyRecipe compilation rootFuel policy)
     {allowed : ExpressionId → Prop}
-    (metadata : MetadataOn prepared named source allowed)
+    (metadata : MetadataOn prepared named source allowed directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn policy (context prepared named)
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed directSites := by
   exact recipe_policy_on_native recipe (NativeMetadataOn.of_ordinary metadata) scope reasonAt
 
 /-- The full profile is proved from one actual retained production recipe.
@@ -440,10 +445,10 @@ theorem retained_policy_on
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
     {allowed : ExpressionId → Prop}
-    (metadata : MetadataOn prepared named source allowed)
+    (metadata : MetadataOn prepared named source allowed directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed directSites := by
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_on recipe metadata scope reasonAt
@@ -454,10 +459,10 @@ theorem retained_policy_on_native
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
     {allowed : ExpressionId → Prop}
-    (metadata : NativeMetadataOn prepared named source allowed)
+    (metadata : NativeMetadataOn prepared named source allowed directSites)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) source scope reasonAt allowed directSites := by
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, _body, recipe, sameCompilation⟩ := retained
   rw [sameCompilation]
   exact recipe_policy_on_native recipe metadata scope reasonAt
@@ -470,14 +475,14 @@ theorem retained_paired_policy_for
     {function : Dynamic.Closure} {parameterScope : SourceCoreLocalCell.Scope}
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
-    (original : MetadataFor prepared named function.source)
-    (viewed : MetadataFor prepared named code.view)
+    (original : MetadataFor prepared named function.source directSites)
+    (viewed : MetadataFor prepared named code.view directSites)
     (originalScope viewScope : SourceCoreLocalCell.Scope)
     (originalReasonAt viewReasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) function.source originalScope originalReasonAt ∧
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) function.source originalScope originalReasonAt directSites ∧
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) code.view viewScope viewReasonAt :=
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) code.view viewScope viewReasonAt directSites :=
   ⟨retained_policy_for retained original originalScope originalReasonAt,
     retained_policy_for retained viewed viewScope viewReasonAt⟩
 
@@ -487,12 +492,12 @@ theorem retained_selected_policy_for
     {function : Dynamic.Closure} {parameterScope : SourceCoreLocalCell.Scope}
     {administrative : Core.Context} {code : Code prepared function parameterScope administrative}
     (retained : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained named code)
-    (metadata : MetadataFor prepared named function.source)
+    (metadata : MetadataFor prepared named function.source directSites)
     {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
     (selected : stages.Closure function child)
     (scope : SourceCoreLocalCell.Scope) (reasonAt : ExpressionId → Word) :
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyFor code.policy code.compilation
-      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) child.source scope reasonAt := by
+      prepared.fuel (SourceCoreCompatibleValues.Context.initial checked) child.source scope reasonAt directSites := by
   rw [stages.source selected]
   exact retained_policy_for retained metadata scope reasonAt
 

@@ -16,7 +16,9 @@ open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (GeneralSynta
 open CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles (NativeMetadataFor)
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport (CanonicalRootAt)
 
-variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+section Sites
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
   {row : SourceSpecialization.SpecializedFunction}
   (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)
   {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
@@ -27,7 +29,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
     completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-  (metadata : NativeMetadataFor compiled.indexed prepared.named header.function.source)
+  (ordinary : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compiled.indexed.base.plan instantiation)
+  (metadata : NativeMetadataFor compiled.indexed prepared.named header.function.source directSites)
   {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
   (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
   (complete : RecursiveNamedCatalogNativeContexts.Complete
@@ -39,17 +43,17 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 local notation "stages" => RecursiveNamedPreparedStageScopes.registry actual
 local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
 
-include prepared aligned diagnostic receiver wellFormed metadata complete in
+include prepared aligned diagnostic receiver wellFormed ordinary metadata complete in
 /-- Original Source typing and the actual accepted action determine this root.
 All lexical context changes come from the compiler collector's binder fields. -/
-theorem of_policy
+theorem of_policy_sites
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {invocation : Staging.Recursive.Scope}
     (selected : (stages).Closure header.function invocation)
     (fields : Dynamic.RuntimeContextFields header.context context)
     (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
     {id : ExpressionId} {node : ExpressionNode}
-    (tree : GeneralSyntax invocation.source id)
+    (tree : GeneralSyntax invocation.source id directSites)
     (found : invocation.source.lookupExpression? id = some node)
     (typed : ExpressionHasType invocation.source context id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
@@ -69,15 +73,15 @@ theorem of_policy
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.recipe_policy_for_native
     root.compilerPolicy metadata scope header.reasonAt
   have childProfile : GeneralPolicyFor root.selected.policy (CallableIndexedNamedGeneration.context compiled.indexed prepared.named)
-      compiled.indexed.fuel (.initial compiled.compatible.checked) invocation.source scope header.reasonAt := by
+      compiled.indexed.fuel (.initial compiled.compatible.checked) invocation.source scope header.reasonAt directSites := by
     simpa only [sameSource] using profile
-  have coercions : ∀ id actualNode, GeneralSyntax invocation.source id →
+  have coercions : ∀ id actualNode, GeneralSyntax invocation.source id directSites →
       invocation.source.lookupExpression? id = some actualNode → actualNode.coercions = [] := by
     intro id actualNode syntaxTree actualFound
     exact metadata.coercions id (by simpa only [sameSource] using syntaxTree)
       actualNode (by simpa only [sameSource] using actualFound)
   have compiledChild := accepted
-  let certificate := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_general_functions
+  let certificate := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_sites_functions ordinary
     compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     unique declarations childProfile coercions tree found typed compiledChild
   obtain ⟨sidecar, issued⟩ := CallableIndexedActualNamedSourceReceipts.hook_sidecar compiled header.hook
@@ -96,7 +100,7 @@ theorem of_policy
   have ready : CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds.CallsReady
       (compiled := compiled) (invocation := invocation) certificate := by
     intro callFuel callScope callId callee ids callMetadata code compiler path
-    have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax path
+    have syntaxTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.calls_syntax_of path tree
     have callProfile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.recipe_policy_for_native
       root.compilerPolicy metadata callScope header.reasonAt
     have readPolicy := callProfile.read callId (by simpa only [sameSource] using syntaxTree)
@@ -131,7 +135,7 @@ theorem of_policy
       rw [header.frame.context, header.frame.source]
       exact sourceTyped.toBodyInstanceTypingCertificate.sourceRuntimeValid
     exact (original.transport (RecursiveNamedInitialContextValidity.mono_fields header.extended)).transport fields
-  let result := CanonicalRootAt.of_general_compiled
+  let result := CanonicalRootAt.of_sites_compiled ordinary
     compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     unique declarations childProfile coercions tree found typed compiledChild ready rfl
     (fields.solvedRequirements.trans (header.valid.ledger.trans aligned.solved))
@@ -148,9 +152,82 @@ theorem of_policy
   exact ⟨result, rfl⟩
 
 
-include prepared aligned diagnostic receiver wellFormed metadata complete in
+include prepared aligned diagnostic receiver wellFormed ordinary metadata complete in
 /-- Original Source typing and the actual accepted action determine this root.
 All lexical context changes come from the compiler collector's binder fields. -/
+theorem of_accepted_sites
+    {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {invocation : Staging.Recursive.Scope}
+    (selected : (stages).Closure header.function invocation)
+    (fields : Dynamic.RuntimeContextFields header.context context)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
+    {id : ExpressionId} {node : ExpressionNode}
+    (tree : GeneralSyntax invocation.source id directSites)
+    (found : invocation.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType invocation.source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
+    ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
+  have sameSource := (stages).source selected
+  obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt
+    prepared aligned (by simpa only [sameSource] using accepted)
+  exact of_policy_sites prepared aligned diagnostic receiver wellFormed ordinary metadata rows complete actual selected
+    fields declarations tree found typed root (by simpa only [sameSource] using root.selected.accepted)
+
+end Sites
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  {row : SourceSpecialization.SpecializedFunction}
+  (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)
+  {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
+  {instantiation : DeclarationInstantiation}
+  (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
+  (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (metadata : NativeMetadataFor compiled.indexed prepared.named header.function.source)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (complete : RecursiveNamedCatalogNativeContexts.Complete
+    (prepared := compiled.indexed.ancestry) (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed)
+    (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
+  (actual : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry actual
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+include prepared aligned diagnostic receiver wellFormed metadata complete in
+theorem of_policy
+    {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {invocation : Staging.Recursive.Scope}
+    (selected : (stages).Closure header.function invocation)
+    (fields : Dynamic.RuntimeContextFields header.context context)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
+    {id : ExpressionId} {node : ExpressionNode}
+    (tree : GeneralSyntax invocation.source id)
+    (found : invocation.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType invocation.source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    {rootFuel : Nat} {rootSource : TypedSource} {rootScope : SourceCoreLocalCell.Scope}
+    {rootId : ExpressionId} {rootReasonAt : ExpressionId → Word}
+    {rootLowered : SourceCoreBasic.LoweredExpr}
+    (root : CallableIndexedOwnedContextualCompilerPolicyProfiles.RootPolicyReceipt (compiled := compiled)
+      prepared.named prepared.diagnostics prepared.code prepared.compilation rootFuel
+      rootSource rootScope rootId rootReasonAt rootLowered)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody
+      fuel (CallableIndexedNamedGeneration.context compiled.indexed prepared.named)
+      invocation.source scope id header.reasonAt = .ok lowered) :
+    ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
+  exact of_policy_sites prepared aligned diagnostic receiver wellFormed
+    (fun _ supported => supported.ordinary compiled.indexed.base.plan) metadata rows complete actual
+    selected fields declarations tree found typed root accepted
+
+include prepared aligned diagnostic receiver wellFormed metadata complete in
 theorem of_accepted
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {invocation : Staging.Recursive.Scope}
@@ -165,10 +242,8 @@ theorem of_accepted
     (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
     ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
       context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
-  have sameSource := (stages).source selected
-  obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt
-    prepared aligned (by simpa only [sameSource] using accepted)
-  exact of_policy prepared aligned diagnostic receiver wellFormed metadata rows complete actual selected
-    fields declarations tree found typed root (by simpa only [sameSource] using root.selected.accepted)
+  exact of_accepted_sites prepared aligned diagnostic receiver wellFormed
+    (fun _ supported => supported.ordinary compiled.indexed.base.plan) metadata rows complete actual
+    selected fields declarations tree found typed accepted
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedCanonicalScopedRoots
