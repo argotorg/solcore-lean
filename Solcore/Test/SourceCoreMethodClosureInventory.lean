@@ -1,0 +1,165 @@
+import Solcore.Test.SourceCoreMethodClosureFixture
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicRootCoverage
+set_option autoImplicit false
+set_option Elab.async false
+namespace Tests.SourceCoreMethodClosure
+open Solcore Frontend SourceInference SourceSemantics CoreLowering
+open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
+
+structure OrdinaryInventory (fixture : CompiledFixture) (observed : ObservedProgram fixture) where
+  wordInput : Input fixture.recipe.compiled
+  wordSame : wordInput.row = observed.wordRow.row
+  wordPacket : Issued wordInput
+  wordHeader : ActualHeader fixture observed.wordRow.row
+  wordAligned : wordHeader.header = wordPacket.header
+  wordSlot : wordHeader.header.slot = observed.wordRow.index
+  wordSignature : wordHeader.header.named.signature = observed.wordRow.global
+  boolInput : Input fixture.recipe.compiled
+  boolSame : boolInput.row = observed.boolRow.row
+  boolPacket : Issued boolInput
+  boolHeader : ActualHeader fixture observed.boolRow.row
+  boolAligned : boolHeader.header = boolPacket.header
+  boolSlot : boolHeader.header.slot = observed.boolRow.index
+  boolSignature : boolHeader.header.named.signature = observed.boolRow.global
+  makeWordInput : Input fixture.recipe.compiled
+  makeWordSame : makeWordInput.row = observed.makeWordRow.row
+  makeWordPacket : Issued makeWordInput
+  makeWordHeader : ActualHeader fixture observed.makeWordRow.row
+  makeWordAligned : makeWordHeader.header = makeWordPacket.header
+  makeWordSlot : makeWordHeader.header.slot = observed.makeWordRow.index
+  makeWordSignature : makeWordHeader.header.named.signature = observed.makeWordRow.global
+  makeBoolInput : Input fixture.recipe.compiled
+  makeBoolSame : makeBoolInput.row = observed.makeBoolRow.row
+  makeBoolPacket : Issued makeBoolInput
+  makeBoolHeader : ActualHeader fixture observed.makeBoolRow.row
+  makeBoolAligned : makeBoolHeader.header = makeBoolPacket.header
+  makeBoolSlot : makeBoolHeader.header.slot = observed.makeBoolRow.index
+  makeBoolSignature : makeBoolHeader.header.named.signature = observed.makeBoolRow.global
+  useWordInput : Input fixture.recipe.compiled
+  useWordSame : useWordInput.row = observed.useWordRow.row
+  useWordPacket : Issued useWordInput
+  useWordHeader : ActualHeader fixture observed.useWordRow.row
+  useWordAligned : useWordHeader.header = useWordPacket.header
+  useWordSlot : useWordHeader.header.slot = observed.useWordRow.index
+  useWordSignature : useWordHeader.header.named.signature = observed.useWordRow.global
+  useBoolInput : Input fixture.recipe.compiled
+  useBoolSame : useBoolInput.row = observed.useBoolRow.row
+  useBoolPacket : Issued useBoolInput
+  useBoolHeader : ActualHeader fixture observed.useBoolRow.row
+  useBoolAligned : useBoolHeader.header = useBoolPacket.header
+  useBoolSlot : useBoolHeader.header.slot = observed.useBoolRow.index
+  useBoolSignature : useBoolHeader.header.named.signature = observed.useBoolRow.global
+
+def OrdinaryInventory.rows {fixture observed} (given : OrdinaryInventory fixture observed) :
+    Inventory [given.wordInput, given.boolInput, given.makeWordInput, given.makeBoolInput, given.useWordInput, given.useBoolInput] :=
+  .cons given.wordPacket (.cons given.boolPacket (.cons given.makeWordPacket (.cons given.makeBoolPacket (.cons given.useWordPacket (.cons given.useBoolPacket (.nil))))))
+
+theorem ordinary_inventory (fixture : CompiledFixture) (observed : ObservedProgram fixture) :
+    Nonempty (OrdinaryInventory fixture observed) := by
+  obtain ⟨wordInput, wordSame, wordPacket, wordHeader, wordAligned, wordSlot, wordSignature⟩ := observed.wordRow.issue
+  obtain ⟨boolInput, boolSame, boolPacket, boolHeader, boolAligned, boolSlot, boolSignature⟩ := observed.boolRow.issue
+  obtain ⟨makeWordInput, makeWordSame, makeWordPacket, makeWordHeader, makeWordAligned, makeWordSlot, makeWordSignature⟩ := observed.makeWordRow.issue
+  obtain ⟨makeBoolInput, makeBoolSame, makeBoolPacket, makeBoolHeader, makeBoolAligned, makeBoolSlot, makeBoolSignature⟩ := observed.makeBoolRow.issue
+  obtain ⟨useWordInput, useWordSame, useWordPacket, useWordHeader, useWordAligned, useWordSlot, useWordSignature⟩ := observed.useWordRow.issue
+  obtain ⟨useBoolInput, useBoolSame, useBoolPacket, useBoolHeader, useBoolAligned, useBoolSlot, useBoolSignature⟩ := observed.useBoolRow.issue
+  exact ⟨{wordInput, wordSame, wordPacket, wordHeader, wordAligned, wordSlot, wordSignature, boolInput, boolSame, boolPacket, boolHeader, boolAligned, boolSlot, boolSignature, makeWordInput, makeWordSame, makeWordPacket, makeWordHeader, makeWordAligned, makeWordSlot, makeWordSignature, makeBoolInput, makeBoolSame, makeBoolPacket, makeBoolHeader, makeBoolAligned, makeBoolSlot, makeBoolSignature, useWordInput, useWordSame, useWordPacket, useWordHeader, useWordAligned, useWordSlot, useWordSignature, useBoolInput, useBoolSame, useBoolPacket, useBoolHeader, useBoolAligned, useBoolSlot, useBoolSignature}⟩
+
+theorem OrdinaryInventory.word_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.wordHeader.header ∈ headers given.rows := by
+  rw [given.wordAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+theorem OrdinaryInventory.bool_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.boolHeader.header ∈ headers given.rows := by
+  rw [given.boolAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+theorem OrdinaryInventory.makeWord_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.makeWordHeader.header ∈ headers given.rows := by
+  rw [given.makeWordAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+theorem OrdinaryInventory.makeBool_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.makeBoolHeader.header ∈ headers given.rows := by
+  rw [given.makeBoolAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+theorem OrdinaryInventory.useWord_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.useWordHeader.header ∈ headers given.rows := by
+  rw [given.useWordAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+theorem OrdinaryInventory.useBool_member {fixture observed} (given : OrdinaryInventory fixture observed) :
+    given.useBoolHeader.header ∈ headers given.rows := by
+  rw [given.useBoolAligned]
+  simp [OrdinaryInventory.rows, headers]
+
+/-- Actual instantiation metadata selects one exact ordinary row even while
+other physical slots contain implementation methods. -/
+theorem ObservedRow.direct_slot {fixture : CompiledFixture} {signature : ProgramFunctionSignature}
+    (observed : ObservedRow fixture signature)
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context} {values : SourceCoreCompatibleValues.Context}
+    {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {reasonAt : ExpressionId → Core.Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body fuel
+      compilation values source scope id callee ids instantiation reasonAt lowered)
+    (plan : compilation.plan = fixture.recipe.compiled.indexed.base.plan)
+    (globals : compilation.globals = fixture.recipe.compiled.indexed.base.globals)
+    (metadata : instantiation = CallableNamedCanonicalOrder.retainedInstantiation observed.row) :
+    receipt.signature = observed.global ∧ receipt.index = observed.index := by
+  have target := receipt.target
+  simp only [plan, metadata, observed.target] at target
+  have key := Except.ok.inj target
+  have found := receipt.global
+  rw [globals] at found
+  have member : (receipt.signature, receipt.index) ∈
+      fixture.recipe.compiled.indexed.base.globals.zipIdx.filter
+        (fun item => decide (item.1.key = observed.global.key)) := by
+    refine List.mem_filter.mpr ⟨List.mk_mem_zipIdx_iff_getElem?.mpr found, ?_⟩
+    simp only [observed.globalKey, key, decide_true]
+  rw [observed.slot] at member
+  exact Prod.mk.inj (List.mem_singleton.mp member)
+
+theorem ObservedRow.global_slot {fixture : CompiledFixture} {signature : ProgramFunctionSignature}
+    (observed : ObservedRow fixture signature) {index : Nat} {global : SourceCoreCalls.Signature}
+    (found : fixture.recipe.compiled.indexed.base.globals[index]? = some global)
+    (key : global.key = observed.row.key) : global = observed.global ∧ index = observed.index := by
+  have member : (global, index) ∈ fixture.recipe.compiled.indexed.base.globals.zipIdx.filter
+      (fun item => decide (item.1.key = observed.global.key)) := by
+    refine List.mem_filter.mpr ⟨List.mk_mem_zipIdx_iff_getElem?.mpr found, ?_⟩
+    simp only [observed.globalKey, key, decide_true]
+  rw [observed.slot] at member
+  exact Prod.mk.inj (List.mem_singleton.mp member)
+
+/-- The four actual public entries are covered by their ordinary Source
+headers; the complete physical cache separately retains both method slots. -/
+theorem OrdinaryInventory.public_coverage {fixture observed}
+    (given : OrdinaryInventory fixture observed) :
+    RecursiveNamedPublicRootCoverage.Coverage
+      (compiled := fixture.recipe.compiled)
+      (values := .initial fixture.recipe.compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions fixture.recipe.compiled.indexed)
+      (headers given.rows) := by
+  intro entry member named slot found
+  have entryKey : entry.key ∈ [observed.wordRow.row.key, observed.boolRow.row.key,
+      observed.useWordRow.row.key, observed.useBoolRow.row.key] := by
+    rw [← observed.entryKeys]
+    exact List.mem_map.mpr ⟨entry, member, rfl⟩
+  have namedKey : named.signature.key = entry.key := of_decide_eq_true (List.find?_some (p := fun item : SourceCoreGeneralFunctions.Function × Nat => decide (item.1.signature.key = entry.key)) found)
+  have selected := CallableIndexedPreparedInventories.cached_global_at fixture.recipe.compiled
+    (List.mk_mem_zipIdx_iff_getElem?.mp (List.mem_of_find?_eq_some found))
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at entryKey
+  rcases entryKey with same | same | same | same
+  · have slots := observed.wordRow.global_slot selected (namedKey.trans same)
+    exact ⟨given.wordHeader.header, given.word_member, given.wordSlot.trans slots.2.symm⟩
+  · have slots := observed.boolRow.global_slot selected (namedKey.trans same)
+    exact ⟨given.boolHeader.header, given.bool_member, given.boolSlot.trans slots.2.symm⟩
+  · have slots := observed.useWordRow.global_slot selected (namedKey.trans same)
+    exact ⟨given.useWordHeader.header, given.useWord_member, given.useWordSlot.trans slots.2.symm⟩
+  · have slots := observed.useBoolRow.global_slot selected (namedKey.trans same)
+    exact ⟨given.useBoolHeader.header, given.useBool_member, given.useBoolSlot.trans slots.2.symm⟩
+
+end Tests.SourceCoreMethodClosure
