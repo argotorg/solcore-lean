@@ -1946,6 +1946,7 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicRootExitAdmission
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicProgramOutcomeWithExit
 import Solcore.Test.SourceCoreNestedFormationForward
 import Solcore.Test.SourceCoreEvidenceScopedForward
+import Solcore.Test.SourceCoreEvidenceClosureForward
 set_option autoImplicit false
 
 open Solcore
@@ -3160,6 +3161,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreEvidenceDirect.runForward
   SourceCoreNestedFormation.runForward
   SourceCoreEvidenceScoped.runForward
+  SourceCoreEvidenceClosure.runForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
