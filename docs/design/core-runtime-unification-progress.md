@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generated factory formation through retained public closures (2026-10-13)
+
+`15231c91` adds `NamedFactoryAdmission`, which checks a returned lambda in the actual cached Source. `82441690` replaces the existing factory's hand-written formation conditions with that certificate.
+
+The check retains the original lambda node, its parameters and result type, the inner return and its complete expression. Only the lambda's own metadata is checked for the formation profile. The inner call keeps its original coercion and ordered evidence. Exact cached/Header identity and accepted terminal compilation construct the formation receipt and expression occurrence internally; independent Source typing remains authoritative.
+
+All seven existing public calls, original Source traces, captured environments, retained histories and sufficient-fuel endpoints still pass. Results remain `41 / 7 / 41 / 7`; store lengths remain `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+Validation: coherent checks for 8 affected modules, the full build (7,143 jobs), registered tests (14,156 build jobs and final pass marker), kernel policy and 311 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The certificate covers an outer terminal return of a lambda with one inner value return. It certifies formation; the retained closure body and selected conversion method still use their existing authentic support producers. Certification completeness, wider syntax and preservation across all actual passes remain unfinished.
+
+The existing factory observer now records exact successful `certifyCachedFactory` evaluation on the actual cached function. No new fixture is introduced. Ordinary keep/use support, generated direct-call support and closure histories remain connected.
+
 ## Generated direct-call certificates through public execution (2026-10-13)
 
 `a0cabf84` derives evidence-aware scoped support from executable certificates on the original cached Source. `cd13d9d5` connects it to the existing `relay(value) { let local = identity(value); return local; }` public proof.
