@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Issued named and builtin handles share physical histories (2026-10-14)
+
+`287c4b29` connects actual named and builtin issuance to the common physical session. `ea787a6a` migrates the existing direct-issued sequence to those producers and the complete program certificate.
+
+The original five operations create a closure capturing `10`, issue the named `read` function, call it with the old closure, issue the builtin integer conversion, and call that builtin with `37`. Results remain `10` and `37`. The named factory's complete captured environment follows its actual global-slot reads and cached cells. Both issuers append the exact handle while retaining the earlier captures, Source heap, native store and registry.
+
+One certificate covers the original two-row cache and its two-row direct table. The automatic catalog issuer is exercised on that same certificate. Source code, the original checker budget of `1000`, all five operations and four outcome definitions are unchanged. Both direct-call forward guarantees retain every output-fuel budget of at least `1`.
+
+Validation: 1,030 affected modules checked together, full build (7,195 jobs), registered tests (14,222 build jobs and final pass marker), kernel policy and 521 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The earlier nine-event failure/reuse, seven-call method-evidence and coercion, and six-call relay sequences still pass.
+
+Independent Source well-formedness and successful finite certification remain explicit. Wider compiler alternatives, complete static coverage from compiler success and preservation across every actual pass remain unfinished.
+
+Actual issuance now supplies positive callable entries in the same model as direct and named execution. The next public connection collects handles nested in compound outputs, retaining their capture sharing and order. Work also continues on deriving body support from accepted compiler actions, so that final clients need not supply successful extra certification.
+
 ## Direct invocation and failure retain the common physical session (2026-10-14)
 
 `82517c33` extracts the exact checked-method receipt. `7546d7ad` adds common public adapters for actual input registry extensions, direct packed calls and failures. `c40caab7` connects the existing recursive-index sequence to those adapters and the complete program certificate.
@@ -540,11 +554,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `82517c33` / `7546d7ad` / `c40caab7`: actual checked-method coherence and nine public events through the common physical session. |
-| Latest completed verification | Full build (7185 jobs), registered tests, kernel policy and 493 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `287c4b29` / `ea787a6a`: actual named/builtin issuance and direct execution share the positive physical session. |
+| Latest completed verification | Full build (7195 jobs), registered tests, kernel policy and 521 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | One actual full-cache certificate supplies body support; original mapping selection, direct closure invocation, failure and capture reuse retain independent Source traces and sufficient-fuel public bounds. |
-| Current implementation priority | Connect actual named/builtin issuance and remaining public boundaries to the common physical state, then close static coverage and all-pass composition from accepted compilation. |
+| Latest proof scope | The original five-operation issued-handle sequence uses one actual program certificate and common physical history; exact captures, results and output fuel of at least one are retained. |
+| Current implementation priority | Connect compound output collection to the common physical state and derive body support from accepted compiler actions; complete all-pass composition remains open. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

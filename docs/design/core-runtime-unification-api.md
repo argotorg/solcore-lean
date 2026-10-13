@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Issued named and builtin handles share physical histories (2026-10-14)
+
+`287c4b29` connects actual named and builtin issuance to the common physical session. `ea787a6a` migrates the existing direct-issued sequence to those producers and the complete program certificate.
+
+The original five operations create a closure capturing `10`, issue the named `read` function, call it with the old closure, issue the builtin integer conversion, and call that builtin with `37`. Results remain `10` and `37`. The named factory's complete captured environment follows its actual global-slot reads and cached cells. Both issuers append the exact handle while retaining the earlier captures, Source heap, native store and registry.
+
+One certificate covers the original two-row cache and its two-row direct table. The automatic catalog issuer is exercised on that same certificate. Source code, the original checker budget of `1000`, all five operations and four outcome definitions are unchanged. Both direct-call forward guarantees retain every output-fuel budget of at least `1`.
+
+Validation: 1,030 affected modules checked together, full build (7,195 jobs), registered tests (14,222 build jobs and final pass marker), kernel policy and 521 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The earlier nine-event failure/reuse, seven-call method-evidence and coercion, and six-call relay sequences still pass.
+
+Independent Source well-formedness and successful finite certification remain explicit. Wider compiler alternatives, complete static coverage from compiler success and preservation across every actual pass remain unfinished.
+
+`CallableIndexedOwnedNamedPhysicalCaptures.of_read` constructs complete captures from an actual native read; `of_cached` keeps its original interface. `RecursiveNamedPublicPhysicalFactoryValues` derives named and builtin representations from genuine issuer receipts. `RecursiveNamedPublicPhysicalSessionIssuance.State.remember_named` and `remember_builtin` return exact Source/handle types, an appended entry and the same Source heap. `RecursiveNamedPublicPhysicalSessionDirectWordForward.forward_call` preserves the existing output-fuel lower bound of one, using an accepted start and independent Source trace. Public runtime APIs are unchanged.
+
 ## Direct invocation and failure retain the common physical session (2026-10-14)
 
 `82517c33` extracts the exact checked-method receipt. `7546d7ad` adds common public adapters for actual input registry extensions, direct packed calls and failures. `c40caab7` connects the existing recursive-index sequence to those adapters and the complete program certificate.
