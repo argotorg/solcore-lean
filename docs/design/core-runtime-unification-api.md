@@ -1,8 +1,24 @@
 # Migration to the common Core execution API
 
-Last updated: 2026-10-13.
+Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
+
+## Whole-program static admission through public execution (2026-10-14)
+
+`4d7992ae` adds finite certification of the actual final cache and original Source nodes. `f232b62a` uses that certificate for the existing seven-call retained-closure sequence.
+
+`ProgramAdmission.certify` checks every cached row, original lambda body, selected method source and coercion catalog. The ordinary direct-call table remains a conservative subset, but it cannot silently stand in for whole-cache coverage. Actual cached selection and original declaration/method provenance discharge the excluded-row cases. Original coercions, ordered requirements and captured environments remain intact.
+
+`Certificate.issue` obtains selection identity from actual public checker success, builds the authentic ordinary catalog, closes table alignment, and constructs one common `PhysicalProgramSupport.Support`. No caller supplies named, closure or method coverage callbacks or an execution law. Source well-formedness, successful certification, recipe preparation and authentic initial receiver/entry receipts remain explicit premises.
+
+The active seven-call regression now obtains one certificate from the actual program. Its existing three-header order uses `issue_for_checked` with finite raw-row alignment. The automatic full-catalog issuer is also exercised on that same certificate. All seven Source traces and sufficient execution/output-fuel guarantees remain, with scalar results `41 / 7 / 41 / 7`, three authentic exported closures and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+Validation: 12 affected modules checked together, full build (7,158 jobs), registered tests (14,170 build jobs and final pass marker), kernel policy and 362 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Successful certification is additional admission for the supported fragment. It is not implied by compilation success. This version admits the current named let/return and factory bodies, terminal constrained direct calls with output coercions in closures, primitive terminal methods and closed coercion catalogs. Complete syntax coverage, checker-derived Source well-formedness, broader public inputs/results/failures and preservation across all actual compiler passes remain unfinished.
+
+The new modules use the `CallableIndexedOwnedPrepared` prefix: `ClosedCoercionAdmission`, `PrimitiveSourceAdmission`, `PrimitiveMethodAdmission`, `CoercedClosureAdmission` and `ProgramAdmission`. Their executable checks retain original data; proof-only issuers construct authentic compiler packets and the shared support package. `Certificate.issue_for_checked` accepts a chosen inventory and raw-table alignment. `Certificate.issue` constructs the catalog and alignment internally. The public runtime API is unchanged.
 
 ## Common public session meaning from static program support (2026-10-13)
 
