@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodOriginIdentity
 import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginSource
