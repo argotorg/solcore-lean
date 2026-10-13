@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Compiler receipts cover mutable relay bodies (2026-10-14)
+
+`1d90a8c7` extracts actual method-operator, assignment and while-loop actions. `77d9e3c8` connects both original relay functions and both identity functions to the existing public execution certificate.
+
+Loop receipts retain the condition, loop body, continuation, scope and compilation budgets. Assignment refinement uses the genuine Header callback policy to obtain the actual right-hand action, original binder, place layout and emitted code. It preserves exact Source target types separately from their native representation. The original trait-operator receipt retains its dictionary and ordered operands.
+
+The complete certificate now obtains eight ordinary function roots from accepted compiler actions. The original program still has twelve cache rows, ten direct-table rows and the same seven Source/public operations. Relay-local writes, captured environments, reached heaps, outputs `33 / true / 33 / 55` and public fuel conclusions are preserved. Separate recursive body or expression scans are no longer required for those selected roots.
+
+Validation: 48 affected modules checked together, full build (7,231 jobs), registered tests (14,296 build jobs), kernel policy and 660 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Ordinary primitive operators, operators with output coercions, projected or compound assignments, generalized locals and other body forms retain explicit unsupported branches in this producer. Factory roots, closure and method bodies, metadata and catalog formation still have complementary checks. Complete compiler coverage and preservation across all actual passes remain unfinished.
+
+The old direct and indirect root producers remain in the same certificate. Empty loop-body tails are accepted only in non-returning mode; top-level fallthrough remains a distinct obligation. The twelve unrelated workspace changes remain excluded.
+
 ## Accepted indirect calls supply retained closure execution (2026-10-14)
 
 `375099a2` derives indirect-call structure from actual accepted compiler actions. `f7f43e37` connects the original `useWord` and `useBool` callers to the same complete certificate as the two evidence-bearing entry roots.
