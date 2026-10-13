@@ -1,6 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedLexicalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
+import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
+import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
 
 /-! General recursive expressions share the existing named scoped compiler
 flow with legacy expressions and ordinary formation. Each canonical child
@@ -23,11 +25,30 @@ inductive Certificate
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (bodyRegistry : SourceCoreRawMetadata.Registry) (semanticFaults : FunctionCalls.FaultRep)
     (context : SourceSemantics.Context) (invocation : Staging.Recursive.Scope)
-    (scope : SourceCoreLocalCell.Scope) (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr) : Prop where
-  | legacy (actual : CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Certificate
-      header bodyRegistry semanticFaults context invocation scope id lowered)
-  | canonical (root : CanonicalRootAt compiled headers context invocation scope id lowered semanticFaults)
-      («prefix» : root.compilation.administrativePrefix = 1)
+    (scope : SourceCoreLocalCell.Scope) : ExpressionId → SourceCoreBasic.LoweredExpr → Prop where
+  | legacy {id lowered} (actual : CallableIndexedOwnedPreparedStagedNamedLexicalSupport.Certificate
+      header bodyRegistry semanticFaults context invocation scope id lowered) :
+      Certificate headers header bodyRegistry semanticFaults context invocation scope id lowered
+  | canonical {id lowered} (root : CanonicalRootAt compiled headers context invocation scope id lowered semanticFaults)
+      («prefix» : root.compilation.administrativePrefix = 1) :
+      Certificate headers header bodyRegistry semanticFaults context invocation scope id lowered
+  | group {id node inner innerNode code}
+      (metadata : CompatibleExpressionPrimitives.Metadata compiled.compatible.checked invocation.source id node code.type)
+      (form : node.form = .group inner)
+      (innerFound : invocation.source.lookupExpression? inner = some innerNode)
+      (sourceType : node.type = innerNode.type)
+      (child : Certificate headers header bodyRegistry semanticFaults context invocation scope inner code) :
+      Certificate headers header bodyRegistry semanticFaults context invocation scope id code
+  | tuple {id node ids types codes}
+      (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
+      (covers : invocation.evidence.Covers context)
+      (actual : CompatibleExpressionTuples.Header (.initial compiled.compatible.checked) invocation.source id node ids types codes)
+      (sequence : DataExpressionSequence.Tree invocation.source
+        (RecursiveStageTupleMeaning.Entries scope (ids.zip codes)) scope ids types codes)
+      (children : ∀ child code, (child, code) ∈ ids.zip codes →
+        Certificate headers header bodyRegistry semanticFaults context invocation scope child code) :
+      Certificate headers header bodyRegistry semanticFaults context invocation scope id
+        (SourceCoreCalls.packArguments codes)
 
 /-- The same authentic branching receipt covers lexical bodies, branches and
 finite loops. Collected retains its own compiler tree and catalog sites. -/

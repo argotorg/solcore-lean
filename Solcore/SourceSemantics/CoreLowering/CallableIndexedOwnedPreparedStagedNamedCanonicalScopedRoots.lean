@@ -42,7 +42,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include prepared aligned diagnostic receiver wellFormed metadata complete in
 /-- Original Source typing and the actual accepted action determine this root.
 All lexical context changes come from the compiler collector's binder fields. -/
-theorem of_accepted
+theorem of_policy
     {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
     {invocation : Staging.Recursive.Scope}
     (selected : (stages).Closure header.function invocation)
@@ -53,12 +53,18 @@ theorem of_accepted
     (found : invocation.source.lookupExpression? id = some node)
     (typed : ExpressionHasType invocation.source context id node.type)
     {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
-    (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
+    {rootFuel : Nat} {rootSource : TypedSource} {rootScope : SourceCoreLocalCell.Scope}
+    {rootId : ExpressionId} {rootReasonAt : ExpressionId → Word}
+    {rootLowered : SourceCoreBasic.LoweredExpr}
+    (root : CallableIndexedOwnedContextualCompilerPolicyProfiles.RootPolicyReceipt (compiled := compiled)
+      prepared.named prepared.diagnostics prepared.code prepared.compilation rootFuel
+      rootSource rootScope rootId rootReasonAt rootLowered)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody
+      fuel (CallableIndexedNamedGeneration.context compiled.indexed prepared.named)
+      invocation.source scope id header.reasonAt = .ok lowered) :
     ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
       context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
   have sameSource := (stages).source selected
-  obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt
-    prepared aligned (by simpa only [sameSource] using accepted)
   have unique : NodeOccurrencesUnique invocation.source := sameSource ▸ header.unique
   have profile := CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.recipe_policy_for_native
     root.compilerPolicy metadata scope header.reasonAt
@@ -70,10 +76,7 @@ theorem of_accepted
     intro id actualNode syntaxTree actualFound
     exact metadata.coercions id (by simpa only [sameSource] using syntaxTree)
       actualNode (by simpa only [sameSource] using actualFound)
-  have compiledChild : SourceCoreFunctions.lowerExpressionWithPolicy root.selected.policy root.selected.lowerBody
-      (predecessor + 1) (CallableIndexedNamedGeneration.context compiled.indexed prepared.named)
-      invocation.source scope id header.reasonAt = .ok lowered := by
-    simpa only [sameSource] using root.selected.accepted
+  have compiledChild := accepted
   let certificate := CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.of_general_functions
     compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     unique declarations childProfile coercions tree found typed compiledChild
@@ -143,5 +146,29 @@ theorem of_accepted
     (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.named_ready
       prepared diagnostic aligned sameSource certificate)
   exact ⟨result, rfl⟩
+
+
+include prepared aligned diagnostic receiver wellFormed metadata complete in
+/-- Original Source typing and the actual accepted action determine this root.
+All lexical context changes come from the compiler collector's binder fields. -/
+theorem of_accepted
+    {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope}
+    {invocation : Staging.Recursive.Scope}
+    (selected : (stages).Closure header.function invocation)
+    (fields : Dynamic.RuntimeContextFields header.context context)
+    (declarations : CompatibleExpressionReads.ScopeDeclarations invocation.source scope context)
+    {id : ExpressionId} {node : ExpressionNode}
+    (tree : GeneralSyntax invocation.source id)
+    (found : invocation.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType invocation.source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : header.policy.lowerExpression fuel invocation.source scope id header.reasonAt = .ok lowered) :
+    ∃ root : CanonicalRootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      context invocation scope id lowered faults, root.compilation.administrativePrefix = 1 := by
+  have sameSource := (stages).source selected
+  obtain ⟨predecessor, ⟨root⟩⟩ := CallableIndexedOwnedPreparedStagedNamedLexicalReadRoots.policy_receipt
+    prepared aligned (by simpa only [sameSource] using accepted)
+  exact of_policy prepared aligned diagnostic receiver wellFormed metadata rows complete actual selected
+    fields declarations tree found typed root (by simpa only [sameSource] using root.selected.accepted)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedCanonicalScopedRoots

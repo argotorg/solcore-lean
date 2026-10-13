@@ -11,6 +11,8 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedSc
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingEntryPrefix
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGroupBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTupleHeadBounds
 
 /-! Canonical direct and index children use the actual named parameter packet
 through the existing scoped flow engine. Lexical allocation, finite loops and
@@ -65,7 +67,7 @@ theorem preserves_children {budget : Nat}
     PreservesAt (nestedBridge owner) context model stages invocation
       (Certificate headers header bodyRegistry semanticFaults context invocation) faults size := by
   intro scope id lowered certified
-  cases certified with
+  induction certified generalizing size with
   | legacy actual =>
     cases actual with
     | recursive root =>
@@ -96,6 +98,28 @@ theorem preserves_children {budget : Nat}
     exact canonicalChildren size within root owner
       (CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.nestedCaller
         owner header root.compilation.administrativePrefix samePrefix) ⟨rfl, rfl, rfl⟩
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+    have childMeaning : PreservesBelow (nestedBridge owner) context model stages invocation
+        (Point scope inner code) faults size := by
+      intro childSize smaller current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact ih (Nat.lt_trans smaller within)
+    intro actualNode
+    exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves (nestedBridge owner)
+      (by rw [stages.source selected]; exact header.unique) size childMeaning size (Nat.le_refl _)
+      (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes runtime covers actual sequence children ih =>
+    have childMeaning : PreservesBelow (nestedBridge owner) context model stages invocation
+        (RecursiveStageTupleMeaning.Entries scope (ids.zip codes)) faults size := by
+      intro childSize smaller current child code entry
+      obtain ⟨rfl, member⟩ := entry
+      exact ih child code member (Nat.lt_trans smaller within)
+    intro actualNode
+    exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_preserves (nestedBridge owner)
+      functions faults (by rw [stages.source selected]; exact header.unique)
+      support.wellFormed runtime covers size childMeaning
+      ⟨node, ids, types, codes, rfl, actual, sequence⟩
+
 
 include support globals selected in
 theorem reflects_children {budget : Nat}
@@ -110,7 +134,7 @@ theorem reflects_children {budget : Nat}
     ReflectsAt (nestedBridge owner) context model stages invocation
       (Certificate headers header bodyRegistry semanticFaults context invocation) faults size := by
   intro scope id lowered certified
-  cases certified with
+  induction certified generalizing size with
   | legacy actual =>
     cases actual with
     | recursive root =>
@@ -140,6 +164,28 @@ theorem reflects_children {budget : Nat}
     exact canonicalChildren size within root owner
       (CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport.nestedCaller
         owner header root.compilation.administrativePrefix samePrefix) ⟨rfl, rfl, rfl⟩
+  | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
+    have childMeaning : ReflectsAt (nestedBridge owner) context model stages invocation
+        (Point scope inner code) faults size := by
+      intro current child actual point
+      obtain ⟨rfl, rfl, rfl⟩ := point
+      exact ih within
+    intro actualNode
+    exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects (nestedBridge owner)
+      (by rw [stages.source selected]; exact header.unique) size childMeaning
+      (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
+  | @tuple id node ids types codes runtime covers actual sequence children ih =>
+    have childMeaning : ReflectsBelow (nestedBridge owner) context model stages invocation
+        (RecursiveStageTupleMeaning.Entries scope (ids.zip codes)) faults (size + 1) := by
+      intro childSize smaller current child code entry
+      obtain ⟨rfl, member⟩ := entry
+      exact ih child code member (Nat.lt_of_le_of_lt (Nat.le_of_lt_succ smaller) within)
+    intro actualNode
+    exact CallableIndexedOwnedPreparedStagedTupleHeadBounds.tuple_reflects (nestedBridge owner)
+      functions faults (by rw [stages.source selected]; exact header.unique)
+      support.wellFormed runtime covers size childMeaning
+      ⟨node, ids, types, codes, rfl, actual, sequence⟩
+
 
 
 include support globals selected in
