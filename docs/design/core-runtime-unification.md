@@ -4,6 +4,22 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Actual compilation supplies named body admission (2026-10-14)
+
+`2f8a51b8` extracts named statement structure from accepted compiler actions and derives local declaration facts from original Source typing. `c5522652` uses those receipts in the existing seven-call coercion and retained-closure proof.
+
+The producer retains the exact return or let action, child order, lexical scope, lowering budget, binder allocation and emitted body. Original Header typing supplies monomorphic binder ownership and requirements. Unsupported statement branches and generalized locals retain the same actual compiled body as an explicit remaining obligation.
+
+The original `keep` function now receives its body admission from the genuine Header compilation. A complementary program check validates every other cached root, every closure and method, the complete direct table and coercion selection. The exact selected cache position is filled by the compiler-derived root proof, producing the existing full `ProgramAdmission.Certificate`. Both the selected-inventory and automatic-catalog issuers consume this certificate. The old `keep` body-scanner success is no longer a premise of that route.
+
+All seven original Source traces and sufficient-fuel public conclusions remain, with results `41 / 7 / 41 / 7`, three retained closures and the same reached heaps. Original Source, runtime, support family and final sequence theorem files are unchanged. A separate existing relay regression confirms that an actual let/direct/return body obtains its local declaration receipt from Header typing.
+
+Validation: 34 affected modules checked together, full build (7,207 jobs), registered tests (14,244 build jobs and final pass marker), kernel policy and 576 endpoint audits pass. The actual four-row cache and three-row table also verify that the chosen root needs no body-scan fuel, while an unchosen root, a missing cache position and insufficient fuel for the other program checks are rejected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This covers the selected actual compiler branches. Original return/read facts, expression syntax and metadata, independent Source well-formedness and certification of the other bodies remain explicit. The next connection derives expression structure from the actual accepted expression actions; complete compiler coverage and all-pass preservation remain unfinished.
+
+The next integration carries the existing relay's ordered direct-call arguments from real compiler receipts into its current body support and public execution proofs. Whole-source metadata includes unexecuted nodes, so compilation of a body does not by itself establish that global metadata profile.
+
 ## Nested callable outputs retain the common physical history (2026-10-14)
 
 `29b42221` connects actual compound output collection to the common physical session. `e744359f` moves the existing constructor-call sequence onto this connection and the complete program certificate.
@@ -568,11 +584,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `29b42221` / `e744359f`: constructor outputs and selected callable handles retain the common physical history. |
-| Latest completed verification | Full build (7199 jobs), registered tests, kernel policy and 546 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `2f8a51b8` / `c5522652`: accepted compiler actions replace the selected named body's scanner premise in the public proof. |
+| Latest completed verification | Full build (7207 jobs), registered tests, kernel policy and 576 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | The original nine-operation constructor sequence retains exact callable order, capture sharing, independent Source traces and sufficient-fuel public guarantees. |
-| Current implementation priority | Derive static body support from actual accepted compiler actions, remove separate body-recognizer premises and complete all-pass composition. |
+| Latest proof scope | The original seven-call coercion sequence consumes a complete program certificate whose keep root is derived from actual compilation; captured environments and all public fuel guarantees remain. |
+| Current implementation priority | Derive expression structure and ordered child coverage from accepted expression actions, connect the existing relay public proof and extend full compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

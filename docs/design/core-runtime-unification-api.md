@@ -4,6 +4,22 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual compilation supplies named body admission (2026-10-14)
+
+`2f8a51b8` extracts named statement structure from accepted compiler actions and derives local declaration facts from original Source typing. `c5522652` uses those receipts in the existing seven-call coercion and retained-closure proof.
+
+The producer retains the exact return or let action, child order, lexical scope, lowering budget, binder allocation and emitted body. Original Header typing supplies monomorphic binder ownership and requirements. Unsupported statement branches and generalized locals retain the same actual compiled body as an explicit remaining obligation.
+
+The original `keep` function now receives its body admission from the genuine Header compilation. A complementary program check validates every other cached root, every closure and method, the complete direct table and coercion selection. The exact selected cache position is filled by the compiler-derived root proof, producing the existing full `ProgramAdmission.Certificate`. Both the selected-inventory and automatic-catalog issuers consume this certificate. The old `keep` body-scanner success is no longer a premise of that route.
+
+All seven original Source traces and sufficient-fuel public conclusions remain, with results `41 / 7 / 41 / 7`, three retained closures and the same reached heaps. Original Source, runtime, support family and final sequence theorem files are unchanged. A separate existing relay regression confirms that an actual let/direct/return body obtains its local declaration receipt from Header typing.
+
+Validation: 34 affected modules checked together, full build (7,207 jobs), registered tests (14,244 build jobs and final pass marker), kernel policy and 576 endpoint audits pass. The actual four-row cache and three-row table also verify that the chosen root needs no body-scan fuel, while an unchosen root, a missing cache position and insufficient fuel for the other program checks are rejected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This covers the selected actual compiler branches. Original return/read facts, expression syntax and metadata, independent Source well-formedness and certification of the other bodies remain explicit. The next connection derives expression structure from the actual accepted expression actions; complete compiler coverage and all-pass preservation remain unfinished.
+
+`AcceptedNamedBodyFlow.of_compilation` exposes actual named lowering. `AcceptedNamedBodyBindings.of_header` derives local declaration receipts or retains an actual generalized binding. `AcceptedNamedBodyAdmission` constructs current Source admission and transports it to the exact cached row. `AcceptedProgramBodyCompletion.certify` leaves one actual cache position pending; `Pending.complete` requires that position's root proof and returns the existing full certificate. Public runtime APIs are unchanged.
+
 ## Nested callable outputs retain the common physical history (2026-10-14)
 
 `29b42221` connects actual compound output collection to the common physical session. `e744359f` moves the existing constructor-call sequence onto this connection and the complete program certificate.
