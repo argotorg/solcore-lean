@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreCompilationScope
 import Solcore.Test.SourceCoreConstructorCallsCompilerProfile
 import Solcore.Test.SourceCoreCanonicalScopedCompilerProfile
 import Solcore.Test.SourceCorePublicSourceOutcomes
@@ -3719,6 +3720,7 @@ def run : IO Unit := do
 end Tests
 
 def main : IO UInt32 := do
+  Tests.SourceCoreCompilationScope.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"
