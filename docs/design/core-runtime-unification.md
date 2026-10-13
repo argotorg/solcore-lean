@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Selected methods inside retained closures (2026-10-13)
+
+`81da9984` preserves actual closure and named captures in the shared function representation. `ef0cd998` connects direct calls, selected operator methods and original Source indirect calls through one recursive proof, keeping the complete physical cache and reached heap. `8a082cea` connects seven public calls across three distinct retained closures.
+
+The sequence creates Word `11` and Bool `false` closures, invokes the first through `useWord(f) = f()`, creates a Word `33` closure, then invokes the Bool, first Word and third Word closures. Results are `11 / false / 11 / 33`; native store lengths are `9 / 15 / 21 / 27 / 33 / 39 / 45 / 51`. All seven original checkpoints have Source meaning and sufficient execution/output-fuel bounds. Each sufficient factory result appends its actual handle to the reusable history.
+
+Validation: all 761 affected modules pass coherent checks. The full build (6,865 jobs), all registered tests (13,600 build jobs and the final pass marker), kernel policy and 210 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary retained closures with terminal expressions that call selected methods, and original Source indirect calls that invoke them. The physical family also retains named and builtin handle branches. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Combining this family with scoped closure mutation, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected operator methods through public execution (2026-10-13)
 
 Selected operator methods now connect independent Source evaluation to actual compiler selection and public execution. A constrained generic caller resolves its operator through the complete inherited dictionary. The proof retains the selected implementation body, its original typing and the actual installed method closure.
@@ -328,11 +338,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `0883d66d` / `aebd8640` / `e963a2a9`: selected operator methods through four linked public calls. |
-| Latest completed verification | Full build (6803 jobs), all registered tests, kernel policy and 199 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `81da9984` / `ef0cd998` / `8a082cea`: selected methods in retained closures through seven linked public calls. |
+| Latest completed verification | Full build (6865 jobs), all registered tests, kernel policy and 210 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual method selection and all physical cache cells are retained; four public calls have Source meaning, exact successive heaps and execution/output-fuel bounds. |
-| Current implementation priority | Connect method-bearing retained closures and original Source indirect calls, then broader selection, coercions, remaining grammar and all-pass composition. |
+| Latest proof scope | Actual captured physical slots, selected method evidence and original Source indirect calls remain connected across three distinct handles, seven successive heaps and all seven execution/output-fuel bounds. |
+| Current implementation priority | Connect method-bearing scoped closure mutation through the same physical family, then broader selection, coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

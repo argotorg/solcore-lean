@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected methods inside retained closures (2026-10-13)
+
+Commits `81da9984`, `ef0cd998` and `8a082cea` connect selected methods inside retained closure bodies through actual Source indirect calls and seven successive public sessions. The artifact has eight physical cache slots and six ordinary Headers. Method cells remain covered by physical authority without being treated as ordinary declarations.
+
+A named handle now retains the exact captured environment and embedding. Code identity and cache typing alone cannot identify that capture. At a later call, retained capture facts and current physical authority reconstruct the same installed function. Closure and named origins remain present throughout argument execution and heap restoration; there is no conversion from an erased heap back into the stronger representation.
+
+The public regression derives function-input registry equality from actual handle reimport. Its three factory calls append genuine handles, and all seven calls use their preceding returned session and Source heap. The four scalar results are `11 / false / 11 / 33`. Each original checkpoint has a Source-derived sufficient-fuel result, including an appended history for every sufficient factory completion. No called-body execution or initialized-heap relation is supplied by the fixture.
+
+Validation: all 761 affected modules pass coherent checks. The full build (6,865 jobs), all registered tests (13,600 build jobs and the final pass marker), kernel policy and 210 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary retained closures with terminal expressions that call selected methods, and original Source indirect calls that invoke them. The physical family also retains named and builtin handle branches. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Combining this family with scoped closure mutation, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected operator methods through public execution (2026-10-13)
 
 Commits `0883d66d`, `aebd8640` and `e963a2a9` connect selected operator methods through genuine Source typing, actual compiler receipts and four successive public calls. A single strong induction supplies called-body meaning; the closed endpoints introduce no assumed method execution or initialized heap relation.

@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected methods inside retained closures (2026-10-13)
+
+`PhysicalClosureAssociation` and `PhysicalNamedAssociation` retain the original callable identity and actual captured physical slots. `PhysicalCellOrigins` carries these facts through recursive payloads and heaps. The shared indirect prefixes accept this receiving representation; conversion to the older contextual representation is used only to classify callees.
+
+`OrdinaryMethodPolicy`, `MethodBodyViewTransport` and `OrdinaryMethodScopedRoots` authenticate the original method-bearing closure expression. `PhysicalMixedCallerFamily` closes direct, selected method and indirect calls; `PhysicalMixedNamedFamilyPorts` supplies public body meaning. `InitializedPhysicalClosureArguments` and `RecursiveNamedPublicPhysicalClosureHistory` derive initial arguments and retain every returned capture.
+
+Closed endpoints are `Tests.SourceCoreMethodClosure.closed_sequence_meaning` and `closed_sequence_forward_meaning`. They cover seven linked public calls, including original Source `f()` invocation, three distinct exported closures and all seven original-checkpoint fuel bounds. The public execution API is unchanged.
+
+Validation: all 761 affected modules pass coherent checks. The full build (6,865 jobs), all registered tests (13,600 build jobs and the final pass marker), kernel policy and 210 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary retained closures with terminal expressions that call selected methods, and original Source indirect calls that invoke them. The physical family also retains named and builtin handle branches. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Combining this family with scoped closure mutation, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected operator methods through public execution (2026-10-13)
 
 `OperatorMethodCertificates`, `OperatorMethodAuthority` and `OperatorMethodIssuance.of_actual` retain actual lowering, the selected implementation and the complete Source dictionary. `ClosedMethodSelection.Catalog` derives Source selection support from the original well-formed program and actual compilation plan.
