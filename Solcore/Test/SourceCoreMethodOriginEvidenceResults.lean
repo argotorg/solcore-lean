@@ -1,5 +1,6 @@
-import Solcore.Test.SourceCoreEvidenceDirectResults
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicScalarResults
 set_option autoImplicit false
+set_option Elab.async false
 namespace Tests.SourceCoreMethodOriginEvidence
-export Tests.SourceCoreEvidenceDirect (ScalarOutput)
+export Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicScalarResults (ScalarOutput)
 end Tests.SourceCoreMethodOriginEvidence

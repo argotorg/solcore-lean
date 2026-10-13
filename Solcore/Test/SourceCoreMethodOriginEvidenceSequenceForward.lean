@@ -20,14 +20,10 @@ theorem CallMeaning.forward {fixture : CompiledFixture} {observed : ObservedProg
     {scalar : ScalarOutput} {call : ObservedCall session key publicArguments}
     {arguments : List Dynamic.Value} {invocation : Staging.Recursive.Scope}
     (meaning : CallMeaning before header scalar call arguments invocation)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (ready : session.ExportsReady) :
     ForwardAt (entries := entries) support.toOrdinaryInventory receiver scalar call meaning.after.heap := by
   apply forward_call before scalar call meaning.request meaning.inputs meaning.registry meaning.rawType meaning.nativeType ready
-    (support.bodies meaning.request.header meaning.request.selected.member)
-    (fun budget {child} selected => preserves_bodies receiver support sources bodies methods before.issued before.extension
-      meaning.request.header meaning.request.selected.member selected budget)
+    support.program
   rw [meaning.headerEq]
   exact meaning.trace
 
@@ -42,15 +38,11 @@ theorem FactoryMeaning.forward {fixture : CompiledFixture} {observed : ObservedP
     {call : ObservedFunctionCall session key publicArguments} {resultType : TypeSystem.Ty}
     {arguments : List Dynamic.Value} {invocation : Staging.Recursive.Scope}
     (meaning : FactoryMeaning before header call resultType arguments invocation)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (simple : ∀ value ∈ publicArguments, SourceCoreIndexedSession.SimplePublic value)
     (ready : session.ExportsReady) :
     FactoryForwardAt (entries := entries) support.toOrdinaryInventory receiver call resultType meaning.entry.source meaning.after.heap := by
   apply forward_factory before call meaning.request meaning.inputs simple meaning.rawType ready
-    (support.bodies meaning.request.header meaning.request.selected.member)
-    (fun budget {child} selected => preserves_bodies receiver support sources bodies methods before.issued before.extension
-      meaning.request.header meaning.request.selected.member selected budget)
+    support.program
   rw [meaning.headerEq]
   exact meaning.trace
 
@@ -82,8 +74,7 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
     {useBoolStages : ObservedStages fixture observed.useBoolRow.toObservedRow}
     {sequence : ObservedSequence fixture observed} {receiver : ObservedReceiver fixture observed}
     (meaning : SequenceWitness wordStages boolStages useWordStages useBoolStages sequence receiver)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled) : ForwardMeaning meaning := by
+    : ForwardMeaning meaning := by
   have initialReady : sequence.first.session.ExportsReady :=
     (show sequence.first.bootstrap.ReadyAt 102400 sequence.first.session from .single sequence.first.ready).exportsReady
       sequence.first.authority
@@ -94,46 +85,40 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
   have secondReadReady := sequence.secondRead.executed.exportsReady thirdReady
   have repeatedReady := sequence.repeatedRead.executed.exportsReady secondReadReady
   exact ⟨forward_initial meaning.support.toOrdinaryInventory meaning.support.distinct sequence.first
-      (meaning.support.bodies meaning.support.wordHeader.header meaning.support.toOrdinaryInventory.word_member)
-      (fun budget {child} selected => preserves_bodies receiver meaning.support sources bodies methods receiver.issued (.refl _)
-        meaning.support.wordHeader.header meaning.support.toOrdinaryInventory.word_member selected budget)
+      meaning.support.program
       meaning.firstTrace,
-    meaning.secondMeaning.forward sources bodies methods (bool_simple false true true) firstReady,
-    meaning.firstReadMeaning.forward sources bodies methods secondReady,
-    meaning.thirdMeaning.forward sources bodies methods (word_simple (Core.Word.ofNatModulo 55) (Core.Word.ofNatModulo 66) false) firstReadReady,
-    meaning.secondReadMeaning.forward sources bodies methods thirdReady,
-    meaning.repeatedReadMeaning.forward sources bodies methods secondReadReady,
-    meaning.thirdReadMeaning.forward sources bodies methods repeatedReady⟩
+    meaning.secondMeaning.forward (bool_simple false true true) firstReady,
+    meaning.firstReadMeaning.forward secondReady,
+    meaning.thirdMeaning.forward (word_simple (Core.Word.ofNatModulo 55) (Core.Word.ofNatModulo 66) false) firstReadReady,
+    meaning.secondReadMeaning.forward thirdReady,
+    meaning.repeatedReadMeaning.forward secondReadReady,
+    meaning.thirdReadMeaning.forward repeatedReady⟩
 
 theorem closed_sequence_forward_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (wordStages : ObservedStages fixture observed.wordRow.toObservedRow)
     (boolStages : ObservedStages fixture observed.boolRow.toObservedRow)
     (useWordStages : ObservedStages fixture observed.useWordRow.toObservedRow)
     (useBoolStages : ObservedStages fixture observed.useBoolRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) :
     ∃ (receiver : ObservedReceiver fixture observed)
       (meaning : SequenceWitness wordStages boolStages useWordStages useBoolStages sequence receiver), ForwardMeaning meaning := by
   obtain ⟨receiver, ⟨meaning⟩⟩ := closed_sequence_meaning fixture observed wordStages boolStages useWordStages useBoolStages
-    factories sources bodies methods sequence
-  exact ⟨receiver, meaning, meaning.forward sources bodies methods⟩
+    admission sequence
+  exact ⟨receiver, meaning, meaning.forward⟩
 
 def runForward : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
-  let factories ← observeFactories fixture observed
+  let admission ← observeProgramCertificate fixture observed
   let wordStages ← observeStages fixture observed.wordRow.toObservedRow
   let boolStages ← observeStages fixture observed.boolRow.toObservedRow
   let useWordStages ← observeStages fixture observed.useWordRow.toObservedRow
   let useBoolStages ← observeStages fixture observed.useBoolRow.toObservedRow
-  let ⟨sources⟩ ← observeClosureSources fixture observed
-  let ⟨bodies⟩ ← observeMethodBodies fixture
-  let ⟨methods⟩ ← observeMethodCatalog fixture
   let sequence ← observeSequence fixture observed
+  have _automatic := admission.automatic_catalog_initial
   have _meaning := closed_sequence_forward_meaning fixture observed wordStages boolStages useWordStages useBoolStages
-    factories sources bodies methods sequence
+    admission sequence
   let stores := [sequence.first.session.heapSize, sequence.first.completion.session.heapSize,
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,

@@ -59,8 +59,6 @@ theorem RetainedState.word_factory_meaning {fixture : CompiledFixture} {observed
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (value next : Core.Word) (flag : Bool)
     (call : ObservedFunctionCall session observed.wordRow.row.key [.word value, .word next, .bool flag])
@@ -83,19 +81,15 @@ theorem RetainedState.word_factory_meaning {fixture : CompiledFixture} {observed
       (.named request.header.named.signature.key) := by
     rw [selected]; exact stages.descriptor_at support.wordHeader
   obtain ⟨entry, entryType, handleEq, _handleType, after, trace⟩ := state.make_typed_handle call request inputs
-    (word_simple value next flag) descriptor (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
+    (word_simple value next flag) descriptor support.program invocation
   exact ⟨⟨request, selected, inputs, raw, entry, entryType.trans raw, handleEq, after,
-    by rw [← selected]; exact trace⟩⟩
+    by simpa only [selected] using trace⟩⟩
 
 theorem RetainedState.bool_factory_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (value next : Bool) (flag : Bool)
     (call : ObservedFunctionCall session observed.boolRow.row.key [.bool value, .bool next, .bool flag])
@@ -118,19 +112,15 @@ theorem RetainedState.bool_factory_meaning {fixture : CompiledFixture} {observed
       (.named request.header.named.signature.key) := by
     rw [selected]; exact stages.descriptor_at support.boolHeader
   obtain ⟨entry, entryType, handleEq, _handleType, after, trace⟩ := state.make_typed_handle call request inputs
-    (bool_simple value next flag) descriptor (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
+    (bool_simple value next flag) descriptor support.program invocation
   exact ⟨⟨request, selected, inputs, raw, entry, entryType.trans raw, handleEq, after,
-    by rw [← selected]; exact trace⟩⟩
+    by simpa only [selected] using trace⟩⟩
 
 theorem RetainedState.useWord_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (entry : Entry) (member : entry ∈ entries) (entryType : entry.sourceType = closureType .word)
     {handle : SourceCorePublicValues.Handle} (handleEq : entry.handle = handle)
@@ -158,18 +148,14 @@ theorem RetainedState.useWord_meaning {fixture : CompiledFixture} {observed : Ob
     rw [selected]; exact stages.descriptor_at support.useWordHeader
   have registry := request.started.function_registry state.registry
   obtain ⟨after, trace⟩ := state.finished_call (.word value) call returned request inputs registry raw native descriptor
-    (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
-  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by rw [← selected]; exact trace⟩⟩
+    support.program invocation
+  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by simpa only [selected] using trace⟩⟩
 
 theorem RetainedState.useBool_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (entry : Entry) (member : entry ∈ entries) (entryType : entry.sourceType = closureType .bool)
     {handle : SourceCorePublicValues.Handle} (handleEq : entry.handle = handle)
@@ -197,10 +183,8 @@ theorem RetainedState.useBool_meaning {fixture : CompiledFixture} {observed : Ob
     rw [selected]; exact stages.descriptor_at support.useBoolHeader
   have registry := request.started.function_registry state.registry
   obtain ⟨after, trace⟩ := state.finished_call (.bool value) call returned request inputs registry raw native descriptor
-    (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
-  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by rw [← selected]; exact trace⟩⟩
+    support.program invocation
+  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by simpa only [selected] using trace⟩⟩
 
 structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (wordStages : ObservedStages fixture observed.wordRow.toObservedRow)
@@ -247,32 +231,28 @@ theorem sequence_meaning {fixture : CompiledFixture} {observed : ObservedProgram
     (boolStages : ObservedStages fixture observed.boolRow.toObservedRow)
     (useWordStages : ObservedStages fixture observed.useWordRow.toObservedRow)
     (useBoolStages : ObservedStages fixture observed.useBoolRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     Nonempty (SequenceWitness wordStages boolStages useWordStages useBoolStages sequence receiver) := by
-  obtain ⟨support⟩ := static_supports fixture observed factories methods receiver.issued
+  obtain ⟨support⟩ := static_supports fixture observed admission receiver
   obtain ⟨firstEntry, firstType, firstHandle, initial, firstTrace⟩ := first_meaning_typed_handle
     support.toOrdinaryInventory support.distinct
-    (support.bodies support.wordHeader.header support.toOrdinaryInventory.word_member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods receiver.issued (.refl _)
-      support.wordHeader.header support.toOrdinaryInventory.word_member selected budget) wordStages sequence.first
-  obtain ⟨second⟩ := RetainedState.bool_factory_meaning support sources bodies methods initial false true true sequence.second boolStages
+    support.program wordStages sequence.first
+  obtain ⟨second⟩ := RetainedState.bool_factory_meaning support initial false true true sequence.second boolStages
     (RecursiveStageRegistry.scope boolStages.sidecar [] support.boolHeader.header.function)
-  obtain ⟨firstRead⟩ := RetainedState.useWord_meaning support sources bodies methods second.after firstEntry
+  obtain ⟨firstRead⟩ := RetainedState.useWord_meaning support second.after firstEntry
     (by simp) firstType firstHandle (Core.Word.ofNatModulo 33) sequence.firstRead sequence.firstValue useWordStages
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
-  obtain ⟨third⟩ := RetainedState.word_factory_meaning support sources bodies methods firstRead.after
+  obtain ⟨third⟩ := RetainedState.word_factory_meaning support firstRead.after
     (Core.Word.ofNatModulo 55) (Core.Word.ofNatModulo 66) false sequence.third wordStages
     (RecursiveStageRegistry.scope wordStages.sidecar [] support.wordHeader.header.function)
-  obtain ⟨secondRead⟩ := RetainedState.useBool_meaning support sources bodies methods third.after second.entry
+  obtain ⟨secondRead⟩ := RetainedState.useBool_meaning support third.after second.entry
     (by simp) second.entryType second.handleEq true sequence.secondRead sequence.secondValue useBoolStages
     (RecursiveStageRegistry.scope useBoolStages.sidecar [] support.useBoolHeader.header.function)
-  obtain ⟨repeatedRead⟩ := RetainedState.useWord_meaning support sources bodies methods secondRead.after firstEntry
+  obtain ⟨repeatedRead⟩ := RetainedState.useWord_meaning support secondRead.after firstEntry
     (by simp) firstType firstHandle (Core.Word.ofNatModulo 33) sequence.repeatedRead sequence.repeatedValue useWordStages
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
-  obtain ⟨thirdRead⟩ := RetainedState.useWord_meaning support sources bodies methods repeatedRead.after third.entry
+  obtain ⟨thirdRead⟩ := RetainedState.useWord_meaning support repeatedRead.after third.entry
     (by simp) third.entryType third.handleEq (Core.Word.ofNatModulo 55) sequence.thirdRead sequence.thirdValue useWordStages
     (RecursiveStageRegistry.scope useWordStages.sidecar [] support.useWordHeader.header.function)
   exact ⟨⟨support, firstEntry, firstType, firstHandle, initial, firstTrace,
@@ -283,13 +263,11 @@ theorem closed_sequence_meaning (fixture : CompiledFixture) (observed : Observed
     (boolStages : ObservedStages fixture observed.boolRow.toObservedRow)
     (useWordStages : ObservedStages fixture observed.useWordRow.toObservedRow)
     (useBoolStages : ObservedStages fixture observed.useBoolRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) :
     ∃ receiver : ObservedReceiver fixture observed,
       Nonempty (SequenceWitness wordStages boolStages useWordStages useBoolStages sequence receiver) := by
   obtain ⟨receiver⟩ := initial_receiver fixture observed
-  exact ⟨receiver, sequence_meaning wordStages boolStages useWordStages useBoolStages factories sources bodies methods sequence receiver⟩
+  exact ⟨receiver, sequence_meaning wordStages boolStages useWordStages useBoolStages admission sequence receiver⟩
 
 end Tests.SourceCoreMethodOriginEvidence

@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreMethodOriginEvidenceFixture
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionState
 
 /-! Actual public calls reuse distinct closure exports through the returned
 sessions. Every step retains its original startup and run receipts. -/
@@ -9,13 +10,10 @@ open Solcore Frontend SourceInference SourceSemantics
 
 def secondSeed : Core.Word := Core.Word.ofNatModulo 20
 
-structure ObservedCall {artifact : SourceCoreExecution.Artifact}
+abbrev ObservedCall {artifact : SourceCoreExecution.Artifact}
     (session : SourceCoreExecution.Session artifact) (key : SourceCoreIndexedSession.Key)
-    (arguments : List SourceCorePublicValues.Value) where
-  checkpoint : SourceCoreExecution.Checkpoint artifact
-  started : session.start key arguments runOptions.inputValidationFuel = .ok checkpoint
-  completion : SourceCoreExecution.Completion artifact
-  executed : session.RunAt key arguments runOptions (.ok (.succeeded completion))
+    (arguments : List SourceCorePublicValues.Value) :=
+  CoreLowering.RecursiveNamedPublicPhysicalSessionState.Call session key arguments runOptions
 
 def observeCall {artifact : SourceCoreExecution.Artifact}
     (session : SourceCoreExecution.Session artifact) (key : SourceCoreIndexedSession.Key)
@@ -30,13 +28,12 @@ def observeCall {artifact : SourceCoreExecution.Artifact}
     | .ok (.exportError error _) => throw (IO.userError (reprStr error))
     | .ok (.outOfFuel _) => throw (IO.userError "captured reuse public call exhausted")
     | .ok (.succeeded completion) =>
-      return ⟨checkpoint, started, completion, result ▸ executed.property⟩
+      return ⟨⟨checkpoint, started⟩, completion, result ▸ executed.property⟩
 
-structure ObservedFunctionCall {artifact : SourceCoreExecution.Artifact}
+abbrev ObservedFunctionCall {artifact : SourceCoreExecution.Artifact}
     (session : SourceCoreExecution.Session artifact) (key : SourceCoreIndexedSession.Key)
-    (arguments : List SourceCorePublicValues.Value) extends ObservedCall session key arguments where
-  handle : SourceCorePublicValues.Handle
-  returned : completion.value = .function handle
+    (arguments : List SourceCorePublicValues.Value) :=
+  CoreLowering.RecursiveNamedPublicPhysicalSessionState.FunctionCall session key arguments runOptions
 
 def observeFunctionCall {artifact : SourceCoreExecution.Artifact}
     (session : SourceCoreExecution.Session artifact) (key : SourceCoreIndexedSession.Key)
