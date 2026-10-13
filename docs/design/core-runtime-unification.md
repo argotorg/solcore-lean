@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Accepted expression actions supply public relay support (2026-10-14)
+
+`cc411eaf` derives original expression structure from accepted compiler actions. `cf93e645` connects those receipts to the existing six-call relay proof.
+
+The producer retains the original occurrence, selected special callback, ordinary or evidence-bearing direct-call receipt, and every ordered argument action. Recursion follows the actual decreasing compiler budget. It constructs expression syntax or identifies an unsupported action within that same accepted trace. Body admission obtains its expression children internally and retains the exact body when a branch remains unsupported.
+
+The relay now obtains its statement and expression admission from its genuine Header compilation. The executable observer checks the actual cache, metadata, requirements and direct targets. Its old statement and recursive expression scanners are no longer required. The original Source, execution sequence, captured environments and public fuel guarantees remain, including `make10 / make20 / A10 / make30 / B20 / A11`.
+
+Validation: 33 affected modules checked together, full build (7,218 jobs), registered tests (6,800 build jobs and final pass marker), kernel policy and 602 endpoint audits pass. The original three-row cache supplies the three-row direct table; removing the required target is rejected. The earlier coercion, method-evidence, failure/reuse, direct-issued and nested-output sequences still pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Global metadata, complete target formation and independent Source well-formedness remain explicit. Other expression branches, contextual local initialization and full compiler coverage still require proof. Meaning preservation across every actual compiler pass remains unfinished.
+
+The next connection applies the accepted-expression producer to the original evidence-bearing three-argument roots, completing both selected cached roots before issuing common program support.
+
 ## Actual compilation supplies named body admission (2026-10-14)
 
 `2f8a51b8` extracts named statement structure from accepted compiler actions and derives local declaration facts from original Source typing. `c5522652` uses those receipts in the existing seven-call coercion and retained-closure proof.
@@ -584,11 +598,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `2f8a51b8` / `c5522652`: accepted compiler actions replace the selected named body's scanner premise in the public proof. |
-| Latest completed verification | Full build (7207 jobs), registered tests, kernel policy and 576 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `cc411eaf` / `cf93e645`: accepted expression and body actions supply the original relay's public support. |
+| Latest completed verification | Full build (7218 jobs), registered tests, kernel policy and 602 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | The original seven-call coercion sequence consumes a complete program certificate whose keep root is derived from actual compilation; captured environments and all public fuel guarantees remain. |
-| Current implementation priority | Derive expression structure and ordered child coverage from accepted expression actions, connect the existing relay public proof and extend full compiler coverage. |
+| Latest proof scope | The original six-call relay derives statement and expression admission from actual compilation while retaining captured environments and all public fuel guarantees. |
+| Current implementation priority | Connect accepted evidence-bearing three-argument roots to the complete program certificate and extend compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

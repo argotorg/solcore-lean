@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Accepted expression actions supply public relay support (2026-10-14)
+
+`cc411eaf` derives original expression structure from accepted compiler actions. `cf93e645` connects those receipts to the existing six-call relay proof.
+
+The producer retains the original occurrence, selected special callback, ordinary or evidence-bearing direct-call receipt, and every ordered argument action. Recursion follows the actual decreasing compiler budget. It constructs expression syntax or identifies an unsupported action within that same accepted trace. Body admission obtains its expression children internally and retains the exact body when a branch remains unsupported.
+
+The relay now obtains its statement and expression admission from its genuine Header compilation. The executable observer checks the actual cache, metadata, requirements and direct targets. Its old statement and recursive expression scanners are no longer required. The original Source, execution sequence, captured environments and public fuel guarantees remain, including `make10 / make20 / A10 / make30 / B20 / A11`.
+
+Validation: 33 affected modules checked together, full build (7,218 jobs), registered tests (6,800 build jobs and final pass marker), kernel policy and 602 endpoint audits pass. The original three-row cache supplies the three-row direct table; removing the required target is rejected. The earlier coercion, method-evidence, failure/reuse, direct-issued and nested-output sequences still pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Global metadata, complete target formation and independent Source well-formedness remain explicit. Other expression branches, contextual local initialization and full compiler coverage still require proof. Meaning preservation across every actual compiler pass remains unfinished.
+
+Independent exact-source reviews cover every producer and the migrated public fixture. Argument traversal retains equal lengths, every original occurrence and each corresponding accepted child action. Residuals retain the original Header action, selected policy, full trace and dependent path; a failure from another expression cannot satisfy them. The public consumer derives the existing evidence certificate before issuing support, with no body-execution law as an input.
+
 ## Actual compilation supplies named body admission (2026-10-14)
 
 `2f8a51b8` extracts named statement structure from accepted compiler actions and derives local declaration facts from original Source typing. `c5522652` uses those receipts in the existing seven-call coercion and retained-closure proof.

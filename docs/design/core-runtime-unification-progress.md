@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Accepted expression actions supply public relay support (2026-10-14)
+
+`cc411eaf` derives original expression structure from accepted compiler actions. `cf93e645` connects those receipts to the existing six-call relay proof.
+
+The producer retains the original occurrence, selected special callback, ordinary or evidence-bearing direct-call receipt, and every ordered argument action. Recursion follows the actual decreasing compiler budget. It constructs expression syntax or identifies an unsupported action within that same accepted trace. Body admission obtains its expression children internally and retains the exact body when a branch remains unsupported.
+
+The relay now obtains its statement and expression admission from its genuine Header compilation. The executable observer checks the actual cache, metadata, requirements and direct targets. Its old statement and recursive expression scanners are no longer required. The original Source, execution sequence, captured environments and public fuel guarantees remain, including `make10 / make20 / A10 / make30 / B20 / A11`.
+
+Validation: 33 affected modules checked together, full build (7,218 jobs), registered tests (6,800 build jobs and final pass marker), kernel policy and 602 endpoint audits pass. The original three-row cache supplies the three-row direct table; removing the required target is rejected. The earlier coercion, method-evidence, failure/reuse, direct-issued and nested-output sequences still pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Global metadata, complete target formation and independent Source well-formedness remain explicit. Other expression branches, contextual local initialization and full compiler coverage still require proof. Meaning preservation across every actual compiler pass remains unfinished.
+
+The original relay support and final public theorem declarations are preserved. Unsupported cases are excluded through the original reached forms and actual argument edges. The stored declaration reference stays outside the runtime child list. The twelve unrelated workspace changes remain excluded.
+
 ## Actual compilation supplies named body admission (2026-10-14)
 
 `2f8a51b8` extracts named statement structure from accepted compiler actions and derives local declaration facts from original Source typing. `c5522652` uses those receipts in the existing seven-call coercion and retained-closure proof.
