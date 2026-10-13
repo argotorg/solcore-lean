@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Mapping selection uses the common compiler profile (2026-10-14)
+
+`37daf672` connects accepted index compilation to the expression proof producer. `cd154b59` carries the original nine-operation mapping-selection sequence through the common certified public session.
+
+The compiler receipt preserves evaluation of the base before the key, both actual child actions, the original scalar-key type and the generated lookup metadata. The finite profile supplies those conditions from the original expression nodes. The resulting expression trace feeds the existing mapping semantics and physical callable history.
+
+The original `echo(table)[choose(key)]` program retains its four cached rows and four direct targets. One automatic catalog follows creation of closures with values `10` and `20`, selection and invocation of the first, creation of a third with `30`, selection and invocation of the second, a missing-key failure and reuse of the oldest handle in the returned session. All nine Source traces and sufficient-fuel public conclusions retain their exact reached heaps. The same state chain also supplies ordinary Dynamic successes or the original semantic/stage failure projection. Public store sizes remain `5 / 8 / 11 / 25 / 25 / 28 / 42 / 42 / 56 / 56`.
+
+Validation: 58 affected modules checked together, full build (7,294 jobs), registered tests (14,426 build jobs), kernel policy and 933 endpoint audits pass. Earlier evidence-program, scoped-closure, ordinary Source outcome and failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This extends the common compiler profile to the supported scalar-key index case. Independent Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Constructor payloads and the remaining compiler forms still require connections to the producer. Full syntax and actual-pass preservation remain unfinished.
+
+Reviews check genuine original key typing, base/key evaluation order, metadata and exact compiler child actions. The public companion consumes one complete profile and derives inputs from the reached handle history. Missing-key failure and later reuse share the returned physical state, including sufficient-fuel failure conclusions for every output budget.
+
 ## Public outcomes retain ordinary Source applications (2026-10-14)
 
 `da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.

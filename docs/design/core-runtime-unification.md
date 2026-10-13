@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Mapping selection uses the common compiler profile (2026-10-14)
+
+`37daf672` connects accepted index compilation to the expression proof producer. `cd154b59` carries the original nine-operation mapping-selection sequence through the common certified public session.
+
+The compiler receipt preserves evaluation of the base before the key, both actual child actions, the original scalar-key type and the generated lookup metadata. The finite profile supplies those conditions from the original expression nodes. The resulting expression trace feeds the existing mapping semantics and physical callable history.
+
+The original `echo(table)[choose(key)]` program retains its four cached rows and four direct targets. One automatic catalog follows creation of closures with values `10` and `20`, selection and invocation of the first, creation of a third with `30`, selection and invocation of the second, a missing-key failure and reuse of the oldest handle in the returned session. All nine Source traces and sufficient-fuel public conclusions retain their exact reached heaps. The same state chain also supplies ordinary Dynamic successes or the original semantic/stage failure projection. Public store sizes remain `5 / 8 / 11 / 25 / 25 / 28 / 42 / 42 / 56 / 56`.
+
+Validation: 58 affected modules checked together, full build (7,294 jobs), registered tests (14,426 build jobs), kernel policy and 933 endpoint audits pass. Earlier evidence-program, scoped-closure, ordinary Source outcome and failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This extends the common compiler profile to the supported scalar-key index case. Independent Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Constructor payloads and the remaining compiler forms still require connections to the producer. Full syntax and actual-pass preservation remain unfinished.
+
+Next, connect constructor payloads and their retained callable values to the common compiler profile and public session.
+
 ## Public outcomes retain ordinary Source applications (2026-10-14)
 
 `da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
@@ -768,11 +782,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `da668e8f` / `b50005da`: actual public completions retain ordinary Source applications, semantic failures and genuine stage rejection. |
-| Latest completed verification | Full build (7289 jobs), registered tests, kernel policy and 902 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `37daf672` / `cd154b59`: accepted mapping indices use the common compiler certificate and all nine public-session operations. |
+| Latest completed verification | Full build (7294 jobs), registered tests, kernel policy and 933 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Ordinary Source outcomes retain original callable evidence, ordered arguments, captured environments and exact reached heaps in the common public session. |
-| Current implementation priority | Extend the common compiler profile to mapping indices and constructors, then complete remaining syntax and actual-pass coverage. |
+| Latest proof scope | Actual base/key compiler actions supply index semantics; retained closure inputs, missing-key failure and subsequent old-handle reuse share one certified session. |
+| Current implementation priority | Connect constructor payloads to the common producer, then complete remaining syntax and actual-pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

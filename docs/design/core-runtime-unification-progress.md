@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Mapping selection uses the common compiler profile (2026-10-14)
+
+`37daf672` connects accepted index compilation to the expression proof producer. `cd154b59` carries the original nine-operation mapping-selection sequence through the common certified public session.
+
+The compiler receipt preserves evaluation of the base before the key, both actual child actions, the original scalar-key type and the generated lookup metadata. The finite profile supplies those conditions from the original expression nodes. The resulting expression trace feeds the existing mapping semantics and physical callable history.
+
+The original `echo(table)[choose(key)]` program retains its four cached rows and four direct targets. One automatic catalog follows creation of closures with values `10` and `20`, selection and invocation of the first, creation of a third with `30`, selection and invocation of the second, a missing-key failure and reuse of the oldest handle in the returned session. All nine Source traces and sufficient-fuel public conclusions retain their exact reached heaps. The same state chain also supplies ordinary Dynamic successes or the original semantic/stage failure projection. Public store sizes remain `5 / 8 / 11 / 25 / 25 / 28 / 42 / 42 / 56 / 56`.
+
+Validation: 58 affected modules checked together, full build (7,294 jobs), registered tests (14,426 build jobs), kernel policy and 933 endpoint audits pass. Earlier evidence-program, scoped-closure, ordinary Source outcome and failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This extends the common compiler profile to the supported scalar-key index case. Independent Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Constructor payloads and the remaining compiler forms still require connections to the producer. Full syntax and actual-pass preservation remain unfinished.
+
+Mapping input typing is recovered from the actual retained history. The failed call preserves that history and supplies the state for the subsequent old-handle invocation. No new Core instruction or Source execution rule is needed. The twelve unrelated workspace changes remain excluded.
+
 ## Public outcomes retain ordinary Source applications (2026-10-14)
 
 `da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
