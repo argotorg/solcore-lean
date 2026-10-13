@@ -6,6 +6,22 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Original checker budgets supply method coherence (2026-10-14)
+
+`4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.
+
+Successful pattern and expression inference preserves its entire result and state when the structural budget increases. Two successful function checks therefore return the same complete checked function, including the typed graph, substitutions and ordered solved requirements. The corresponding program theorem preserves every ordered function and method record.
+
+Method coherence now retains the original successful checking budget. Actual compiler selection supplies its own successful method recheck at `1024`; equality of those complete results identifies the retained method. Unselected methods need no extra fixed-budget success premise. The ordinary and automatic catalog issuers derive coherence from the supplied original checker receipt.
+
+The companion performs an actual check at `1000` and proves equality with the original fixture program. That receipt constructs the static support used by all seven Source traces and public forward conclusions. The original method remains present, with results `33 / true / 33 / 55`, three retained closures and the same eight reached heap sizes. Existing defaults and checker implementations are unchanged.
+
+Validation: 2,114 affected modules checked together, full build (7,243 jobs), registered tests (14,320 build jobs), kernel policy and 719 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Independent Source well-formedness, remaining metadata and body certification, complete compiler syntax and preservation across all actual passes remain unfinished. The agreement results compare successful checks; they do not treat exhausted budgets as successful completion.
+
+The changed budget premise is consumed by the common support package before the seven-call witness is built. It is not a separate runtime comparison. The twelve unrelated workspace changes remain excluded.
+
 ## Factory closure bodies come from actual compilation (2026-10-14)
 
 `956ced51` derives ordinary closure admission from the actual lambda body action. `dde742cb` completes both factory closure source rows in the original evidence program.

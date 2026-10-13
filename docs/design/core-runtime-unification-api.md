@@ -4,6 +4,22 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Original checker budgets supply method coherence (2026-10-14)
+
+`4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.
+
+Successful pattern and expression inference preserves its entire result and state when the structural budget increases. Two successful function checks therefore return the same complete checked function, including the typed graph, substitutions and ordered solved requirements. The corresponding program theorem preserves every ordered function and method record.
+
+Method coherence now retains the original successful checking budget. Actual compiler selection supplies its own successful method recheck at `1024`; equality of those complete results identifies the retained method. Unselected methods need no extra fixed-budget success premise. The ordinary and automatic catalog issuers derive coherence from the supplied original checker receipt.
+
+The companion performs an actual check at `1000` and proves equality with the original fixture program. That receipt constructs the static support used by all seven Source traces and public forward conclusions. The original method remains present, with results `33 / true / 33 / 55`, three retained closures and the same eight reached heap sizes. Existing defaults and checker implementations are unchanged.
+
+Validation: 2,114 affected modules checked together, full build (7,243 jobs), registered tests (14,320 build jobs), kernel policy and 719 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Independent Source well-formedness, remaining metadata and body certification, complete compiler syntax and preservation across all actual passes remain unfinished. The agreement results compare successful checks; they do not treat exhausted budgets as successful completion.
+
+`checkFunctionBody_success_unique_fuel` proves equality of complete checked functions; `checkProgram_success_unique_fuel` extends this to the full original program. `CallableMethodBodyCoherence.Checked` now records an existential successful original budget. `of_loaded`, `of_checked`, `Certificate.issue_for_checked` and `Certificate.issue` accept that actual budget. Code that destructed the previous fixed-budget relation must unpack the budget first. Runtime APIs are unchanged.
+
 ## Factory closure bodies come from actual compilation (2026-10-14)
 
 `956ced51` derives ordinary closure admission from the actual lambda body action. `dde742cb` completes both factory closure source rows in the original evidence program.

@@ -4,6 +4,22 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Original checker budgets supply method coherence (2026-10-14)
+
+`4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.
+
+Successful pattern and expression inference preserves its entire result and state when the structural budget increases. Two successful function checks therefore return the same complete checked function, including the typed graph, substitutions and ordered solved requirements. The corresponding program theorem preserves every ordered function and method record.
+
+Method coherence now retains the original successful checking budget. Actual compiler selection supplies its own successful method recheck at `1024`; equality of those complete results identifies the retained method. Unselected methods need no extra fixed-budget success premise. The ordinary and automatic catalog issuers derive coherence from the supplied original checker receipt.
+
+The companion performs an actual check at `1000` and proves equality with the original fixture program. That receipt constructs the static support used by all seven Source traces and public forward conclusions. The original method remains present, with results `33 / true / 33 / 55`, three retained closures and the same eight reached heap sizes. Existing defaults and checker implementations are unchanged.
+
+Validation: 2,114 affected modules checked together, full build (7,243 jobs), registered tests (14,320 build jobs), kernel policy and 719 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Independent Source well-formedness, remaining metadata and body certification, complete compiler syntax and preservation across all actual passes remain unfinished. The agreement results compare successful checks; they do not treat exhausted budgets as successful completion.
+
+The next connection issues a common certified public session from actual compile, bootstrap and call receipts, preserving later handle reuse in the same physical history.
+
 ## Factory closure bodies come from actual compilation (2026-10-14)
 
 `956ced51` derives ordinary closure admission from the actual lambda body action. `dde742cb` completes both factory closure source rows in the original evidence program.
@@ -668,11 +684,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `956ced51` / `dde742cb`: actual inner lambda compilation supplies both factory closure certificates, alongside all ten ordinary root receipts. |
-| Latest completed verification | Full build (7237 jobs), registered tests, kernel policy and 693 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `4351f151` / `66e74cdd`: actual original checker success derives method coherence at differing budgets and supplies the same seven-call public meaning. |
+| Latest completed verification | Full build (7243 jobs), registered tests, kernel policy and 719 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | All ten original ordinary roots and both factory closure source rows derive admission from accepted compilation, preserving the seven-operation Source/public sequence and captures. |
-| Current implementation priority | Connect arbitrary successful checker budgets and a common certified public session, then complete compiler and pass coverage. |
+| Latest proof scope | Complete checker results agree across successful budgets; original budget1000 and selected method budget1024 connect through every public step without a separate coherence premise. |
+| Current implementation priority | Connect automatic program support to generic public session steps, then complete compiler and pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
