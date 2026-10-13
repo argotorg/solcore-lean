@@ -3,7 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPh
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodTerminalBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodBodyBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds
@@ -41,6 +41,25 @@ def MethodSupports : Prop :=
     (port : Port (compiled := compiled) receipt context caller stages),
     ∃ packet : Packet port.principal, packet.sourceAt = port.sourceAt ∧
       Support port.principal packet headers stages semanticFaults
+
+/-- Method bodies may retain either an actual terminal or scoped compiler packet. -/
+def MixedMethodSupports : Prop :=
+  ∀ {policy body fuel compilation source scope id reasonAt lowered context caller}
+    (receipt : Receipt policy body fuel compilation (.initial compiled.compatible.checked) source scope id reasonAt lowered)
+    (port : Port (compiled := compiled) receipt context caller stages),
+    ∃ packet : CallableIndexedOwnedPreparedStagedMethodBodies.Packet port.principal,
+      packet.sourceAt = port.sourceAt ∧
+      CallableIndexedOwnedPreparedStagedMethodBodies.Support port.principal packet headers stages semanticFaults
+
+/-- Existing terminal method support embeds without changing its static receipts. -/
+theorem MethodSupports.toMixed
+    (support : MethodSupports (compiled := compiled) (headers := headers)
+      (stages := stages) (semanticFaults := semanticFaults)) :
+    MixedMethodSupports (compiled := compiled) (headers := headers)
+      (stages := stages) (semanticFaults := semanticFaults) := by
+  intro policy body fuel compilation source scope id reasonAt lowered context caller receipt port
+  obtain ⟨packet, sourceAt, supported⟩ := support receipt port
+  exact ⟨.terminal packet, sourceAt, supported⟩
 
 private theorem tree_types {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate}
     {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {stored : List TypeSystem.Ty}
@@ -118,14 +137,15 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
     CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport.SupportFor association.original stages (closurePackets association))
   (owners : ∀ owner : OwnedKey keys, CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
   (methodSupport : MethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
+  (mixedMethodSupport : MixedMethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
 
 local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include closurePackets closureSupport owners stagePrepared receiver profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+include closurePackets closureSupport owners stagePrepared receiver profile wellFormed observations extension semantic bodies bodySupport mixedMethodSupport in
 /-- Every ordinary and method body uses only strictly smaller Source grades. -/
-theorem preserves_with_bodies (size : Nat) :
+theorem preserves_with_methods (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   induction size using Nat.strongRecOn with
   | ind budget ih =>
@@ -156,7 +176,7 @@ theorem preserves_with_bodies (size : Nat) :
     have methodHeads : PreservesMethod callerBridge.forgetSlots model stages callFaults budget root.support.certificate := by
       intro fuel current id code types compiler path sequence size within childMeaning
       obtain ⟨port⟩ := root.support.methodReady compiler path
-      obtain ⟨packet, sourceAtEq, static⟩ := methodSupport compiler port
+      obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
       have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.SourceBodies
           (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
         intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
@@ -164,14 +184,10 @@ theorem preserves_with_bodies (size : Nat) :
         have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
           simpa only [sourceAtEq] using argumentsTyped
         simpa only [sourceAtEq] using
-          CallableIndexedOwnedPreparedStagedMethodTerminalBounds.source_continuation
+          CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation
             port.principal packet static wellFormed functions selected installed owner keyPhysical caller
-            heapTyped packetArguments stable size
-            (fun smaller strict => by
-              intro context invocation scope expression lowered oldRoot selectedOwner selectedPhysical
-              exact ih smaller (Nat.lt_of_lt_of_le strict within)
-                (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod oldRoot)
-                selectedOwner selectedPhysical)
+            heapTyped packetArguments stable extension size
+            (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
       intro actualScope actualId actualCode point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans compiler.metadata.found)
@@ -202,9 +218,9 @@ theorem preserves_with_bodies (size : Nat) :
       budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
       budget (Nat.le_refl _) point
 
-include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport mixedMethodSupport in
 /-- Every ordinary and method body uses only strictly smaller native grades. -/
-theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   subst stages
   induction size using Nat.strongRecOn with
@@ -237,7 +253,7 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
     have methodHeads : ReflectsMethod callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget root.support.certificate := by
       intro fuel current id code types compiler path sequence size within childMeaning
       obtain ⟨port⟩ := root.support.methodReady compiler path
-      obtain ⟨packet, sourceAtEq, static⟩ := methodSupport compiler port
+      obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
       have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.NativeBodies
           (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
         intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
@@ -245,14 +261,10 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
         have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
           simpa only [sourceAtEq] using argumentsTyped
         simpa only [sourceAtEq] using
-          CallableIndexedOwnedPreparedStagedMethodTerminalBounds.native_continuation
+          CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation
             port.principal packet static wellFormed functions selected installed owner keyPhysical caller
-            heapTyped packetArguments stable size
-            (fun smaller strict => by
-              intro context invocation scope expression lowered oldRoot selectedOwner selectedPhysical
-              exact ih smaller (Nat.lt_of_lt_of_le strict within)
-                (CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofMethod oldRoot)
-                selectedOwner selectedPhysical)
+            heapTyped packetArguments stable extension size
+            (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
       intro actualScope actualId actualCode point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
       cases Option.some.inj (found.symm.trans compiler.metadata.found)
@@ -282,6 +294,20 @@ theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScop
       observations extension semantic root.support.sameLedger root.support.runtimeLedger root.support.uninitialized
       budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
       budget (Nat.le_refl _) point
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+/-- The existing named-body API embeds its terminal method packets. -/
+theorem preserves_with_bodies (size : Nat) :
+    PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  preserves_with_methods receiver stagePrepared profile wellFormed observations extension semantic
+    bodies bodySupport closurePackets closureSupport owners methodSupport.toMixed size
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+/-- The existing named-body API embeds its terminal method packets. -/
+theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+    ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  reflects_with_methods receiver stagePrepared profile wellFormed observations extension semantic
+    bodies bodySupport closurePackets closureSupport owners methodSupport.toMixed stageEq size
 
 include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
 /-- Existing terminal families delegate to the same body-generic induction. -/

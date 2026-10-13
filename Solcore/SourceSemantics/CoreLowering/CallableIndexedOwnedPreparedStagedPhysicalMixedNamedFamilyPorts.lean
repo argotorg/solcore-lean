@@ -9,7 +9,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedFunctionValues (Header Key OwnedKey)
 open CallableIndexedOwnedPublicFaultReceiverTables (IssuedAt)
 open CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch (Terminal)
-open CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily (MethodSupports)
+open CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily (MethodSupports MixedMethodSupports)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -53,10 +53,37 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
     CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport.SupportFor association.original stages (closurePackets association))
   (owners : ∀ owner : OwnedKey keys, CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
   (methodSupport : MethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
+  (mixedMethodSupport : MixedMethodSupports (compiled := compiled) (headers := headers) (stages := stages) (semanticFaults := semanticFaults))
 
 local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry semanticFaults profile
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport mixedMethodSupport in
+theorem preserves_with_methods
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (member : header ∈ headers) {child : Staging.Recursive.Scope}
+    (selected : stages.Closure header.function child) (budget : Nat) :
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
+      (headers := headers) (keys := keys) header model stages child callFaults budget := by
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
+    (bodySupport header member) profile wellFormed extension selected
+    (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_methods
+      receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
+      closurePackets closureSupport owners mixedMethodSupport size)
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport mixedMethodSupport in
+theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (member : header ∈ headers) {child : Staging.Recursive.Scope}
+    (selected : stages.Closure header.function child) (budget : Nat) :
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
+      (headers := headers) (keys := keys) header model stages child callFaults budget := by
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
+    (bodySupport header member) profile wellFormed extension selected
+    (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_methods
+      receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
+      closurePackets closureSupport owners mixedMethodSupport stageEq size)
 
 include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
 theorem preserves_with_bodies
