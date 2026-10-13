@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCatalogAdmission
 import Solcore.Test.SourceCoreCoercionPublicCatalog
+import Solcore.Test.SourceCoreCoercionPublicKeepCompilerSupport
 import Solcore.Test.SourceCoreCoercionPublicCommon
 set_option autoImplicit false
 set_option Elab.async false
@@ -54,8 +55,7 @@ theorem ActualHeader.use_admitted_support (observed : ObservedProgram fixture)
     (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)
     (.generic ⟨methods.formed, methods.assumptions⟩) observed.makeRow.entryMember (actualStagePrepared fixture)
 
-/- The actual finite Source checker supplies the complete metadata and body
-syntax for keep. Only authentic Header/source alignment is transported here. -/
+/- The actual compiler body receipt supplies keep statement structure. -/
 include rows receiver methods in
 theorem ActualHeader.keep_admitted_support (observed : ObservedProgram fixture)
     (actual : ActualHeader fixture observed.keepRow.row)
@@ -64,31 +64,7 @@ theorem ActualHeader.keep_admitted_support (observed : ObservedProgram fixture)
       CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
         (headers := headers rows) (bodyRegistry := bodyRegistry)
         (stages := actualRegistry) (semanticFaults := faults) actual.header body) := by
-  have indexEq := (observed.keepRow.prepared_slot actual.prepared).2
-  have selected : fixture.recipe.compiled.indexed.base.functions[observed.keepRow.index]? =
-      some actual.prepared.named := indexEq ▸ actual.prepared.selected
-  have namedEq : actual.prepared.named = observed.keepRow.named :=
-    Option.some.inj (selected.symm.trans observed.keepRow.cached)
-  have bodyEq : actual.header.function.body = [observed.keepShape.statement.id] := by
-    rw [actual.aligned.function]
-    change actual.prepared.compilation.statements = [observed.keepShape.statement.id]
-    have accepted := actual.prepared.compilation.roots
-    change (actual.prepared.named.specialized.function.typedBody.roots.mapM _) = _ at accepted
-    rw [actual.prepared.same, observed.keepShape.roots] at accepted
-    exact (Except.ok.inj accepted).symm
-  have resultEq : actual.header.function.resultType = .bool := by
-    rw [actual.header.agreement.result, actual.aligned.named, actual.prepared.same]
-    exact observed.keepResultType
-  have admission : CallableIndexedOwnedPreparedNamedScopedAdmission.Admission actual.prepared actual.header [] := by
-    change CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission fixture.recipe.compiled
-      actual.prepared.named actual.header.function.source actual.header.function.body actual.header.function.resultType []
-    rw [namedEq, actual.source, bodyEq, resultEq]
-    exact observed.keepAdmission
-  obtain ⟨loaded, checked⟩ := fixture.loaded
-  have checked := CallableMethodBodyCoherence.of_loaded checked
-  exact CallableIndexedOwnedPreparedNamedCatalogAdmission.of_empty_actual rows actual.prepared actual.aligned admission
-    fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed checked
-    (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)
-    (.generic ⟨methods.formed, methods.assumptions⟩) observed.makeRow.entryMember (actualStagePrepared fixture)
+  exact actual.keep_compiler_support rows receiver
+    (.generic ⟨methods.formed, methods.assumptions⟩) observed
 
 end Tests.SourceCoreCoercionPublic

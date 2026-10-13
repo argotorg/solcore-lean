@@ -448,6 +448,21 @@ private def observeSourceAdmission (compiled : SourceCoreUnifiedCompilation.Comp
   | none => throw (IO.userError "actual named Source admission failed")
   | some receipt => return ⟨⟨receipt.down, accepted⟩⟩
 
+private structure CheckedSourceMetadata (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) : Prop where
+  metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+    compiled.indexed named source (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite [])
+  accepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata? compiled.indexed named source
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite []) = some ⟨metadata⟩
+
+private def observeSourceMetadata (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) :
+    IO (PLift (CheckedSourceMetadata compiled named source)) := do
+  match accepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata? compiled.indexed named source
+      (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite []) with
+  | none => throw (IO.userError "actual keep expression metadata rejected")
+  | some receipt => pure ⟨⟨receipt.down, accepted⟩⟩
+
 structure ObservedProgram (fixture : CompiledFixture) where
   makeRow : ObservedRoot fixture fixture.makeSignature
   useRow : ObservedRoot fixture fixture.useSignature
@@ -459,10 +474,12 @@ structure ObservedProgram (fixture : CompiledFixture) where
     fixture.recipe.compiled useRow.named useRow.row.function.typedBody [useShape.body.statement.id] .word []
   useAdmissionAccepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource fixture.recipe.compiled
     useRow.named useRow.row.function.typedBody [useShape.body.statement.id] .word [] 64 = some ⟨useAdmission⟩
-  keepAdmission : CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission
-    fixture.recipe.compiled keepRow.named keepRow.row.function.typedBody [keepShape.statement.id] .bool []
-  keepAdmissionAccepted : CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource fixture.recipe.compiled
-    keepRow.named keepRow.row.function.typedBody [keepShape.statement.id] .bool [] 64 = some ⟨keepAdmission⟩
+  keepMetadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+    fixture.recipe.compiled.indexed keepRow.named keepRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite [])
+  keepMetadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+    fixture.recipe.compiled.indexed keepRow.named keepRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite []) = some ⟨keepMetadata⟩
   makeInputScheme : makeShape.binder.scheme = .mono .bool
   useInputScheme : useShape.body.binder.scheme = .mono (closureType .word)
   makeNodes : makeRow.row.function.typedBody.nodes = makeShape.nodeList
@@ -495,10 +512,9 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
     useRow.row.function.typedBody [useShape.body.statement.id] .word
   let useAdmission := useChecked.admission
   let useAdmissionAccepted := useChecked.accepted
-  let ⟨keepChecked⟩ ← observeSourceAdmission fixture.recipe.compiled keepRow.named
-    keepRow.row.function.typedBody [keepShape.statement.id] .bool
-  let keepAdmission := keepChecked.admission
-  let keepAdmissionAccepted := keepChecked.accepted
+  let ⟨keepChecked⟩ ← observeSourceMetadata fixture.recipe.compiled keepRow.named keepRow.row.function.typedBody
+  let keepMetadata := keepChecked.metadata
+  let keepMetadataAccepted := keepChecked.accepted
   let ⟨makeInputScheme⟩ ← observed (makeShape.binder.scheme = .mono .bool) "actual coercion fixture makeInputScheme"
   let ⟨useInputScheme⟩ ← observed (useShape.body.binder.scheme = .mono (closureType .word)) "actual coercion fixture useInputScheme"
   let ⟨makeNodes⟩ ← observed (makeRow.row.function.typedBody.nodes = makeShape.nodeList) "actual coercion fixture makeNodes"
@@ -519,6 +535,6 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
   let ⟨entryKeys⟩ ← observed (fixture.recipe.compiled.indexed.entries.map (·.key) = [makeRow.row.key, useRow.row.key]) "actual coercion fixture entryKeys"
   let ⟨noLocals⟩ ← observed (fixture.recipe.compiled.indexed.base.locals.bindings = []) "actual coercion fixture noLocals"
   let ⟨profile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true) "actual coercion fixture profile"
-  return {makeRow, useRow, keepRow, makeShape, useShape, keepShape, useAdmission, useAdmissionAccepted, keepAdmission, keepAdmissionAccepted, makeInputScheme, useInputScheme, makeNodes, useNodes, keepNodes, makeResultType, useResultType, keepResultType, makeKey, useKey, keepKey, keepInstantiation, makeKeepInstantiation, ordinarySlotsDistinct, globalsLength, entryKeys, noLocals, profile}
+  return {makeRow, useRow, keepRow, makeShape, useShape, keepShape, useAdmission, useAdmissionAccepted, keepMetadata, keepMetadataAccepted, makeInputScheme, useInputScheme, makeNodes, useNodes, keepNodes, makeResultType, useResultType, keepResultType, makeKey, useKey, keepKey, keepInstantiation, makeKeepInstantiation, ordinarySlotsDistinct, globalsLength, entryKeys, noLocals, profile}
 
 end Tests.SourceCoreCoercionPublic
