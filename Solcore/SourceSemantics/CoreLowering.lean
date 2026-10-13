@@ -1929,6 +1929,9 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionR
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistryFunctionStep
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistryScalarForward
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistryScalarStep
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalFactoryValues
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectWordForward
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionIssuance
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

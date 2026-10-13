@@ -5,6 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaders
 methods. The actual Header and cached lambda retain Source provenance; the
 canonical environment is the literal installed one with all physical slots. -/
 set_option autoImplicit false
+set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedNamedPhysicalCaptures
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedPhysicalGlobals RecursiveGlobalInitializationMeaning RecursiveGlobalInitializationTyping
@@ -33,17 +34,17 @@ structure Capture (headers : List (Header compiled program)) (key : Key compiled
   embedding_eq : named.embedding = shift header.slot
   slots : Slots compiled 0 [] named.canonical
 
-theorem of_cached
+theorem of_read
     (member : header ∈ headers)
     (frameZero : key.frameLocation = 0) (prefixZero : key.capturePrefix = 0)
     (locations : ∀ target, target ∈ headers → key.locations target = location compiled target.slot)
     (globals : header.globals = compiled.indexed.base.globals.length)
-    (cached : compiled.indexed.secondPass.closures[header.slot]? = some
-      (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code))
-    (physical : Authority compiled mapping store)
+    (read : store.read? (location compiled header.slot) = some (.inRight .unit
+      (.closure header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType)
+        (header.code.rename (shift header.slot).lift)
+        (List.replicate header.slot .unit ++ environment compiled))))
     (typed : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
     Nonempty (Capture headers key header mapping world store) := by
-  obtain ⟨_unmapped, read⟩ := physical.cached cached
   obtain ⟨capturedContext, capturedTyped, _bodyTyped⟩ := stored_closure typed read
   obtain ⟨administrative, canonicalTyped⟩ := drop_installer_units header.slot capturedTyped
   have layout : EnvironmentsAgree (shift header.slot) (environment compiled)
@@ -68,6 +69,18 @@ theorem of_cached
         (CallableIndexedPreparedInventories.cached_global_at compiled target.selected) }
   refine ⟨⟨⟨frameZero, prefixZero, locations⟩, named, ?_, rfl, rfl, rfl, environment_slots compiled⟩⟩
   simpa only [locations header member] using read
+
+theorem of_cached
+    (member : header ∈ headers)
+    (frameZero : key.frameLocation = 0) (prefixZero : key.capturePrefix = 0)
+    (locations : ∀ target, target ∈ headers → key.locations target = location compiled target.slot)
+    (globals : header.globals = compiled.indexed.base.globals.length)
+    (cached : compiled.indexed.secondPass.closures[header.slot]? = some
+      (.lambda header.named.signature.parameterType (LanguageResult.resultType header.named.signature.resultType) header.code))
+    (physical : Authority compiled mapping store)
+    (typed : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
+    Nonempty (Capture headers key header mapping world store) := by
+  exact of_read member frameZero prefixZero locations globals (physical.cached cached).2 typed
 
 /-- An actual prepared inventory row supplies the exact cache equation and all
 header alignment; callers do not separately assume a cached body. -/

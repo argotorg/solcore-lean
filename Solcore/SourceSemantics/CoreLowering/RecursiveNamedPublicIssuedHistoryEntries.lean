@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalFactoryValues
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicCurrentFactoryValues
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicBuiltinArgumentReceipts
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistoryEntries
@@ -6,6 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistoryE
 and encoding observations. Their Source meaning is derived from the current
 owned caller and physical store, rather than supplied as a certificate. -/
 set_option autoImplicit false
+set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicFunctionHistory
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open SourceCoreIndexedSession RecursiveNamedPublicStartMeaning
@@ -53,6 +55,39 @@ inductive IssuedEntry {compiled : SourceCoreUnifiedCompilation.Compiled} {artifa
         registry anchor before issued.session
         ⟨function.type, .builtin ⟨function⟩, handle, native,
           CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function), fuel⟩
+  | physicalNamed {recipe : Recipe} (prepared : Recipe.prepare compiled = .ok recipe)
+      (inputs : List (Input compiled)) (rows : Inventory inputs)
+      {input : Input compiled} (packet : Issued input) (member : Inventory.HasRow packet rows)
+      (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+      (profile : compiled.compatible.checked.catalog.callableContracts = true)
+      (anchor : Header compiled (Program.ofChecked compiled.sourceProgram))
+      {before : Session artifact} {issued : Completion artifact} {fuel : Nat}
+      (issuance : before.NamedIssuedAt packet.header.named.signature.key fuel issued)
+      (atRecipe : ArtifactRecipe artifact recipe)
+      {handle : Handle} (handleValue : issued.value = .function handle) {native : Core.Value}
+      (encoded : issued.session.EncodesAt fuel packet.header.named.specialized.function.type (.function handle) native)
+      (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
+      IssuedEntry (headers rows) (keys compiled)
+        (CallableIndexedOwnedPhysicalCellOrigins.functions (headers rows) (keys compiled) bodyRegistry faults profile)
+        registry anchor before issued.session
+        ⟨packet.header.named.specialized.function.type,
+          .global (CallableNamedReversal.global (CallableNamedMetadata.global packet.header.named.specialized input.prepared.available)),
+          handle, native, CallableContract.functionType packet.header.named.signature.parameterType packet.header.named.signature.resultType, fuel⟩
+  | physicalBuiltin {recipe : Recipe} (prepared : Recipe.prepare compiled = .ok recipe)
+      (headers : List (Header compiled (Program.ofChecked compiled.sourceProgram)))
+      (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
+      (bodyRegistry registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep)
+      (profile : compiled.compatible.checked.catalog.callableContracts = true)
+      (anchor : Header compiled (Program.ofChecked compiled.sourceProgram))
+      {before : Session artifact} {issued : Completion artifact} {function : BuiltinFunctionId} {fuel : Nat}
+      (issuance : before.BuiltinIssuedAt function fuel issued)
+      (atRecipe : ArtifactRecipe artifact recipe)
+      {handle : Handle} (handleValue : issued.value = .function handle) {native : Core.Value}
+      (encoded : issued.session.EncodesAt fuel function.type (.function handle) native) :
+      IssuedEntry headers keys (CallableIndexedOwnedPhysicalCellOrigins.functions headers keys bodyRegistry faults profile)
+        registry anchor before issued.session
+        ⟨function.type, .builtin ⟨function⟩, handle, native,
+          CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function), fuel⟩
 
 /-- Retaining a newly issued entry preserves all earlier registry slots. -/
 theorem IssuedEntry.chain
@@ -67,6 +102,8 @@ theorem IssuedEntry.chain
   cases receipt with
   | named _ _ _ _ _ _ _ _ _ _ issuance _ handleValue _ _ => exact .named (.refl _) issuance handleValue
   | builtin _ _ _ _ _ _ _ _ issuance _ handleValue _ => exact .builtin (.refl _) issuance handleValue
+  | physicalNamed _ _ _ _ _ _ _ _ _ _ issuance _ handleValue _ _ => exact .named (.refl _) issuance handleValue
+  | physicalBuiltin _ _ _ _ _ _ _ _ issuance _ handleValue _ => exact .builtin (.refl _) issuance handleValue
 
 /-- Current store checks identify every fresh named capture. Builtins retain
 their compiler-owned closed code. Both cases use the real issued handle. -/
@@ -99,6 +136,22 @@ theorem IssuedEntry.current
   | builtin prepared headers keys bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded =>
       obtain ⟨native, sameRuntime, _type, imported, represented, typed⟩ :=
         RecursiveNamedPublicBuiltinArgumentReceipts.Session.builtin_value_represents_after
+          prepared headers keys bodyRegistry registry faults profile mapping anchor.function.context heap
+          issuance (.refl _) atRecipe handleValue (world := world)
+      have same := imported.unique encoded
+      cases same
+      exact ⟨sameRuntime, encoded, represented, typed⟩
+  | physicalNamed prepared inputs rows packet member bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded wellFormed =>
+      obtain ⟨native, imported, represented, typed⟩ :=
+        RecursiveNamedPublicPhysicalFactoryValues.Session.named_value_represents_current
+          prepared inputs rows packet member bodyRegistry registry faults profile caller anchor
+          issuance atNative (.refl _) atRecipe handleValue wellFormed
+      have same := imported.unique encoded
+      cases same
+      exact ⟨issuance.same_runtime, encoded, represented, typed⟩
+  | physicalBuiltin prepared headers keys bodyRegistry registry faults profile anchor issuance atRecipe handleValue encoded =>
+      obtain ⟨native, sameRuntime, _type, imported, represented, typed⟩ :=
+        RecursiveNamedPublicPhysicalFactoryValues.Session.builtin_value_represents_after
           prepared headers keys bodyRegistry registry faults profile mapping anchor.function.context heap
           issuance (.refl _) atRecipe handleValue (world := world)
       have same := imported.unique encoded
