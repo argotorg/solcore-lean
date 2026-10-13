@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
@@ -63,7 +64,7 @@ variable {directSites : DeclarationInstantiation → Prop}
   {loaded : LoadedProgram}
   (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
-  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
   {signature : ProgramFunctionSignature}
   (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
   (sourceOwner : function.source.owner = signature.id)
@@ -80,7 +81,7 @@ local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults co
 include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
 /-- Every original expression is issued at its real lexical context, including the
 RHS and later reads after a genuine assignment or local allocation. -/
-def support_general_generic
+def support_general_with_catalog
     (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType) :
     CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
@@ -112,7 +113,7 @@ def support_general_generic
       Root compiled headers stages code.policy code.lowerBody code.compilation compiled.indexed.fuel
         context child code.reasonAt scope id lowered rawType faults))
     (fun context fields current fuel id node lowered declarations tree reached found typed accepted _nativeType _native => by
-      exact CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots.of_child_generic
+      exact CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots.of_child_with_catalog
         stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner
         selected fields declarations tree reached found typed (accepted_child code choice accepted))
   have weakened := CallableLambdaViewMatchRuntimeCertificates.transport_with
@@ -134,7 +135,7 @@ include provenance receiver wellFormed supported original rows covered checked c
 omit choice in
 /-- The real lowerer and typed original syntax produce the same-model packet
 and all static support together, without selecting a proof as runtime data. -/
-theorem of_actual_generic
+theorem of_actual_with_catalog
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
     (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
       support.body.context (.statements true function.body) function.resultType)
@@ -145,11 +146,140 @@ theorem of_actual_generic
   obtain ⟨choice⟩ := CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts.choose
     code support.caller.named provenance.policy_recipe.body_recipe support.compilation shape child selected
   exact ⟨⟨choice.packet,
-    support_general_generic stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog methods
+    support_general_with_catalog stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog methods
       signatureMember sourceOwner choice syntaxTree⟩⟩
 
 end Generic
 
+
+
+section GenericWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+  (code : Code compiled.indexed function scope administrative)
+  {bodyRegistry : SourceCoreRawMetadata.Registry}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry
+    (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics))
+  (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported code.compilation.plan instantiation)
+  (original : MetadataFor compiled.indexed support.caller.named function.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey code.compilation.plan instantiation = .ok signature.key →
+    code.compilation.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  {signature : ProgramFunctionSignature}
+  (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
+  (sourceOwner : function.source.owner = signature.id)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry stagePrepared
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+variable (choice : Choice code
+  («stages» := RecursiveNamedPreparedStageScopes.registry stagePrepared))
+
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+
+
+include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
+def support_general_generic
+    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+      support.body.context (.statements true function.body) function.resultType) :
+    CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
+      headers code support.body.toContext stages choice.packet faults := by
+  exact support_general_with_catalog stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) signatureMember sourceOwner choice syntaxTree
+
+include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
+omit choice in
+theorem of_actual_generic
+    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
+    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+      support.body.context (.statements true function.body) function.resultType)
+    (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
+    Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
+      CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
+        headers code support.body.toContext stages packet faults) := by
+  exact of_actual_with_catalog stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) signatureMember sourceOwner shape syntaxTree child selected
+
+end GenericWrappers
+
+section EvidenceWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+  (code : Code compiled.indexed function scope administrative)
+  {bodyRegistry : SourceCoreRawMetadata.Registry}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry
+    (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics))
+  (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported code.compilation.plan instantiation)
+  (original : MetadataFor compiled.indexed support.caller.named function.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey code.compilation.plan instantiation = .ok signature.key →
+    code.compilation.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
+  {signature : ProgramFunctionSignature}
+  (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
+  (sourceOwner : function.source.owner = signature.id)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry stagePrepared
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+variable (choice : Choice code
+  («stages» := RecursiveNamedPreparedStageScopes.registry stagePrepared))
+
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+
+
+include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
+def support_general_with_evidence
+    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+      support.body.context (.statements true function.body) function.resultType) :
+    CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
+      headers code support.body.toContext stages choice.packet faults := by
+  exact support_general_with_catalog stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) signatureMember sourceOwner choice syntaxTree
+
+include provenance receiver wellFormed supported original rows covered checked catalog methods signatureMember sourceOwner in
+omit choice in
+theorem of_actual_with_evidence
+    (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
+    (syntaxTree : GenericImperativeMatch.Syntax function.source (fun id => GeneralSyntax function.source id directSites)
+      support.body.context (.statements true function.body) function.resultType)
+    (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
+    Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages,
+      CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
+        headers code support.body.toContext stages packet faults) := by
+  exact of_actual_with_catalog stagePrepared code support provenance receiver wellFormed supported original rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) signatureMember sourceOwner shape syntaxTree child selected
+
+end EvidenceWrappers
 
 section Legacy
 variable {directSites : DeclarationInstantiation → Prop}

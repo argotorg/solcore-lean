@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodCallerResolvedEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodCallerEvidence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodTerminalSupport
@@ -23,7 +24,7 @@ def DirectSource (source : TypedSource) : Prop :=
     (∃ name resolution, node.form = .reference name resolution) ∨
     (∃ callee arguments instantiation, node.form = .call callee arguments (.declaration instantiation))
 
-section Generic
+section Resolved
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {method : ExecutableImplMethods.CheckedMethod}
   (principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method)
   (packet : Packet principal)
@@ -44,7 +45,8 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled} {method : Executable
     compiled.indexed.base.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  (catalog : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  (resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller
+    compiled.sourceProgram principal.named.specialized principal.dictionary)
 
 local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
 
@@ -69,10 +71,10 @@ private theorem policy_receipt {scope : SourceCoreLocalCell.Scope} {fuel : Nat}
     exact ⟨predecessor, CallableIndexedOwnedContextualCompilerPolicyProfiles.RootPolicyReceipt.of_accepted
       principal.cached.compilation principal.record accepted⟩
 
-include diagnostic receiver wellFormed sourceForms supported metadata rows covered catalog in
+include diagnostic receiver wellFormed sourceForms supported metadata rows covered resolved in
 /-- The actual compiler action and selected scope supply a mixed root with all
 readiness obligations derived from original Source forms and full context fields. -/
-theorem of_child_generic
+theorem of_child_with_evidence
     {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
     (selected : stages.Closure principal.sourceFunction child)
     {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields packet.sourceAt.context context)
@@ -147,8 +149,8 @@ theorem of_child_generic
       · obtain ⟨actual⟩ := CallableCoercionExpressionCertificates.direct_of_accepted
           compiler.metadata.found compiler.form authentic
         rw [(SourceCoreUnifiedPreparationCertificates.compiled_fields compiled).1] at actual
-        let caller := CallableIndexedOwnedPreparedStagedMethodCallerEvidence.of_selected_generic
-          principal packet.sourceAt catalog selected fields
+        let caller := CallableIndexedOwnedPreparedStagedMethodCallerResolvedEvidence.of_selected
+          principal packet.sourceAt resolved selected fields
         exact ⟨⟨port, CallableIndexedOwnedPreparedStagedDirectCallAuthority.authenticated_evidence_of_resolved
           compiler port actual caller.resolved caller.signatures caller.ledger caller.assumptions caller.unique⟩⟩
     indexReady := by
@@ -164,9 +166,9 @@ theorem of_child_generic
           simp [nodeForm] at form }
   exact ⟨result, rfl⟩
 
-include diagnostic receiver wellFormed sourceForms supported metadata rows covered catalog in
+include diagnostic receiver wellFormed sourceForms supported metadata rows covered resolved in
 /-- The original scoped grammar and actual method compiler provide every child. -/
-theorem of_actual_generic
+theorem of_actual_with_evidence
     {recipe : SourceCoreIndexedSession.Recipe}
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -179,10 +181,83 @@ theorem of_actual_generic
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply CallableIndexedOwnedPreparedStagedMethodScopedCollectors.of_compiler principal packet ready member wellFormed syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native
-  exact of_child_generic principal packet diagnostic receiver wellFormed sourceForms supported metadata rows covered catalog selected fields
+  exact of_child_with_evidence principal packet diagnostic receiver wellFormed sourceForms supported metadata rows covered resolved selected fields
     declarations tree found typed accepted
 
+end Resolved
+
+section Generic
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {method : ExecutableImplMethods.CheckedMethod}
+  (principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method)
+  (packet : Packet principal)
+  (diagnostic : CallableIndexedOwnedPreparedStagedMethodTerminalSupport.DiagnosticAt principal.cached)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (sourceForms : DirectSource principal.sourceBody.source)
+  {directSites : DeclarationInstantiation → Prop}
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported compiled.indexed.base.plan instantiation)
+  (metadata : MetadataFor compiled.indexed principal.named principal.sourceBody.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation = .ok signature.key →
+    compiled.indexed.base.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  (catalog : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+private def resolved_generic :
+    CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller
+      compiled.sourceProgram principal.named.specialized principal.dictionary := by
+  have empty := CallableIndexedOwnedPreparedStagedMethodCallerEvidence.assumptions_empty_generic principal catalog
+  have dictionary := RecursiveMethodSelectionIdentity.dictionary_empty principal.selected empty
+  have callerEmpty : principal.named.specialized.assumptions = [] := by
+    rw [principal.cached.same]
+    exact empty
+  refine ⟨[], ?_, dictionary⟩
+  rw [callerEmpty]
+  rfl
+
+include diagnostic receiver wellFormed sourceForms supported metadata rows covered catalog in
+theorem of_child_generic
+    {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
+    (selected : stages.Closure principal.sourceFunction child)
+    {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields packet.sourceAt.context context)
+    {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+    (declarations : CompatibleExpressionReads.ScopeDeclarations principal.sourceBody.source scope context)
+    (tree : GeneralSyntax principal.sourceBody.source id directSites)
+    (found : principal.sourceBody.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType principal.sourceBody.source context id node.type)
+    {fuel : Nat} {lowered : SourceCoreBasic.LoweredExpr}
+    (accepted : (CallablePreparedMethodRuntimeProfileFactory.policy principal.cached.compilation).lowerExpression
+      fuel principal.sourceBody.source scope id (principal.cached.diagnostics.reasonAt principal.named.signature.key) = .ok lowered) :
+    Certificate headers stages (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics)
+      context child scope id lowered := by
+  exact of_child_with_evidence principal packet diagnostic receiver wellFormed sourceForms supported metadata rows covered
+    (resolved_generic principal catalog) selected fields declarations tree found typed accepted
+
+include diagnostic receiver wellFormed sourceForms supported metadata rows covered catalog in
+theorem of_actual_generic
+    {recipe : SourceCoreIndexedSession.Recipe}
+    (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    {stages : Staging.Recursive.Registry}
+    (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source
+      (fun id => GeneralSyntax principal.sourceBody.source id directSites)
+      packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType) :
+    Support principal packet headers stages
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
+  exact of_actual_with_evidence principal packet diagnostic receiver wellFormed sourceForms supported metadata rows covered
+    (resolved_generic principal catalog) ready member syntaxTree
+
 end Generic
+
 
 section Legacy
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {method : ExecutableImplMethods.CheckedMethod}

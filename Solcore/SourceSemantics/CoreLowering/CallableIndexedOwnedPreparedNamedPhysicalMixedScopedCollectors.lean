@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPhysicalMixedScopedRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedStaticSupport
@@ -58,6 +59,53 @@ def of_imperative_compiler
 include aligned in
 /-- The actual prepared Header, per-site slots and source metadata issue
 all mixed children without exposing a child execution premise. -/
+def of_actual_with_catalog
+    (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    {directSites : DeclarationInstantiation → Prop}
+    (supported : ∀ instantiation, directSites instantiation →
+      CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported compiled.indexed.base.plan instantiation)
+    (metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+      compiled.indexed prepared.named header.function.source directSites)
+    {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+    (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+    (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+      SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation = .ok signature.key →
+      compiled.indexed.base.globals[index]? = some signature →
+      ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+        header.slot = index ∧ header.named.signature = signature)
+    {loaded : LoadedProgram}
+    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+    (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    (receipt : Receipt header)
+    (actual : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+    (syntaxTree : GenericImperativeMatch.Syntax header.function.source (fun id => GeneralSyntax header.function.source id directSites)
+      header.context (.statements true header.function.body) header.function.resultType) :
+    CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedStaticSupport.Support
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) header
+      (RecursiveNamedPreparedStageScopes.registry actual) receipt
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
+  apply of_imperative_compiler prepared aligned ready wellFormed member receipt
+    (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
+  intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
+  have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected
+  obtain ⟨root, prefixEq⟩ := CallableIndexedOwnedPreparedStagedNamedPhysicalMixedScopedRoots.of_accepted_sites_with_catalog
+    prepared aligned diagnostic receiver wellFormed supported metadata rows covered checked catalog methods actual selected fields
+    (by simpa only [sameSource] using declarations) (by simpa only [sameSource] using approved)
+    (by simpa only [sameSource] using found) (by simpa only [sameSource] using typed)
+    (by simpa only [sameSource] using accepted)
+  exact ⟨root, prefixEq⟩
+
+
+
+include aligned in
 def of_actual_generic
     (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
     (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
@@ -91,16 +139,48 @@ def of_actual_generic
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) header
       (RecursiveNamedPreparedStageScopes.registry actual) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply of_imperative_compiler prepared aligned ready wellFormed member receipt
-    (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
-  intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
-  have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected
-  obtain ⟨root, prefixEq⟩ := CallableIndexedOwnedPreparedStagedNamedPhysicalMixedScopedRoots.of_accepted_sites_generic
-    prepared aligned diagnostic receiver wellFormed supported metadata rows covered checked catalog methods actual selected fields
-    (by simpa only [sameSource] using declarations) (by simpa only [sameSource] using approved)
-    (by simpa only [sameSource] using found) (by simpa only [sameSource] using typed)
-    (by simpa only [sameSource] using accepted)
-  exact ⟨root, prefixEq⟩
+  exact of_actual_with_catalog prepared aligned ready diagnostic receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) member receipt actual syntaxTree
+
+
+
+
+include aligned in
+def of_actual_with_evidence
+    (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+    (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    {directSites : DeclarationInstantiation → Prop}
+    (supported : ∀ instantiation, directSites instantiation →
+      CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported compiled.indexed.base.plan instantiation)
+    (metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+      compiled.indexed prepared.named header.function.source directSites)
+    {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+    (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+    (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+      SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation = .ok signature.key →
+      compiled.indexed.base.globals[index]? = some signature →
+      ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+        header.slot = index ∧ header.named.signature = signature)
+    {loaded : LoadedProgram}
+    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+    (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
+    {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+    (member : entry ∈ compiled.indexed.entries)
+    (receipt : Receipt header)
+    (actual : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+    (syntaxTree : GenericImperativeMatch.Syntax header.function.source (fun id => GeneralSyntax header.function.source id directSites)
+      header.context (.statements true header.function.body) header.function.resultType) :
+    CallableIndexedOwnedPreparedStagedPhysicalMixedNamedScopedStaticSupport.Support
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) header
+      (RecursiveNamedPreparedStageScopes.registry actual) receipt
+      (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
+  exact of_actual_with_catalog prepared aligned ready diagnostic receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) member receipt actual syntaxTree
+
+
 
 
 include aligned in

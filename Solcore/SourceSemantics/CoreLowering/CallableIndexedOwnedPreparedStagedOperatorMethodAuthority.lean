@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOp
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodPreparedStageScopes
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodSelectionIdentity
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
 
 /-! A method port retains the genuine selected method, its full dictionary and
 its actual cached slot. Runtime capture authority and body meaning are separate
@@ -27,8 +28,18 @@ def Dispatch (traitName methodName : String) : Prop :=
   (∃ operator left right, receipt.node.form = .binary left operator right ∧
     BinaryTraitDispatch operator traitName methodName)
 
-/-- Static formation of the actual selected method. The closed initial profile
-has empty method assumptions; its caller may retain a nonempty dictionary. -/
+/-- Static formation and complete source typing of the actual selected method. -/
+structure SelectionCore
+    (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator) : Prop where
+  formed : CallableCoercionMethodInstantiation.Formation
+    selected.certificate.selected.implementation selected.certificate.selected.declaration
+  range : SourceSemantics.ParameterSubstitution.RangeWellFormed
+    (SourceSemantics.Context.ofSignatures receipt.program.signatures)
+    receipt.method.specialized.parameterSubstitution
+  covered : CallableCoercionEvidenceOrigins.CallerCovered receipt.caller receipt.method
+  unique : NodeOccurrencesUnique
+    (CallableCoercionMethodInstantiation.bodyInstance receipt.program receipt.method).source
+
 structure SelectionSupport
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator) : Prop where
   formed : CallableCoercionMethodInstantiation.Formation
@@ -40,6 +51,10 @@ structure SelectionSupport
   unique : NodeOccurrencesUnique
     (CallableCoercionMethodInstantiation.bodyInstance receipt.program receipt.method).source
   empty : (CallableCoercionMethodInstantiation.bodyInstance receipt.program receipt.method).context.assumptions = []
+
+theorem SelectionSupport.core {selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator}
+    (support : SelectionSupport receipt selected) : SelectionCore receipt selected :=
+  ⟨support.formed, support.range, support.covered, support.unique⟩
 
 structure Port (context : SourceSemantics.Context) (caller : Dynamic.EvidenceEnvironment)
     (stages : Staging.Recursive.Registry) where
@@ -63,6 +78,8 @@ structure Port (context : SourceSemantics.Context) (caller : Dynamic.EvidenceEnv
     principal.cached.diagnostics = match compiled.indexed.base.callableContext with
       | none => diagnostics.program
       | some native => {diagnostics.program with rootTable := native.diagnostics.rootTable}
+  resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller
+    compiled.sourceProgram principal.named.specialized principal.dictionary
   sourceAt : CallablePreparedMethodRuntimeProfileFactory.SourceAt principal.cached.compilation
     (.initial compiled.compatible.checked) principal.sourceBody principal.dictionary
 

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport
 
@@ -39,7 +40,7 @@ variable {directSites : DeclarationInstantiation → Prop}
   {loaded : LoadedProgram}
   (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
-  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
   {signature : ProgramFunctionSignature}
   (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
   (sourceOwner : function.source.owner = signature.id)
@@ -52,7 +53,7 @@ local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.h
 include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
 /-- The accepted terminal callback yields the original method-aware expression
 root at every genuine selected Source scope. -/
-theorem of_actual_generic
+theorem of_actual_with_catalog
     (expression : ExpressionId)
     (terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Terminal
       function.source expression function.body)
@@ -75,7 +76,7 @@ theorem of_actual_generic
       code packet support.body.toContext support.body.frame selectedChild selectedAt
   have accepted := CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.accepted_view_action code packet callback reason
   obtain ⟨⟨actualType, root⟩⟩ :=
-    CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots.of_child_generic stagePrepared code support provenance
+    CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots.of_child_with_catalog stagePrepared code support provenance
       receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner
       selectedAt (Dynamic.RuntimeContextFields.refl _)
       (by simpa only [sameSource] using declarations)
@@ -88,6 +89,107 @@ theorem of_actual_generic
 
 end Generic
 
+
+
+section GenericWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (code : Code compiled.indexed function scope administrative)
+  (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry semanticFaults)
+  (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported code.compilation.plan instantiation)
+  (metadata : MetadataFor compiled.indexed support.caller.named function.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey code.compilation.plan instantiation = .ok signature.key →
+    code.compilation.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  {signature : ProgramFunctionSignature}
+  (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
+  (sourceOwner : function.source.owner = signature.id)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry stagePrepared
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+
+
+include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
+theorem of_actual_generic
+    (expression : ExpressionId)
+    (terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Terminal
+      function.source expression function.body)
+    (tree : GeneralSyntax function.source expression directSites)
+    (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
+    Nonempty (Σ packet : Terminal code stages,
+      SelectedBody («headers» := headers) code support.body.toContext stages packet faults) := by
+  exact of_actual_with_catalog stagePrepared code support provenance receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) signatureMember sourceOwner expression terminal tree child selected
+
+end GenericWrappers
+
+section EvidenceWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (code : Code compiled.indexed function scope administrative)
+  (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry semanticFaults)
+  (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported code.compilation.plan instantiation)
+  (metadata : MetadataFor compiled.indexed support.caller.named function.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey code.compilation.plan instantiation = .ok signature.key →
+    code.compilation.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
+  {signature : ProgramFunctionSignature}
+  (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
+  (sourceOwner : function.source.owner = signature.id)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry stagePrepared
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+
+
+include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
+theorem of_actual_with_evidence
+    (expression : ExpressionId)
+    (terminal : CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.Terminal
+      function.source expression function.body)
+    (tree : GeneralSyntax function.source expression directSites)
+    (child : Staging.Recursive.Scope) (selected : (stages).Closure function child) :
+    Nonempty (Σ packet : Terminal code stages,
+      SelectedBody («headers» := headers) code support.body.toContext stages packet faults) := by
+  exact of_actual_with_catalog stagePrepared code support provenance receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) signatureMember sourceOwner expression terminal tree child selected
+
+end EvidenceWrappers
 
 section Legacy
 variable {directSites : DeclarationInstantiation → Prop}

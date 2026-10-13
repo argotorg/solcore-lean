@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodArgumentRows
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGenericMethodSelection
@@ -59,7 +60,7 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
   {loaded : LoadedProgram}
   (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
-  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
   (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
     compiled.indexed.ancestry.graph.inputs.callable)
 
@@ -119,7 +120,7 @@ theorem calls_ready_sites {fuel : Nat}
 include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
 /-- The Source frame and actual selected child derive all runtime-independent
 conditions. No native argument or source heap representation is assumed. -/
-def at_scope_sites_generic {fuel : Nat}
+def at_scope_sites_with_catalog {fuel : Nat}
     (root : RootPolicyReceipt (compiled := compiled) terminal.prepared.named terminal.prepared.diagnostics
       terminal.prepared.code terminal.prepared.compilation fuel header.function.source
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
@@ -217,13 +218,13 @@ def at_scope_sites_generic {fuel : Nat}
       directReady := CallableIndexedOwnedPreparedStagedNamedMethodTerminalSupport.direct_ready terminal wellFormed metadata tree rows covered root sourceEq selected certificate
       indexReady := CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.named_ready
         terminal.prepared diagnostic terminal.aligned sourceEq certificate
-      methodReady := CallableIndexedOwnedPreparedStagedNamedMethodTerminalSupport.method_ready_generic terminal wellFormed metadata tree checked catalog methods actualStages root sourceEq selected certificate }
+      methodReady := CallableIndexedOwnedPreparedStagedNamedMethodTerminalSupport.method_ready_with_catalog terminal wellFormed metadata tree checked catalog methods actualStages root sourceEq selected certificate }
   exact ⟨support, rfl, rfl, rfl⟩
 
 include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
 /-- Original named compilation, real caller evidence and the actual method cache
 produce the physical body support. Every execution premise comes later. -/
-theorem of_actual_generic
+theorem of_actual_with_catalog
     (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
       (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
       terminal.expression terminal.receipt.child) :
@@ -235,7 +236,7 @@ theorem of_actual_generic
   have sourceReceipt := (CallableIndexedActualNamedSourceReceipts.header_source compiled header).1
   have canonicalSource : header.function.source = sidecar.source := by
     simpa only [EmptySourceSubstitution.source] using sourceReceipt.source issued
-  obtain ⟨request, signature, generic, signatureMember, _genericMember, _requested, accepted⟩ :=
+  obtain ⟨request, signature, generic, signatureMember, _with_catalogMember, _requested, accepted⟩ :=
     terminal.prepared.origin
   have identities := RecursiveNamedSpecializationBodyFacts.identities accepted
   have body := RecursiveNamedSpecializationBodyFacts.body accepted
@@ -251,10 +252,127 @@ theorem of_actual_generic
     guards := RecursiveNamedPreparedScopeCoherence.selected_frame actualStages
       (SourceCoreUnifiedPreparationCertificates.compiled_planPrepared compiled) wellFormed
       signatureMember sourceOwner issued sourceReceipt selected }
-  exact at_scope_sites_generic terminal diagnostic receiver wellFormed supported metadata tree
+  exact at_scope_sites_with_catalog terminal diagnostic receiver wellFormed supported metadata tree
     rows covered checked catalog methods actualStages root child selected authority
 
 end Generic
+
+
+section GenericWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported compiled.indexed.base.plan instantiation)
+  (metadata : MetadataFor compiled.indexed terminal.prepared.named header.function.source directSites)
+  (tree : GeneralSyntax header.function.source terminal.expression directSites)
+  {stages : Staging.Recursive.Registry}
+
+variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation = .ok signature.key →
+    compiled.indexed.base.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
+  (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
+    compiled.indexed.ancestry.graph.inputs.callable)
+
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+
+include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
+def at_scope_sites_generic {fuel : Nat}
+    (root : RootPolicyReceipt (compiled := compiled) terminal.prepared.named terminal.prepared.diagnostics
+      terminal.prepared.code terminal.prepared.compilation fuel header.function.source
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression header.reasonAt terminal.receipt.child)
+    (child : Staging.Recursive.Scope) (selected : (RecursiveNamedPreparedStageScopes.registry actualStages).Closure header.function child)
+    (authority : SidecarAt terminal child) :
+    { support : CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (RecursiveNamedPreparedStageScopes.registry actualStages)
+      header.context child (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child faults //
+      support.rawType = header.function.resultType ∧ support.reasonAt = header.reasonAt ∧
+      support.compilation.administrativePrefix = 1 } := by
+  exact at_scope_sites_with_catalog terminal diagnostic receiver wellFormed supported metadata tree rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) actualStages root child selected authority
+
+include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
+theorem of_actual_generic
+    (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child) :
+    Nonempty (CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.Support
+      (headers := CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (stages := RecursiveNamedPreparedStageScopes.registry actualStages) (semanticFaults := faults) header terminal) := by
+  exact of_actual_with_catalog terminal diagnostic receiver wellFormed supported metadata tree rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.generic methods) actualStages point
+
+end GenericWrappers
+
+section EvidenceWrappers
+variable {directSites : DeclarationInstantiation → Prop}
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt terminal.prepared)
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported compiled.indexed.base.plan instantiation)
+  (metadata : MetadataFor compiled.indexed terminal.prepared.named header.function.source directSites)
+  (tree : GeneralSyntax header.function.source terminal.expression directSites)
+  {stages : Staging.Recursive.Registry}
+
+variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey compiled.indexed.base.plan instantiation = .ok signature.key →
+    compiled.indexed.base.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
+  (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
+    compiled.indexed.ancestry.graph.inputs.callable)
+
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+
+
+include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
+def at_scope_sites_with_evidence {fuel : Nat}
+    (root : RootPolicyReceipt (compiled := compiled) terminal.prepared.named terminal.prepared.diagnostics
+      terminal.prepared.code terminal.prepared.compilation fuel header.function.source
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression header.reasonAt terminal.receipt.child)
+    (child : Staging.Recursive.Scope) (selected : (RecursiveNamedPreparedStageScopes.registry actualStages).Closure header.function child)
+    (authority : SidecarAt terminal child) :
+    { support : CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt compiled (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (RecursiveNamedPreparedStageScopes.registry actualStages)
+      header.context child (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child faults //
+      support.rawType = header.function.resultType ∧ support.reasonAt = header.reasonAt ∧
+      support.compilation.administrativePrefix = 1 } := by
+  exact at_scope_sites_with_catalog terminal diagnostic receiver wellFormed supported metadata tree rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) actualStages root child selected authority
+
+include diagnostic receiver wellFormed supported metadata tree rows covered checked catalog methods actualStages in
+theorem of_actual_with_evidence
+    (point : terminal.certificate = CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds.Point
+      (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      terminal.expression terminal.receipt.child) :
+    Nonempty (CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.Support
+      (headers := CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows)
+      (stages := RecursiveNamedPreparedStageScopes.registry actualStages) (semanticFaults := faults) header terminal) := by
+  exact of_actual_with_catalog terminal diagnostic receiver wellFormed supported metadata tree rows covered checked catalog (CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog.evidence methods) actualStages point
+
+end EvidenceWrappers
 
 section Legacy
 variable {directSites : DeclarationInstantiation → Prop}

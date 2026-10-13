@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
+import Solcore.SourceSemantics.CoreLowering.RecursiveMethodDictionaryIdentity
 
 /-! Authentic method issuance ties the actual compiler hook to the selected
 Source method, full dictionary, real cache slot and staged method scope. -/
@@ -9,7 +10,7 @@ set_option maxHeartbeats 1600000
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
 open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedStagedOperatorMethodCertificates (Receipt)
-open CallableIndexedOwnedPreparedStagedOperatorMethodAuthority (Port SelectionSupport)
+open CallableIndexedOwnedPreparedStagedOperatorMethodAuthority (Port SelectionSupport SelectionCore)
 open CallablePreparedMethodSelection CallablePreparedMethodRuntimeMeaning
 open CallableNamedMetadata (environment)
 
@@ -64,9 +65,13 @@ private theorem descriptor {method : ExecutableImplMethods.CheckedMethod}
   | ok descriptor => exact ⟨descriptor⟩
 
 include receipt actual special in
-theorem of_actual
+theorem of_actual_with_evidence
     (selected : OperatorSource actual)
-    (support : SelectionSupport (authentic receipt actual special) selected)
+    (support : SelectionCore (authentic receipt actual special) selected)
+    (coherent : RecursiveMethodDictionaryIdentity.Coherent compiled.sourceProgram.signatures.resolutionRules
+      (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram actual.selection.method).context.assumptions)
+    (resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
+      actual.selection.method.specialized (environment actual.dictionary))
     {loaded : LoadedProgram}
     (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
@@ -124,7 +129,7 @@ theorem of_actual
   obtain ⟨retained⟩ := selected.toSourceReceipt.retained checked
   obtain ⟨sourceAt⟩ := CallablePreparedMethodRuntimeProfileFactory.source_at (values := .initial compiled.compatible.checked) cached rfl retained wellFormed
     chosen support.unique (CallableIndexedOwnedPublicSignatureCatalog.signatures compiled).symm
-  refine ⟨⟨authentic, rfl, principal, signature, slot, ?_, chosen, ?_, _, staged, ⟨diagnostics, diagnosticPresent, rfl⟩, sourceAt⟩⟩
+  refine ⟨⟨authentic, rfl, principal, signature, slot, ?_, chosen, ?_, _, staged, ⟨diagnostics, diagnosticPresent, rfl⟩, ?_, sourceAt⟩⟩
   · rcases actual.form with ⟨operator, operand, form, _⟩ | ⟨operator, left, right, form, _⟩
     · exact .inl ⟨operator, operand, form, by simpa only [principal, CallableIndexedOwnedMethodPrincipal.of_selected, form] using selected.dispatch⟩
     · exact .inr ⟨operator, left, right, form, by simpa only [principal, CallableIndexedOwnedMethodPrincipal.of_selected, form] using selected.dispatch⟩
@@ -132,7 +137,52 @@ theorem of_actual
     have req : receipt.node.requirements = actual.selection.primaryRequirement :: selected.methodIds :=
       requirements.symm.trans selected.requirements
     rw [req] at chosen selectedActual
-    exact RecursiveMethodSelectionIdentity.same_empty catalog
-      (fun _ _ first second => unique.contains_unique first second) chosen selectedActual support.empty
+    have callerValid : callerEvidence.Valid compiled.sourceProgram.signatures.resolutionRules := by
+      rw [dictionary]
+      exact (CallableEvidenceEnvironment.resolved_valid actual.resolved).1
+    exact RecursiveMethodDictionaryIdentity.same_coherent catalog
+      (fun _ _ first second => unique.contains_unique first second) signatures callerValid chosen selectedActual coherent
+  · change CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
+      cached.named.specialized (environment actual.dictionary)
+    rw [cached.same]
+    exact resolved
+
+
+include receipt actual special in
+/-- Existing empty-method issuers construct the strengthened receipt internally. -/
+theorem of_actual
+    (selected : OperatorSource actual)
+    (support : SelectionSupport (authentic receipt actual special) selected)
+    {loaded : LoadedProgram}
+    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+    {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
+    (prepared : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget compiled.sourceProgram before
+      preparationFuel budget = .ok compilation.plan)
+    (callerMember : caller ∈ compilation.plan.specializations)
+    (nodeMember : .expression receipt.node ∈ caller.function.typedBody.nodes)
+    (samePlan : compilation.plan = compiled.indexed.base.plan)
+    (globals : compilation.globals = compiled.indexed.base.globals)
+    {context : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    (signatures : context.signatures = compiled.sourceProgram.signatures)
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
+    (unique : RequirementIdsUnique context)
+    (dictionary : callerEvidence = environment actual.available)
+    (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
+      compiled.indexed.ancestry.graph.inputs.callable) :
+    Nonempty (Port (compiled := compiled) receipt context callerEvidence
+      (RecursiveNamedPreparedStageScopes.registry actualStages)) := by
+  have chosen := selected.toSourceReceipt.selects checked support.formed support.range signatures ledger assumptions support.covered
+  have emptyDictionary := RecursiveMethodSelectionIdentity.dictionary_empty chosen support.empty
+  have empty : actual.selection.method.specialized.assumptions = [] := support.empty
+  have resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
+      actual.selection.method.specialized (environment actual.dictionary) :=
+    ⟨[], by rw [empty]; rfl, emptyDictionary⟩
+  apply of_actual_with_evidence receipt actual special selected (support.core (authentic receipt actual special))
+    (support.empty ▸ RecursiveMethodDictionaryIdentity.Coherent.empty _) resolved
+    checked wellFormed catalog prepared callerMember nodeMember samePlan globals
+    signatures ledger assumptions unique dictionary actualStages
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
