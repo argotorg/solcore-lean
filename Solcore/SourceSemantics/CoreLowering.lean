@@ -1962,6 +1962,8 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedNamedRefinedBodyAdmission
 
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualLambdaReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedFactoryAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedProgramClosureCompletion
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
