@@ -1,4 +1,5 @@
-import Solcore.Test.SourceCoreCanonicalScopedTypes
+import Solcore.Test.SourceCoreCanonicalScopedCompilerExpressions
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyExpressionAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEvidenceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 set_option autoImplicit false
@@ -7,21 +8,54 @@ namespace Tests.SourceCoreCanonicalScoped
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (GeneralSyntax)
 
-theorem ActualHeader.relay_body {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+/-- Both the statement tree and its ordered expression actions come from the
+actual accepted compiler body. The original finite metadata remains explicit. -/
+theorem ActualHeader.relay_admission {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (actual : ActualHeader fixture observed.relayRow.row) :
-    actual.header.function.body = [observed.relayShape.initialized.id, observed.relayShape.statement.id] := by
-  rw [actual.aligned.function]
-  have accepted := actual.prepared.compilation.roots
-  change (actual.prepared.named.specialized.function.typedBody.roots.mapM _) = _ at accepted
-  rw [actual.prepared.same, observed.relayShape.roots] at accepted
-  exact (Except.ok.inj accepted).symm
+    CallableIndexedOwnedPreparedNamedScopedAdmission.Admission actual.prepared actual.header
+      observed.relayAdmission.table.rows := by
+  rcases AcceptedNamedBodyExpressionAdmission.of_actual actual.prepared actual.aligned
+      actual.relay_metadata observed.relay_direct_supported actual.relay_direct_sites
+      fixture.source_wellFormed with admission | unsupported
+  · exact admission
+  · obtain ⟨unsupported⟩ := unsupported
+    cases unsupported with
+    | «structure» receipt outside =>
+        rw [(actual.relay_compiler_details receipt).1] at outside
+        cases outside
+    | generalized receipt binding member quantified =>
+        have present := List.mem_map.mpr
+          (show ∃ selected ∈ receipt.tree.bindings, selected.binder = binding.binder from ⟨binding, member, rfl⟩)
+        rw [(actual.relay_compiler_details receipt).2.1] at present
+        have same := List.mem_singleton.mp present
+        exact False.elim (quantified (by rw [same, observed.relayShape.localScheme]; rfl))
+    | expression receipt child member residual =>
+        have present := List.mem_map.mpr
+          (show ∃ selected ∈ receipt.tree.children, selected.expression = child.expression from ⟨child, member, rfl⟩)
+        rw [(actual.relay_compiler_details receipt).2.2] at present
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at present
+        have reached : RelayReached observed child.expression := by
+          rcases present with initial | final
+          · exact .inl initial
+          · exact .inr (.inr final)
+        exact False.elim (actual.relay_expression_residual_impossible reached residual)
+
+/-- This is the same evidence certificate consumed by the existing public
+family. Its Source admission is derived from the compiler action. -/
+def ActualHeader.relay_certificate {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (actual : ActualHeader fixture observed.relayRow.row) :
+    CallableIndexedOwnedPreparedNamedEvidenceAdmission.Certificate fixture.recipe.compiled observed.relayAdmission.named := {
+  table := observed.relayAdmission.table
+  sourceAdmission := AcceptedNamedBodyAdmission.source_of_header actual.prepared actual.aligned
+    observed.relayAdmission.selected observed.relayAdmission.same actual.relay_admission
+  requirements := observed.relayAdmission.requirements }
 
 theorem ActualHeader.relay_receipt {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (actual : ActualHeader fixture observed.relayRow.row) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.Receipt actual.header) := by
   exact CallableIndexedOwnedPreparedNamedEvidenceAdmission.receipt
     actual.prepared actual.aligned observed.relayAdmission.selected observed.relayAdmission.same
-    observed.relayAdmission.certificate
+    actual.relay_certificate
 
 def ActualHeader.relay_bundle {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (actual : ActualHeader fixture observed.relayRow.row)
@@ -53,7 +87,7 @@ def ActualHeader.relay_support {fixture : CompiledFixture} {observed : ObservedP
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   exact CallableIndexedOwnedPreparedNamedEvidenceAdmission.of_receipt
     actual.prepared actual.aligned observed.relayAdmission.selected observed.relayAdmission.same
-    observed.relayAdmission.certificate rows complete fixture.recipePrepared actual.diagnostic
+    actual.relay_certificate rows complete fixture.recipePrepared actual.diagnostic
     receiver fixture.source_wellFormed (bootstrap_zero fixture.recipe.compiled)
     observed.relayRow.entryMember receipt stagePrepared
 

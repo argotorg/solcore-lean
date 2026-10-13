@@ -199,16 +199,75 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
           entryKey := entryKey }
     | _ => throw (IO.userError "reuse unique global slot")
 
-/-- This receipt executes only the actual cached named row and source tables.
-The later Header is connected by its authentic cached selection. -/
+def RelayDirectSites (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction) : Prop :=
+  ∀ id node, source.lookupExpression? id = some node → ∀ callee ids instantiation,
+    node.form = .call callee ids (.declaration instantiation) →
+    CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite rows instantiation
+
+private def relayDirectNode (rows : List SourceSpecialization.SpecializedFunction) : Node → Prop
+  | .expression expression => match expression.form with
+    | .call _ _ (.declaration instantiation) =>
+        CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite rows instantiation
+    | _ => True
+  | .statement _ => True
+
+private def relayDirectNode? (rows : List SourceSpecialization.SpecializedFunction)
+    (node : Node) : Option (PLift (relayDirectNode rows node)) :=
+  match node with
+  | .statement _ => some ⟨True.intro⟩
+  | .expression expression => by
+      cases form : expression.form
+      case call callee ids resolution =>
+        cases resolution
+        case declaration instantiation =>
+          exact do
+            let ⟨site⟩ ← CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite? rows instantiation
+            pure ⟨by simpa only [relayDirectNode, form] using site⟩
+        all_goals exact some ⟨by simp only [relayDirectNode, form]⟩
+      all_goals exact some ⟨by simp only [relayDirectNode, form]⟩
+
+private def relayAll? {α : Type} (predicate : α → Prop)
+    (check : (item : α) → Option (PLift (predicate item))) :
+    (items : List α) → Option (PLift (∀ item ∈ items, predicate item))
+  | [] => some ⟨by intro item member; cases member⟩
+  | first :: rest => do
+    let ⟨head⟩ ← check first
+    let ⟨tail⟩ ← relayAll? predicate check rest
+    pure ⟨by
+      intro item member
+      rcases List.mem_cons.mp member with same | member
+      · exact same ▸ head
+      · exact tail item member⟩
+
+/-- This finite check authenticates declaration metadata in every stored node.
+It does not traverse expressions or construct expression syntax. -/
+def relayDirectSites? (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction) :
+    Option (PLift (RelayDirectSites source rows)) := do
+  let ⟨all⟩ ← relayAll? (relayDirectNode rows) (relayDirectNode? rows) source.nodes
+  pure ⟨by
+    intro id node found callee ids instantiation form
+    have selected := all (.expression node) (lookupExpression?_sound found).1
+    simpa only [relayDirectNode, form] using selected⟩
+
+/-- Only the actual cache, expression metadata and direct targets are checked.
+The accepted compiler action later supplies statement and expression structure. -/
 structure ObservedRelayAdmission (fixture : CompiledFixture)
     (row : ObservedRow fixture fixture.relaySignature) where
   named : SourceCoreGeneralFunctions.Function
   selected : fixture.recipe.compiled.indexed.base.functions[row.index]? = some named
   same : named.specialized = row.row
-  certificate : CallableIndexedOwnedPreparedNamedEvidenceAdmission.Certificate fixture.recipe.compiled named
-  accepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.certifySource
-    fixture.recipe.compiled fixture.source_wellFormed named 100 = some certificate
+  table : CallableIndexedOwnedPreparedOrdinarySyntaxTable.Table fixture.recipe.compiled
+  metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+    fixture.recipe.compiled.indexed named named.specialized.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite table.rows)
+  metadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+    fixture.recipe.compiled.indexed named named.specialized.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite table.rows) = some ⟨metadata⟩
+  requirements : CallableIndexedOwnedPreparedNamedEvidenceAdmission.Requirements named.specialized.function.typedBody
+  requirementsAccepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.requirements?
+    named.specialized.function.typedBody = some ⟨requirements⟩
+  sites : RelayDirectSites named.specialized.function.typedBody table.rows
+  sitesAccepted : relayDirectSites? named.specialized.function.typedBody table.rows = some ⟨sites⟩
 
 def observeRelayAdmission (fixture : CompiledFixture)
     (row : ObservedRow fixture fixture.relaySignature) : IO (ObservedRelayAdmission fixture row) := do
@@ -217,10 +276,21 @@ def observeRelayAdmission (fixture : CompiledFixture)
   | some named =>
     let ⟨sameRaw⟩ ← observed ((named.specialized == row.row) = true) "actual relay full cache metadata"
     have same : named.specialized = row.row := eq_of_beq sameRaw
-    match accepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.certifySource
-        fixture.recipe.compiled fixture.source_wellFormed named 100 with
-    | none => throw (IO.userError "actual let/direct relay source admission failed")
-    | some certificate => return ⟨named, selected, same, certificate, accepted⟩
+    let table := CallableIndexedOwnedPreparedOrdinarySyntaxTable.collect fixture.recipe.compiled
+      fixture.source_wellFormed 100
+    match metadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+        fixture.recipe.compiled.indexed named named.specialized.function.typedBody
+        (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite table.rows) with
+    | none => throw (IO.userError "actual relay expression metadata rejected")
+    | some metadata =>
+      match requirementsAccepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.requirements?
+          named.specialized.function.typedBody with
+      | none => throw (IO.userError "actual relay evidence requirements rejected")
+      | some requirements =>
+        match sitesAccepted : relayDirectSites? named.specialized.function.typedBody table.rows with
+        | none => throw (IO.userError "actual relay direct target rejected")
+        | some sites => pure ⟨named, selected, same, table, metadata.down, metadataAccepted,
+            requirements.down, requirementsAccepted, sites.down, sitesAccepted⟩
 
 structure ObservedProgram (fixture : CompiledFixture) where
   identityRow : ObservedRow fixture fixture.identitySignature
