@@ -20,6 +20,7 @@ structure OrdinaryFormation
     (scope : SourceCoreLocalCell.Scope) (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr)
     extends CallableIndexedOwnedGeneralOrdinaryLambdaFormationHeads.Formation
       (registry := registry) (faults := faults) caller context evidence scope id lowered where
+  callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller context evidence
   binderPolicy : BinderPolicy caller.named site.code
   recipe : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained caller.named site.code
   compilerPolicy : CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named site.code
@@ -52,7 +53,7 @@ theorem OrdinaryFormation.at
     (globals : caller.globals = compiled.indexed.base.globals.length) :
     OrdinaryAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured caller receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment globals
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment globals receipt.callerReceipt
 
 theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     {principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method}
@@ -88,7 +89,8 @@ def ordinary_of_producer
     (sourceType : produced.site.code.sourceNode.type = FunctionValues.sourceType
       (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence []))
     (ordinary : Dynamic.OrdinaryRequirementLayout produced.site.code.sourceNode.requirements produced.site.code.sourceNode.coercions [])
-    (coercions : produced.site.code.sourceNode.coercions = []) :
+    (coercions : produced.site.code.sourceNode.coercions = [])
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller context evidence) :
     OrdinaryFormation (registry := registry) (faults := faults) caller context evidence scope id lowered where
   parameters := parameters
   result := result
@@ -102,6 +104,7 @@ def ordinary_of_producer
   sourceType := sourceType
   ordinary := ordinary
   coercions := coercions
+  callerReceipt := callerReceipt
   binderPolicy := produced.binderPolicy
   recipe := produced.recipe
   compilerPolicy := produced.compilerPolicy

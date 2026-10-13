@@ -70,11 +70,12 @@ theorem provenance
       (expressionSyntax (source caller.named)) body.context
       (.statements true statements) result)
     (environment : Dynamic.Environment)
-    (callerGlobals : caller.globals = compiled.indexed.base.globals.length) :
+    (callerGlobals : caller.globals = compiled.indexed.base.globals.length)
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller sourceContext evidence) :
     OrdinaryAt (code produced environment) (ordinary_support produced body environment) :=
   .recaptured caller produced.site expressionSyntax certificates body produced.binder
     (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation produced.recipe)
-    produced.compilerPolicy bodyView bodyReasons declarations syntaxTree environment callerGlobals
+    produced.compilerPolicy bodyView bodyReasons declarations syntaxTree environment callerGlobals callerReceipt
 
 /-- The retained compiler recipe survives recapture without an equality cast
 between different Codes or an assumption about a BodyWith expression callback. -/
@@ -255,6 +256,7 @@ the usual runtime capture and formation fields are not reconstructed from a
 native payload or its emitted expression. -/
 def association
     (callerGlobals : caller.globals = compiled.indexed.base.globals.length)
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller sourceContext evidence)
     (owner : OwnedKey keys) (history : CallableIndexedLambdaValues.History (code produced environment))
     (origin : CallableIndexedOwnedOrdinaryLambdaSupport.SourceOrigin
       (ordinary_support produced body environment) history)
@@ -279,10 +281,11 @@ def association
     (function (caller := caller) (parameters := parameters) (result := result)
       (statements := statements) (sourceContext := sourceContext) (evidence := evidence) environment)
     scope actual owner captured (code produced environment) history (ordinary_support produced body environment)
-    origin prefixContext globals referenceIndex typed (provenance produced body bodyView bodyReasons declarations syntaxTree environment callerGlobals)
+    origin prefixContext globals referenceIndex typed (provenance produced body bodyView bodyReasons declarations syntaxTree environment callerGlobals callerReceipt)
 
 variable {stages : Staging.Recursive.Registry}
   (callerGlobals : caller.globals = compiled.indexed.base.globals.length)
+  (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller sourceContext evidence)
   (owner : OwnedKey keys) (history : CallableIndexedLambdaValues.History (code produced environment))
   (origin : CallableIndexedOwnedOrdinaryLambdaSupport.SourceOrigin
     (ordinary_support produced body environment) history)
@@ -303,7 +306,7 @@ closure with equal emitted payload. The Code and context reduce literally. -/
 def authority_for (choice : Choice produced environment stages)
     (conditions : Conditions produced body choice) :
     CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.ClosureAuthorityFor
-      (association captured produced body bodyView bodyReasons declarations callerGlobals owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations callerGlobals callerReceipt owner history origin prefixContext globals referenceIndex typed syntaxTree)
       choice.packet :=
   authority produced body choice conditions
 
@@ -313,15 +316,15 @@ def support_for (choice : Choice produced environment stages)
     (conditions : Conditions produced body choice)
     (ready : Ready produced body choice conditions) :
     CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.ClosureSupportFor
-      (association captured produced body bodyView bodyReasons declarations callerGlobals owner history origin prefixContext globals referenceIndex typed syntaxTree)
+      (association captured produced body bodyView bodyReasons declarations callerGlobals callerReceipt owner history origin prefixContext globals referenceIndex typed syntaxTree)
       stages
       (CallableIndexedOwnedPreparedStagedSelectedTerminalCertificates.closureFor
-        (association captured produced body bodyView bodyReasons declarations callerGlobals owner history origin prefixContext globals referenceIndex typed syntaxTree)
+        (association captured produced body bodyView bodyReasons declarations callerGlobals callerReceipt owner history origin prefixContext globals referenceIndex typed syntaxTree)
         choice.packet) :=
   CallableIndexedOwnedPreparedStagedSelectedBodySupportFactories.closure_support_for
-    (association captured produced body bodyView bodyReasons declarations callerGlobals owner history origin prefixContext globals referenceIndex typed syntaxTree)
+    (association captured produced body bodyView bodyReasons declarations callerGlobals callerReceipt owner history origin prefixContext globals referenceIndex typed syntaxTree)
     choice.packet
-    (authority_for captured produced body bodyView bodyReasons declarations callerGlobals owner history origin prefixContext globals referenceIndex typed syntaxTree choice conditions)
+    (authority_for captured produced body bodyView bodyReasons declarations callerGlobals callerReceipt owner history origin prefixContext globals referenceIndex typed syntaxTree choice conditions)
     ready
 end Association
 

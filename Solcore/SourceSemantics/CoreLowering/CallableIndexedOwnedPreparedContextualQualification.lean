@@ -45,7 +45,7 @@ def Association.Qualified
   cases association with
   | ordinary receipt =>
     cases receipt with
-    | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed _callerGlobals =>
+    | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed _callerGlobals _callerReceipt =>
       exact facet.ordinary code support
   | principal receipt =>
     cases receipt with
@@ -62,7 +62,7 @@ theorem Association.Qualified.extend
   cases association with
   | ordinary receipt =>
     cases receipt with
-    | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed _callerGlobals =>
+    | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed _callerGlobals _callerReceipt =>
       exact qualified
   | principal receipt =>
     cases receipt with

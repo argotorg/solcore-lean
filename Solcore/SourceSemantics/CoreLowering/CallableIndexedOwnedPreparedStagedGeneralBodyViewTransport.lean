@@ -120,6 +120,16 @@ private theorem basic_atomic_eq {source view : TypedSource}
           cases atomic <;>
             simp only [viewReading, formEq, bind, Except.bind, pure, Except.pure]
 
+/-- Reader and leaf fields shared by ordinary and evidence-aware policies.
+The special action is compared at the actual compiler step separately. -/
+structure ReadPolicyOn (policy : SourceCoreFunctions.Policy)
+    (readFuel : Nat) (values : SourceCoreCompatibleValues.Context) (source : TypedSource)
+    (allowed : ExpressionId → Prop) (directSites : DeclarationInstantiation → Prop) : Prop where
+  read : ∀ id, allowed id → GeneralSyntax source id directSites → policy.readExpression source id =
+    SourceCoreCompatibleDataExpressions.readExpression values.checked source id
+  lower : policy.lowerRead = SourceCoreCompatibleDataExpressions.lowerRead readFuel values
+  leaf : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer values
+
 section Compiler
 variable {source view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
   (edited : LocalView source view changed) (avoids : Avoids source roots changed)
@@ -127,11 +137,11 @@ variable {source view : TypedSource} {roots : List NodeId} {changed : List Expre
   {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
   {values : SourceCoreCompatibleValues.Context} {scope : SourceCoreLocalCell.Scope}
   {reasonAt : ExpressionId → Word}
-  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
-    policy compilation readFuel values source scope reasonAt
+  (sourceProfile : ReadPolicyOn
+    policy readFuel values source
       (fun id => Reaches source roots (.expression id)) directSites)
-  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
-    policy compilation readFuel values view scope reasonAt
+  (viewProfile : ReadPolicyOn
+    policy readFuel values view
       (fun id => Reaches view roots (.expression id)) directSites)
   {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
   (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
@@ -147,25 +157,32 @@ private theorem policy_read_eq {id : ExpressionId} (tree : GeneralSyntax source 
   exact compatible_read_eq edited.metadata (expression_lookup edited avoids reached)
 
 include callables readView in
-private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : ExpressionNode}
+theorem compiler_step_eq_of_hook (fuel : Nat) {id : ExpressionId} {node : ExpressionNode}
     (tree : GeneralSyntax source id directSites) (reached : Reaches source roots (.expression id))
     (found : source.lookupExpression? id = some node)
     (children : ∀ child, RuntimeChild node.form child →
       SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation source scope child reasonAt =
-        SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope child reasonAt) :
+        SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel compilation view scope child reasonAt)
+    (specialEq :
+      (match policy.lowerSpecial? with
+        | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+        | some lower => lower compilation
+            (fun budget childSource childScope childId childReasonAt =>
+              SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
+                compilation childSource childScope childId childReasonAt)
+            (fuel + 1) source scope id reasonAt) =
+      (match policy.lowerSpecial? with
+        | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+        | some lower => lower compilation
+            (fun budget childSource childScope childId childReasonAt =>
+              SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
+                compilation childSource childScope childId childReasonAt)
+            (fuel + 1) view scope id reasonAt)) :
     SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1) compilation source scope id reasonAt =
       SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1) compilation view scope id reasonAt := by
   have lookup := expression_lookup edited avoids reached
   have viewFound := lookup.symm.trans found
   have sameRead := policy_read_eq edited avoids sourceProfile viewProfile tree reached
-  have sourceBypass := sourceProfile.special id reached tree
-    (fun budget childSource childScope childId childReasonAt =>
-      SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
-        compilation childSource childScope childId childReasonAt) (fuel + 1)
-  have viewBypass := viewProfile.special id (reached.metadata edited.metadata) (syntax_view edited avoids tree reached)
-    (fun budget childSource childScope childId childReasonAt =>
-      SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
-        compilation childSource childScope childId childReasonAt) (fuel + 1)
   by_cases owner : id.occurrence.owner = source.owner
   · have viewOwner := owner.trans edited.metadata.owner
     conv => lhs; rw [SourceCoreFunctions.lowerExpressionWithPolicy]
@@ -174,8 +191,19 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
     have viewOwned : ¬id.occurrence.owner ≠ view.owner := fun different => different viewOwner
     simp only [if_neg sourceOwned, if_neg viewOwned,
       found, viewFound, bind, Except.bind, pure, Except.pure]
-    cases hook : policy.lowerSpecial? <;> simp only [hook] at sourceBypass viewBypass ⊢
-    all_goals try rw [sourceBypass, viewBypass]
+    cases hook : policy.lowerSpecial? <;> simp only [hook] at specialEq ⊢
+    all_goals try
+      rename_i lower
+      rw [specialEq]
+      cases action : lower compilation
+          (fun budget childSource childScope childId childReasonAt =>
+            SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
+              compilation childSource childScope childId childReasonAt)
+          (fuel + 1) view scope id reasonAt
+      all_goals try rfl
+      all_goals rename_i output
+      all_goals cases output
+      all_goals try rfl
     all_goals
       try dsimp only [bind, Except.bind, pure, Except.pure]
       cases reading : policy.readExpression source id with
@@ -394,6 +422,27 @@ private theorem compiler_step_eq (fuel : Nat) {id : ExpressionId} {node : Expres
         Except SourceCoreBasic.Error SourceCoreBasic.LoweredExpr)
     rw [edited.metadata.owner]
 
+end Compiler
+
+section Compiler
+variable {source view : TypedSource} {roots : List NodeId} {changed : List ExpressionId}
+  (edited : LocalView source view changed) (avoids : Avoids source roots changed)
+  {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+  {compilation : SourceCoreFunctions.Context} {readFuel : Nat}
+  {values : SourceCoreCompatibleValues.Context} {scope : SourceCoreLocalCell.Scope}
+  {reasonAt : ExpressionId → Word}
+  (sourceProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
+    policy compilation readFuel values source scope reasonAt
+      (fun id => Reaches source roots (.expression id)) directSites)
+  (viewProfile : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralPolicyOn
+    policy compilation readFuel values view scope reasonAt
+      (fun id => Reaches view roots (.expression id)) directSites)
+  {native : Option SourceCoreGeneralFunctions.CallableContext} {active : TypeSystem.Substitution}
+  (callables : policy.callables = SourceCoreGeneralFunctions.callablePolicy native active)
+  (readView : ∀ id, Reaches source roots (.expression id) →
+    policy.readExpression source id = policy.readExpression view id)
+include edited avoids sourceProfile viewProfile
+
 include callables readView in
 /-- The actual production compiler returns the same complete action on every
 reached node of the supported recursive grammar. Compiler fuel is identical;
@@ -408,9 +457,15 @@ theorem compiler_eq_on (fuel : Nat) {id : ExpressionId} (tree : GeneralSyntax so
   | zero => simp only [SourceCoreFunctions.lowerExpressionWithPolicy]
   | succ fuel ih =>
       obtain ⟨node, found⟩ := syntax_found tree
-      apply compiler_step_eq edited avoids sourceProfile viewProfile callables readView fuel tree reached found
-      intro child edge
-      exact ih (syntax_child tree found edge) (.expression reached found (runtime_child_references edge))
+      apply compiler_step_eq_of_hook edited avoids
+        ⟨sourceProfile.read, sourceProfile.lower, sourceProfile.leaf⟩
+        ⟨viewProfile.read, viewProfile.lower, viewProfile.leaf⟩
+        callables readView fuel tree reached found
+      · intro child edge
+        exact ih (syntax_child tree found edge) (.expression reached found (runtime_child_references edge))
+      · exact (sourceProfile.special id reached tree _ _).trans
+          (viewProfile.special id (reached.metadata edited.metadata)
+            (syntax_view edited avoids tree reached) _ _).symm
 
 include callables readView in
 /-- An accepted Code.view action transfers to the original Source through the

@@ -251,6 +251,7 @@ variable {caller : Header compiled (Program.ofChecked compiled.sourceProgram)}
   {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
   (head : OrdinaryWithPolicy caller context evidence scope id lowered) (environment : Dynamic.Environment)
   (callerGlobals : caller.globals = compiled.indexed.base.globals.length)
+  (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller context evidence)
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
   {bodyRegistry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -278,7 +279,7 @@ local notation "history" => CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFor
   capturedAt code plain owner initial packet
 local notation "carrier" => value code (CallableIndexedLambdaValues.Captures.embedding capturedAt) (History.native history) actual
 
-include callerGlobals head environment captured prefixContext actualSites sites packet profile observed in
+include callerGlobals callerReceipt head environment captured prefixContext actualSites sites packet profile observed in
 /-- The existing formation endpoint receives the derived same-Code policy qualification. -/
 theorem formation_member (stored : RuntimeStoreHasTypes world store compiled.indexed.layouts.definitions) :
     Dynamic.ExpressionEvaluates (Program.ofChecked compiled.sourceProgram)
@@ -292,7 +293,7 @@ theorem formation_member (stored : RuntimeStoreHasTypes world store compiled.ind
     (∀ result finalStore, Evaluates actual store ((code).lowered.expression.rename (capturedAt).embedding) result finalStore →
       result = .inRight .word carrier ∧ finalStore = store) := by
   exact CallableIndexedOwnedPreparedQualifiedFormationReceipts.Ordinary.formation_member
-    capturedAt code owner (policyFacet compiled) profile support callerGlobals (head.prepared_at environment).2
+    capturedAt code owner (policyFacet compiled) profile support callerGlobals callerReceipt (head.prepared_at environment).2
     actualSites sites (head.prepared_at environment).1 initial packet rfl observed stored
     head.toFormation.ordinary head.toFormation.coercions
 

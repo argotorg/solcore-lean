@@ -129,7 +129,9 @@ theorem of_terminal_parameters
     (by intro id _reached; rw [actualView])
     (CallableIndexedOwnedContextualLambdaReadDiagnostics.of_prepared terminal.prepared diagnostic terminal.aligned reason)
     declarations
-    syntaxTree facts.sourceType facts.ordinary facts.coercions⟩
+    syntaxTree facts.sourceType facts.ordinary facts.coercions
+    (CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt.of_header terminal.prepared terminal.aligned
+      (.refl _) (congrArg (fun function => function.evidence) terminal.aligned.function))⟩
 
 /-- The nullary entry point keeps its original API. -/
 theorem of_terminal

@@ -155,6 +155,8 @@ theorem of_terminal
     (CallableIndexedOwnedContextualLambdaProvenance.BodyView.of_empty rfl)
     (CallableIndexedOwnedContextualLambdaProvenance.BodyReasons.of_empty rfl)
     declarations
-    (.body (.nil (.inr rfl))) facts.sourceType facts.ordinary facts.coercions⟩
+    (.body (.nil (.inr rfl))) facts.sourceType facts.ordinary facts.coercions
+    (CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt.of_header terminal.prepared terminal.aligned
+      (.refl _) (congrArg (fun function => function.evidence) terminal.aligned.function))⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEmptyLambdaFormation

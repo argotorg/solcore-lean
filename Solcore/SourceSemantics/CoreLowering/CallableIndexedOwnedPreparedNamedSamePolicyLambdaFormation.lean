@@ -133,6 +133,8 @@ theorem of_expression
     (by intro id _reached; rw [actualView])
     (CallableIndexedOwnedContextualLambdaReadDiagnostics.of_prepared prepared diagnostic aligned reason)
     declarations
-    syntaxTree facts.sourceType facts.ordinary facts.coercions⟩
+    syntaxTree facts.sourceType facts.ordinary facts.coercions
+    (CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt.of_header prepared aligned fields
+      ((stages.evidence selected).trans (congrArg (fun function => function.evidence) aligned.function)))⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSamePolicyLambdaFormation

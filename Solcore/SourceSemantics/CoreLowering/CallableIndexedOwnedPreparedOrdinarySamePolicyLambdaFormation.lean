@@ -151,9 +151,11 @@ theorem of_expression
       exact childReached
     rw [reason]
     exact provenance.body_reasons childId (reached_body reached found form path)
+  obtain ⟨callerReceipt⟩ := provenance.body_caller_receipt
   exact ⟨CallableIndexedOwnedContextualLambdaFormationReceipts.ordinary_of_producer support.caller produced
     (CallableIndexedOwnedPreparedReturnLambdaBodySupport.Syntax expression)
     (CallableIndexedOwnedPreparedReturnLambdaBodySupport.Child expression loweredBody) body bodyView bodyReasons
-    (by simpa only [support.source] using declarations) syntaxTree facts.sourceType facts.ordinary facts.coercions⟩
+    (by simpa only [support.source] using declarations) syntaxTree facts.sourceType facts.ordinary facts.coercions
+    ((callerReceipt.extend fields).with_evidence (stages.evidence selected))⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinarySamePolicyLambdaFormation

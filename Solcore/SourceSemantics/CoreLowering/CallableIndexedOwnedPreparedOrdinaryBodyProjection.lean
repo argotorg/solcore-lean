@@ -107,7 +107,8 @@ theorem plain_source_origin {history : History code}
 
 /-- The actual Site, binder policy and body recipe supply provenance for this projection. -/
 theorem plain_provenance (prepared : PreparedAt code support)
-    (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length) :
+    (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length)
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt support.caller function.context function.evidence) :
     CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code
       (plain support actualSites sites) := by
   cases prepared with
@@ -116,7 +117,7 @@ theorem plain_provenance (prepared : PreparedAt code support)
     exact .recaptured caller site expressionSyntax certificates
       (bodyWith body actualSites sites) binderPolicy
       (CallableIndexedOwnedContextualLambdaBodyRecipes.Retained.of_recipe compilation body.recipe)
-      compilerPolicy bodyView bodyReasons declarations body.syntaxTree environment callerGlobals
+      compilerPolicy bodyView bodyReasons declarations body.syntaxTree environment callerGlobals callerReceipt
 
 section Flow
 variable
@@ -230,7 +231,8 @@ inductive Receipt
       (typed : RuntimeValueHasType world (value code captured.embedding history.native actual)
         (CallableContract.functionType code.receipt.parameterCore code.receipt.resultCore)
         compiled.indexed.layouts.definitions)
-      (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length) :
+      (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length)
+      (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt support.caller function.context function.evidence) :
       Receipt headers keys bodyRegistry faults mapping world function
         (value code captured.embedding history.native actual) code.receipt.loweredParameters
         code.receipt.parameterCore code.receipt.resultCore
@@ -245,10 +247,10 @@ def Receipt.forget
     CallableIndexedOwnedContextualTypedClosureReceipts.Association headers keys bodyRegistry faults
       mapping world function native bindings parameterCore resultCore := by
   cases receipt with
-  | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed callerGlobals =>
+  | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed callerGlobals callerReceipt =>
     exact .ordinary owner captured code history (plain support actualSites sites)
       (plain_source_origin support actualSites sites origin) prefixContext globals referenceIndex typed
-      (plain_provenance support actualSites sites prepared callerGlobals)
+      (plain_provenance support actualSites sites prepared callerGlobals callerReceipt)
 
 /-- Real map/world growth preserves the prepared packet, Code, tree and history. -/
 def Receipt.extend
@@ -256,9 +258,9 @@ def Receipt.extend
     (maps : LocationMap.Extends mapping futureMapping) (worlds : WorldExtends world futureWorld) :
     Receipt headers keys bodyRegistry faults futureMapping futureWorld function native bindings parameterCore resultCore := by
   cases receipt with
-  | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed callerGlobals =>
+  | ordinary owner captured code history support actualSites sites origin prepared prefixContext globals referenceIndex typed callerGlobals callerReceipt =>
     exact .ordinary owner (captured.extend maps worlds) code history support actualSites sites origin prepared
-      prefixContext globals referenceIndex (typed.weaken worlds) callerGlobals
+      prefixContext globals referenceIndex (typed.weaken worlds) callerGlobals callerReceipt
 
 /-- A positive prepared leaf may erase forward under Prop. The reverse
 direction is intentionally absent because the old leaf discarded this data. -/

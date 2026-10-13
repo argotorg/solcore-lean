@@ -101,10 +101,11 @@ def ordinary_of_produced_with_policy
       (CallableIndexedLambdaGeneration.closure caller.named parameters result statements context evidence []))
     (ordinary : Dynamic.OrdinaryRequirementLayout produced.produced.site.code.sourceNode.requirements
       produced.produced.site.code.sourceNode.coercions [])
-    (coercions : produced.produced.site.code.sourceNode.coercions = []) :
+    (coercions : produced.produced.site.code.sourceNode.coercions = [])
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt caller context evidence) :
     OrdinaryWithPolicy (registry := registry) (faults := faults) caller context evidence scope id lowered where
   toOrdinaryFormation := ordinary_of_producer caller produced.produced expressionSyntax certificates body bodyView bodyReasons declarations
-    syntaxTree sourceType ordinary coercions
+    syntaxTree sourceType ordinary coercions callerReceipt
   policyRecipe := produced.policyRecipe
 
 /-- The same producer attachment preserves the actual method dictionary.

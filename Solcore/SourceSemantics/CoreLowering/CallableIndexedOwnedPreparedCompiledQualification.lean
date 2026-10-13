@@ -85,6 +85,7 @@ No inverse on an arbitrary existing positive payload or heap is involved. -/
 def ordinary_association
     (support : CallableIndexedOwnedPreparedOrdinaryLambdaSupport.Support code)
     (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length)
+    (callerReceipt : CallableIndexedOwnedOrdinaryCallerReceipts.CallerAt support.caller function.context function.evidence)
     (collected : Ordinary headers code support)
     (actualSites : (CallableIndexedOwnedPreparedOrdinaryBodyProjection.actualTree support.body).CatalogSites
       .reachable bodyRegistry faults)
@@ -103,7 +104,7 @@ def ordinary_association
       (value code captured.embedding (CallableIndexedLambdaValues.History.native history) actual) code.receipt.loweredParameters
       code.receipt.parameterCore code.receipt.resultCore :=
   ⟨.ordinary (.ordinary owner captured code history support actualSites sites origin prepared
-    prefixContext globals referenceIndex typed callerGlobals), collected⟩
+    prefixContext globals referenceIndex typed callerGlobals callerReceipt), collected⟩
 
 /-- The corresponding actual Principal packet keeps its real dictionary and
 leading method bundle, at the same body and carrier. -/
