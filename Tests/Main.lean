@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreCanonicalScopedCompilerProfile
 import Solcore.Test.SourceCoreMethodOriginEvidenceCompilerProfile
 import Solcore.Test.SourceCoreOrdinarySyntaxTable
 import Solcore.Test.SourceCoreFinalCatalogLateRows
@@ -3189,6 +3190,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodOriginEvidence.Certified.runForward
   SourceCoreCertifiedLexicalFailure.run
   SourceCoreMethodOriginEvidence.CompilerProfile.runForward
+  SourceCoreCanonicalScoped.CompilerProfile.runForward
   SourceCoreCoercionPublic.runForward
   SourceCoreAcceptedBodyBindings.run
   SourceCoreFinalCatalogLateRows.runLateRows
