@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualTypedClosureReceipts
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport
 
 /-! Canonical terminal closure roots retain the same compiler, original Source
 and parameter context. Actual captured global values are supplied later by the
@@ -47,6 +48,29 @@ def SelectedBody.rootAt {compiled : SourceCoreUnifiedCompilation.Compiled}
       packet.expression packet.receipt.child semanticFaults :=
   CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofRoot (support.roots child selected)
 
+/-- Terminal and scoped flow packets both refer to the identical retained Code. -/
+inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (stages : Staging.Recursive.Registry) where
+  | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
+  | branching (packet : CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.Branching code stages)
+
+def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (code : Code compiled.indexed function scope administrative)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context
+      (values := .initial compiled.compatible.checked) (prepared := compiled.indexed) code)
+    (stages : Staging.Recursive.Registry) (packet : Packet code stages)
+    (semanticFaults : FunctionCalls.FaultRep) : Type :=
+  match packet with
+  | .terminal terminal => SelectedBody (headers := headers) code inputs stages terminal semanticFaults
+  | .branching branching => CallableIndexedOwnedPreparedStagedPhysicalBranchingClosureStaticSupport.SelectedBody
+      headers code inputs stages branching semanticFaults
+
 def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
     {keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -58,8 +82,8 @@ def PacketFor {compiled : SourceCoreUnifiedCompilation.Compiled}
       headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) (stages : Staging.Recursive.Registry) : Type :=
   match association with
-  | .ordinary _ _ code _ _ _ _ _ _ _ _ => CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages
-  | .principal _ _ code _ _ _ _ _ _ _ _ => CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages
+  | .ordinary _ _ code _ _ _ _ _ _ _ _ => Packet code stages
+  | .principal _ _ code _ _ _ _ _ _ _ _ => Packet code stages
 
 def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -74,8 +98,8 @@ def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
     (packet : PacketFor association stages) : Type :=
   match association with
   | .ordinary _ _ code _ support _ _ _ _ _ _ =>
-      SelectedBody (headers := headers) code support.body.toContext stages packet semanticFaults
+      Support (headers := headers) code support.body.toContext stages packet semanticFaults
   | .principal _ _ code _ support _ _ _ _ _ _ =>
-      SelectedBody (headers := headers) code support.body.toContext stages packet semanticFaults
+      Support (headers := headers) code support.body.toContext stages packet semanticFaults
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport

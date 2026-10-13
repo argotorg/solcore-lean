@@ -138,12 +138,14 @@ theorem closure_support {fixture : CompiledFixture} (observed : ObservedProgram 
     have found := code.sourceFound
     rw [support.source] at found
     rcases sources.selected support.caller.selected (lookupExpression?_sound found) code.sourceForm with original | original
-    · exact factory_packet observed observed.makeWordShape observed.makeWordNodes
+    · obtain ⟨⟨packet, supported⟩⟩ := factory_packet observed observed.makeWordShape observed.makeWordNodes
         (by rw [fixture.sameProgram, fixture.signatures]; exact .head _)
         rows stagePrepared receiver methods code support provenance (support.source.trans original)
-    · exact factory_packet observed observed.makeBoolShape observed.makeBoolNodes
+      exact ⟨⟨.terminal packet, supported⟩⟩
+    · obtain ⟨⟨packet, supported⟩⟩ := factory_packet observed observed.makeBoolShape observed.makeBoolNodes
         (by rw [fixture.sameProgram, fixture.signatures]; exact .head _)
         rows stagePrepared receiver methods code support provenance (support.source.trans original)
+      exact ⟨⟨.terminal packet, supported⟩⟩
   | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
     obtain ⟨shape⟩ := bodies.selected support.principal
     have found := code.sourceFound
