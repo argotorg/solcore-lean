@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Nested closure formation through retained public handles (2026-10-13)
+
+Commits `0de590b2` and `df6f8314` connect inner closure generation to the same Source/public proof family used for later handle invocation. No supplied body execution law or initialized heap relation replaces the compiler receipts. Original Source typing, precise reached metadata, retained policy fields and actual global-slot provenance construct the static support.
+
+The closed regression covers all seven linked calls and four distinct function handles. It proves exact successive Source heaps, histories that retain every previous handle, and sufficient execution/output fuel at each original start. Both factory exports and both inner-formation exports append their actual handles to the reusable history.
+
+Validation: all 1,448 affected modules pass coherent checks. The full build (6,695 jobs), all registered tests (13,260 build jobs and the final pass marker), kernel policy and 59 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary closure formation in retained scoped bodies. The inner closure retains its own local capture and may call a named function. Formation under further expression forms, evidence-aware scoped callers, method and coercion paths, remaining control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing generic calls through public execution (2026-10-13)
 
 Commits `8439d72a` and `d5614a9b` connect full direct-call evidence through actual compilation and four successive public executions. Requirement-bearing Source traces preserve their original lists. The actual selected target, complete specialization metadata and physical slot determine the callee; the prepared caller identifies its inherited dictionary. Ledger uniqueness identifies independently produced Source evidence with the actual callee dictionary.

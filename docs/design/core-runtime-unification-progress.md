@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Nested closure formation through retained public handles (2026-10-13)
+
+`0de590b2` connects ordinary closure formation inside a retained closure body. The actual retained compiler policy supplies type projection and cell allocation; original Source metadata and the reached lexical context produce the inner closure receipt. Authentic global-slot provenance and the existing nested runtime packet preserve the captured frame through local allocation.
+
+`df6f8314` connects seven public calls: two factory calls, two invocations that produce inner closures, and three inner invocations returning `10 / 20 / 10`. The four exported handles are distinct. Every call retains the exact predecessor session and Source heap, and all seven original checkpoints have sufficient execution/output fuel. All four function-producing calls return reusable histories.
+
+Validation: all 1,448 affected modules pass coherent checks. The full build (6,695 jobs), all registered tests (13,260 build jobs and the final pass marker), kernel policy and 59 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary closure formation in retained scoped bodies. The inner closure retains its own local capture and may call a named function. Formation under further expression forms, evidence-aware scoped callers, method and coercion paths, remaining control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing generic calls through public execution (2026-10-13)
 
 `8439d72a` connects requirement-bearing direct calls to the common recursive caller proof. Actual compiler selection and the prepared caller identify the complete callee evidence. Independent Source evidence production is proved equal to that dictionary through the actual requirement ledger. Ordinary calls retain their existing APIs and use the same semantic head.

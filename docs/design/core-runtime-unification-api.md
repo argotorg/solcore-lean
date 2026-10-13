@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Nested closure formation through retained public handles (2026-10-13)
+
+`PolicyRecipe` retains the actual type projector and source-cell allocator. `OrdinarySamePolicyLambdaProducer.of_expression` constructs the inner producer from the retained Code and its real reached child. `OrdinarySamePolicyLambdaFormation.of_expression` derives the Source frame and body-view receipts at that lexical context. `ReturnLambdaBodySupport.of_return_view` retains the individual original and prepared-view lookup facts required by the generated body.
+
+`OrdinaryMixedScopedSupport.of_actual` issues canonical or formation certificates from the genuine collector. `MixedBodyStaticSupport.NestedBranchingSupport` and `SupportFor` retain the actual ordinary association. The nested body/application bounds use authentic parameter entry and captured-frame packets in both semantic directions. `OrdinaryAt.globals` is retained from actual formation.
+
+Validation: all 1,448 affected modules pass coherent checks. The full build (6,695 jobs), all registered tests (13,260 build jobs and the final pass marker), kernel policy and 59 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary closure formation in retained scoped bodies. The inner closure retains its own local capture and may call a named function. Formation under further expression forms, evidence-aware scoped callers, method and coercion paths, remaining control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing generic calls through public execution (2026-10-13)
 
 `DirectCallCertificates.Supported` retains the closed replacement range and original Source ordering. `Receipt` records actual target selection and accepts genuine evidence-lowering receipts. `DirectCallAuthority.EvidenceAt` records independent production and identification of the complete dictionary; `PortWithEvidence` carries this fact into the shared numeric proof.

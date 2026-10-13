@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Nested closure formation through retained public handles (2026-10-13)
+
+A retained ordinary closure can now allocate a local value through a named call and return another closure that captures that value. The same original compiler policy and reached Source scope determine the inner formation. The shared body proof retains the actual enclosing frame and global slots while evaluating the body and restoring its caller.
+
+The public regression creates two separate outer closures and two separate inner closures. The inner handles return `10 / 20 / 10` across seven linked calls. All Source heaps, exported handles and reusable histories follow the actual returned sessions; each checkpoint has an independent sufficient-fuel theorem.
+
+Validation: all 1,448 affected modules pass coherent checks. The full build (6,695 jobs), all registered tests (13,260 build jobs and the final pass marker), kernel policy and 59 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers ordinary closure formation in retained scoped bodies. The inner closure retains its own local capture and may call a named function. Formation under further expression forms, evidence-aware scoped callers, method and coercion paths, remaining control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing generic calls through public execution (2026-10-13)
 
 Direct declaration calls now retain their actual requirement lists through independent Source evaluation and the shared preservation/reflection proof. The compiler action selects the concrete function, while the prepared caller and requirement ledger establish the complete evidence passed to it. No caller-supplied dictionary equality or called-body execution law is added.
@@ -288,11 +298,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `8439d72a` / `d5614a9b`: actual declaration evidence through nested generic calls and four linked public sessions. |
-| Latest completed verification | Full build (6668 jobs), all registered tests, kernel policy and 117 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `0de590b2` / `df6f8314`: nested ordinary closure formation and four retained handles across seven public calls. |
+| Latest completed verification | Full build (6695 jobs), all registered tests, kernel policy and 59 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Root implementation evidence and inherited generic caller evidence retain full Source meaning; all four calls have execution/output fuel bounds. |
-| Current implementation priority | Remaining formation and compiler alternatives, followed by all-pass composition. |
+| Latest proof scope | Inner closure creation retains the original compiler policy and actual captured frame; all seven calls have Source meaning and execution/output fuel bounds. |
+| Current implementation priority | Evidence-aware scoped callers, then remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
