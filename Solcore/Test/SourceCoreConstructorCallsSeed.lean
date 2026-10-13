@@ -1,6 +1,7 @@
 import Solcore.Test.SourceCoreConstructorCallsCommon
 import Solcore.Test.SourceCoreConstructorCallsSelection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicReturnedInputRegistry
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitial
 
 /-! Actual initialization and the first public make(10) execution establish
 the first Source closure and history entry, including its captured parameter. -/
@@ -11,9 +12,40 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 open RecursiveNamedPublicFunctionHistory (Entry)
 
+def ObservedPublicRun.as_function_call {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (first : ObservedPublicRun fixture observed.makeRow) :
+    RecursiveNamedPublicPhysicalSessionState.FunctionCall first.session observed.makeRow.row.key [.word seed] runOptions :=
+  ⟨⟨⟨first.checkpoint, first.started⟩, first.completion, first.executed⟩, first.handle, first.returned⟩
+
+theorem ObservedPublicRun.initial_start {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    {receiver : ObservedReceiver fixture observed} (support : PublicSupports receiver)
+    (first : ObservedPublicRun fixture observed.makeRow) :
+    Nonempty (RecursiveNamedPublicPhysicalSessionInitial.Started support.rows fixture.recipePrepared
+      support.makeHeader.header first.as_function_call.toCall.toStartedCall) := by
+  obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
+      opened, prepared, sessionAt, checkpointAt, started⟩ :=
+    fixture.actual_start first.opened first.started
+  obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
+  have selectedEq : selectedHeader = support.makeHeader.header := by
+    apply selected_make_root (fixture := fixture) (observed := observed)
+      support.makeHeader support.readHeader (root := root) (header := selectedHeader)
+    · exact support.header_list ▸ selected
+    · exact of_decide_eq_true (List.find?_some (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled =>
+        decide (candidate.key = observed.makeRow.row.key)) started.selected)
+  subst selectedHeader
+  exact ⟨{
+    publicCompiled := fixture.facadeCompiled
+    artifact := artifact, nativeSession := session, checkpoint := checkpoint, root := root
+    world := world, store := store, native := native, encodedValues := encodedValues
+    opened := opened, atSession := sessionAt, atCheckpoint := checkpointAt
+    started := started, selected := selected, bootstrap := first.bootstrap
+    bootstrapFuel := 100000, fresh := first.fresh, authority := first.authority
+    ready := .single first.ready }⟩
+
 theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
-    (extra : ObservedMake fixture observed) (support : PublicSupports receiver)
+    (extra : ObservedMake fixture observed)
+    (support : PublicSupports receiver)
     (makeStages : ObservedStages fixture observed.makeRow)
     (first : ObservedPublicRun fixture observed.makeRow) :
     ∃ entry : Entry,
@@ -23,93 +55,46 @@ theorem first_meaning_typed_handle {fixture : CompiledFixture} {observed : Obser
         SourceCall support support.makeHeader.header
           (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
           ⟨[]⟩ [.word seed] (.value entry.source) state.heap := by
-  obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
-      opened, prepared, sessionAt, checkpointAt, started⟩ :=
-    fixture.actual_start first.opened first.started
-  have ready : first.bootstrap.ReadyAt 100000 first.session := .single first.ready
-  obtain ⟨_bootstrap, initialized, _value, _initialStore, _atBootstrap, initial,
-      initializedAt, _done, booted⟩ := ready.indexed opened first.fresh
-  have same : initialized = session := initializedAt.unique sessionAt
-  subst initialized
-  have startupRegistry : encodedValues.registry = fixture.recipe.compiled.compatible.checked.staticRegistry := by
-    apply started.simple_registry (booted.registry_at initial)
-    intro value member
-    have same : value = .word seed := List.mem_singleton.mp member
-    exact same ▸ SourceCoreIndexedSession.SimplePublic.word seed
-  obtain ⟨selectedHeader, selected⟩ := started.selection prepared support.complete
-  have selectedEq : selectedHeader = support.makeHeader.header := by
-    apply selected_make_root (fixture := fixture) (observed := observed)
-      support.makeHeader support.readHeader (root := root) (header := selectedHeader)
-    · exact support.header_list ▸ selected
-    · exact of_decide_eq_true (List.find?_some (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled =>
-        decide (candidate.key = observed.makeRow.row.key)) started.selected)
-  subst selectedHeader
-  have inputs : RecursiveNamedPublicNestedInputs.Inputs support.rows session support.makeHeader.header.function.context
-      (support.makeHeader.header.bindings.map (fun binding => binding.1.scheme.body)) [.word seed] [.word seed] := by
-    rw [support.makeHeader.make_input_types extra]
-    exact .cons (.leaf (.data ⟨.word seed, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word seed⟩ ⟨.word seed, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word seed⟩)) .nil
-  have metadata : SourceCoreRawMetadata.Extends encodedValues.registry receiver.completion.result.context.registry := by
-    rw [startupRegistry]
-    exact receiver.completion.result.extension
-  have sourceAt : CallableIndexedOwnedFunctionValues.NamedSourceAt support.makeHeader.header support.makeInput.prepared.available
-      (CallableNamedReversal.global (CallableNamedMetadata.global support.makePacket.header.named.specialized support.makeInput.prepared.available)) := by
-    rw [support.makeEq]
-    exact support.makePacket.sourceAt
-  obtain ⟨caller, returnedCompletion, generation, value, finalStore, capture, sourceSize, outcome, after,
-      finalMap, finalWorld, succeeded, valueEq, _typeEq, _budgetEq, returnedAt, trace, _fullResult,
-      returnedCaller, source, payload, sourceValue, _nativeValue, _related, retained⟩ :=
-    CallableIndexedOwnedPreparedStagedInitializedHistoryPublicSeed.public_run_succeeded_remembers
-      (inputs := [support.makeInput, support.readInput]) (rows := support.rows) (distinct := support.distinct)
-      (stagePrepared := actualStagePrepared fixture)
-      (completion := receiver.completion)
-      (receiver := receiver.issued)
-      (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
-      (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)
-      (observations := support.observations) (extension := receiver.completion.result.extension)
-      (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := fun header member =>
-        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
-      (wellFormed := fixture.source_wellFormed) (prepared := prepared) (selected := selected)
-      (opened := opened) (fresh := first.fresh) (ready := .single first.ready)
-      (sameRuntime := SourceCoreExecution.Session.SameRuntime.refl first.session) (atSession := sessionAt)
-      (atCheckpoint := checkpointAt) (started := started) (inputReceipts := inputs)
-      (metadata := metadata) (sourceAt := sourceAt)
-      (invocation := RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
-      first.started first.executed first.returned support.makeDescriptor
-  let entry : Entry := ⟨support.makeHeader.header.function.resultType, source, first.handle,
-    payload, support.makeHeader.header.output, runOptions.outputValidationFuel⟩
-  have returnedRegistry := started.returned_registry succeeded
-  rw [startupRegistry] at returnedRegistry
-  let state : RetainedState support first.completion.session [entry] := {
-    artifact := artifact
-    session := returnedCompletion.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := returnedCaller
-    atSession := returnedAt
-    atRecipe := started.recipe_eq
-    receiving := receiver.completion
-    issued := receiver.issued
-    extension := .refl _
-    registry := receiver.registry.symm ▸ returnedRegistry
-    history := retained }
-  have atRecipe : artifact.RecipeAt fixture.recipe := by
-    cases artifact
-    exact started.recipe_eq
-  have requested := started.original.result_type_at atRecipe started.selected
-  have resultType := (RecursiveNamedPublicRootSourceSignature.inputs_and_result selected).2
+  obtain ⟨start⟩ := first.initial_start support
+  have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
+      support.makeHeader.header.function.context [.word seed] support.makeHeader.header.types := by
+    have bindingTypes : support.makeHeader.header.types =
+        support.makeHeader.header.bindings.map (fun binding => binding.1.scheme.body) := by
+      have bodyTypes := Dynamic.MonoBindersExtend.bodyTypes_eq support.makeHeader.header.extended
+      rw [support.makeHeader.header.parameters] at bodyTypes
+      simpa only [List.map_map, Function.comp_def] using bodyTypes.symm
+    rw [bindingTypes, support.makeHeader.make_input_types extra]
+    exact .cons ⟨.word seed, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word seed⟩ .nil
+  have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.word seed] [.word seed] :=
+    .cons ⟨.word seed, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word seed⟩ .nil
+  obtain ⟨entry, type, handle, state, trace⟩ :=
+    RecursiveNamedPublicPhysicalSessionInitial.first_function support.rows fixture.recipePrepared
+      support.makeHeader.header support.makeHeader.header support.program support.distinct first.as_function_call start
+      (by intro value member; cases List.mem_singleton.mp member; exact .word seed)
+      inputTypes inputMeanings support.makeDescriptor
+      (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
+  obtain ⟨checkpoint, started, resumed⟩ := first.executed
+  have same : checkpoint = first.checkpoint := Except.ok.inj (started.symm.trans first.started)
+  subst checkpoint
+  obtain ⟨actual, _generation, _value, _store, _done, exported, valueEq, _typeEq, _budgetEq, _atSession⟩ :=
+    resumed.indexed_succeeded start.atCheckpoint
+  have atRecipe : start.artifact.RecipeAt fixture.recipe := by
+    have convert : ∀ (artifact : SourceCoreIndexedSession.Artifact),
+        RecursiveNamedPublicStartMeaning.ArtifactRecipe artifact fixture.recipe → artifact.RecipeAt fixture.recipe :=
+      fun artifact atRecipe => by cases artifact; exact atRecipe
+    exact convert _ start.started.recipe_eq
+  have requested := start.started.original.result_type_at atRecipe start.started.selected
+  have resultType := (RecursiveNamedPublicRootSourceSignature.inputs_and_result start.selected).2
   rw [resultType, support.makeHeader.make_result_type] at requested
-  have handleType := succeeded.function_source_type requested (valueEq.symm.trans first.returned)
-  refine ⟨entry, support.makeHeader.make_result_type, rfl, handleType, state, ?_⟩
-  exact ⟨support.makeInput.prepared.available, _, sourceSize, sourceAt, sourceValue ▸ trace⟩
+  have handleType := exported.function_source_type requested (valueEq.symm.trans first.returned)
+  exact ⟨entry, type.trans support.makeHeader.make_result_type, handle, handleType, state, trace⟩
 
 /-- The original factory theorem remains available when the public handle's
 raw type is not needed by the caller. -/
 theorem first_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
-    (extra : ObservedMake fixture observed) (support : PublicSupports receiver)
+    (extra : ObservedMake fixture observed)
+    (support : PublicSupports receiver)
     (makeStages : ObservedStages fixture observed.makeRow)
     (first : ObservedPublicRun fixture observed.makeRow) :
     ∃ entry : Entry,

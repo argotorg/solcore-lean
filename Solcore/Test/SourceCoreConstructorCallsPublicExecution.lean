@@ -70,12 +70,12 @@ structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgra
 
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (readStages : ObservedStages fixture observed.readRow)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     Nonempty (SequenceWitness makeStages sequence receiver) := by
-  obtain ⟨support⟩ := static_supports (completion := receiver.completion)
-    fixture observed extra makeStages readStages receiver.completion.result.context.registry receiver.issued
+  obtain ⟨support⟩ := static_supports fixture observed admission makeStages readStages receiver
   let scope := RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function
   obtain ⟨first, firstType, firstHandle, _firstHandleType, initial, firstTrace⟩ :=
     first_meaning_typed_handle extra support makeStages sequence.first
@@ -163,21 +163,24 @@ theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram
 
 theorem closed_sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (readStages : ObservedStages fixture observed.readRow)
     (sequence : ObservedSequence fixture observed) :
     ∃ receiver : ObservedReceiver fixture observed, Nonempty (SequenceWitness makeStages sequence receiver) := by
   obtain ⟨receiver⟩ := initial_receiver fixture observed
-  exact ⟨receiver, sequence_meaning fixture observed extra makeStages readStages sequence receiver⟩
+  exact ⟨receiver, sequence_meaning fixture observed extra admission makeStages readStages sequence receiver⟩
 
 def run : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
   let extra ← observeMake fixture observed
+  let admission ← observeProgramCertificate fixture observed
   let makeStages ← observeStages fixture observed.makeRow
   let readStages ← observeStages fixture observed.readRow
   let sequence ← observeSequence fixture observed
-  have _meaning := closed_sequence_meaning fixture observed extra makeStages readStages sequence
+  have _automatic := admission.automatic_catalog_initial
+  have _meaning := closed_sequence_meaning fixture observed extra admission makeStages readStages sequence
   IO.println "Constructor with indirect child: new capture20, retained factory30, old capture10, builtin37; exact Source traces, ordered collected payloads and returned histories proved"
 
 end Tests.SourceCoreConstructorCalls

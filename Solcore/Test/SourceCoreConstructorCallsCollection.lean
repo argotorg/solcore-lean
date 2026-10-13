@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreConstructorCallsIssuance
 import Solcore.Test.SourceCoreConstructorCallsSelectionMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryOutputCollection
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectOutputCollection
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -64,43 +64,14 @@ theorem collect {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     factoryHandle priorHandle convertHandle
   have returned : call.completion.value = outputValue observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput := by
     simpa only [observed.readShape.instantiationEq, outputValue, outputMetadata] using call.returned
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
-  have semantic : ∀ reason token,
-      CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults state.receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token represented
-    exact CompatibleRegistryDiagnosticExtension.semantic_preserved fixture.recipe.compiled
-      receiver.issued state.issued present state.extension represented
-  obtain ⟨receiving, checkpoint, actual, generation, value, finalStore, actualParameter, actualResult,
-    nativeParameter, nativeResult, callable, packed, encodedValues, sources, sourceSize, source, payload, after,
-    finalMap, finalWorld, reached, added, contextAt, issued, extended, _diagnostics, started, _parameterView, _resultView,
-    succeeded, actualAt, packing, trace, _resultAt, _nativeValue, selected, _handles, _related, retained, returnedRegistry⟩ :=
-    RecursiveNamedPublicActualRegistryOutputCollection.public_invoke_succeeded_collects
-      (completion := state.receiving) state.issued (actualStagePrepared fixture) observed.profile
-      support.observations semantic support.family
-      (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member))
-      support.supports fixture.source_wellFormed state.history pack packMember packType input state.atRecipe
-      state.registry state.atSession (by simpa only [packHandle] using call.executed)
-      (returned.symm ▸ outputSelection observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput) invocation
-  have originalSelected : RecursiveNamedPublicNestedOutputSelections.Selected fixture.recipe.compiled.compatible.checked actual.session
-      (outputSelection observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput)
-      source payload nativeResult runOptions.outputValidationFuel added := selected_uncast returned.symm selected
-  obtain ⟨collected⟩ := selected_entries observed originalSelected
-  let next : RetainedState support call.completion.session (entries ++ added) := {
-    artifact := state.artifact
-    session := actual.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := reached
-    atSession := actualAt.2.2.2
-    atRecipe := state.atRecipe
-    receiving := receiving
-    issued := issued
-    extension := state.extension.trans extended
-    registry := by rw [contextAt]; exact returnedRegistry
-    history := retained }
+  obtain ⟨sources, packing, _arity, source, added, next, sourceSize, trace, _handles, selected⟩ :=
+    RecursiveNamedPublicPhysicalSessionDirectOutputCollection.State.collect support.program
+      fixture.recipePrepared state pack packMember packType input
+      (by simpa only [packHandle] using call.executed)
+      (returned.symm ▸ outputSelection observed call.newOutput call.priorOutput call.factoryOutput call.builtinOutput)
+      invocation
+  obtain ⟨_artifact, _actual, _native, _type, _atCompletion, selected⟩ := selected
+  obtain ⟨collected⟩ := selected_entries observed (selected_uncast returned.symm selected)
   exact ⟨source, added, collected, next, sources, sourceSize, packing, trace⟩
 
 end Tests.SourceCoreConstructorCalls

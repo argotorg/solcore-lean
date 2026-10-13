@@ -135,9 +135,9 @@ theorem selected_read_at
 end StartedSelection
 
 theorem StaticSupportPackage.header_list {fixture : CompiledFixture}
-    {observed : ObservedProgram fixture} {registry : SourceCoreRawMetadata.Registry}
+    {observed : ObservedProgram fixture}
     {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed}
-    (support : StaticSupportPackage fixture observed registry completion) :
+    (support : StaticSupportPackage fixture observed completion) :
     CallableIndexedOwnedPreparedFiniteNamedInventories.headers support.rows =
       [support.makeHeader.header, support.readHeader.header] := by
   rw [support.rowsEq]
