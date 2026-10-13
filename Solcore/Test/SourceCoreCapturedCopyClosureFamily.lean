@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodySupportCompatibility
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.Test.SourceCoreCapturedCopyMetadata
 import Solcore.Test.SourceCoreCapturedCopySyntax
@@ -37,6 +38,7 @@ def ActualHeader.closure_family {fixture : CompiledFixture} {observed : Observed
   cases association with
   | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>
     apply CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds.OrdinarySequenceFor.compiled
+    apply CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.SupportFor.of_generic_packets
     have sameSource := support.source.trans (stages.source_of_cached actual support.caller.selected)
     have found := code.sourceFound
     rw [sameSource] at found

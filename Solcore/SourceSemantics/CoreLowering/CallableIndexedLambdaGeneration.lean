@@ -100,7 +100,7 @@ theorem contextual_certificate_with_policy_recipe {checked : SourceCoreCompatibl
       simpa [SourceCoreGeneralFunctions.contextualSource, found, form, bind, Except.bind, pure, Except.pure] using read
   · change SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext [] = _
     rw [prepared.ancestry.graph.inputs.callableSelected]
-  · exact ⟨rfl, rfl, rfl, rfl⟩
+  · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- The original interface forgets only the additional literal policy fields. -/
 theorem contextual_certificate_with_body_recipe {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)

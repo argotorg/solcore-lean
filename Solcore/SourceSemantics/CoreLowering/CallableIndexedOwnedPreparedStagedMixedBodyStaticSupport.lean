@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedCanonicalBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites
@@ -160,6 +161,7 @@ inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}
     {administrative : Core.Context}
     (code : Code compiled.indexed function scope administrative)
     (stages : Staging.Recursive.Registry) where
+  | nestedBranching (packet : Branching code stages)
   | canonicalBranching (packet : Branching code stages)
   | canonicalTerminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
   | terminal (packet : CallableIndexedOwnedPreparedStagedTerminalClosureParentBounds.Terminal code stages)
@@ -334,6 +336,47 @@ theorem CanonicalBranchingSupport.sites {compiled function scope administrative 
     (support.tree child selected).CatalogSites .reachable registry faults :=
   (support.collected child selected).sites registry faults
 
+/-- Ordinary bodies can mix canonical calls and genuine nested formation.
+The certificate is tied to this actual ordinary support's caller and registry,
+so the application route needs no caller equality or new runtime body law. -/
+structure NestedBranchingSupport {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+    {administrative : Core.Context}
+    (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)))
+    (keys : List (CallableIndexedOwnedFunctionValues.Key compiled (Program.ofChecked compiled.sourceProgram)))
+    {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+    {code : Code compiled.indexed function scope administrative}
+    (ordinary : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry semanticFaults)
+    (stages : Staging.Recursive.Registry) (packet : Branching code stages) : Type where
+  globals : ordinary.caller.globals = compiled.indexed.base.globals.length
+  complete : RecursiveNamedCatalogNativeContexts.Complete
+    (values := .initial compiled.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) headers
+  zero : ∀ owner : CallableIndexedOwnedFunctionValues.OwnedKey keys, owner.key.capturePrefix = 0
+  wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)
+  collected : ∀ child, stages.Closure function child →
+    CallableIndexedOwnedPreparedBranchingCatalogSites.Collected compiled.indexed.layouts packet.allocationOwner packet.active
+      compiled.indexed.ancestry.layout.frame compiled.indexed.base.globals.length packet.onError
+      (.initial compiled.compatible.checked) child.source (fun _ => True)
+      (CallableIndexedOwnedPreparedStagedLexicalTree.TypedCertificate child.source
+        (fun context => CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport.Certificate
+          headers ordinary.caller bodyRegistry semanticFaults context child))
+      compiled.indexed.layouts.definitions administrative
+      ordinary.body.context (parameterScope code) (.statements true function.body)
+      function.resultType code.receipt.resultCore packet.flow
+
+abbrev NestedBranchingSupport.tree {compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet}
+    (support : @NestedBranchingSupport compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :=
+  (support.collected child selected).tree
+
+theorem NestedBranchingSupport.sites {compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet}
+    (support : @NestedBranchingSupport compiled function scope administrative headers keys bodyRegistry semanticFaults code ordinary stages packet)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+    (registry : SourceCoreRawMetadata.Registry) (faults : FunctionCalls.FaultRep) :
+    (support.tree child selected).CatalogSites .reachable registry faults :=
+  (support.collected child selected).sites registry faults
+
 /-- The chosen static support is indexed by the authentic packet and input
 context. The sequence branch contains no whole-body result equality. -/
 def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -346,6 +389,7 @@ def Support {compiled : SourceCoreUnifiedCompilation.Compiled}
     (stages : Staging.Recursive.Registry) (packet : Packet code stages)
     (semanticFaults : FunctionCalls.FaultRep) : Type :=
   match packet with
+  | .nestedBranching _ => PEmpty
   | .canonicalBranching branching => CanonicalBranchingSupport headers code inputs stages branching semanticFaults
   | .canonicalTerminal terminal =>
       CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport.SelectedCanonicalBody
@@ -385,10 +429,12 @@ def SupportFor {compiled : SourceCoreUnifiedCompilation.Compiled}
       headers keys bodyRegistry semanticFaults mapping world function native
       bindings parameterCore resultCore) (stages : Staging.Recursive.Registry)
     (packet : PacketFor association stages) : Type :=
-  match association, packet with
-  | .ordinary _ _ code _ support _ _ _ _ _ _, packet =>
-      Support headers code support.body.toContext stages packet semanticFaults
-  | .principal _ _ code _ support _ _ _ _ _ _, packet =>
+  match association with
+  | .ordinary _ _ code _ support _ _ _ _ _ _ =>
+      match packet with
+      | .nestedBranching branching => NestedBranchingSupport headers keys support stages branching
+      | packet => Support headers code support.body.toContext stages packet semanticFaults
+  | .principal _ _ code _ support _ _ _ _ _ _ =>
       Support headers code support.body.toContext stages packet semanticFaults
 
 section NumericProjections

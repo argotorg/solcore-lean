@@ -30,6 +30,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 namespace Ordinary
 variable {canonical : Environment}
   (support : CallableIndexedOwnedPreparedOrdinaryLambdaSupport.Support code)
+  (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length)
   (actualSites : (CallableIndexedOwnedPreparedOrdinaryBodyProjection.actualTree support.body).CatalogSites
     .reachable bodyRegistry faults)
   (sites : support.body.tree.CatalogSites .reachable bodyRegistry faults)
@@ -47,7 +48,7 @@ local notation "history" => CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFor
   captured code plain owner initial packet
 local notation "carrier" => value code captured.embedding (CallableIndexedLambdaValues.History.native history) actual
 
-include actualSites sites packet prepared profile prefixContext observed in
+include callerGlobals actualSites sites packet prepared profile prefixContext observed in
 /-- The ordinary factory's actual trace and runtime typing justify the one new
 leaf. Preparation comes directly from the retained support at that same Code. -/
 theorem formation_member
@@ -74,7 +75,7 @@ theorem formation_member
   exact ⟨sourceTrace, nativeTrace,
     StaticMember.ordinary (.ordinary owner captured code history support actualSites sites ⟨rfl⟩ prepared
       prefixContext observed
-      (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.reference_index captured code plain) typed),
+      (CallableIndexedOwnedAdmittedGeneralOrdinaryLambdaFormation.reference_index captured code plain) typed callerGlobals),
     determined⟩
 
 variable
@@ -88,7 +89,7 @@ variable
   (admitted : Admission (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
     function.context ⟨initial, packet⟩)
 
-include actualSites sites cells wellFormed runtime covers locals typed sourceType admitted prepared packet profile prefixContext observed in
+include callerGlobals actualSites sites cells wellFormed runtime covers locals typed sourceType admitted prepared packet profile prefixContext observed in
 /-- Strong cells and the newly prepared value accompany the original formation
 at its unchanged actual packet. Only the real trace establishes Source admission. -/
 theorem formation_post
@@ -106,7 +107,7 @@ theorem formation_post
     (∀ result finalStore, Evaluates actual store (code.lowered.expression.rename captured.embedding) result finalStore →
       result = .inRight .word carrier ∧ finalStore = store) := by
   obtain ⟨sourceTrace, nativeTrace, member, determined⟩ := formation_member
-    captured code owner profile support actualSites sites prepared initial packet prefixContext observed
+    captured code owner profile support callerGlobals actualSites sites prepared initial packet prefixContext observed
     cells.runtime_hasTypes ordinary coercions
   have represented : GenericExpressionMeaning.ResultRepresents
       (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry

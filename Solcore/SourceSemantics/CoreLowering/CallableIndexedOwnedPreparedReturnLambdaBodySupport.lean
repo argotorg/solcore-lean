@@ -60,20 +60,22 @@ private theorem return_tree
 
 /-- The original callback and one accepted terminal child construct both trees
 at the actual Source and parameter context. No child execution law is assumed. -/
-theorem of_return
+theorem of_return_view
     (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
     (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
     (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
     (sameLedger : function.context.solvedRequirements = code.compilation.solvedRequirements)
     (profile : compiled.compatible.checked.catalog.callableContracts = true)
-    (view : code.view = function.source)
     {statement : StatementId} {node : StatementNode} {expression : ExpressionId} {expressionNode : ExpressionNode}
     (body : function.body = [statement])
     (found : function.source.lookupStatement? statement = some node)
     (form : node.form = .returnStmt (some expression)) (statementType : node.type = function.resultType)
     (read : function.source.lookupExpression? expression = some expressionNode)
     (raw : expressionNode.type = function.resultType)
-    (typed : ExpressionHasType function.source inputs.context expression expressionNode.type) :
+    (typed : ExpressionHasType function.source inputs.context expression expressionNode.type)
+    (viewFound : code.view.lookupStatement? statement = some node)
+    (viewRead : code.view.lookupExpression? expression = some expressionNode)
+    (viewTyped : ExpressionHasType code.view inputs.context expression expressionNode.type) :
     ∃ lowered, ∃ body : CallableIndexedLambdaStaticBodySupport.BodyWith
       (values := .initial compiled.compatible.checked) (Syntax expression) (Child expression lowered)
       code (Program.ofChecked compiled.sourceProgram) registry faults,
@@ -87,8 +89,8 @@ theorem of_return
     applied.trans (CallableIndexedOwnedPreparedStagedSelectedBodyCompilerCallbacks.body_lowerer
       compiled.indexed named compilation.own.assignments diagnostics children)
   have terminal : Terminal code.view expression function.body := by
-    rw [view, body]
-    exact .returning [] found form
+    rw [body]
+    exact .returning [] viewFound form
   have accepted := CallableIndexedLambdaSemanticInvocation.loops_accepted
     (values := .initial compiled.compatible.checked) code policy callback
   obtain ⟨receipt⟩ := CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts.of_accepted
@@ -102,8 +104,7 @@ theorem of_return
   subst flow
   obtain ⟨actualTree, actualSites⟩ := return_tree code (registry := registry) (faults := faults)
     (source := code.view) (bodyScope := code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
-    body (by simpa only [view] using found) form statementType
-    (by simpa only [view] using read) raw (by simpa only [view] using typed) receipt.sameType
+    body viewFound form statementType viewRead raw viewTyped receipt.sameType
   obtain ⟨tree, sites⟩ := return_tree code (registry := registry) (faults := faults)
     (source := function.source) (bodyScope := code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
     body found form statementType read raw typed receipt.sameType
@@ -132,5 +133,28 @@ theorem of_return
   simpa only [body] using (show GenericImperativeMatch.Syntax function.source (Syntax expression function.source)
     inputs.context (.statements true [statement]) function.resultType from
     .body (.returnValue [] found form statementType read raw typed rfl))
+
+/-- Identical Source views retain the original convenience interface. -/
+theorem of_return
+    (retained : CallableIndexedOwnedContextualLambdaBodyRecipes.Retained named code)
+    (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
+    (frame : Dynamic.ClosureFrame (Program.ofChecked compiled.sourceProgram) function)
+    (sameLedger : function.context.solvedRequirements = code.compilation.solvedRequirements)
+    (profile : compiled.compatible.checked.catalog.callableContracts = true)
+    (view : code.view = function.source)
+    {statement : StatementId} {node : StatementNode} {expression : ExpressionId} {expressionNode : ExpressionNode}
+    (body : function.body = [statement])
+    (found : function.source.lookupStatement? statement = some node)
+    (form : node.form = .returnStmt (some expression)) (statementType : node.type = function.resultType)
+    (read : function.source.lookupExpression? expression = some expressionNode)
+    (raw : expressionNode.type = function.resultType)
+    (typed : ExpressionHasType function.source inputs.context expression expressionNode.type) :
+    ∃ lowered, ∃ body : CallableIndexedLambdaStaticBodySupport.BodyWith
+      (values := .initial compiled.compatible.checked) (Syntax expression) (Child expression lowered)
+      code (Program.ofChecked compiled.sourceProgram) registry faults,
+      body.toContext = inputs ∧ GenericImperativeMatch.Syntax function.source (Syntax expression function.source)
+        body.context (.statements true function.body) function.resultType := by
+  exact of_return_view code retained inputs frame sameLedger profile body found form statementType read raw typed
+    (by simpa only [view] using found) (by simpa only [view] using read) (by simpa only [view] using typed)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedReturnLambdaBodySupport

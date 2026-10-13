@@ -83,6 +83,8 @@ structure PolicyRecipe
     (SourceCoreCompatibleValues.Context.initial checked)
   leafLowerer : policy.leafLowerer = SourceCoreCompatibleDataExpressions.leafLowerer
     (SourceCoreCompatibleValues.Context.initial checked)
+  projectType : policy.projectType = SourceCoreCompatibleDataExpressions.projectType checked
+  sourceCells : policy.sourceCells = some (allocator prepared named)
 
 /-- The body and complete policy use one original compilation. The policy keeps
 its own root fuel when the same callback compiles a child at a smaller budget. -/

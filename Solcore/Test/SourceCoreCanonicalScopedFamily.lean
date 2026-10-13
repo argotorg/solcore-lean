@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreCanonicalScopedMakeSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodySupportCompatibility
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryCanonicalScopedSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinarySequenceCallerBounds
 set_option autoImplicit false
@@ -60,13 +61,14 @@ def ObservedProgram.family {fixture : CompiledFixture} (observed : ObservedProgr
         (observed.cached_assumptions identityHeader makeHeader relayHeader support.caller.selected))
     obtain ⟨sidecar, _issued, selected⟩ :=
       CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.body.unique
-    exact
+    obtain ⟨packet, supported⟩ :=
       CallableIndexedOwnedPreparedStagedOrdinaryCanonicalScopedSupport.of_actual
         stagePrepared code support provenance receiver fixture.source_wellFormed metadata rows complete
         (signature := fixture.makeSignature)
         (by rw [fixture.sameProgram, fixture.signatures]; exact .tail _ (.tail _ (.head _)))
         (by rw [sameSource]; exact observed.makeRow.sourceOwner)
         shape tree _ (.anonymous selected)
+    exact ⟨⟨packet, CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport.SupportFor.of_generic _ _ _ supported⟩⟩
   | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
     exact False.elim (fixture.no_principal support.principal)
 

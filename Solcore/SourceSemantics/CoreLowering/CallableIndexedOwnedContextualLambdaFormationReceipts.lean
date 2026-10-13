@@ -48,10 +48,11 @@ theorem OrdinaryFormation.at
     {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (receipt : OrdinaryFormation (registry := registry) (faults := faults) caller context evidence scope id lowered)
-    (environment : Dynamic.Environment) :
+    (environment : Dynamic.Environment)
+    (globals : caller.globals = compiled.indexed.base.globals.length) :
     OrdinaryAt (receipt.toFormation.code environment) (receipt.toFormation.support environment) :=
   .recaptured caller receipt.site receipt.expressionSyntax receipt.certificates receipt.body
-    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment
+    receipt.binderPolicy receipt.recipe receipt.compilerPolicy receipt.bodyView receipt.bodyReasons receipt.declarations receipt.syntaxTree environment globals
 
 theorem PrincipalFormation.at {method : ExecutableImplMethods.CheckedMethod}
     {principal : CallableIndexedOwnedMethodPrincipal.Principal compiled method}

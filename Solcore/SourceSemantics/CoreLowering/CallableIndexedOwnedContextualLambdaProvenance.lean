@@ -128,7 +128,8 @@ inductive OrdinaryAt : {function : Dynamic.Closure} → {scope : SourceCoreLocal
       (syntaxTree : GenericImperativeMatch.Syntax (CallableIndexedNamedGeneration.source caller.named)
         (expressionSyntax (CallableIndexedNamedGeneration.source caller.named)) body.context
         (.statements true statements) result)
-      (environment : Dynamic.Environment) :
+      (environment : Dynamic.Environment)
+      (globals : caller.globals = compiled.indexed.base.globals.length) :
       OrdinaryAt (recaptureCode (values := .initial compiled.compatible.checked) (indexed := compiled.indexed) site.code environment)
         ((CallableIndexedOwnedOrdinaryLambdaSupport.Support.of_site caller site expressionSyntax certificates body).recapture environment)
 
@@ -161,13 +162,21 @@ inductive PrincipalAt : {function : Dynamic.Closure} → {scope : SourceCoreLoca
 variable {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
   {code : Code compiled.indexed function scope administrative}
 
+/-- The original formation retained its actual compiled global extent. -/
+theorem OrdinaryAt.globals
+    {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
+    (receipt : OrdinaryAt code support) :
+    support.caller.globals = compiled.indexed.base.globals.length := by
+  cases receipt with
+  | recaptured _ _ _ _ _ _ _ _ _ _ _ _ _ globals => exact globals
+
 /-- Only proof goals consume the retained seed; no data Site is chosen from
 the Prop receipt. Recapture preserves the exact policy definition. -/
 theorem OrdinaryAt.binder_policy
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
     (receipt : OrdinaryAt code support) : BinderPolicy support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment => exact binderPolicy
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals => exact binderPolicy
 
 theorem OrdinaryAt.syntax
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
@@ -175,7 +184,7 @@ theorem OrdinaryAt.syntax
     GenericImperativeMatch.Syntax function.source (support.expressionSyntax function.source)
       support.body.context (.statements true function.body) function.resultType := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment => exact syntaxTree
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals => exact syntaxTree
 
 theorem PrincipalAt.binder_policy
     {support : CallableIndexedOwnedMethodLambdaSupport.Support code registry faults}
@@ -197,7 +206,7 @@ theorem OrdinaryAt.body_recipe
     (receipt : OrdinaryAt code support) :
     CallableIndexedOwnedContextualLambdaBodyRecipes.Retained support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals =>
       exact recipe
 
 /-- Method provenance retains its own principal and the same production recipe. -/
@@ -216,7 +225,7 @@ theorem OrdinaryAt.policy_recipe
     (receipt : OrdinaryAt code support) :
     CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained support.caller.named code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals =>
       exact compilerPolicy
 
 theorem PrincipalAt.policy_recipe
@@ -232,7 +241,7 @@ theorem OrdinaryAt.body_view
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
     (receipt : OrdinaryAt code support) : BodyView code := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals =>
       exact bodyView
 
 /-- Recapture retains the original named diagnostic tokens on all used reads. -/
@@ -240,7 +249,7 @@ theorem OrdinaryAt.body_reasons
     {support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code registry faults}
     (receipt : OrdinaryAt code support) : BodyReasons code support.caller.named := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals =>
       exact bodyReasons
 
 /-- The captured scope retains its original Source binder declarations. -/
@@ -249,7 +258,7 @@ theorem OrdinaryAt.scope_declarations
     (receipt : OrdinaryAt code support) :
     CompatibleExpressionReads.ScopeDeclarations function.source scope function.context := by
   cases receipt with
-  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment =>
+  | recaptured caller site expressionSyntax certificates body binderPolicy recipe compilerPolicy bodyView bodyReasons declarations syntaxTree environment _globals =>
       exact declarations
 
 theorem PrincipalAt.body_view

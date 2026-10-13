@@ -54,12 +54,13 @@ theorem OrdinaryWithPolicy.at
     {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (receipt : OrdinaryWithPolicy (registry := registry) (faults := faults)
       caller context evidence scope id lowered)
-    (environment : Dynamic.Environment) :
+    (environment : Dynamic.Environment)
+    (globals : caller.globals = compiled.indexed.base.globals.length) :
     OrdinaryAt (receipt.toOrdinaryFormation.toFormation.code environment)
       (receipt.toOrdinaryFormation.toFormation.support environment) ∧
     CallableIndexedOwnedContextualLambdaPolicyRecipes.Retained caller.named
       (receipt.toOrdinaryFormation.toFormation.code environment) :=
-  ⟨receipt.toOrdinaryFormation.at environment, retained_recapture receipt.policyRecipe environment⟩
+  ⟨receipt.toOrdinaryFormation.at environment globals, retained_recapture receipt.policyRecipe environment⟩
 
 /-- The method principal and all policy inputs survive this same recapture. -/
 theorem PrincipalWithPolicy.at {method : ExecutableImplMethods.CheckedMethod}

@@ -104,7 +104,7 @@ private theorem forms {scope : SourceCoreLocalCell.Scope} {id : ExpressionId}
   obtain ⟨_sourceTrace, native, _related, _determined, member⟩ :=
     @CallableIndexedOwnedContextualTypedClosureReceipts.formation_member compiled headers keys
       bodyRegistry semanticFaults mapping world (head.function environment) scope actual canonical before store
-      captured code support owner initial.val initial.property profile rfl observed (receipt.at environment)
+      captured code support owner initial.val initial.property profile rfl observed (receipt.at environment globals)
       (CallableIndexedOwnedGeneralLambdaValues.model headers keys bodyRegistry semanticFaults profile)
       (fun represented => represented) heaps.runtime_hasTypes receipt.ordinary receipt.coercions
   have payload := CallableIndexedOwnedContextualCellOrigins.payload_static_member (registry := receiving) profile member

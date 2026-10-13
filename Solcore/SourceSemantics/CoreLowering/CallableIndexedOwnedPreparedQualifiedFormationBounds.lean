@@ -31,6 +31,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 namespace Ordinary
 variable {canonical : Environment}
   (support : CallableIndexedOwnedPreparedOrdinaryLambdaSupport.Support code)
+  (callerGlobals : support.caller.globals = compiled.indexed.base.globals.length)
   (qualified : qualification.ordinary code support)
   (actualSites : (CallableIndexedOwnedPreparedOrdinaryBodyProjection.actualTree support.body).CatalogSites
     .reachable bodyRegistry faults)
@@ -99,7 +100,7 @@ variable
   (admitted : Admission (CallableIndexedOwnedOrdinaryLambdaEntries.bridge (headers := headers) owner support.caller)
     function.context ⟨initial, packet⟩)
 
-include qualified prefixContext observed prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
+include callerGlobals qualified prefixContext observed prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
 /-- The actual Source value/fault head selects the authentic lambda. Exactly
 one prepared formation establishes native completion and the stronger post. -/
 theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after : Dynamic.Heap}
@@ -116,7 +117,7 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
       obtain ⟨_sourceTrace, nativeTrace, member, post, _determined⟩ :=
         CallableIndexedOwnedPreparedQualifiedFormationReceipts.Ordinary.formation_post
           (registry := registry) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
-          (support := support) (qualified := qualified) (actualSites := actualSites) (sites := sites) (prepared := prepared)
+          (support := support) (callerGlobals := callerGlobals) (qualified := qualified) (actualSites := actualSites) (sites := sites) (prepared := prepared)
           (initial := initial) (packet := packet) (prefixContext := prefixContext) (observed := observed)
           (cells := cells) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
           (typed := typed) (sourceType := sourceType) (admitted := admitted) ordinary coercions
@@ -127,7 +128,7 @@ theorem preserves_at {size : Nat} {outcome : Dynamic.ExpressionOutcome} {after :
         (values := .initial compiled.compatible.checked) (indexed := compiled.indexed)
         (program := Program.ofChecked compiled.sourceProgram) code support.body.unique coercions failed)
 
-include qualified prefixContext observed prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
+include callerGlobals qualified prefixContext observed prepared cells sourceType ordinary coercions admitted wellFormed runtime covers locals typed in
 /-- Native completion is compared with one genuine formation. Its own Source
 grade is obtained from that factory trace; preservation is not invoked again. -/
 theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
@@ -140,7 +141,7 @@ theorem reflects_at {size : Nat} {result : Core.Value} {finalStore : Store}
   obtain ⟨sourceTrace, nativeTrace, member, post, determined⟩ :=
     CallableIndexedOwnedPreparedQualifiedFormationReceipts.Ordinary.formation_post
       (registry := registry) (captured := captured) (code := code) (owner := owner) (qualification := qualification) (profile := profile)
-      (support := support) (qualified := qualified) (actualSites := actualSites) (sites := sites) (prepared := prepared)
+      (support := support) (callerGlobals := callerGlobals) (qualified := qualified) (actualSites := actualSites) (sites := sites) (prepared := prepared)
       (initial := initial) (packet := packet) (prefixContext := prefixContext) (observed := observed)
       (cells := cells) (wellFormed := wellFormed) (runtime := runtime) (covers := covers) (locals := locals)
       (typed := typed) (sourceType := sourceType) (admitted := admitted) ordinary coercions

@@ -48,7 +48,7 @@ theorem RootPolicyReceipt.of_accepted
     |>.mapError SourceCoreBasic.Error.callPreparation) >>= _ = .ok lowered at accepted
   rw [record] at accepted
   simp only [Except.mapError, bind, Except.bind] at accepted
-  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, ⟨rfl, rfl, rfl, rfl⟩⟩⟩
+  exact ⟨⟨⟨_, _, accepted, rfl, rfl, _, rfl, rfl, rfl, rfl⟩, rfl, rfl, rfl, rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩⟩⟩
 
 section Pointwise
 variable

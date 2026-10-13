@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBranchingLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalTerminalLambdaApplicationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCanonicalBodyStaticSupport
@@ -95,7 +96,7 @@ theorem application_preserves (budget : Nat)
             (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys))
           context function.resultType outcome returned := by
   cases association with
-  | ordinary owner captured code history support _origin _prefix globals referenceIndex _typed _provenance =>
+  | ordinary owner captured code history support origin prefixContext globals referenceIndex _typed _provenance =>
     rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
@@ -201,6 +202,22 @@ theorem application_preserves (budget : Nat)
           (currentCarried := carried)
           (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
           (callerRuntime := runtime) children trace within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | nestedBranching branching =>
+      obtain ⟨value, finalStore, evaluated, result⟩ :=
+        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_preserves
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (ordinary := support) (origin := origin) (prefixContext := prefixContext)
+          (packet := branching) (support := supported)
+          (owner := owner) (caller := caller) (observed := globals) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) children canonicalChildren trace within
       obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
         metadata, returned, related, post⟩ := result
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
@@ -366,6 +383,7 @@ theorem application_preserves (budget : Nat)
         metadata, returned, related, post⟩ := result
       exact ⟨value, finalStore, finalMap, finalWorld, evaluated, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | nestedBranching _ => exact nomatch supported
     | canonicalBranching branching =>
       have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
           (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
@@ -451,7 +469,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
             (program := Program.ofChecked compiled.sourceProgram) (headers := headers) (keys := keys))
           context function.resultType outcome returned := by
   cases association with
-  | ordinary owner captured code history support _origin _prefix globals referenceIndex _typed _provenance =>
+  | ordinary owner captured code history support origin prefixContext globals referenceIndex _typed _provenance =>
     rename_i capturedScope capturedActual
     have typed : Dynamic.ValuesHaveTypes function.context before sources support.body.types := by
       simpa only [Dynamic.MonoBindersExtend.bodyTypes_eq support.body.extended] using raw.arguments
@@ -555,6 +573,22 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
           (currentCarried := carried)
           (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
           (callerRuntime := runtime) (valid := valid) children completed within
+      obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
+        metadata, returned, related, post⟩ := result
+      exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
+        finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | nestedBranching branching =>
+      obtain ⟨sourceSize, outcome, after, trace, result⟩ :=
+        CallableIndexedOwnedPreparedStagedNestedBranchingLambdaApplicationBounds.application_reflects
+          (profile := profile) (captured := captured) (code := code) (history := history)
+          (ordinary := support) (origin := origin) (prefixContext := prefixContext)
+          (packet := branching) (support := supported)
+          (owner := owner) (caller := caller) (observed := globals) (stable := stable)
+          (beforeTyped := raw.heaps) (argumentsTyped := typed) (represented := represented)
+          (heaps := heaps) (locals := raw.captures) (reference := reference)
+          (currentCarried := carried)
+          (allowed := CallableIndexedLambdaTemplatePermission.lambda_allowed code history)
+          (callerRuntime := runtime) (valid := valid) children canonicalChildren completed within
       obtain ⟨finalMap, finalWorld, representedResult, finalHeaps, maps, worlds, frame,
         metadata, returned, related, post⟩ := result
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
@@ -718,6 +752,7 @@ theorem application_reflects (valid : Dynamic.ClosureFrame (Program.ofChecked co
         metadata, returned, related, post⟩ := result
       exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, representedResult,
         finalHeaps, maps, worlds, frame, metadata, returned, related, post⟩
+    | nestedBranching _ => exact nomatch supported
     | canonicalBranching branching =>
       have observed : CallableIndexedLambdaCatalogEntries.CaptureGlobals (prepared := compiled.indexed)
           (values := .initial compiled.compatible.checked) (program := Program.ofChecked compiled.sourceProgram)
