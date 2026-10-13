@@ -1,9 +1,10 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport
 
-/-! A finite validator admits ordinary initialized lets and value returns from
-actual named source. Independent original Header typing supplies the changing
-lexical contexts. The issued support uses the existing physical named family. -/
+/-! Finite original-source statement admission supplies scoped named bodies.
+Independent Header typing recovers lexical contexts and loop typing through
+the shared scanner. The existing physical family consumes the issued support. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -15,122 +16,32 @@ open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (GeneralSynta
 open CallableIndexedOwnedPreparedNamedSyntaxAdmission (DirectSite TableAligned)
 open CallableIndexedOwnedFunctionValues (Header)
 
-/-- Context-free admission records only actual syntax and static metadata.
-The context-sensitive statement certificate is derived from original typing. -/
-inductive BodyScan (source : TypedSource) (approved : ExpressionId → Prop)
-    (expected : TypeSystem.Ty) : List StatementId → Prop where
-  | returning {id node expression expressionNode} (rest : List StatementId)
-      (found : source.lookupStatement? id = some node)
-      (form : node.form = .returnStmt (some expression))
-      (sourceType : node.type = expected)
-      (expressionFound : source.lookupExpression? expression = some expressionNode)
-      (valueType : expressionNode.type = expected)
-      (value : approved expression) : BodyScan source approved expected (id :: rest)
-  | initialized {id node binder expression expressionNode rest}
-      (found : source.lookupStatement? id = some node)
-      (form : node.form = .letDecl binder (some expression))
-      (declaration : SourceCoreDataPlaces.rootBinder source binder.id = .ok binder)
-      (monomorphic : binder.scheme.quantified = [])
-      (ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false)
-      (expressionFound : source.lookupExpression? expression = some expressionNode)
-      (valueType : expressionNode.type = binder.scheme.body)
-      (value : approved expression)
-      (remaining : BodyScan source approved expected rest) : BodyScan source approved expected (id :: rest)
-
-private theorem head_tail {source : TypedSource} {control : ControlContext}
-    {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
-    (typed : StatementsHaveType source control context (id :: rest) final facts) :
-    ∃ middle headFacts tailFacts, StatementHasType source control context id middle headFacts ∧
-      StatementsHaveType source control middle rest final tailFacts := by
-  cases typed with
-  | singleton head => exact ⟨_, _, _, head, .nil _ _⟩
-  | cons head tail => exact ⟨_, _, _, head, tail⟩
-
-private theorem form_at {source : TypedSource} {control : ControlContext}
-    {context final : SourceSemantics.Context} {id : StatementId} {facts : StatementFacts} {node : StatementNode}
-    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
-    (typed : StatementHasType source control context id final facts) :
-    Dynamic.StatementHasType.FormTyping source control context node.form final := by
-  obtain ⟨actual, contains, original⟩ := Dynamic.StatementHasType.formTyping typed
-  have same := Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
-  subst actual
-  exact original
+/-- The named-body API selects top-level mode of the shared original-source scan. -/
+abbrev BodyScan (source : TypedSource) (approved : ExpressionId → Prop)
+    (expected : TypeSystem.Ty) (statements : List StatementId) : Prop :=
+  ScopedSourceBodyAdmission.Scan source approved expected true statements
 
 theorem BodyScan.shape {source : TypedSource} {approved : ExpressionId → Prop}
     {expected : TypeSystem.Ty} {statements : List StatementId}
     (scan : BodyScan source approved expected statements) :
-    CallableIndexedOwnedPreparedStagedBranchingTree.Shape source true statements := by
-  induction scan with
-  | returning rest found form _ _ _ _ => exact .returnValue rest found form
-  | initialized found form _ _ _ _ _ _ _ ih => exact .initialized found form ih
+    CallableIndexedOwnedPreparedStagedBranchingTree.Shape source true statements :=
+  ScopedSourceBodyAdmission.Scan.shape scan
 
 theorem BodyScan.syntax {source : TypedSource} {approved : ExpressionId → Prop}
     {expected : TypeSystem.Ty} {statements : List StatementId}
     (scan : BodyScan source approved expected statements) (unique : NodeOccurrencesUnique source)
     {context final : SourceSemantics.Context} {facts : BodyFacts}
     (typed : StatementsHaveType source {returnType := expected} context statements final facts) :
-    GenericImperativeMatch.Syntax source approved context (.statements true statements) expected := by
-  induction scan generalizing context final facts with
-  | returning rest found form sourceType expressionFound valueType value =>
-      obtain ⟨_, _, _, head, _⟩ := head_tail typed
-      have original := form_at unique found head
-      rw [form] at original
-      cases original with
-      | returnValue actual =>
-        exact .body (.returnValue rest found form sourceType expressionFound valueType
-          (by simpa only [valueType] using actual) value)
-  | initialized found form declaration monomorphic ordinary expressionFound valueType value _ ih =>
-      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
-      have original := form_at unique found head
-      rw [form] at original
-      cases original with
-      | letInitialized actual _ extended =>
-          exact .initialized found form declaration monomorphic extended ordinary expressionFound valueType
-            (by simpa only [valueType] using actual) value (ih tail)
-      | letInitializedGeneralized poly _ _ _ _ => exact False.elim (poly monomorphic)
+    GenericImperativeMatch.Syntax source approved context (.statements true statements) expected :=
+  ScopedSourceBodyAdmission.Scan.syntax scan unique rfl typed
 
-/-- The finite source scanner rejects unsupported statements instead of
-turning their semantics into a premise. Expression fuel only bounds scanning. -/
+/-- Fuel bounds both the original statement graph and expression traversal. -/
 def scan?
-    (inputs : List SourceSpecialization.SpecializedFunction) (source : TypedSource) (expected : TypeSystem.Ty) (fuel : Nat) :
-    (statements : List StatementId) → Option (PLift
-      (BodyScan source (fun id => GeneralSyntax source id (DirectSite inputs)) expected statements))
-  | [] => none
-  | id :: rest =>
-      match found : source.lookupStatement? id with
-      | none => none
-      | some node =>
-          match form : node.form with
-          | .returnStmt (some expression) =>
-              if sourceType : node.type = expected then
-                match expressionFound : source.lookupExpression? expression with
-                | none => none
-                | some expressionNode =>
-                    if valueType : expressionNode.type = expected then do
-                      let ⟨value⟩ ← CallableIndexedOwnedPreparedNamedSyntaxAdmission.expression? inputs source fuel expression
-                      pure ⟨.returning rest found form sourceType expressionFound valueType value⟩
-                    else none
-              else none
-          | .letDecl binder (some expression) =>
-              if monomorphic : binder.scheme.quantified = [] then
-                if ordinary : source.inputs.any (fun input => decide (input.id = binder.id)) = false then
-                  match declared : SourceCoreDataPlaces.rootBinder source binder.id with
-                  | .error _ => none
-                  | .ok actual =>
-                      if same : actual = binder then
-                        match expressionFound : source.lookupExpression? expression with
-                        | none => none
-                        | some expressionNode =>
-                            if valueType : expressionNode.type = binder.scheme.body then do
-                              let ⟨value⟩ ← CallableIndexedOwnedPreparedNamedSyntaxAdmission.expression? inputs source fuel expression
-                              let ⟨remaining⟩ ← scan? inputs source expected fuel rest
-                              pure ⟨.initialized found form (by simpa only [same] using declared)
-                                monomorphic ordinary expressionFound valueType value remaining⟩
-                            else none
-                      else none
-                else none
-              else none
-          | _ => none
+    (inputs : List SourceSpecialization.SpecializedFunction) (source : TypedSource) (expected : TypeSystem.Ty) (fuel : Nat)
+    (statements : List StatementId) : Option (PLift
+      (BodyScan source (fun id => GeneralSyntax source id (DirectSite inputs)) expected statements)) :=
+  ScopedSourceBodyAdmission.scan? source
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.expression? inputs source fuel) expected fuel true statements
 
 structure SourceAdmission (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
@@ -162,7 +73,7 @@ def admitSource (compiled : SourceCoreUnifiedCompilation.Compiled)
 
 /-- Successful certification supplies all expression syntax and native hook
 metadata from the original finite tables. It does not claim every accepted
-program belongs to this initial return/let fragment. -/
+program belongs to the supported statement and expression fragment. -/
 def admitPrepared {compiled : SourceCoreUnifiedCompilation.Compiled}
     {row : SourceSpecialization.SpecializedFunction}
     (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)

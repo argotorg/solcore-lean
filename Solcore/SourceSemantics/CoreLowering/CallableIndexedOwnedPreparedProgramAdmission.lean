@@ -1,4 +1,6 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOriginsMethodAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedMethodAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrimitiveMethodAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedClosedCoercionAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedFactoryAdmission
@@ -59,23 +61,56 @@ def certifyRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
         some (.excluded (fun signature member => of_decide_eq_true (List.all_eq_true.mp absent signature member)))
       else none
 
+inductive Selection (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (directRows : List SourceSpecialization.SpecializedFunction) where
+  | closed (methods : CallableIndexedOwnedPreparedPrimitiveMethodAdmission.Certificate compiled)
+      (catalog : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled)
+  | origins (methods : CallableIndexedOwnedPreparedScopedMethodAdmission.Certificate compiled directRows)
+      (catalog : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog compiled)
+
+def Selection.allowCoerced {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {directRows : List SourceSpecialization.SpecializedFunction} : Selection compiled directRows → Bool
+  | .closed .. => true
+  | .origins .. => false
+
+def Selection.operatorCatalog {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {directRows : List SourceSpecialization.SpecializedFunction} :
+    Selection compiled directRows → CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled
+  | .closed _ catalog => .generic ⟨catalog.formed, catalog.assumptions⟩
+  | .origins _ catalog => .origins catalog
+
+def certifySelection (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (directRows : List SourceSpecialization.SpecializedFunction) (fuel : Nat) :
+    Option (Selection compiled directRows) :=
+  let closed := do
+    let methods ← CallableIndexedOwnedPreparedPrimitiveMethodAdmission.certify compiled fuel
+    let ⟨catalog⟩ ← CallableIndexedOwnedPreparedClosedCoercionAdmission.certify compiled
+    pure (.closed methods catalog)
+  match closed with
+  | some selection => some selection
+  | none => do
+    let methods ← CallableIndexedOwnedPreparedScopedMethodAdmission.certify compiled directRows fuel
+    let ⟨catalog⟩ ← CallableIndexedOwnedPreparedOriginsMethodAdmission.certify compiled
+    pure (.origins methods catalog)
+
 structure RowCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
-    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction) where
+    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction)
+    (allowCoerced : Bool) where
   root : RootCertificate compiled named directRows
-  closures : CallableIndexedOwnedPreparedCoercedClosureAdmission.SourceCertificate compiled named directRows
+  closures : CallableIndexedOwnedPreparedClosureAdmission.SourceCertificate compiled named directRows allowCoerced
 
 def certifyRow (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction)
-    (fuel : Nat) : Option (RowCertificate compiled named directRows) := do
+    (allowCoerced : Bool) (fuel : Nat) : Option (RowCertificate compiled named directRows allowCoerced) := do
   let root ← certifyRoot compiled named directRows fuel
-  let ⟨closures⟩ ← CallableIndexedOwnedPreparedCoercedClosureAdmission.certifySource compiled named directRows fuel
+  let ⟨closures⟩ ← CallableIndexedOwnedPreparedClosureAdmission.certifySource compiled named directRows allowCoerced fuel
   pure ⟨root, closures⟩
 
 structure Certificate (compiled : SourceCoreUnifiedCompilation.Compiled) where
   table : CallableIndexedOwnedPreparedOrdinarySyntaxTable.Table compiled
-  rows : ∀ named ∈ compiled.indexed.base.functions, Nonempty (RowCertificate compiled named table.rows)
-  methods : CallableIndexedOwnedPreparedPrimitiveMethodAdmission.Certificate compiled
-  coercions : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled
+  selection : Selection compiled table.rows
+  rows : ∀ named ∈ compiled.indexed.base.functions,
+    Nonempty (RowCertificate compiled named table.rows selection.allowCoerced)
   profile : compiled.compatible.checked.catalog.callableContracts = true
   diagnostics : ∃ program, compiled.indexed.base.diagnostics = some program
 
@@ -89,13 +124,12 @@ def certify (compiled : SourceCoreUnifiedCompilation.Compiled)
     | none => none
     | some diagnostics =>
       let table := CallableIndexedOwnedPreparedOrdinarySyntaxTable.collect compiled wellFormed fuel
-      let ⟨rows⟩ ← allProof? (fun named => Nonempty (RowCertificate compiled named table.rows))
+      let selection ← certifySelection compiled table.rows fuel
+      let ⟨rows⟩ ← allProof? (fun named => Nonempty (RowCertificate compiled named table.rows selection.allowCoerced))
         (fun named => do
-          let certificate ← certifyRow compiled named table.rows fuel
+          let certificate ← certifyRow compiled named table.rows selection.allowCoerced fuel
           pure ⟨⟨certificate⟩⟩) compiled.indexed.base.functions
-      let methods ← CallableIndexedOwnedPreparedPrimitiveMethodAdmission.certify compiled fuel
-      let ⟨coercions⟩ ← CallableIndexedOwnedPreparedClosedCoercionAdmission.certify compiled
-      pure ⟨table, rows, methods, coercions, profile, diagnostics, present⟩
+      pure ⟨table, selection, rows, profile, diagnostics, present⟩
   else none
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -131,7 +165,7 @@ theorem Certificate.named_support (input : Input compiled) (packet : Issued inpu
       prepared packet.aligned input.prepared.selected input.prepared.same admission
     exact CallableIndexedOwnedPreparedNamedScopedAdmission.of_actual prepared packet.aligned rows aligned
       original ready diagnostic issued wellFormed checked identity
-      (.generic ⟨certificate.coercions.formed, certificate.coercions.assumptions⟩)
+      certificate.selection.operatorCatalog
       entryMember (stagePrepared compiled)
   | formation admission =>
     obtain ⟨terminal, ⟨supported⟩⟩ := CallableIndexedOwnedPreparedNamedFactoryAdmission.of_actual
@@ -163,16 +197,29 @@ theorem Certificate.closure_support
     have found := code.sourceFound
     rw [support.source] at found
     obtain ⟨body⟩ := source.closures.selected found code.sourceForm
-    obtain ⟨⟨packet, supported⟩⟩ := CallableIndexedOwnedPreparedCoercedClosureAdmission.of_actual
-      (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
-      certificate.coercions body
-      (fun principal sourceAt diagnostic => certificate.methods.support principal sourceAt diagnostic issued wellFormed
-        (headers := headers rows) (stages compiled))
-    exact ⟨⟨.terminal packet, supported⟩⟩
+    cases body with
+    | ordinary body =>
+      obtain ⟨⟨packet, supported⟩⟩ := CallableIndexedOwnedPreparedClosureAdmission.of_ordinary
+        (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
+        certificate.selection.operatorCatalog body
+      exact ⟨⟨.terminal packet, supported⟩⟩
+    | coerced enabled body =>
+      cases selectionEq : certificate.selection with
+      | closed methods catalog =>
+        obtain ⟨⟨packet, supported⟩⟩ := CallableIndexedOwnedPreparedCoercedClosureAdmission.of_actual
+          (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
+          catalog body
+          (fun principal sourceAt diagnostic => methods.support principal sourceAt diagnostic issued wellFormed
+            (headers := headers rows) (stages compiled))
+        exact ⟨⟨.terminal packet, supported⟩⟩
+      | origins methods catalog =>
+        simp only [selectionEq, Selection.allowCoerced, Bool.false_eq_true] at enabled
   | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
     have found := code.sourceFound
     rw [support.source, support.principal.source_eq] at found
-    exact False.elim (certificate.methods.no_lambda support.principal found code.sourceForm)
+    cases certificate.selection with
+    | closed methods _ => exact False.elim (methods.no_lambda support.principal found code.sourceForm)
+    | origins methods _ => exact False.elim (methods.no_lambda support.principal found code.sourceForm)
 
 private theorem owners_physical (rows : Inventory inputs) :
     ∀ selected : CallableIndexedOwnedFunctionValues.OwnedKey (keys compiled),
@@ -227,9 +274,14 @@ theorem Certificate.issue_for :
     owners := owners_physical rows
     methods := ?_ }⟩
   intro policy body fuel compilation source scope id reasonAt lowered context caller receipt port
-  obtain ⟨packet, same, supported⟩ := certificate.methods.support port.principal port.sourceAt
-    ⟨port.diagnostics⟩ issued wellFormed (headers := headers rows) (stages compiled)
-  exact ⟨.terminal packet, same, supported⟩
+  cases certificate.selection with
+  | closed methods _ =>
+    obtain ⟨packet, same, supported⟩ := methods.support port.principal port.sourceAt
+      ⟨port.diagnostics⟩ issued wellFormed (headers := headers rows) (stages compiled)
+    exact ⟨.terminal packet, same, supported⟩
+  | origins methods _ =>
+    exact methods.support port.principal port.sourceAt port.resolved ⟨port.diagnostics⟩ issued wellFormed
+      rows aligned ready entryMember (stages compiled)
 
 include certificate wellFormed ready issued registry entryMember rows aligned in
 /-- Public checker success supplies the loaded source and finite selection

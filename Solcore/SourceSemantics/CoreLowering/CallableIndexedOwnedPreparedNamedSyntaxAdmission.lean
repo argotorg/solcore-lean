@@ -127,6 +127,13 @@ def expression?
           | .group inner => do
               let ⟨child⟩ ← expression? inputs source fuel inner
               pure ⟨.group found form child⟩
+          | .unary _operator operand => do
+              let ⟨child⟩ ← expression? inputs source fuel operand
+              pure ⟨.unary found form child⟩
+          | .binary left _operator right => do
+              let ⟨first⟩ ← expression? inputs source fuel left
+              let ⟨second⟩ ← expression? inputs source fuel right
+              pure ⟨.binary found form first second⟩
           | .call _callee ids (.declaration instantiation) => do
               let ⟨site⟩ ← directSite? inputs instantiation
               let ⟨children⟩ ← allProof? (fun child => GeneralSyntax source child (DirectSite inputs))
