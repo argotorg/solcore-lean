@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Method bodies come from actual cached compilation (2026-10-14)
+
+`fdbd1f8e` derives method body admission from the actual retained selection and cached compilation. `3624d72d` connects both method rows to the existing whole-program certificate and public sequences.
+
+Final compilation provenance supplies the genuine selected implementation method at its exact cache index. Agreement with the original successful checker result retains its full typed body and ordered evidence. The complete parameter replacement range and original Source well-formedness establish the method instantiation. Accepted body and expression actions then supply its syntax and lexical binding proofs.
+
+The unchanged evidence program now completes all ten ordinary roots, both factory closure sources and both method rows using compiler receipts. Its twelve cached rows, ten direct targets, dictionaries, substitutions and three captured closures are preserved. The original seven-call sequence, automatic-catalog sequence and checker-budget companion still prove Source traces and public results `33 / true / 33 / 55`.
+
+Validation: 16 affected modules checked together, full build (7,266 jobs), registered tests (14,370 build jobs), kernel policy and 792 endpoint audits pass. Method checks reject missing direct targets and insufficient replacement-type traversal. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The pending certificate may exist before deferred bodies have proofs. Completion still requires the original direct targets and a certificate for every actual method row. Source well-formedness, supported forms, monomorphic local bindings, metadata, method-origin catalog checks and staged Source traces remain explicit. Complete compiler and pass coverage remain unfinished.
+
+`AcceptedMethodBodyReceipts` recovers actual body and expression actions. `AcceptedMethodBodyAdmission.of_selection` derives the original method Source certificate. `AcceptedProgramMethodCompletion.Pending.complete_receipts` connects all indexed method certificates with ordinary roots and closure sources. Public runtime APIs are unchanged.
+
 ## Certified sessions begin with scalar results or Source failures (2026-10-14)
 
 `071edd23` connects initial scalar success and Source failure to the common physical session. `64a72bde` applies those endpoints to the existing lexical-failure program and its identity continuation.

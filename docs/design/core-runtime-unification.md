@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Method bodies come from actual cached compilation (2026-10-14)
+
+`fdbd1f8e` derives method body admission from the actual retained selection and cached compilation. `3624d72d` connects both method rows to the existing whole-program certificate and public sequences.
+
+Final compilation provenance supplies the genuine selected implementation method at its exact cache index. Agreement with the original successful checker result retains its full typed body and ordered evidence. The complete parameter replacement range and original Source well-formedness establish the method instantiation. Accepted body and expression actions then supply its syntax and lexical binding proofs.
+
+The unchanged evidence program now completes all ten ordinary roots, both factory closure sources and both method rows using compiler receipts. Its twelve cached rows, ten direct targets, dictionaries, substitutions and three captured closures are preserved. The original seven-call sequence, automatic-catalog sequence and checker-budget companion still prove Source traces and public results `33 / true / 33 / 55`.
+
+Validation: 16 affected modules checked together, full build (7,266 jobs), registered tests (14,370 build jobs), kernel policy and 792 endpoint audits pass. Method checks reject missing direct targets and insufficient replacement-type traversal. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The pending certificate may exist before deferred bodies have proofs. Completion still requires the original direct targets and a certificate for every actual method row. Source well-formedness, supported forms, monomorphic local bindings, metadata, method-origin catalog checks and staged Source traces remain explicit. Complete compiler and pass coverage remain unfinished.
+
+Next, replace example-specific root, closure and method assembly with a common producer covering every actual cache row and original lambda node.
+
 ## Certified sessions begin with scalar results or Source failures (2026-10-14)
 
 `071edd23` connects initial scalar success and Source failure to the common physical session. `64a72bde` applies those endpoints to the existing lexical-failure program and its identity continuation.
@@ -712,11 +726,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `071edd23` / `64a72bde`: initial scalar and failure outcomes establish the common public state, including lexical failure followed by identity. |
-| Latest completed verification | Full build (7261 jobs), registered tests, kernel policy and 765 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `fdbd1f8e` / `3624d72d`: both actual cached method bodies complete the same compiler-derived program certificate used by all public sequences. |
+| Latest completed verification | Full build (7266 jobs), registered tests, kernel policy and 792 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Initial scalar success and Source failure preserve the actual bootstrap state, empty handle history and reached heap; later calls retain that state. |
-| Current implementation priority | Connect actual method admission and generic whole-program certificate construction, then complete compiler and pass coverage. |
+| Latest proof scope | Actual selected methods retain their full original checked bodies, substitutions and evidence; compiler actions supply body syntax and lexical binding proofs. |
+| Current implementation priority | Build the whole-program certificate from finite checks of every actual cache row and original lambda, then complete compiler and pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

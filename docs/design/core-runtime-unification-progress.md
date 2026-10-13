@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Method bodies come from actual cached compilation (2026-10-14)
+
+`fdbd1f8e` derives method body admission from the actual retained selection and cached compilation. `3624d72d` connects both method rows to the existing whole-program certificate and public sequences.
+
+Final compilation provenance supplies the genuine selected implementation method at its exact cache index. Agreement with the original successful checker result retains its full typed body and ordered evidence. The complete parameter replacement range and original Source well-formedness establish the method instantiation. Accepted body and expression actions then supply its syntax and lexical binding proofs.
+
+The unchanged evidence program now completes all ten ordinary roots, both factory closure sources and both method rows using compiler receipts. Its twelve cached rows, ten direct targets, dictionaries, substitutions and three captured closures are preserved. The original seven-call sequence, automatic-catalog sequence and checker-budget companion still prove Source traces and public results `33 / true / 33 / 55`.
+
+Validation: 16 affected modules checked together, full build (7,266 jobs), registered tests (14,370 build jobs), kernel policy and 792 endpoint audits pass. Method checks reject missing direct targets and insufficient replacement-type traversal. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The pending certificate may exist before deferred bodies have proofs. Completion still requires the original direct targets and a certificate for every actual method row. Source well-formedness, supported forms, monomorphic local bindings, metadata, method-origin catalog checks and staged Source traces remain explicit. Complete compiler and pass coverage remain unfinished.
+
+The method connection now uses actual compilation in the same program certificate consumed by all public sequences. No operator selector is replayed to manufacture the method origin. The twelve unrelated workspace changes remain excluded.
+
 ## Certified sessions begin with scalar results or Source failures (2026-10-14)
 
 `071edd23` connects initial scalar success and Source failure to the common physical session. `64a72bde` applies those endpoints to the existing lexical-failure program and its identity continuation.
