@@ -67,6 +67,10 @@ private theorem read_no_calls
     have same := compiler.originalForm
     rw [identity, form] at same
     cases same
+  | @method_child current id otherFuel code types outer sequence children child childCode member inside =>
+    have identity := Option.some.inj (outer.metadata.found.symm.trans found)
+    rcases outer.operator.form with ⟨operator, operand, otherForm, _⟩ | ⟨operator, left, right, otherForm, _⟩
+    all_goals rw [identity, form] at otherForm; cases otherForm
   | @group current id other inner innerNode code actual otherForm innerFound type child inside =>
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm

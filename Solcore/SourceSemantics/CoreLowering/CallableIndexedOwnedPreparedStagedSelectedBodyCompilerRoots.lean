@@ -121,6 +121,8 @@ def of_view_action_on
   actualFunctionType := authority.actualFunctionType
   uninitialized := authority.uninitialized
   callsReady := ready
+  noMethods := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_policy_on _
+    (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original edited avoids tree reached) reached sourceProfile
   noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _
     (CallableIndexedOwnedPreparedStagedRecursiveBodyViewTransport.syntax_original edited avoids tree reached)
   noIndexes := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax _

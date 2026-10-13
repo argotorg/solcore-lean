@@ -35,21 +35,16 @@ structure Ready (catalog : List (CallableIndexedOwnedFunctionValues.Header compi
 /-- The actual matching record and each authentic Header retain the Source
 inference order. Their complete metadata then agrees, including nonempty
 substitutions; declaration keys alone do not determine this equality. -/
-theorem of_complete
+theorem of_slot
     {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
-    (complete : RecursiveNamedCatalogNativeContexts.Complete
-      (prepared := compiled.indexed.ancestry)
-      (values := .initial compiled.compatible.checked)
-      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) catalog)
+    (covered : ∃ header ∈ catalog,
+      header.slot = receipt.index ∧ header.named.signature = receipt.signature)
     (plan : compilation.plan = compiled.indexed.base.plan)
-    (globals : compilation.globals = compiled.indexed.base.globals)
     (ordered : ∀ header, header ∈ catalog →
       header.instantiation.parameterSubstitution.map Prod.fst =
         (header.named.specialized.parameterSubstitution.map Prod.fst).reverse) :
     Nonempty (Ready receipt catalog) := by
-  have selected := receipt.global
-  rw [globals] at selected
-  obtain ⟨header, member, slot, signature⟩ := complete receipt.index receipt.signature selected
+  obtain ⟨header, member, slot, signature⟩ := covered
   have record := CallableIndexedActualNamedSourceReceipts.header_record compiled header
   rw [signature, ← plan] at record
   have specialized : header.named.specialized = receipt.specialized :=
@@ -64,6 +59,22 @@ theorem of_complete
   have headerEq := headerMatch.retained_canonical (by
     simpa only [← specialized] using ordered header member)
   exact ⟨⟨header, member, slot, signature, specialized, occurrenceEq.trans headerEq.symm⟩⟩
+
+theorem of_complete
+    {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+    (complete : RecursiveNamedCatalogNativeContexts.Complete
+      (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) catalog)
+    (plan : compilation.plan = compiled.indexed.base.plan)
+    (globals : compilation.globals = compiled.indexed.base.globals)
+    (ordered : ∀ header, header ∈ catalog →
+      header.instantiation.parameterSubstitution.map Prod.fst =
+        (header.named.specialized.parameterSubstitution.map Prod.fst).reverse) :
+    Nonempty (Ready receipt catalog) := by
+  have selected := receipt.global
+  rw [globals] at selected
+  exact of_slot receipt (complete receipt.index receipt.signature selected) plan ordered
 
 /-- Independently typed declaration application fixes the original parameter
 row and return type of the selected Header. Native packed types are unused. -/
@@ -100,15 +111,12 @@ structure Port (catalog : List (CallableIndexedOwnedFunctionValues.Header compil
 
 /-- The real retained Inventory supplies all preparation and Source provenance.
 No new public execution premise or unrelated native run is needed. -/
-theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
-    (complete : RecursiveNamedCatalogNativeContexts.Complete
-      (prepared := compiled.indexed.ancestry)
-      (values := .initial compiled.compatible.checked)
-      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers rows))
-    (plan : compilation.plan = compiled.indexed.base.plan)
-    (globals : compilation.globals = compiled.indexed.base.globals) :
+theorem of_inventory_at {inputs : List (Input compiled)} (rows : Inventory inputs)
+    (covered : ∃ header ∈ headers rows,
+      header.slot = receipt.index ∧ header.named.signature = receipt.signature)
+    (plan : compilation.plan = compiled.indexed.base.plan) :
     Nonempty (Port receipt (headers rows)) := by
-  obtain ⟨ready⟩ := of_complete receipt complete plan globals
+  obtain ⟨ready⟩ := of_slot receipt covered plan
     (CallableIndexedOwnedPreparedFiniteNamedInventories.ordered rows)
   obtain ⟨input, packet, _retained, same⟩ := rows.mem_headers ready.header ready.member
   have aligned := packet.aligned
@@ -139,6 +147,18 @@ theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
             sourceInstantiation := sourceMetadata
             dictionary := (same ▸ sourceAt).dictionary.symm.trans
               (congrArg Dynamic.Closure.evidence aligned.function) }⟩
+
+theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
+    (complete : RecursiveNamedCatalogNativeContexts.Complete
+      (prepared := compiled.indexed.ancestry)
+      (values := .initial compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (headers rows))
+    (plan : compilation.plan = compiled.indexed.base.plan)
+    (globals : compilation.globals = compiled.indexed.base.globals) :
+    Nonempty (Port receipt (headers rows)) := by
+  have selected := receipt.global
+  rw [globals] at selected
+  exact of_inventory_at receipt rows (complete receipt.index receipt.signature selected) plan
 
 /-- Full Source evidence is produced and identified at the actual caller
 context. It contains no Source or native body execution premise. -/

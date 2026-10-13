@@ -26,7 +26,7 @@ open CallableIndexedOwnedContextualTypedClosureReceipts (Association)
 open CallableIndexedOwnedPreparedStagedFiniteClosureParentBounds (FiniteFor)
 open CallableIndexedOwnedPreparedStagedFiniteNamedGlobalDispatch (Terminal)
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
-open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls NoDirect NoIndexes)
+open CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates (Certificate Calls NoMethods NoDirect NoIndexes)
 universe u
 
 def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
@@ -115,18 +115,18 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode) :
-    NoDirect root → NoIndexes root → CallsReady root → ∀ size,
+    NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size,
       PreservesAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   induction root with
   | leaf tree =>
-      intro _noDirect _noIndexes _ports size current child code point
+      intro _noMethods _noDirect _noIndexes _ports size current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.preserves
         bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
         unique wellFormed runtime covers size tree
   | @unary id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType unaryProfile child ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(operand, ⟨core.operandType, childCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -135,7 +135,8 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         have pair := Prod.mk.inj member
         obtain ⟨rfl, rfl⟩ := pair
         intro node
-        exact ih (fun compiler inside => noDirect compiler (.unary_child
+        exact ih (fun compiler inside => noMethods compiler (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => noDirect compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => ports compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -145,7 +146,7 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(left, ⟨operatorMode.operandType operator, leftCode⟩), (right, ⟨operatorMode.operandType operator, rightCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -155,7 +156,9 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihFirst (fun compiler inside => noDirect compiler (.binary_left
+          exact ihFirst (fun compiler inside => noMethods compiler (.binary_left
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => noDirect compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -165,7 +168,9 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihSecond (fun compiler inside => noDirect compiler (.binary_right
+          exact ihSecond (fun compiler inside => noMethods compiler (.binary_right
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => noDirect compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -178,7 +183,7 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .binary metadata form leftFound rightFound leftType rightType outputType binaryProfile (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree ihCondition ihThen ihElse =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(condition, ⟨.bool, conditionCode⟩), (thenId, ⟨type, thenCode⟩), (elseId, ⟨type, elseCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -188,7 +193,10 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihCondition (fun compiler inside => noDirect compiler (.conditional_condition
+          exact ihCondition (fun compiler inside => noMethods compiler (.conditional_condition
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_condition
@@ -201,7 +209,10 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihThen (fun compiler inside => noDirect compiler (.conditional_then
+          exact ihThen (fun compiler inside => noMethods compiler (.conditional_then
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_then
@@ -214,7 +225,10 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         · have pair := Prod.mk.inj member2
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihElse (fun compiler inside => noDirect compiler (.conditional_else
+          exact ihElse (fun compiler inside => noMethods compiler (.conditional_else
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_else
@@ -230,12 +244,13 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (Point rootScope inner code) callFaults size := by
         intro childSize _smaller current child actual point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih (fun compiler inside => noDirect compiler
+        exact ih (fun compiler inside => noMethods compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => noDirect compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => ports compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -244,13 +259,14 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_preserves bridge unique size
         childMeaning size (Nat.le_refl _) (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @tuple id node ids types codes header sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun compiler inside => noDirect compiler
+          (fun compiler inside => noMethods compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => noDirect compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -260,13 +276,14 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
   | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun compiler inside => noDirect compiler
+          (fun compiler inside => noMethods compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => noDirect compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -276,13 +293,16 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun nested inside => noDirect nested
+          (fun nested inside => noMethods nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => noDirect nested
           (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
             (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
@@ -299,19 +319,23 @@ theorem preserves {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId
         (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
         ⟨rfl, rfl, compiler.output⟩
   | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree _ihFirst _ihSecond =>
-      intro _noDirect noIndexes
+      intro _noMethods _noDirect noIndexes
       exact False.elim (noIndexes header keyFound form sourceType scalar (.here firstTree secondTree))
+  | @method id fuel lowered types compiler sequence children _ih =>
+      intro  noMethods
+      exact False.elim (noMethods compiler (.here sequence children))
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
-      intro noDirect
+      intro noMethods noDirect
       exact False.elim (noDirect compiler (.here calleeTyped application sequence children))
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun nested inside => noDirect nested
+          (fun nested inside => noMethods nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => noDirect nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -336,18 +360,18 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
     (root : Certificate policy body compilation readFuel
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt rootScope rootId rootCode) :
-    NoDirect root → NoIndexes root → CallsReady root → ∀ size,
+    NoMethods root → NoDirect root → NoIndexes root → CallsReady root → ∀ size,
       ReflectsAt bridge context model stages invocation
         (Point rootScope rootId rootCode) callFaults size := by
   induction root with
   | leaf tree =>
-      intro _noDirect _noIndexes _ports size current child code point
+      intro _noMethods _noDirect _noIndexes _ports size current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedReadProductTreeBounds.reflects
         bridge functions extension sameLedger runtimeLedger callFaults uninitialized semantic
         unique wellFormed runtime covers size tree
   | @unary id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType unaryProfile child ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(operand, ⟨core.operandType, childCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -356,7 +380,8 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         have pair := Prod.mk.inj member
         obtain ⟨rfl, rfl⟩ := pair
         intro node
-        exact ih (fun compiler inside => noDirect compiler (.unary_child
+        exact ih (fun compiler inside => noMethods compiler (.unary_child
+            (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => noDirect compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) (fun compiler inside => ports compiler (.unary_child
             (actual := metadata) (form := form) (found := found) (inputType := inputType) (outputType := outputType) (profile := unaryProfile) inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -366,7 +391,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
   | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(left, ⟨operatorMode.operandType operator, leftCode⟩), (right, ⟨operatorMode.operandType operator, rightCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -376,7 +401,9 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihFirst (fun compiler inside => noDirect compiler (.binary_left
+          exact ihFirst (fun compiler inside => noMethods compiler (.binary_left
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => noDirect compiler (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.binary_left
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -386,7 +413,9 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihSecond (fun compiler inside => noDirect compiler (.binary_right
+          exact ihSecond (fun compiler inside => noMethods compiler (.binary_right
+            (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
+            (profile := binaryProfile) (first := first) (second := second) inside)) (fun compiler inside => noDirect compiler (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
             (profile := binaryProfile) (first := first) (second := second) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.binary_right
             (actual := metadata) (form := form) (leftFound := leftFound) (rightFound := rightFound) (leftType := leftType) (rightType := rightType) (outputType := outputType)
@@ -399,7 +428,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .binary metadata form leftFound rightFound leftType rightType outputType binaryProfile (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @conditional id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree ihCondition ihThen ihElse =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(condition, ⟨.bool, conditionCode⟩), (thenId, ⟨type, thenCode⟩), (elseId, ⟨type, elseCode⟩)]) callFaults size := by
         intro childSize smaller current child code entry
@@ -409,7 +438,10 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         · have pair := Prod.mk.inj member0
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihCondition (fun compiler inside => noDirect compiler (.conditional_condition
+          exact ihCondition (fun compiler inside => noMethods compiler (.conditional_condition
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_condition
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_condition
@@ -422,7 +454,10 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         · have pair := Prod.mk.inj member1
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihThen (fun compiler inside => noDirect compiler (.conditional_then
+          exact ihThen (fun compiler inside => noMethods compiler (.conditional_then
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_then
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_then
@@ -435,7 +470,10 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         · have pair := Prod.mk.inj member2
           obtain ⟨rfl, rfl⟩ := pair
           intro node
-          exact ihElse (fun compiler inside => noDirect compiler (.conditional_else
+          exact ihElse (fun compiler inside => noMethods compiler (.conditional_else
+            (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
+            (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
+            (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun compiler inside => noDirect compiler (.conditional_else
             (actual := metadata) (form := form) (conditionFound := conditionFound) (thenFound := thenFound) (elseFound := elseFound)
             (conditionType := conditionType) (thenType := thenType) (elseType := elseType)
             (conditionTree := conditionTree) (thenTree := thenTree) (elseTree := elseTree) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar (.conditional_else
@@ -451,12 +489,13 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .conditional metadata form conditionFound thenFound elseFound conditionType thenType elseType (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩) (by exact ⟨rfl, by simp⟩)
   | @group id node inner innerNode code metadata form innerFound sourceType child ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsAt bridge context model stages invocation
           (Point rootScope inner code) callFaults size := by
         intro current child actual point
         obtain ⟨rfl, rfl, rfl⟩ := point
-        exact ih (fun compiler inside => noDirect compiler
+        exact ih (fun compiler inside => noMethods compiler
+          (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => noDirect compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) (fun compiler inside => ports compiler
           (.group (actual := metadata) (form := form) (found := innerFound) (type := sourceType) inside)) size ⟨rfl, rfl, rfl⟩
@@ -465,13 +504,14 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       exact CallableIndexedOwnedPreparedStagedGroupBounds.group_reflects bridge unique size
         childMeaning (.actual metadata form innerFound sourceType ⟨rfl, rfl, rfl⟩)
   | @tuple id node ids types codes header sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults (size + 1) := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun compiler inside => noDirect compiler
+          (fun compiler inside => noMethods compiler
+          (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => noDirect compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.tuple_child (header := header) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -481,13 +521,14 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         bridge functions callFaults unique wellFormed runtime covers size childMeaning
         ⟨node, ids, types, codes, rfl, header, sequence⟩
   | @constructor id node instantiation ids tag headerWord codes header form admissible ranges count nodes sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip codes)) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun compiler inside => noDirect compiler
+          (fun compiler inside => noMethods compiler
+          (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => noDirect compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) (fun compiler inside => ports compiler
           (.constructor_child (header := header) (form := form) (admissible := admissible) (ranges := ranges) (count := count) (nodes := nodes) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩
@@ -497,13 +538,16 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         bridge functions extension callFaults unique wellFormed runtime covers size childMeaning
         header form admissible ranges count nodes sequence ⟨rfl, rfl, rfl⟩
   | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope (ids.zip compiler.codes)) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun nested inside => noDirect nested
+          (fun nested inside => noMethods nested
+          (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
+            (sourceType := sourceType) (nativeTypes := nativeTypes)
+            (sequence := sequence) (children := children) member inside)) (fun nested inside => noDirect nested
           (.builtin_child (outer := compiler) (calleeTyped := calleeTyped)
             (sourceType := sourceType) (nativeTypes := nativeTypes)
             (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
@@ -520,19 +564,23 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         (compiler.result ▸ compiler.metadata) compiler.form nativeTypes size sequence childMeaning
         ⟨rfl, rfl, compiler.output⟩
   | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType scalar firstTree secondTree _ihFirst _ihSecond =>
-      intro _noDirect noIndexes
+      intro _noMethods _noDirect noIndexes
       exact False.elim (noIndexes header keyFound form sourceType scalar (.here firstTree secondTree))
+  | @method id fuel lowered types compiler sequence children _ih =>
+      intro  noMethods
+      exact False.elim (noMethods compiler (.here sequence children))
   | @direct id callee ids instantiation fuel lowered types compiler calleeTyped application sequence children _ih =>
-      intro noDirect
+      intro noMethods noDirect
       exact False.elim (noDirect compiler (.here calleeTyped application sequence children))
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
-      intro noDirect noIndexes ports size
+      intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope compiler.entries) callFaults size := by
         intro childSize _smaller current child code entry
         obtain ⟨rfl, member⟩ := entry
         exact ih child code member
-          (fun nested inside => noDirect nested
+          (fun nested inside => noMethods nested
+          (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => noDirect nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun indexed indexFound indexForm indexType indexScalar inside => noIndexes indexed indexFound indexForm indexType indexScalar
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) (fun nested inside => ports nested
           (.call_child (outer := compiler) (sequence := sequence) (children := children) member inside)) childSize ⟨rfl, rfl, rfl⟩

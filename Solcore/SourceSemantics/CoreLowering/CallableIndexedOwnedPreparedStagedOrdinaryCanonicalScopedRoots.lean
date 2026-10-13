@@ -147,6 +147,8 @@ theorem of_child
       · rw [compiler.form] at form
         cases form)
     (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.ordinary_ready support provenance.body_reasons
-      sameSource reached certificate)⟩⟩
+      sameSource reached certificate)
+    (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_steps _ childTree
+      (profile.steps (fun _ mono => mono.ordinary code.compilation.plan)))⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryCanonicalScopedRoots

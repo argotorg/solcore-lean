@@ -78,6 +78,7 @@ def Root.of_compiled
     actualFunctionType := actualFunctionType
     uninitialized := fun current id code receipt _reached => uninitialized current id code receipt
     callsReady := callsReady
+    noMethods := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_policy _ syntaxTree policyFor
     noDirect := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax _ syntaxTree
     noIndexes := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax _ syntaxTree }
 

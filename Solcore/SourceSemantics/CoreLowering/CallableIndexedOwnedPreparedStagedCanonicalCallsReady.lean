@@ -48,6 +48,8 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
     (path : Calls compiler root) (tree : Syntax source rootId) : Syntax source callId := by
   induction path with
   | here sequence children => exact tree
+  | @method_child scope id otherFuel code types outer sequence children child childCode member inside ih =>
+    exact ih (syntax_child tree outer.metadata.found (outer.argument_references (List.of_mem_zip member).1))
   | @group scope id node inner innerNode code actual form found sourceType child inside ih =>
     exact ih (syntax_child tree actual.found (by simp [form, ExpressionForm.references]))
   | @tuple_child scope id node tupleIds types codes header sequence children child childCode member inside ih =>

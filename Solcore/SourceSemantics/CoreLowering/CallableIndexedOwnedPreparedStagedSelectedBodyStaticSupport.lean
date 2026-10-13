@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLegacyCallerMethodExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalClosureUsedChildBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedLambdaEntryPrefix
@@ -70,6 +71,7 @@ structure Root (compiled : SourceCoreUnifiedCompilation.Compiled)
     (rawType : TypeSystem.Ty) (semanticFaults : FunctionCalls.FaultRep) extends
     RootData compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults where
+  noMethods : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoMethods toRootData.certificate
   noDirect : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoDirect toRootData.certificate
   noIndexes : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoIndexes toRootData.certificate
 
@@ -85,6 +87,7 @@ structure CanonicalRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
     (headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))) extends
     RootData compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults where
+  noMethods : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoMethods toRootData.certificate
   directReady : ∀ {fuel callScope callId callee ids instantiation callCode}
     (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt
       policy lowerBody fuel compilation (.initial compiled.compatible.checked)
@@ -135,10 +138,11 @@ certificate, including all recursively evaluated callee and argument entries. -/
 def RootData.legacy
     (root : RootData compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults)
-    (syntaxTree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source expression) :
+    (syntaxTree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.Syntax invocation.source expression)
+    (noMethods : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoMethods root.certificate) :
     Root compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults :=
-  ⟨root, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree,
+  ⟨root, noMethods, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree,
     CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root.certificate syntaxTree⟩
 
 /-- Shared roots receive full evidence authority derived at their actual
@@ -154,10 +158,11 @@ def RootData.canonical_with
       CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler root.certificate →
       Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.PortWithEvidence
         compiler headers context invocation.evidence))
-    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate) :
+    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate)
+    (noMethods : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoMethods root.certificate) :
     CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults headers :=
-  ⟨root, ready, indexes⟩
+  ⟨root, noMethods, ready, indexes⟩
 
 /-- All reached direct sites use the original finite inventory and authentic
 compiler context; no semantic call law or runtime globals are manufactured. -/
@@ -179,11 +184,12 @@ def RootData.canonical
       CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler root.certificate →
       CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan instantiation ∧
         compiler.node.requirements = [])
-    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate) :
+    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate)
+    (noMethods : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.NoMethods root.certificate) :
     CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) :=
-  ⟨root, fun compiler path => by
+  ⟨root, noMethods, fun compiler path => by
     obtain ⟨port⟩ := CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals
     obtain ⟨ordinary, requirements⟩ := ordinarySites compiler path
     exact ⟨⟨port, CallableIndexedOwnedPreparedStagedDirectCallAuthority.ordinary_evidence

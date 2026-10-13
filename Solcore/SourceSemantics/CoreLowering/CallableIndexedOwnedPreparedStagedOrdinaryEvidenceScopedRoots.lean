@@ -175,7 +175,8 @@ theorem of_original_child
     callsReady := ready }
   exact ⟨⟨node.type, root.canonical_with directReady
     (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.ordinary_ready support provenance.body_reasons
-      sameSource reached certificate)⟩⟩
+      sameSource reached certificate)
+    (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_steps _ childTree profile)⟩⟩
 
 include receiver wellFormed supported metadata rows complete signatureMember sourceOwner provenance in
 /-- The real body-view callback supplies a root for the original Source at its

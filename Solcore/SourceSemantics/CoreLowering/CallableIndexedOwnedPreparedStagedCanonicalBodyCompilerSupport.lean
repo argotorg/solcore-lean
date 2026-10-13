@@ -208,7 +208,8 @@ def CanonicalRootAt.of_steps_compiled {directSites : DeclarationInstantiation �
     (reasonAt := reasonAt) (scope := scope) (expression := expression) (lowered := lowered)
     (node := node) (rawType := rawType) (semanticFaults := semanticFaults)
     native active callables unique declarations policyFor coercions syntaxTree found typed accepted callsReady rawResult
-    sameLedger runtimeLedger wellFormed runtime covers actualFunctionType uninitialized).canonical_with directReady indexReady)
+    sameLedger runtimeLedger wellFormed runtime covers actualFunctionType uninitialized).canonical_with directReady indexReady
+    (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_steps _ syntaxTree policyFor))
 
 def CanonicalRootAt.of_sites_compiled {directSites : DeclarationInstantiation → Prop}
     (ordinary : ∀ i, directSites i → CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan i)
@@ -275,7 +276,8 @@ def CanonicalRootAt.of_sites_compiled {directSites : DeclarationInstantiation �
       refine ⟨ordinary _ (actualTree.direct_site compiler.metadata.found compiler.form), ?_⟩
       have sameScope := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.direct_calls_scope path
       exact compiler.ordinary_requirements
-        (sameScope.symm ▸ policyFor.special _ actualTree) (policyFor.read _ actualTree)) indexReady)
+        (sameScope.symm ▸ policyFor.special _ actualTree) (policyFor.read _ actualTree)) indexReady
+      (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_steps _ syntaxTree (policyFor.steps ordinary)))
 
 def RootData.of_general_compiled
     (native : SourceCoreGeneralFunctions.CallableContext) (active : TypeSystem.Substitution)

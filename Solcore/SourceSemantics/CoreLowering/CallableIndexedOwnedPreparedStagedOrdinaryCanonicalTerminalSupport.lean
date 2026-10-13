@@ -174,6 +174,8 @@ def at_scope
         cases form)
     (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.ordinary_ready support provenance.body_reasons
       sameSource (CallableIndexedOwnedPreparedStagedSelectedBodyCompilerRoots.terminal_reached code packet) certificate)
+    (CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_methods_of_steps _ syntaxTree
+      (profile.steps (fun _ mono => mono.ordinary code.compilation.plan)))
 
 include receiver wellFormed metadata rows complete signatureMember sourceOwner provenance in
 /-- The accepted ordinary factory and complete Header inventory issue the
