@@ -1,7 +1,6 @@
 import Solcore.Test.SourceCoreRecursiveIndexCommon
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryReflection
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicWordResultMeaning
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryOutputCollection
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarStep
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectSuccessStep
 
 /-! Collected closure handles use the current metadata receiver.
 Each returned state retains that receiver for the following public call. -/
@@ -40,50 +39,12 @@ theorem invoke_word {fixture : CompiledFixture} {observed : ObservedProgram fixt
     ∃ (sources : List Dynamic.Value) (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value (.word word)) after.heap := by
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
-  have semantic : ∀ reason token,
-      CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults state.receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token represented
-    exact CompatibleRegistryDiagnosticExtension.semantic_preserved fixture.recipe.compiled
-      receiver.issued state.issued present state.extension represented
-  obtain ⟨receiving, checkpoint, actual, generation, value, finalStore, actualParameter, actualResult,
-      nativeParameter, nativeResult, callable, packed, encodedValues, sources, sourceSize, outcome,
-      after, finalMap, finalWorld, reached, contextAt, issued, extended, _diagnostics,
-      started, _parameterView, _resultView, succeeded, actualAt, packing, trace, result,
-      _related, retained, returnedRegistry⟩ :=
-    RecursiveNamedPublicActualRegistryReflection.public_invoke_succeeded
-      (completion := state.receiving) state.issued (actualStagePrepared fixture) observed.profile
-      support.observations semantic support.family
-      (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member))
-      support.supports fixture.source_wellFormed state.history entry member entryType
-      input state.atRecipe state.registry state.atSession
-      (by simpa only [entryHandle] using call.executed) invocation
-  have handleType : entry.handle.sourceType = .function parameter .word := entryHandle ▸ handleType
-  have requested := started.requested_exact handleType
-  have signature := started.selected.signature handleType
-  have projected := started.resultProjection
-  rw [signature.2] at projected
-  have nativeResultEq : nativeResult = .word := (Except.ok.inj projected).symm
-  rw [nativeResultEq] at result
-  have outcomeValue := RecursiveNamedPublicWordResultMeaning.represented_word succeeded requested
-    (actualAt.1.symm.trans returned) result.1
-  let next : RetainedState support call.completion.session entries := {
-    artifact := state.artifact
-    session := actual.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := reached
-    atSession := actualAt.2.2.2
-    atRecipe := state.atRecipe
-    receiving := receiving
-    issued := issued
-    extension := state.extension.trans extended
-    registry := (congrArg (·.registry) contextAt).symm ▸ returnedRegistry
-    history := retained }
-  exact ⟨sources, next, packing, sourceSize, by simpa only [outcomeValue] using trace⟩
+  obtain ⟨sources, packing, _arity, after, size, trace⟩ :=
+    RecursiveNamedPublicPhysicalSessionDirectScalarStep.State.invoke_scalar
+      support.program fixture.recipePrepared state entry member (.word word)
+      entryType (entryHandle ▸ handleType) input
+      (by simpa only [entryHandle] using call.executed) returned invocation
+  exact ⟨sources, after, packing, size, trace⟩
 
 
 /-- Successful intervening execution retains the complete old history even
@@ -104,41 +65,10 @@ theorem invoke_success {fixture : CompiledFixture} {observed : ObservedProgram f
       (after : RetainedState support call.completion.session entries),
       Dynamic.ValuesPack sources packedSource ∧
       SourceInvocation support invocation state.heap entry.source sources (.value source) after.heap := by
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
-  have semantic : ∀ reason token,
-      CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults state.receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token represented
-    exact CompatibleRegistryDiagnosticExtension.semantic_preserved fixture.recipe.compiled
-      receiver.issued state.issued present state.extension represented
-  obtain ⟨receiving, checkpoint, actual, generation, value, finalStore, actualParameter, actualResult,
-    nativeParameter, nativeResult, callable, packed, encodedValues, sources, sourceSize, source, payload, after,
-    finalMap, finalWorld, reached, added, contextAt, issued, extended, _diagnostics, _started, _parameterView, _resultView,
-    _succeeded, actualAt, packing, trace, _resultAt, _nativeValue, selected, _handles, _related, retained, returnedRegistry⟩ :=
-    RecursiveNamedPublicActualRegistryOutputCollection.public_invoke_succeeded_collects
-      (completion := state.receiving) state.issued (actualStagePrepared fixture) observed.profile
-      support.observations semantic support.family
-      (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member))
-      support.supports fixture.source_wellFormed state.history entry member entryType input state.atRecipe
-      state.registry state.atSession (by simpa only [entryHandle] using call.executed) .skip invocation
-  have addedNil : added = [] := by
-    simpa only [RecursiveNamedPublicNestedOutputSelections.Selection.handles, List.map_eq_nil_iff] using _handles
-  subst added
-  let next : RetainedState support call.completion.session entries := {
-    artifact := state.artifact
-    session := actual.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := reached
-    atSession := actualAt.2.2.2
-    atRecipe := state.atRecipe
-    receiving := receiving
-    issued := issued
-    extension := state.extension.trans extended
-    registry := (congrArg (·.registry) contextAt).symm ▸ returnedRegistry
-    history := by simpa only [List.append_nil, PublicSupports.functions] using retained }
-  exact ⟨sources, source, next, packing, sourceSize, trace⟩
+  obtain ⟨sources, packing, _arity, source, after, size, trace⟩ :=
+    RecursiveNamedPublicPhysicalSessionDirectSuccessStep.State.invoke_success
+      support.program fixture.recipePrepared state entry member entryType input
+      (by simpa only [entryHandle] using call.executed) invocation
+  exact ⟨sources, source, after, packing, size, trace⟩
 
 end Tests.SourceCoreRecursiveIndex

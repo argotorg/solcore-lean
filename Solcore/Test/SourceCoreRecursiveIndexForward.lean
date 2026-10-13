@@ -94,7 +94,7 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
 all nine actual steps have Source traces, and each trace implies public progress
 at sufficient fuel on the original checkpoint, including the missing-key fault. -/
 theorem closed_forward_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
-    (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (echoStages : ObservedStages fixture observed.echoRow)
     (chooseStages : ObservedStages fixture observed.chooseRow)
@@ -103,20 +103,21 @@ theorem closed_forward_meaning (fixture : CompiledFixture) (observed : ObservedP
     ∃ receiver : ObservedReceiver fixture observed,
       ∃ meaning : SequenceWitness makeStages sequence receiver, ForwardMeaning meaning := by
   obtain ⟨receiver, meaning⟩ :=
-    closed_sequence_meaning fixture observed extra makeStages echoStages chooseStages selectStages sequence
+    closed_sequence_meaning fixture observed admission makeStages echoStages chooseStages selectStages sequence
   obtain ⟨meaning⟩ := meaning
   exact ⟨receiver, meaning, meaning.forward⟩
 
 def runForward : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
-  let extra ← observeMake fixture observed
+  let admission ← observeProgramCertificate fixture observed
+  have _automatic := admission.automatic_catalog_initial
   let makeStages ← observeStages fixture observed.makeRow
   let echoStages ← observeStages fixture observed.echoRow
   let chooseStages ← observeStages fixture observed.chooseRow
   let selectStages ← observeStages fixture observed.selectRow
   let sequence ← observeSequence fixture observed
-  have _meaning := closed_forward_meaning fixture observed extra makeStages echoStages chooseStages selectStages sequence
+  have _meaning := closed_forward_meaning fixture observed admission makeStages echoStages chooseStages selectStages sequence
   IO.println "Recursive echo(table)[choose(key)]: select A10, allocate30, select B20, missing key, reuse A10; all nine Source traces and public fuel bounds proved"
 
 end Tests.SourceCoreRecursiveIndex

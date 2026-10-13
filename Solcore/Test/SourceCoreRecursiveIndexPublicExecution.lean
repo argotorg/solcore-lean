@@ -83,15 +83,15 @@ structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgra
     failedState.heap first.source repeatedArguments (.value (.word seed)) finalState.heap
 
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
-    (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (echoStages : ObservedStages fixture observed.echoRow)
     (chooseStages : ObservedStages fixture observed.chooseRow)
     (selectStages : ObservedStages fixture observed.selectRow)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     Nonempty (SequenceWitness makeStages sequence receiver) := by
-  obtain ⟨support⟩ := static_supports (completion := receiver.completion)
-    fixture observed extra makeStages echoStages chooseStages selectStages receiver.completion.result.context.registry receiver.issued
+  obtain ⟨support⟩ := static_supports
+    fixture observed admission makeStages echoStages chooseStages selectStages receiver
   let scope := RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function
   obtain ⟨first, firstType, firstHandle, firstHandleType, initial, firstTrace⟩ :=
     first_meaning_typed_handle support makeStages sequence.first
@@ -131,7 +131,7 @@ theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram
     failure, failedTrace, failedMeaning, repeatedArguments, repeatedPacking, repeatedReadTrace }⟩
 
 theorem closed_sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
-    (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (echoStages : ObservedStages fixture observed.echoRow)
     (chooseStages : ObservedStages fixture observed.chooseRow)
@@ -139,6 +139,6 @@ theorem closed_sequence_meaning (fixture : CompiledFixture) (observed : Observed
     (sequence : ObservedSequence fixture observed) :
     ∃ receiver : ObservedReceiver fixture observed, Nonempty (SequenceWitness makeStages sequence receiver) := by
   obtain ⟨receiver⟩ := initial_receiver fixture observed
-  exact ⟨receiver, sequence_meaning fixture observed extra makeStages echoStages chooseStages selectStages sequence receiver⟩
+  exact ⟨receiver, sequence_meaning fixture observed admission makeStages echoStages chooseStages selectStages sequence receiver⟩
 
 end Tests.SourceCoreRecursiveIndex

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionRegistryFailureStep
 import Solcore.Test.SourceCoreRecursiveIndexInputs
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNamedReflection
 
@@ -50,7 +51,7 @@ theorem RetainedState.select_failure
         failure call.reason := by
   obtain ⟨request⟩ := RecursiveNamedPublicHistoryFrontdoor.recover_start
     fixture.recipePrepared [support.makeInput, support.echoInput, support.chooseInput, support.selectInput]
-    support.rows support.complete state.atRecipe state.history.current.1 state.atSession call.started
+    support.rows support.complete state.atRecipe state.history.semantic.current.1 state.atSession call.started
   have selected := selected_select_at support.makeHeader support.echoHeader support.chooseHeader
     support.selectHeader support.header_list request
   have inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
@@ -63,59 +64,12 @@ theorem RetainedState.select_failure
       (.named request.header.named.signature.key) := by
     rw [selected]
     exact support.selectDescriptor
-  obtain ⟨receiving, _member, contextAt, issued, extended, retained, _diagnostics⟩ :=
-    RecursiveNamedPublicActualRegistryNamedStart.named_start state.history state.registry request.started
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
-  have semantic : ∀ reason token,
-      CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token represented
-    exact CompatibleRegistryDiagnosticExtension.semantic_preserved fixture.recipe.compiled
-      receiver.issued issued present (state.extension.trans extended) represented
-  obtain ⟨actual, value, finalStore, capture, sourceSize, outcome, sourceHeap, finalMap, finalWorld,
-      failed, returnedAt, trace, result, reached, _related, history⟩ :=
-    CallableIndexedOwnedPreparedStagedHistoryPublicFailures.public_run_failed_retains
-      (inputs := [support.makeInput, support.echoInput, support.chooseInput, support.selectInput]) (rows := support.rows)
-      (stagePrepared := actualStagePrepared fixture) (completion := receiving) (receiver := issued)
-      (profile := observed.profile) (observations := support.observations)
-      (extension := receiving.result.extension) (semantic := semantic)
-      (family := support.family) (namedTerminals := fun header member =>
-        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member))
-      (namedSupport := support.supports) (wellFormed := fixture.source_wellFormed)
-      (prepared := fixture.recipePrepared) (selected := request.selected)
-      (caller := state.caller) (history := retained) (atCheckpoint := request.atCheckpoint)
-      (started := request.started) (inputReceipts := inputs)
-      (metadata := by rw [contextAt]; exact .refl _)
-      (sourceAt := request.sourceAt) (invocation := invocation) call.started call.executed descriptor
-  have registryAt : actual.RegistryAt request.encodedValues.registry := by
-    have values := failed.2.2.2.2.1.trans request.started.values
-    rcases request with ⟨checkpoint, root, header, payloads, encodedValues, rawD, function,
-      atCheckpoint, started, selected, sourceAt⟩
-    cases checkpoint
-    exact congrArg SourceCoreCompatibleValues.Context.registry values
-  let after : RetainedState support call.returned entries := {
-    artifact := state.artifact
-    session := actual
-    mapping := finalMap
-    world := finalWorld
-    heap := sourceHeap
-    store := finalStore
-    caller := reached
-    atSession := returnedAt
-    atRecipe := state.atRecipe
-    receiving := receiving
-    issued := issued
-    extension := state.extension.trans extended
-    registry := (congrArg (·.registry) contextAt).symm ▸ registryAt
-    history := history }
-  have represented := result.2.1
-  cases represented with
-  | value _ => have impossible := failed.2.1; cases impossible
-  | @fault failure token matched =>
-    have tokenEq : token = call.reason := by
-      simpa only [Core.LanguageResult.decode?, Option.some.injEq, Core.LanguageResult.Outcome.failed.injEq] using failed.2.1
-    refine ⟨after, failure, ⟨request.rawD, request.function, sourceSize, ?_, trace⟩, ?_⟩
-    · exact selected ▸ request.sourceAt
-    · exact tokenEq ▸ matched
+  let started : RecursiveNamedPublicPhysicalSessionState.StartedCall session observed.selectRow.row.key
+      [table firstHandle secondHandle, .word key] runOptions := ⟨call.checkpoint, call.started⟩
+  obtain ⟨failure, after, trace, decoded⟩ :=
+    RecursiveNamedPublicPhysicalSessionFailureStep.State.failed_call_at_input_registry
+      support.program fixture.recipePrepared state started call.returned call.reason call.executed
+      request inputs descriptor invocation
+  exact ⟨after, failure, by simpa only [selected] using trace, decoded⟩
 
 end Tests.SourceCoreRecursiveIndex

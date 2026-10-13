@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreRecursiveIndexInvocation
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryOutputPreservation
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarForward
 
 /-! The three captured closure calls establish independent Source traces.
 Those traces imply actual public export on their original starts at every
@@ -46,67 +46,11 @@ theorem forward_word {fixture : CompiledFixture} {observed : ObservedProgram fix
     .data ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
       ⟨.unit, by simp [SourceCoreIndexedSession.DataInput.publicValue], .unit⟩
   obtain ⟨publicCheckpoint, accepted, _resumed⟩ := call.executed
-  obtain ⟨checkpoint, atCheckpoint, original⟩ :=
-    RecursiveNamedPublicDirectHandleMeaning.recover_handle_start state.atSession accepted
-  have imported := (state.history.current.2.2.2.2 entry member).1
-  rw [entryType, entryHandle] at imported
-  obtain ⟨actualParameter, actualResult, nativeParameter, nativeResult, callable, packed, encodedValues,
-      started, _parameterView, _resultView⟩ :=
-    RecursiveNamedPublicDirectPackedInputMeaning.actual_start_compatible state.atRecipe
-      state.history.current.1 imported original
-  have signature := started.selected.signature handleType
-  have requested := started.requested_exact handleType
-  have projected := started.resultProjection
-  rw [signature.2] at projected
-  have nativeResultEq : nativeResult = .word := (Except.ok.inj projected).symm
-  subst nativeResult
-  rw [← entryHandle] at started
-  obtain ⟨program, present⟩ := RecursiveNamedPublicHistoryRegistryExtension.diagnostics_present state.history
-  have semantic : ∀ reason token,
-      CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics reason token →
-      CallableIndexedOwnedPublicDecodedStagedCallFaults.faults state.receiving.result.diagnostics (.semantic reason) token := by
-    intro reason token represented
-    exact CompatibleRegistryDiagnosticExtension.semantic_preserved fixture.recipe.compiled
-      receiver.issued state.issued present state.extension represented
   obtain ⟨size, trace⟩ := trace
-  obtain ⟨receiving, contextAt, issued, extended, _diagnostics, requiredExecution, requiredOutput,
-      payload, finalStore, finalMap, finalWorld, _nativeEnough, fullResult, publicEnough⟩ :=
-    RecursiveNamedPublicActualRegistryOutputPreservation.public_resume_has_sufficient_fuel
-      (completion := state.receiving) state.issued (actualStagePrepared fixture) observed.profile
-      support.observations semantic support.family
-      (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member))
-      support.supports fixture.source_wellFormed state.history entry member entryType
-      unitInput state.registry (state.atSession.exportsReady_iff.mp exportsReady)
-      started packing trace atCheckpoint
-  have payloadEq : payload = .word word := by
-    have represented := fullResult.1
-    cases represented with
-    | value related =>
-      obtain ⟨actual, sourceEq, nativeEq⟩ := CompatibleExpressionPrimitives.word_fields related
-      cases Dynamic.Value.word.inj sourceEq
-      exact nativeEq
-  subst payload
-  refine ⟨publicCheckpoint, accepted, requiredExecution, requiredOutput, ?_⟩
-  intro executionFuel outputFuel outcome enoughExecution enoughOutput resumed
-  obtain ⟨completion, actual, _generation, reached, succeeded, exported, atCompletion,
-      _related, history, returnedRegistry, returnedReady⟩ :=
-    publicEnough executionFuel outputFuel outcome enoughExecution enoughOutput resumed
-  have valueEq : completion.value = .word word := atCompletion.1.trans (exported.word_value requested)
-  let returned : RetainedState support completion.session entries := {
-    artifact := state.artifact
-    session := actual.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := reached
-    atSession := atCompletion.2.2.2
-    atRecipe := state.atRecipe
-    receiving := receiving
-    issued := issued
-    extension := state.extension.trans extended
-    registry := (congrArg (·.registry) contextAt).symm ▸ returnedRegistry
-    history := history }
-  exact ⟨completion, succeeded, valueEq, atCompletion.2.2.2.exportsReady_iff.mpr returnedReady, returned, rfl⟩
+  have forward := RecursiveNamedPublicPhysicalSessionDirectScalarForward.forward_call
+    support.program fixture.recipePrepared state entry member (.word word)
+    entryType (entryHandle ▸ handleType) unitInput
+    (by simpa only [entryHandle] using accepted) exportsReady packing trace
+  exact ⟨publicCheckpoint, accepted, forward⟩
 
 end Tests.SourceCoreRecursiveIndex
