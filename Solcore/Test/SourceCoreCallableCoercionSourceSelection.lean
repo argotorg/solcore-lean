@@ -6,6 +6,7 @@ ordered dictionary. Runtime checks exercise the same accepted compiler paths;
 source body invocation and installed closure history are separate obligations. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 1600000
 namespace Tests.SourceCoreCallableCoercionSourceSelection
@@ -35,7 +36,7 @@ theorem accepted_source_selection {loaded : LoadedProgram} {program : CheckedPro
     Dynamic.OperatorMethodSelected (Program.ofChecked program) context (environment available) "Coerce" "coerce"
       (step.requirement :: step.methodRequirements) (bodyInstance program method) (environment dictionary) := by
   obtain ⟨receipt⟩ := of_accepted accepted
-  exact receipt.selects loadedAccepted (formed receipt) range signatures ledger assumptions resolved covered materialized
+  exact receipt.selects (CallableMethodBodyCoherence.of_loaded loadedAccepted) (formed receipt) range signatures ledger assumptions resolved covered materialized
 
 /-- A reached authentic primary row is enough even when unrelated ledger rows
 are not valid. The actual materializer is not replaced with an invented map. -/

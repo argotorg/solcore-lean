@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.RecursiveMethodDictionaryIdentity
@@ -71,8 +72,7 @@ private theorem of_actual_with_identity
     (support : SelectionCore (authentic receipt actual special) selected)
     (resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
       actual.selection.method.specialized (environment actual.dictionary))
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (_catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
@@ -151,8 +151,7 @@ theorem of_actual_with_evidence
       (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram actual.selection.method).context.assumptions)
     (resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
       actual.selection.method.specialized (environment actual.dictionary))
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
@@ -203,8 +202,7 @@ theorem of_actual_with_origins
       (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram actual.selection.method).context.assumptions)
     (resolved : CallableIndexedOwnedPreparedStagedDirectCallAuthority.ResolvedCaller compiled.sourceProgram
       actual.selection.method.specialized (environment actual.dictionary))
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
@@ -254,8 +252,7 @@ include receipt actual special in
 theorem of_actual
     (selected : OperatorSource actual)
     (support : SelectionSupport (authentic receipt actual special) selected)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}

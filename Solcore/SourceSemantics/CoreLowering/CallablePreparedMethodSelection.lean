@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodFrame
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleRuntimeContextValidity
@@ -7,6 +8,7 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedParameterProje
 source evidence, and the compiler's chosen plan row. It does not reinterpret
 an implementation method as an ordinary program function. -/
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 8192
 set_option maxHeartbeats 1600000
 namespace Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodSelection
@@ -401,7 +403,7 @@ open CallableCoercionMethodInstantiation (bodyInstance Formation)
 /-- The actual authenticated dictionaries supply the independent source method
 judgment. Caller-covered headers and full substitution formation remain explicit. -/
 theorem SourceReceipt.selects
-    {loaded : LoadedProgram} (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {receipt : Operator program project caller compilation child fuel source scope id reasonAt policy node output}
     (selected : SourceReceipt receipt)
     (formed : Formation selected.certificate.selected.implementation selected.certificate.selected.declaration)
@@ -440,8 +442,7 @@ theorem selected_typed {sourceProgram : Program} {context : Context}
 
 /-- The retained checker record is the source of the full body, substitution,
 unused ledger rows and original staging metadata. -/
-theorem SourceReceipt.retained {loaded : LoadedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem SourceReceipt.retained     (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {receipt : Operator program project caller compilation child fuel source scope id reasonAt policy node output}
     (selected : SourceReceipt receipt) :
     Nonempty (CallableCoercionBodyProvenance.Certificate program receipt.selection.method) := by
@@ -582,7 +583,7 @@ theorem SourceReceipt.prepared_frame {compiled : SourceCoreUnifiedCompilation.Co
     (callerMember : caller ∈ compilation.plan.specializations)
     (nodeMember : .expression node ∈ caller.function.typedBody.nodes)
     (samePlan : compilation.plan = compiled.indexed.base.plan)
-    {loaded : LoadedProgram} (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (loadedAccepted : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (formed : Formation selected.certificate.selected.implementation selected.certificate.selected.declaration)
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
       (Context.ofSignatures compiled.sourceProgram.signatures) receipt.selection.method.specialized.parameterSubstitution)

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionAuthority
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
@@ -82,8 +83,7 @@ include step in
 theorem of_actual
     (selected : CallableCoercionSourceSelection.Certificate compiled.sourceProgram caller node available coercion step.method)
     (support : Support step selected)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}

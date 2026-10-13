@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedBranchingCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedPhysicalMixedScopedRoots
@@ -78,8 +79,7 @@ def of_actual_with_catalog
       compiled.indexed.base.globals[index]? = some signature →
       ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
         header.slot = index ∧ header.named.signature = signature)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -125,8 +125,7 @@ def of_actual_generic
       compiled.indexed.base.globals[index]? = some signature →
       ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
         header.slot = index ∧ header.named.signature = signature)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -164,8 +163,7 @@ def of_actual_with_evidence
       compiled.indexed.base.globals[index]? = some signature →
       ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
         header.slot = index ∧ header.named.signature = signature)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -203,8 +201,7 @@ def of_actual
       compiled.indexed.base.globals[index]? = some signature →
       ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
         header.slot = index ∧ header.named.signature = signature)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}

@@ -57,6 +57,7 @@ theorem ActualHeader.scoped_receipt {fixture : CompiledFixture}
   obtain ⟨receipt⟩ := CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.of_accepted
     actual.aligned.accepted (by rw [actual.source, bodyEq]; exact shape.body_shape) actual.aligned.projection
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   refine ⟨receipt, ?_⟩
   apply CallableIndexedOwnedPreparedNamedPhysicalMixedScopedCollectors.of_actual_with_evidence actual.prepared actual.aligned
     fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed

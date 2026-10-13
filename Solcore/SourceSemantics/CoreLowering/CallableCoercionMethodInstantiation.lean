@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
 import Solcore.SourceSemantics.ProgramCheckingSoundness
 
@@ -5,6 +6,7 @@ import Solcore.SourceSemantics.ProgramCheckingSoundness
 are connected to independent source method instantiation. Type formation stays
 an independent static obligation. No body execution or closure history is stored. -/
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 1200000
 namespace Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
@@ -464,8 +466,7 @@ theorem method_predicates (selected : Selection program primary name method)
 
 /-- Actual same-fuel retained checking and structural substitution yield the
 source method instantiation. Range formation is not inferred from groundness. -/
-theorem instantiates {loaded : LoadedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem instantiates     (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     (selected : Selection program primary name method)
     (formed : selected.implementation.parameters.Nodup)
     (range : SourceSemantics.ParameterSubstitution.RangeWellFormed

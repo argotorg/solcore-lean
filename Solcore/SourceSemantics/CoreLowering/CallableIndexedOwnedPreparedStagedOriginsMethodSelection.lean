@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionCoreSupport
 import Solcore.SourceSemantics.CoreLowering.CallableMethodOriginTable
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
@@ -38,8 +39,7 @@ The public body family supplies no method execution or dictionary equality. -/
 theorem of_actual
     (selected : OperatorSource actual)
     (methods : Catalog compiled)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}

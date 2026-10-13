@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOriginsMethodAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedMethodAdmission
@@ -136,7 +137,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (certificate : Certificate compiled)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {recipe : SourceCoreIndexedSession.Recipe} (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
-  {loaded : LoadedProgram} (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (identity : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   {initial : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
   (issued : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed initial.entry
@@ -284,23 +285,57 @@ theorem Certificate.issue_for :
       rows aligned ready entryMember (stages compiled)
 
 include certificate wellFormed ready issued registry entryMember rows aligned in
-/-- Public checker success supplies the loaded source and finite selection
-identity facts; the caller provides only static raw-row alignment. -/
-theorem Certificate.issue_for_checked {raw : Workspace.RawWorkspace}
-    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+/-- The original public checker receipt retains its actual checking budget.
+The separate static method receipt matches the compiler's method recheck. -/
+theorem Certificate.issue_for_checked_with_methods {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (methods : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram) :
     Nonempty (Support compiled (headers rows) (keys compiled) initial) := by
-  obtain ⟨loaded, _loaded, checked⟩ := checkProgram_success_load accepted
-  exact certificate.issue_for wellFormed ready checked
+  exact certificate.issue_for wellFormed ready methods
     (CallableCoercionSelectionIdentity.Catalog.of_checked accepted) issued registry entryMember rows aligned
 
 include certificate wellFormed ready issued registry entryMember in
-/-- The primary issuer constructs the authentic ordinary catalog and closes
-finite table alignment internally. It requires no body coverage callbacks. -/
-theorem Certificate.issue {raw : Workspace.RawWorkspace}
-    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+/-- The automatic catalog issuer also retains the actual whole-program budget. -/
+theorem Certificate.issue_with_methods {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (methods : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram) :
     ∃ catalog : Catalog compiled, Nonempty (Support compiled (headers catalog.rows) (keys compiled) initial) := by
   obtain ⟨catalog⟩ := CallableIndexedOwnedPreparedOrdinaryCatalog.of_compiled compiled wellFormed
-  exact ⟨catalog, certificate.issue_for_checked wellFormed ready issued registry entryMember
-    catalog.rows (certificate.table.aligned catalog) accepted⟩
+  exact ⟨catalog, certificate.issue_for_checked_with_methods wellFormed ready issued registry entryMember
+    catalog.rows (certificate.table.aligned catalog) methods accepted⟩
+
+include certificate wellFormed ready issued registry entryMember rows aligned in
+/-- An empty retained method catalog needs no additional body check. The actual
+original checker receipt establishes that every method target is absent. -/
+theorem Certificate.issue_for_without_methods {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram)
+    (empty : compiled.sourceProgram.methods = []) :
+    Nonempty (Support compiled (headers rows) (keys compiled) initial) :=
+  certificate.issue_for_checked_with_methods wellFormed ready issued registry entryMember rows aligned
+    (CallableMethodBodyCoherence.of_empty_checked accepted empty) accepted
+
+include certificate wellFormed ready issued registry entryMember in
+theorem Certificate.issue_without_methods {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram)
+    (empty : compiled.sourceProgram.methods = []) :
+    ∃ catalog : Catalog compiled, Nonempty (Support compiled (headers catalog.rows) (keys compiled) initial) :=
+  certificate.issue_with_methods wellFormed ready issued registry entryMember
+    (CallableMethodBodyCoherence.of_empty_checked accepted empty) accepted
+
+include certificate wellFormed ready issued registry entryMember rows aligned in
+/-- The existing fixed-budget entry derives its method receipt internally. -/
+theorem Certificate.issue_for_checked {raw : Workspace.RawWorkspace}
+    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+    Nonempty (Support compiled (headers rows) (keys compiled) initial) :=
+  certificate.issue_for_checked_with_methods wellFormed ready issued registry entryMember rows aligned
+    (CallableMethodBodyCoherence.of_checked accepted) accepted
+
+include certificate wellFormed ready issued registry entryMember in
+/-- The existing automatic catalog entry keeps its original public interface. -/
+theorem Certificate.issue {raw : Workspace.RawWorkspace}
+    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+    ∃ catalog : Catalog compiled, Nonempty (Support compiled (headers catalog.rows) (keys compiled) initial) :=
+  certificate.issue_with_methods wellFormed ready issued registry entryMember
+    (CallableMethodBodyCoherence.of_checked accepted) accepted
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission

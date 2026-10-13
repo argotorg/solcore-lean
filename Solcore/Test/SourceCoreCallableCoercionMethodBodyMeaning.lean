@@ -7,6 +7,7 @@ coercion step; this does not assert uniqueness of every possible source dictiona
 The runtime fixtures retain method evidence, input allocation, effects and faults. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxHeartbeats 2400000
 set_option maxRecDepth 4096
 namespace Tests.SourceCoreCallableCoercionMethodBodyMeaning
@@ -45,7 +46,7 @@ theorem accepted_source_frame {loaded : LoadedProgram} {program : CheckedProgram
     Dynamic.OperatorMethodSelected (SourceSemantics.Program.ofChecked program) context (environment available) "Coerce" "coerce"
       (step.requirement :: step.methodRequirements) (bodyInstance program method) (environment dictionary) ∧
     CallableCoercionMethodFrame.Frame (bodyInstance program method) (CallableCoercionMethodFrame.view (bodyInstance program method) (environment dictionary) compiled.statements) :=
-  CallableCoercionMethodFrame.of_compilation loadedAccepted receipt formed range signatures ledger assumptions resolved covered materialized compiled completeRecord
+  CallableCoercionMethodFrame.of_compilation (CallableMethodBodyCoherence.of_loaded loadedAccepted) receipt formed range signatures ledger assumptions resolved covered materialized compiled completeRecord
 
 variable {checked : Checked} {base : Base checked}
   (prepared : SourceCoreCallableIndexedAncestry.Prepared base)

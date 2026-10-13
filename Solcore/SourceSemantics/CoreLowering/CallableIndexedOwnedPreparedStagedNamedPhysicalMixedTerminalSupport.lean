@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodArgumentRows
@@ -57,8 +58,7 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
     compiled.indexed.base.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
   (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
@@ -278,8 +278,7 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
     compiled.indexed.base.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
   (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
@@ -336,8 +335,7 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
     compiled.indexed.base.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
   (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled
@@ -394,8 +392,7 @@ variable {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Inpu
     compiled.indexed.base.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
   (actualStages : RecursiveNamedPreparedStageContracts.Prepared compiled

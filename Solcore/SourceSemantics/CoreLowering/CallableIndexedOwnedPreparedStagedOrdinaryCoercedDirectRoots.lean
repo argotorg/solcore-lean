@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercedBodyViewTransport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionChainIssuance
@@ -91,8 +92,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (metadata : NativeMetadataFor compiled.indexed support.caller.named function.source (fun _ => False))
   {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
   (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled)
   {signature : ProgramFunctionSignature} (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)

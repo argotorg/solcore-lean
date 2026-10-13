@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodAuthority
 
 /-! A finite closed method catalog discharges method formation and dictionary
@@ -27,8 +28,7 @@ variable {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.
 
 /-- Every field follows from the selected implementation and full materializer,
 including empty method dictionaries and original source occurrence uniqueness. -/
-theorem selection_support {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok receipt.program)
+theorem selection_support     (checked : CallableMethodBodyCoherence.Checked receipt.program)
     (wellFormed : ProgramWellFormed (Program.ofChecked receipt.program))
     (catalog : Catalog receipt.program)
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator) :

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrimitiveSourceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryCoercedTerminalSupport
@@ -158,7 +159,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   {inputs : List (Input compiled)} (rows : Inventory inputs)
   {directRows : List SourceSpecialization.SpecializedFunction} (aligned : TableAligned inputs directRows)
-  {loaded : LoadedProgram} (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled)
 

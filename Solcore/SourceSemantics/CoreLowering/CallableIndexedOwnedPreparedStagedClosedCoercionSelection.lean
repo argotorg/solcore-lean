@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionIssuance
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceShapeTable
 
@@ -31,8 +32,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     scope node policy input coercion output call)
 
 include step in
-theorem selection_support {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+theorem selection_support     (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : Catalog compiled)
     (selected : CallableCoercionSourceSelection.Certificate compiled.sourceProgram caller node available coercion step.method)
@@ -82,8 +82,7 @@ theorem selection_support {loaded : LoadedProgram}
 include step in
 theorem of_actual
     (methods : Catalog compiled)
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}

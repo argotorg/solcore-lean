@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.NamedCallSource
@@ -7,6 +8,7 @@ lexical entry. A closure-shaped proof view relates its body trace to the
 independent BodyInvokes/BodyFaults judgments. It is not a source closure or an
 ordinary FunctionInstantiates claim. -/
 set_option autoImplicit false
+set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodFrame
 open Frontend SourceInference
 open CallableNamedMetadata (environment)
@@ -71,8 +73,8 @@ theorem of_selected {program : Program} {context : SourceSemantics.Context}
 
 /-- The actual method selector and dictionary construct the source frame at
 its actual residual context. The compiled root traversal supplies the body. -/
-theorem of_compilation {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem of_compilation {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
     {available dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment}
     {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod} {context : SourceSemantics.Context}

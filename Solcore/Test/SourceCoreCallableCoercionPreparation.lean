@@ -8,6 +8,7 @@ coercions inside appended carriers. Formal consumers retain same-fuel source
 body provenance and the explicit caller-covered dictionary boundary. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
+set_option Elab.async false
 namespace Tests.SourceCoreCallableCoercionPreparation
 open Solcore Frontend SourceInference SourceSemantics SourceSemantics.CoreLowering
 open CallableCoercionPreparation CallableCoercionPreparationSteps
@@ -32,7 +33,7 @@ theorem prepared_source_body {loaded : LoadedProgram} {program : CheckedProgram}
       step.specialized.function.solvedRequirements = retained.checked.solvedRequirements.map
         (StructuralSubstitution.applySolvedRequirement step.specialized.parameterSubstitution) := by
   rw [step_specialized prepared member nodeMember site resolved step]
-  obtain ⟨receipt⟩ := CallableCoercionBodyProvenance.of_accepted loadedAccepted step.selectedMethod
+  obtain ⟨receipt⟩ := CallableCoercionBodyProvenance.of_accepted (CallableMethodBodyCoherence.of_loaded loadedAccepted) step.selectedMethod
   exact ⟨receipt.retained, receipt.retainedMember, receipt.retainedId, receipt.body, receipt.ledger⟩
 
 /-- The actual dictionary is obtained from the preparation visit. Its source

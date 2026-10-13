@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedScopedAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinarySyntaxTable
 
@@ -54,8 +55,7 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (coercions : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
@@ -91,8 +91,7 @@ theorem of_empty_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
     (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
-    {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+        (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
     (coercions : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
     (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
     {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}

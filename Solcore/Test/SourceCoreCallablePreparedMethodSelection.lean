@@ -8,6 +8,7 @@ formation and whole-program assumptions. Public runtime checks use the original
 compiled source; marker callbacks below audit only the selected lowering shape. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 8192
 set_option maxHeartbeats 2400000
 namespace Tests.SourceCoreCallablePreparedMethodSelection
@@ -49,7 +50,7 @@ theorem actual_source {loaded : LoadedProgram}
         types lexicalContext facts ∧
       CompatibleRuntimeContextValidity.Valid (bodyInstance program receipt.selection.method).context.solvedRequirements
         lexicalContext (environment receipt.dictionary) := by
-  have sourceSelected := selected.selects loadedAccepted formed range signatures ledger assumptions covered
+  have sourceSelected := selected.selects (CallableMethodBodyCoherence.of_loaded loadedAccepted) formed range signatures ledger assumptions covered
   exact ⟨sourceSelected, selected_typed sourceSelected programTyped⟩
 
 abbrev actual_cache := @CallablePreparedMethodSelection.cached_row

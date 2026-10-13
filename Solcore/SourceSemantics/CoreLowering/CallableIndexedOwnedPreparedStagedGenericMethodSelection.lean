@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosedMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionGoal
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionRanges
@@ -31,8 +32,7 @@ variable {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.
   (receipt : Receipt policy lowerBody fuel compilation values source scope id reasonAt lowered)
 
 /-- Shared static suffix after the selected raw range is derived. -/
-theorem support_of_range {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok receipt.program)
+theorem support_of_range     (checked : CallableMethodBodyCoherence.Checked receipt.program)
     (wellFormed : ProgramWellFormed (Program.ofChecked receipt.program))
     (catalog : Catalog receipt.program)
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator)
@@ -70,8 +70,7 @@ theorem support_of_range {loaded : LoadedProgram}
 
 /-- Actual original parent typing, current requirement identities and compiler
 selection derive the complete raw range before instantiating the Source body. -/
-theorem selection_support {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok receipt.program)
+theorem selection_support     (checked : CallableMethodBodyCoherence.Checked receipt.program)
     (wellFormed : ProgramWellFormed (Program.ofChecked receipt.program))
     (catalog : Catalog receipt.program)
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator)

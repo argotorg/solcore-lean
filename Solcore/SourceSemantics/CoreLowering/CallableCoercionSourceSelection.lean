@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionEvidenceOrigins
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPreparation
@@ -7,6 +8,7 @@ the actual ordered dictionary. Caller-covered headers use the same resolver32;
 uncovered origins, cross-fuel coherence and dictionary uniqueness are not
 asserted. Runtime body execution and installed closure history remain separate. -/
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 1200000
 namespace Solcore.SourceSemantics.CoreLowering.CallableCoercionSourceSelection
@@ -207,8 +209,8 @@ def Certificate.toMethodCertificate {program : CheckedProgram} {caller : SourceS
 /-- Actual selector, same-fuel retained body and returned dictionary determine
 an independent source selection. Range formation and caller coverage remain
 explicit; neither is inferred from a ground specialization key. -/
-theorem MethodCertificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem MethodCertificate.selects {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
     {available dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment}
     {primaryId : RequirementId} {methodIds : List RequirementId} {arity : Nat}
@@ -272,8 +274,8 @@ theorem MethodCertificate.selects {loaded : LoadedProgram} {program : CheckedPro
     intro goal member
     exact EvidenceEnvironment.LooksUp.exists_of_key_mem (goals.symm ▸ member)
 
-theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem Certificate.selects {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
     {available dictionary : SourceTypedRuntime.RuntimeEvidenceEnvironment}
     {step : CoercionStep} {method : ExecutableImplMethods.CheckedMethod} {context : Context}
@@ -294,8 +296,8 @@ theorem Certificate.selects {loaded : LoadedProgram} {program : CheckedProgram}
 /-- Public preparation fixes the emitted complete carrier, and the actual
 spine step fixes the same source selection and dictionary. This is a static
 connection; it does not assert invocation of an installed method closure. -/
-theorem prepared_step {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem prepared_step {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {before : SourceSpecializationWorklist.Plan} {fuel budget : Nat}
     {project : CallableCoercionSpine.Projector} {compilation : CallableCoercionSpine.Context}
     (prepared : SourceCompilationPlan.prepareExecutablePlanEvidenceWithBudget program before fuel budget = .ok compilation.plan)

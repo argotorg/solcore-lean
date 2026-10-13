@@ -118,6 +118,7 @@ private theorem factory_packet {fixture : CompiledFixture} (observed : ObservedP
   obtain ⟨sidecar, _issued, selected⟩ :=
     CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.body.unique
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   apply CallableIndexedOwnedPreparedStagedOrdinaryMethodTerminalSupport.of_actual_with_catalog
     (directSites := fun inst => inst = shape.call.instantiation)
     stagePrepared code support provenance receiver fixture.source_wellFormed

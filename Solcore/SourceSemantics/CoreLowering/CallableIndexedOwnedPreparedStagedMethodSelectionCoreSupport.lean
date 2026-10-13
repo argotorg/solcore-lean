@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGenericMethodSelection
 
 /-! Selection formation and full raw replacement typing do not require an
@@ -28,8 +29,7 @@ variable {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCoreFunctions.
 
 /-- Source instantiation retains the selected declaration's complete body and
 the same checked replacement range. -/
-theorem support_of_range {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok receipt.program)
+theorem support_of_range     (checked : CallableMethodBodyCoherence.Checked receipt.program)
     (wellFormed : ProgramWellFormed (Program.ofChecked receipt.program))
     (catalog : Catalog receipt.program)
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator)
@@ -47,8 +47,7 @@ theorem support_of_range {loaded : LoadedProgram}
 
 /-- Genuine original parent typing and current requirement identities establish
 the range before the selected method Source body is instantiated. -/
-theorem selection_support {loaded : LoadedProgram}
-    (checked : Frontend.checkLoadedProgram loaded 1024 = .ok receipt.program)
+theorem selection_support     (checked : CallableMethodBodyCoherence.Checked receipt.program)
     (wellFormed : ProgramWellFormed (Program.ofChecked receipt.program))
     (catalog : Catalog receipt.program)
     (selected : CallablePreparedMethodRuntimeMeaning.OperatorSource receipt.operator)

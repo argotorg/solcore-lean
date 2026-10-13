@@ -48,6 +48,7 @@ theorem ActualHeader.use_admitted_support (observed : ObservedProgram fixture)
     rw [namedEq, actual.source, bodyEq, resultEq]
     exact observed.useAdmission
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   exact CallableIndexedOwnedPreparedNamedCatalogAdmission.of_empty_actual rows actual.prepared actual.aligned admission
     fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed checked
     (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)
@@ -84,6 +85,7 @@ theorem ActualHeader.keep_admitted_support (observed : ObservedProgram fixture)
     rw [namedEq, actual.source, bodyEq, resultEq]
     exact observed.keepAdmission
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   exact CallableIndexedOwnedPreparedNamedCatalogAdmission.of_empty_actual rows actual.prepared actual.aligned admission
     fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed checked
     (by rw [fixture.sameProgram]; exact CallableCoercionSelectionIdentity.Catalog.of_checked fixture.checked)

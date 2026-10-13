@@ -46,6 +46,7 @@ theorem ActualHeader.direct_support {signature generic : ProgramFunctionSignatur
     rw [actual.source]
     exact shape.metadata nodes terminal.prepared.named noLocals
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   refine ⟨terminal, CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport.of_actual
     (directSites := fun inst => inst = shape.call.instantiation)
     terminal diagnostic receiver fixture.source_wellFormed (fun _ same => same ▸ supported) metadata
@@ -77,6 +78,7 @@ theorem ActualHeader.use_support {signature : ProgramFunctionSignature} {type : 
     rw [actual.source]
     exact shape.policy_metadata nodes terminal.prepared.named noLocals
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   refine ⟨terminal, CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport.of_actual
     terminal diagnostic receiver fixture.source_wellFormed (fun _ impossible => impossible.elim) metadata
     (by rw [expression, actual.source]; exact shape.syntax) rows
@@ -103,6 +105,7 @@ theorem ActualHeader.identity_support {signature : ProgramFunctionSignature} {ty
     rw [actual.source]
     exact shape.metadata nodes terminal.prepared.named noLocals
   obtain ⟨loaded, checked⟩ := fixture.loaded
+  have checked := CallableMethodBodyCoherence.of_loaded checked
   refine ⟨terminal, CallableIndexedOwnedPreparedStagedNamedPhysicalMixedTerminalSupport.of_actual
     terminal diagnostic receiver fixture.source_wellFormed (fun _ impossible => impossible.elim) metadata
     (by rw [expression, actual.source]; exact shape.syntax) rows

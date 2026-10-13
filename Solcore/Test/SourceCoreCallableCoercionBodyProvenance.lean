@@ -6,6 +6,7 @@ then to structural source substitution. Executable checks use the public Core
 boundary; they do not stand in for source coercion execution proofs. -/
 #check_failure Solcore.Frontend.SourceTypedRuntime.run
 set_option autoImplicit false
+set_option Elab.async false
 namespace Tests.SourceCoreCallableCoercionBodyProvenance
 open Solcore Frontend SourceInference SourceSemantics SourceSemantics.CoreLowering
 open CallableCoercionBodyProvenance
@@ -22,7 +23,7 @@ theorem actual_method_body {loaded : LoadedProgram} {program : CheckedProgram}
         method.specialized.parameterSubstitution retained.checked.typedBody ∧
       method.specialized.function.solvedRequirements = retained.checked.solvedRequirements.map
         (StructuralSubstitution.applySolvedRequirement method.specialized.parameterSubstitution) := by
-  obtain ⟨receipt⟩ := of_accepted loadedAccepted accepted
+  obtain ⟨receipt⟩ := of_accepted (CoreLowering.CallableMethodBodyCoherence.of_loaded loadedAccepted) accepted
   exact ⟨receipt.retained, receipt.retainedMember, receipt.retainedId, receipt.body, receipt.ledger⟩
 
 /-- Actual plan extension supplies emitted carrier identity, independently of

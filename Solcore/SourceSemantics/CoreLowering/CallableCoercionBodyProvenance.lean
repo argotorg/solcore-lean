@@ -1,13 +1,15 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPlanProvenance
 import Solcore.SourceSemantics.SubstitutionCorrespondence
 
-/-! A selected coercion method is rechecked with the same synthetic signature
-and fuel as the loaded program. Its complete generic checker result therefore
-comes from the retained method catalog. Specialization is then connected to
+/-! A selected coercion method is rechecked with its actual synthetic signature.
+The static method-checking receipt identifies its complete generic checker
+result with the original retained method catalog. Specialization is then connected to
 independent structural source substitution. Runtime calls and closure history
 remain separate obligations. -/
 set_option autoImplicit false
+set_option Elab.async false
 set_option maxRecDepth 4096
 set_option maxHeartbeats 800000
 namespace Solcore.SourceSemantics.CoreLowering.CallableCoercionBodyProvenance
@@ -173,17 +175,17 @@ private theorem retained_of_target {environment : ProgramEnvironment} {signature
     · obtain ⟨retained, member, provenance⟩ := ih tail
       exact ⟨retained, List.mem_cons_of_mem _ member, provenance⟩
 
-/-- Same signature and fuel identify the entire retained checker carrier,
+/-- The same synthetic method check identifies the entire retained checker carrier,
 including its typed graph, inference substitution and ordered evidence ledger. -/
-theorem Selection.retained {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+theorem Selection.retained {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {method : ExecutableImplMethods.CheckedMethod} (selected : Selection program method) :
     ∃ retained, retained ∈ program.methods ∧ retained.id = method.id ∧ selected.generic = retained.checked := by
   have member : (⟨selected.implementation, selected.declaration⟩ : ImplementationMethodCheckTarget) ∈
       implementationMethodCheckTargets program.signatures := by
     apply List.mem_flatMap.mpr
     exact ⟨_, selected.implementationMember, List.mem_map.mpr ⟨_, selected.methodMember, rfl⟩⟩
-  obtain ⟨retained, member, provenance⟩ := retained_of_target (checkLoadedProgram_success_body_checks loadedAccepted).2 member
+  obtain ⟨retained, member, provenance⟩ := retained_of_target loadedAccepted member
   cases provenance with
   | intro idEq traitLookup checked =>
     have sameTrait := Option.some.inj (traitLookup.symm.trans selected.traitLookup)
@@ -237,10 +239,10 @@ structure Certificate (program : CheckedProgram) (method : ExecutableImplMethods
   retainedId : retained.id = method.id
   completeCheckedEq : generic = retained.checked
 
-/-- The real coercion selector and loaded checker use the same budget 1024.
-No conclusion about different checking budgets is needed or made. -/
-theorem of_accepted {loaded : LoadedProgram} {program : CheckedProgram}
-    (loadedAccepted : Frontend.checkLoadedProgram loaded 1024 = .ok program)
+/-- The real coercion selector and static method receipt use the same budget 1024.
+The whole-program checker budget is independent of this receipt. -/
+theorem of_accepted {program : CheckedProgram}
+    (loadedAccepted : CallableMethodBodyCoherence.Checked program)
     {caller : SourceSpecialization.SpecializedFunction} {node : ExpressionNode}
     {available : SourceTypedRuntime.RuntimeEvidenceEnvironment} {step : CoercionStep}
     {method : ExecutableImplMethods.CheckedMethod}
@@ -259,7 +261,7 @@ theorem of_checked_program {raw : Workspace.RawWorkspace} {program : CheckedProg
     (accepted : SourceCompilationPlan.checkedCoercionMethod program caller node available step = .ok method) :
     Nonempty (Certificate program method) := by
   obtain ⟨loaded, _, loadedAccepted⟩ := checkProgram_success_load checked
-  exact of_accepted loadedAccepted accepted
+  exact of_accepted (CallableMethodBodyCoherence.of_loaded loadedAccepted) accepted
 
 namespace Certificate
 variable {program : CheckedProgram} {method : ExecutableImplMethods.CheckedMethod}

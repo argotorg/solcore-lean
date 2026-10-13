@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicSignatureCatalog
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLocalIdentityFreshness
@@ -61,8 +62,7 @@ variable {directSites : DeclarationInstantiation → Prop}
     code.compilation.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedMethodSelectionIssuer.Catalog compiled)
   {signature : ProgramFunctionSignature}
@@ -177,8 +177,7 @@ variable {directSites : DeclarationInstantiation → Prop}
     code.compilation.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
   {signature : ProgramFunctionSignature}
@@ -241,8 +240,7 @@ variable {directSites : DeclarationInstantiation → Prop}
     code.compilation.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
   {signature : ProgramFunctionSignature}
@@ -305,8 +303,7 @@ variable {directSites : DeclarationInstantiation → Prop}
     code.compilation.globals[index]? = some signature →
     ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
       header.slot = index ∧ header.named.signature = signature)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   (methods : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
   {signature : ProgramFunctionSignature}

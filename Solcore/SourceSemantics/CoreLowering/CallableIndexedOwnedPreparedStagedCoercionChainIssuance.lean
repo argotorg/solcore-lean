@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosedCoercionSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionChain
 
@@ -16,8 +17,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {scope : SourceCoreBasic.Scope} {node : ExpressionNode}
   {policy : SourceCoreFunctions.CallablePolicy}
   (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled)
-  {loaded : LoadedProgram}
-  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+    (checked : CallableMethodBodyCoherence.Checked compiled.sourceProgram)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
   {before : SourceCompilationPlan.Plan} {preparationFuel budget : Nat}
