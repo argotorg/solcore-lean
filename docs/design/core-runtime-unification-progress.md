@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Compiler evidence roots complete shared public support (2026-10-14)
+
+`670dd39f` connects accepted returning expressions to a certificate with several selected cache positions. `795ad95e` uses it for both original evidence-bearing three-argument entry roots.
+
+Both roots now obtain body and expression admission from their actual Header compiler actions. Their original node forms and ordered argument edges rule out unsupported branches. The observed evidence, target receipts and Source lookup remain unchanged. Each root is proved before the complete program certificate is constructed; the final certificate does not supply its own missing root proof.
+
+The pending certificate retains every original cache row and checks all remaining roots, closures, methods, direct targets and catalog obligations. Completion identifies a selected function by its actual cache position and successful lookup. The original program still has twelve cache rows and ten direct-table rows. The same completed certificate supplies the existing Source and public execution proofs, including all seven operations, outputs `33 / true / 33 / 55`, retained captures and sufficient-fuel conclusions.
+
+Validation: 11 affected modules checked together, full build (7,222 jobs), registered tests (14,276 build jobs), kernel policy and 619 endpoint audits pass. Both selected roots work with zero body-scan fuel. Missing cache positions, an unselected root with zero fuel, an insufficient program budget and missing evidence targets are rejected. Empty and repeated selections preserve full coverage. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Global metadata, original Source well-formedness and complementary finite certification remain explicit. Other compiler branches and preservation across all actual compiler passes remain unfinished.
+
+The two source-admission proofs are constructed independently from genuine compiler receipts, then inserted into one complete certificate. All original Source, runtime, support-family and final public theorem files remain unchanged. The twelve unrelated workspace changes remain excluded.
+
 ## Accepted expression actions supply public relay support (2026-10-14)
 
 `cc411eaf` derives original expression structure from accepted compiler actions. `cf93e645` connects those receipts to the existing six-call relay proof.

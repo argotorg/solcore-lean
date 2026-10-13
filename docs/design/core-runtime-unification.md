@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Compiler evidence roots complete shared public support (2026-10-14)
+
+`670dd39f` connects accepted returning expressions to a certificate with several selected cache positions. `795ad95e` uses it for both original evidence-bearing three-argument entry roots.
+
+Both roots now obtain body and expression admission from their actual Header compiler actions. Their original node forms and ordered argument edges rule out unsupported branches. The observed evidence, target receipts and Source lookup remain unchanged. Each root is proved before the complete program certificate is constructed; the final certificate does not supply its own missing root proof.
+
+The pending certificate retains every original cache row and checks all remaining roots, closures, methods, direct targets and catalog obligations. Completion identifies a selected function by its actual cache position and successful lookup. The original program still has twelve cache rows and ten direct-table rows. The same completed certificate supplies the existing Source and public execution proofs, including all seven operations, outputs `33 / true / 33 / 55`, retained captures and sufficient-fuel conclusions.
+
+Validation: 11 affected modules checked together, full build (7,222 jobs), registered tests (14,276 build jobs), kernel policy and 619 endpoint audits pass. Both selected roots work with zero body-scan fuel. Missing cache positions, an unselected root with zero fuel, an insufficient program budget and missing evidence targets are rejected. Empty and repeated selections preserve full coverage. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Global metadata, original Source well-formedness and complementary finite certification remain explicit. Other compiler branches and preservation across all actual compiler passes remain unfinished.
+
+The next connection derives the original indirect caller roots from accepted compiler actions, retaining the called closure and its captured environment through the same public execution family.
+
 ## Accepted expression actions supply public relay support (2026-10-14)
 
 `cc411eaf` derives original expression structure from accepted compiler actions. `cf93e645` connects those receipts to the existing six-call relay proof.
@@ -598,11 +612,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `cc411eaf` / `cf93e645`: accepted expression and body actions supply the original relay's public support. |
-| Latest completed verification | Full build (7218 jobs), registered tests, kernel policy and 602 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `670dd39f` / `795ad95e`: both original evidence-bearing roots derive admission from actual compilation before shared public support is issued. |
+| Latest completed verification | Full build (7222 jobs), registered tests, kernel policy and 619 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | The original six-call relay derives statement and expression admission from actual compilation while retaining captured environments and all public fuel guarantees. |
-| Current implementation priority | Connect accepted evidence-bearing three-argument roots to the complete program certificate and extend compiler coverage. |
+| Latest proof scope | The original seven-operation evidence program obtains both three-argument entry roots from compiler receipts, retaining its captures and all public fuel conclusions. |
+| Current implementation priority | Connect original indirect caller roots to the same compiler-derived admission and extend complete compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
