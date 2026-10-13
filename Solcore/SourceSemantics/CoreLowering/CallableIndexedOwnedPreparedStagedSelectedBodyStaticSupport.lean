@@ -90,7 +90,7 @@ structure CanonicalRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
       policy lowerBody fuel compilation (.initial compiled.compatible.checked)
       invocation.source callScope callId callee ids instantiation reasonAt callCode),
     CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler toRootData.certificate →
-    Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.Port compiler headers)
+    Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.PortWithEvidence compiler headers context invocation.evidence)
   indexReady : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady toRootData.certificate
 
 /-- Existential packaging for the numeric IH. All compiler indices belong to
@@ -141,6 +141,24 @@ def RootData.legacy
   ⟨root, CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_direct_of_syntax root.certificate syntaxTree,
     CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.no_indexes_of_syntax root.certificate syntaxTree⟩
 
+/-- Shared roots receive full evidence authority derived at their actual
+caller context, for each reached compiler occurrence. -/
+def RootData.canonical_with
+    (root : RootData compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults)
+    {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
+    (ready : ∀ {fuel callScope callId callee ids instantiation callCode}
+      (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt
+        policy lowerBody fuel compilation (.initial compiled.compatible.checked)
+        invocation.source callScope callId callee ids instantiation reasonAt callCode),
+      CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler root.certificate →
+      Nonempty (CallableIndexedOwnedPreparedStagedDirectCallAuthority.PortWithEvidence
+        compiler headers context invocation.evidence))
+    (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate) :
+    CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
+      reasonAt scope expression lowered rawType semanticFaults headers :=
+  ⟨root, ready, indexes⟩
+
 /-- All reached direct sites use the original finite inventory and authentic
 compiler context; no semantic call law or runtime globals are manufactured. -/
 def RootData.canonical
@@ -154,12 +172,22 @@ def RootData.canonical
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows))
     (plan : compilation.plan = compiled.indexed.base.plan)
     (globals : compilation.globals = compiled.indexed.base.globals)
+    (ordinarySites : ∀ {fuel callScope callId callee ids instantiation callCode}
+      (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt
+        policy lowerBody fuel compilation (.initial compiled.compatible.checked)
+        invocation.source callScope callId callee ids instantiation reasonAt callCode),
+      CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.DirectCalls compiler root.certificate →
+      CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan instantiation ∧
+        compiler.node.requirements = [])
     (indexes : CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.IndexReady root.certificate) :
     CanonicalRoot compiled policy lowerBody compilation readFuel context invocation
       reasonAt scope expression lowered rawType semanticFaults
       (CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows) :=
-  ⟨root, fun compiler _path =>
-    CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals, indexes⟩
+  ⟨root, fun compiler path => by
+    obtain ⟨port⟩ := CallableIndexedOwnedPreparedStagedDirectCallAuthority.of_inventory compiler rows complete plan globals
+    obtain ⟨ordinary, requirements⟩ := ordinarySites compiler path
+    exact ⟨⟨port, CallableIndexedOwnedPreparedStagedDirectCallAuthority.ordinary_evidence
+      compiler port ordinary requirements context invocation.evidence⟩⟩, indexes⟩
 end RootConstruction
 
 /-- The direct-enabled numeric family keeps the same authentic static indices

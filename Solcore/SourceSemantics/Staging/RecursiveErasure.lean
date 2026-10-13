@@ -180,19 +180,21 @@ theorem ForLoopPlain.next {program : Program} {scope : Scope} {context innerCont
 
 private theorem value_occurrence {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm} {value : Value}
-    (occurrence : Occurrence scope id form)
-    (evaluates : ExpressionFormEvaluates program context scope.evidence scope.source environment before form [] [] value after) :
+    {requirements : List RequirementId}
+    (occurrence : Occurrence scope id form requirements)
+    (evaluates : ExpressionFormEvaluates program context scope.evidence scope.source environment before form requirements [] value after) :
     ExpressionEvaluates program context scope.evidence scope.source environment before id value after := by
-  obtain ⟨node, contains, shape, requirements, coercions⟩ := occurrence
-  exact .intro contains (by simpa only [shape, requirements, coercions] using evaluates) (by simpa only [coercions] using CoercionPathExecutes.nil (program := program) (context := context) (evidence := scope.evidence) (heap := after) (value := value))
+  obtain ⟨node, contains, shape, actualRequirements, coercions⟩ := occurrence
+  exact .intro contains (by simpa only [shape, actualRequirements, coercions] using evaluates) (by simpa only [coercions] using CoercionPathExecutes.nil (program := program) (context := context) (evidence := scope.evidence) (heap := after) (value := value))
 
 private theorem fault_occurrence {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm} {reason : SemanticFault}
-    (occurrence : Occurrence scope id form)
-    (fault : ExpressionFormFaults program context scope.evidence scope.source environment before form [] [] reason after) :
+    {requirements : List RequirementId}
+    (occurrence : Occurrence scope id form requirements)
+    (fault : ExpressionFormFaults program context scope.evidence scope.source environment before form requirements [] reason after) :
     ExpressionFaults program context scope.evidence scope.source environment before id reason after := by
-  obtain ⟨node, contains, shape, requirements, coercions⟩ := occurrence
-  exact .form contains (by simpa only [shape, requirements, coercions] using fault)
+  obtain ⟨node, contains, shape, actualRequirements, coercions⟩ := occurrence
+  exact .form contains (by simpa only [shape, actualRequirements, coercions] using fault)
 
 theorem StatementsPlain.prepend {mode : Bool} {program : Program} {scope : Scope} {context middleContext finalContext : Context}
     {environment middleEnvironment : Environment} {before middle after : Heap} {id : StatementId} {node : StatementNode}
@@ -530,14 +532,14 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
         obtain ⟨_, fault⟩ := b
         exact fault_occurrence occurrence (.builtinApply rfl a (builtin_fault_evidence fault))
   case directArgumentsFault occurrence calleeOccurrence children ih =>
-    rename_i failure
+    rename_i failure requirements
     cases failure with
     | stage => trivial
     | semantic =>
       obtain ⟨node, found, form, _requirements, _coercions⟩ := calleeOccurrence
       exact fault_occurrence occurrence (.directArguments found form ih)
   case directApplied occurrence calleeOccurrence valid children callEvidence invocation a b =>
-    rename_i evidence outcome
+    rename_i evidence outcome requirements
     cases outcome with
     | value =>
       obtain ⟨_, applied⟩ := b

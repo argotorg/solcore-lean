@@ -140,9 +140,9 @@ theorem expressions_values (wellFormed : ProgramWellFormed program)
 
 /-- The used occurrence and source typing identify one actual raw form. -/
 theorem expression_form {scope : Scope} {context : Context} {id : ExpressionId}
-    {form : ExpressionForm} {type : TypeSystem.Ty}
+    {form : ExpressionForm} {type : TypeSystem.Ty} {requirements : List RequirementId}
     (unique : NodeOccurrencesUnique scope.source)
-    (typed : ExpressionHasType scope.source context id type) (occurrence : Occurrence scope id form) :
+    (typed : ExpressionHasType scope.source context id type) (occurrence : Occurrence scope id form requirements) :
     ∃ raw plan, ExpressionFormHasRawType scope.source context form raw plan := by
   obtain ⟨node, contains, shape, _, _⟩ := occurrence
   cases typed with

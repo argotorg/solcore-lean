@@ -16,7 +16,7 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : CallableInd
   {named : Named} {source : TypedSource}
   {directSites : DeclarationInstantiation → Prop}
 
-private inductive SupportedForm : ExpressionForm → Prop where
+inductive SupportedForm : ExpressionForm → Prop where
   | literal {form} (atomic : CompatibleExpressionLiterals.Atomic form) : SupportedForm form
   | read (name : String) (binder : Resolved.LocalId) : SupportedForm (.reference name (.local binder))
   | unary (operator : Solcore.Syntax.UnaryOp) (operand : ExpressionId) : SupportedForm (.unary operator operand)
@@ -34,7 +34,7 @@ private inductive SupportedForm : ExpressionForm → Prop where
   | call (callee : ExpressionId) (ids : List ExpressionId) (metadata : IndirectCallResolution) :
       SupportedForm (.call callee ids (.indirect metadata))
 
-private theorem syntax_node {id : ExpressionId}
+theorem syntax_node {id : ExpressionId}
     (tree : CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax source id directSites) :
     ∃ node, source.lookupExpression? id = some node ∧ SupportedForm node.form := by
   cases tree with
@@ -212,7 +212,7 @@ theorem MetadataFor.on (metadata : MetadataFor prepared named source directSites
    fun id _ tree => metadata.directCaller id tree,
    fun id _ tree => metadata.localRead id tree⟩
 
-private theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
+theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? id = some node) (supported : SupportedForm node.form)
     (ordinary : ∀ name binder, node.form = .reference name (.local binder) →
       prepared.base.locals.bindings.any (fun binding =>
@@ -235,7 +235,7 @@ private theorem contextual_same {id : ExpressionId} {node : ExpressionNode}
   | tuple => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
   | call => simp [SourceCoreGeneralFunctions.contextualSource, found, form]
 
-private theorem evidence_none
+theorem evidence_none
     (program : CheckedProgram) (projector : SourceCoreEvidence.Projector)
     (caller : SourceSpecialization.SpecializedFunction) (current : SourceCoreFunctions.Context)
     (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat)

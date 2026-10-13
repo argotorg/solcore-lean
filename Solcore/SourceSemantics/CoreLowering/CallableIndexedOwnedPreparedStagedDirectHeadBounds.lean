@@ -17,7 +17,7 @@ open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CorePr
 open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
 open CallableIndexedOwnedAdmittedStagedExpressionBounds
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt)
-open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
+open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port EvidenceAt)
 universe u
 
 def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
@@ -37,6 +37,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   (receipt : Receipt policy body fuel compilation (.initial compiled.compatible.checked)
     invocation.source scope id callee ids instantiation reasonAt lowered)
   (port : Port receipt headers)
+  (evidenceAt : EvidenceAt receipt port context invocation.evidence)
   (callerBridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers)
     (fun index => CallableIndexedOwnedExpressionHeads.Globals (headers := headers)
       owner compilation.administrativePrefix index.scope index.canonical) callerProtocol)
@@ -62,7 +63,7 @@ private theorem parameter_type : port.header.named.signature.parameterType =
 section Preservation
 variable {stages : Staging.Recursive.Registry}
 
-include owner receipt port callerBridge functions faults unique wellFormed runtime covers in
+include owner receipt port evidenceAt callerBridge functions faults unique wellFormed runtime covers in
 theorem preserves {children : GenericExpressionMeaning.Certificate}
     (size : Nat)
     (sequence : DataExpressionSequence.Tree invocation.source children scope ids
@@ -99,9 +100,9 @@ theorem preserves {children : GenericExpressionMeaning.Certificate}
       CallableIndexedOwnedAdmittedStagedExpressionSequence.preserves_values bridge size sequence unique orderedTyping
         childMeaning environments heaps locals agrees actualTyped initial admitted sourceTrace argumentsWithin
     obtain ⟨parameters, headerHeap, headerArguments, supports⟩ :=
-      CallableIndexedOwnedPreparedStagedDirectArgumentRows.at_successful_arguments receipt port
+      CallableIndexedOwnedPreparedStagedDirectArgumentRows.at_successful_arguments receipt port evidenceAt
         wellFormed runtime covers locals admitted.heap calleeValid application sourceTrace represented typing
-    have sourceEq := CallableIndexedOwnedPreparedStagedDirectArgumentRows.global_eq receipt port produced
+    have sourceEq := CallableIndexedOwnedPreparedStagedDirectArgumentRows.global_eq receipt port evidenceAt produced
     rw [sourceEq] at invoked
     obtain ⟨capture⟩ := CallableIndexedOwnedFunctionEntries.capture_from_pool
       (callerBridge.pool reached) owner port.member
@@ -151,7 +152,7 @@ variable {native : SourceCoreGeneralFunctions.CallableContext}
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled native)
   (descriptor : SourceCoreCallableContracts.Descriptor native.table (.named port.header.named.signature.key))
 
-include owner receipt port callerBridge functions faults unique wellFormed runtime covers stagePrepared descriptor in
+include owner receipt port evidenceAt callerBridge functions faults unique wellFormed runtime covers stagePrepared descriptor in
 theorem reflects {children : GenericExpressionMeaning.Certificate}
     (size : Nat)
     (sequence : DataExpressionSequence.Tree invocation.source children scope ids
@@ -176,9 +177,9 @@ theorem reflects {children : GenericExpressionMeaning.Certificate}
   have orderedTyping := rows.1 ▸ typing
   have nativeResult := result_type receipt port
   have parameter := parameter_type receipt port
-  have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.declaration instantiation)) :=
+  have occurrence : Staging.Recursive.Occurrence invocation child (.call callee ids (.declaration instantiation)) receipt.node.requirements :=
     ⟨receipt.node, lookupExpression?_sound receipt.metadata.found, receipt.form,
-      receipt.metadata.requirements, receipt.metadata.coercions⟩
+      rfl, receipt.metadata.coercions⟩
   obtain ⟨name, calleeOccurrence, valid⟩ :=
     CallableIndexedOwnedPreparedStagedDirectArgumentRows.callee_receipt receipt runtime calleeValid
   rw [receipt.emitted, NamedCalls.Arguments.call_rename, ← port.signature, ← port.slot] at completed
@@ -203,7 +204,7 @@ theorem reflects {children : GenericExpressionMeaning.Certificate}
     · exact after_expression_sized initial reached admitted wellFormed runtime covers locals typed trace argumentFrame
   | @values sources values payloads =>
     obtain ⟨parameters, headerHeap, headerArguments, supports⟩ :=
-      CallableIndexedOwnedPreparedStagedDirectArgumentRows.at_successful_arguments receipt port
+      CallableIndexedOwnedPreparedStagedDirectArgumentRows.at_successful_arguments receipt port evidenceAt
         wellFormed runtime covers locals admitted.heap calleeValid application sourceTrace payloads typing
     obtain ⟨capture⟩ := CallableIndexedOwnedFunctionEntries.capture_from_pool
       (callerBridge.pool reached) owner port.member
@@ -216,8 +217,8 @@ theorem reflects {children : GenericExpressionMeaning.Certificate}
         port.header nativeCapture port.prepared port.aligned stagePrepared descriptor port.sourceAt
         port.aligned.layouts port.member wellFormed post.at_values.rows headerHeap headerArguments
         parameters middleHeaps supports size bodyMeaning bodyEvaluation (Nat.le_of_lt bodySmaller)
-    have produced := CallableIndexedOwnedPreparedStagedDirectArgumentRows.empty_evidence receipt context invocation.evidence
-    have sourceEq := CallableIndexedOwnedPreparedStagedDirectArgumentRows.global_eq receipt port produced
+    have produced := evidenceAt.produces
+    have sourceEq := CallableIndexedOwnedPreparedStagedDirectArgumentRows.global_eq receipt port evidenceAt produced
     rw [← sourceEq] at invoked
     have trace := Staging.Recursive.Size.Expression.directApplied occurrence calleeOccurrence valid sourceTrace produced invoked
     obtain ⟨returned, _samePool, returnedRelated⟩ := callerBridge.restore initial finalState

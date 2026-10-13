@@ -3,14 +3,15 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNa
 
 /-! Direct declaration calls retain the independently typed Source argument
 row. Every raw replacement is closed; original Source admissibility recovers
-its validity. Empty predicates identify the exact dictionary; authentic compiler bundles align native
-arguments only after the Source row supplies physical arity. -/
+its validity. Actual evidence production supplies the full callable dictionary;
+authentic compiler bundles align native arguments only after the Source row
+supplies physical arity. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectArgumentRows
 open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt)
-open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
+open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port EvidenceAt)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}
@@ -23,6 +24,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     instantiation reasonAt lowered)
   (port : Port receipt headers)
   {context : SourceSemantics.Context}
+  (evidenceAt : EvidenceAt receipt port context invocation.evidence)
 
 include receipt in
 theorem callee_receipt
@@ -34,39 +36,20 @@ theorem callee_receipt
   | intro contains form admissible _ requirements coercions =>
     refine ⟨_, ⟨_, contains, form, requirements, coercions⟩,
       CompatibleSourceInstantiationClosure.declaration_valid admissible runtime.variables_closed
-        receipt.ordinary.ranges⟩
+        receipt.supported.ranges⟩
 
-include receipt in
-theorem evidence_eq_empty {evidence : Dynamic.EvidenceEnvironment}
-    (produced : Dynamic.DirectCallProducesEvidence context invocation.evidence [] []
-      instantiation.predicates evidence) : evidence = [] := by
-  cases produced with
-  | intro _ _ produces =>
-    have length := produces.length_eq.2
-    rw [receipt.ordinary.predicates] at length
-    exact List.length_eq_zero_iff.mp length.symm
-
-include receipt in
-theorem empty_evidence (context : SourceSemantics.Context)
-    (caller : Dynamic.EvidenceEnvironment) :
-    Dynamic.DirectCallProducesEvidence context caller [] [] instantiation.predicates [] := by
-  rw [receipt.ordinary.predicates]
-  exact .intro (selected := []) (contextual := []) rfl rfl .nil
-
-include receipt port in
+include receipt port evidenceAt in
 theorem global_eq {evidence : Dynamic.EvidenceEnvironment}
-    (produced : Dynamic.DirectCallProducesEvidence context invocation.evidence [] []
+    (produced : Dynamic.DirectCallProducesEvidence context invocation.evidence receipt.node.requirements []
       instantiation.predicates evidence) :
     Dynamic.Value.global ⟨instantiation, evidence⟩ = .global port.function := by
-  have empty := evidence_eq_empty receipt produced
+  have same := evidenceAt.agrees evidence produced
   have metadata := port.sourceInstantiation
-  have dictionary := port.sourceEvidence
   cases h : port.function with
   | mk actual actualEvidence =>
-    simp only [h] at metadata dictionary ⊢
+    simp only [h] at metadata same ⊢
     cases metadata
-    cases dictionary
-    cases empty
+    cases same
     rfl
 
 section Successful
@@ -77,7 +60,7 @@ variable {stages : Staging.Recursive.Registry} {environment : Dynamic.Environmen
   {definitions : DataEnvironment} {model : GenericHeap.PayloadModel catalog projects definitions}
   {mapping : LocationMap} {world : StoreTyping}
 
-include receipt port in
+include receipt port evidenceAt in
 theorem at_successful_arguments
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
     (runtime : Dynamic.SourceRuntimeValid (Program.ofChecked compiled.sourceProgram) context invocation.source)
@@ -109,12 +92,13 @@ theorem at_successful_arguments
     have portCovers : port.function.evidence.Covers
         ((SourceSemantics.Context.ofSignatures context.signatures).withAssumptions
           port.function.instantiation.predicates) := by
-      rw [port.sourceEvidence, port.sourceInstantiation, receipt.ordinary.predicates]
-      constructor
-      · intro goal evidence found
-        cases found
-      · intro predicate member
-        cases member
+      have produced := evidenceAt.produces
+      cases produced with
+      | intro _ _ produces =>
+        constructor
+        · exact produces.valid
+        · simpa only [port.sourceInstantiation, SourceSemantics.Context.withAssumptions,
+            Dynamic.EvidenceEnvironment.Supplies] using produces.supplies
     have base := Dynamic.ValueHasType.global (heap := before) portValid portCovers
     simpa only [port.sourceInstantiation, functionType] using base
   have binderCount : arguments.length = port.header.bindings.length := by

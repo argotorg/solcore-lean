@@ -12,10 +12,10 @@ variable {program : Program} {registry : Registry} {invocation : Scope}
   {id : ExpressionId} {node : ExpressionNode} {size : Nat} {outcome : Outcome}
   {base key : ExpressionId}
 
-private theorem occurrence_form {actualForm : ExpressionForm}
+private theorem occurrence_form {actualForm : ExpressionForm} {requirements : List RequirementId}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
-    (occurrence : Occurrence invocation id actualForm) : actualForm = node.form := by
+    (occurrence : Occurrence invocation id actualForm requirements) : actualForm = node.form := by
   obtain ⟨actualNode, contains, actualFormEq, _, _⟩ := occurrence
   have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   exact actualFormEq.symm.trans (congrArg ExpressionNode.form same)
@@ -44,7 +44,7 @@ theorem children
     (form : node.form = .index base key)
     (trace : Size.Expression program registry size invocation context environment before id outcome after) :
     Children program registry size invocation context environment before base key outcome after := by
-  have actual : ∀ {actualForm}, Occurrence invocation id actualForm → actualForm = .index base key :=
+  have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .index base key :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>

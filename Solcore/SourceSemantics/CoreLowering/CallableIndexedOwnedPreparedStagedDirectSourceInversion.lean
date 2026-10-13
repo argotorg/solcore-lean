@@ -12,13 +12,21 @@ variable {program : Program} {registry : Registry} {invocation : Scope}
   {id callee : ExpressionId} {node : ExpressionNode} {size : Nat} {outcome : Outcome}
   {instantiation : DeclarationInstantiation} {arguments : List ExpressionId}
 
-private theorem occurrence_form {actualForm : ExpressionForm}
+private theorem occurrence_form {actualForm : ExpressionForm} {requirements : List RequirementId}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
-    (occurrence : Occurrence invocation id actualForm) : actualForm = node.form := by
+    (occurrence : Occurrence invocation id actualForm requirements) : actualForm = node.form := by
   obtain ⟨actualNode, contains, actualFormEq, _, _⟩ := occurrence
   have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   exact actualFormEq.symm.trans (congrArg ExpressionNode.form same)
+
+private theorem occurrence_requirements {actualForm : ExpressionForm} {requirements : List RequirementId}
+    (unique : NodeOccurrencesUnique invocation.source)
+    (found : invocation.source.lookupExpression? id = some node)
+    (occurrence : Occurrence invocation id actualForm requirements) : node.requirements = requirements := by
+  obtain ⟨actualNode, contains, _, actualRequirements, _⟩ := occurrence
+  have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+  exact (congrArg ExpressionNode.requirements same).symm.trans actualRequirements
 
 theorem children
     (unique : NodeOccurrencesUnique invocation.source)
@@ -30,13 +38,13 @@ theorem children
       Occurrence invocation callee (.reference name (.declaration instantiation)) ∧
       SourceSemantics.DeclarationInstantiation.Valid context instantiation ∧
       Size.Expressions program registry sequenceSize invocation context environment before arguments (.values values) argumentsHeap ∧
-      Dynamic.DirectCallProducesEvidence context invocation.evidence [] [] instantiation.predicates evidence ∧
+      Dynamic.DirectCallProducesEvidence context invocation.evidence node.requirements [] instantiation.predicates evidence ∧
       Size.Applies program registry invocationSize invocation context argumentsHeap
         (.global ⟨instantiation, evidence⟩) values outcome after) ∨
     (∃ sequenceSize failure, size = Size.stepSize [sequenceSize] ∧
       outcome = .fault failure ∧
       Size.Expressions program registry sequenceSize invocation context environment before arguments (.fault failure) after) := by
-  have actual : ∀ {actualForm}, Occurrence invocation id actualForm → actualForm = .call callee arguments (.declaration instantiation) :=
+  have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .call callee arguments (.declaration instantiation) :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
@@ -46,6 +54,7 @@ theorem children
   | directApplied occurrence calleeOccurrence valid children callEvidence applied =>
       obtain ⟨rfl, rfl, same⟩ := ExpressionForm.call.inj (actual occurrence)
       cases same
+      rw [← occurrence_requirements unique found occurrence] at callEvidence
       exact .inl ⟨_, _, _, _, _, _, rfl, calleeOccurrence, valid, children, callEvidence, applied⟩
   | directArgumentsFault occurrence _calleeOccurrence children =>
       obtain ⟨rfl, rfl, same⟩ := ExpressionForm.call.inj (actual occurrence)

@@ -203,16 +203,18 @@ mutual
         (invocation : Applies program registry scope context argumentsHeap (.builtin ⟨function⟩) values outcome after) :
         Expression program registry scope context environment before id outcome after
     | directArgumentsFault {scope context environment before after id callee arguments instantiation name failure}
-        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        {requirements : List RequirementId}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)) requirements)
         (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
         (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
     | directApplied {scope context environment before argumentsHeap after id callee arguments instantiation name values evidence outcome}
-        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)))
+        {requirements : List RequirementId}
+        (occurrence : Occurrence scope id (.call callee arguments (.declaration instantiation)) requirements)
         (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
         (valid : SourceSemantics.DeclarationInstantiation.Valid context instantiation)
         (children : Expressions program registry scope context environment before arguments (.values values) argumentsHeap)
-        (callEvidence : DirectCallProducesEvidence context scope.evidence [] [] instantiation.predicates evidence)
+        (callEvidence : DirectCallProducesEvidence context scope.evidence requirements [] instantiation.predicates evidence)
         (invocation : Applies program registry scope context argumentsHeap (.global ⟨instantiation, evidence⟩) values outcome after) :
         Expression program registry scope context environment before id outcome after
     | calleeFault {scope context environment before after id callee arguments metadata failure}

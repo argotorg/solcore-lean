@@ -196,8 +196,8 @@ private theorem no_stage
     (literal : Literal solved node type code)
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment
       before id (.fault (.stage failedScope call reason)) after) : False := by
-  have occurrence_atomic : ∀ {form}, Staging.Recursive.Occurrence invocation id form → Atomic form := by
-    intro form occurrence
+  have occurrence_atomic : ∀ {form requirements}, Staging.Recursive.Occurrence invocation id form requirements → Atomic form := by
+    intro form requirements occurrence
     obtain ⟨actualNode, contains, sameForm, _requirements, _coercions⟩ := occurrence
     have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
     cases same

@@ -93,10 +93,10 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {program : Program}
   {type : Ty} {size : Nat} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
   {outcome : Staging.Recursive.Outcome}
 
-private theorem occurrence_form {actualForm : ExpressionForm}
+private theorem occurrence_form {actualForm : ExpressionForm} {requirements : List RequirementId}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
-    (occurrence : Staging.Recursive.Occurrence invocation id actualForm) : actualForm = node.form := by
+    (occurrence : Staging.Recursive.Occurrence invocation id actualForm requirements) : actualForm = node.form := by
   obtain ⟨actualNode, contains, actualFormEq, _, _⟩ := occurrence
   have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   exact actualFormEq.symm.trans (congrArg ExpressionNode.form same)
@@ -106,7 +106,7 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
     (form : node.form = .unary operator operand) (unique : NodeOccurrencesUnique invocation.source)
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment before id outcome after) :
     UnaryTrace program size context registry invocation environment before operand operator outcome after := by
-  have actual : ∀ {actualForm}, Staging.Recursive.Occurrence invocation id actualForm → actualForm = .unary operator operand :=
+  have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .unary operator operand :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
@@ -130,7 +130,7 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
     (form : node.form = .binary left operator right) (unique : NodeOccurrencesUnique invocation.source)
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment before id outcome after) :
     BinaryTrace program size context registry invocation environment before left right operator outcome after := by
-  have actual : ∀ {actualForm}, Staging.Recursive.Occurrence invocation id actualForm → actualForm = .binary left operator right :=
+  have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .binary left operator right :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
@@ -163,7 +163,7 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
     (form : node.form = .conditional condition thenId elseId) (unique : NodeOccurrencesUnique invocation.source)
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment before id outcome after) :
     ConditionalTrace program size context registry invocation environment before condition thenId elseId outcome after := by
-  have actual : ∀ {actualForm}, Staging.Recursive.Occurrence invocation id actualForm → actualForm = .conditional condition thenId elseId :=
+  have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .conditional condition thenId elseId :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>

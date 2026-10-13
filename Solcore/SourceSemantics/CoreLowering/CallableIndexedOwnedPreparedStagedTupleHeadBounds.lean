@@ -23,10 +23,10 @@ private def Point (scope : SourceCoreLocalCell.Scope) (id : ExpressionId)
   fun current child code => current = scope ∧ child = id ∧ code = lowered
 
 private theorem occurrence_form {invocation : Staging.Recursive.Scope} {id : ExpressionId}
-    {node : ExpressionNode} {form : ExpressionForm}
+    {node : ExpressionNode} {form : ExpressionForm} {requirements : List RequirementId}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
-    (owned : Staging.Recursive.Occurrence invocation id form) : node.form = form := by
+    (owned : Staging.Recursive.Occurrence invocation id form requirements) : node.form = form := by
   obtain ⟨other, contains, formed, _, _⟩ := owned
   have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   subst other

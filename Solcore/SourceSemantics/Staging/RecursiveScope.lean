@@ -50,10 +50,12 @@ inductive BodyOutcome where
   | returned (value : Dynamic.Value)
   | fault (failure : Failure)
 
-/-- Exact uncoerced ordinary occurrence, independently of any compiler. -/
-def Occurrence (scope : Scope) (id : ExpressionId) (form : ExpressionForm) : Prop :=
+/-- Exact uncoerced occurrence with its original requirements, independently of
+any compiler. Existing ordinary occurrences default to no requirements. -/
+def Occurrence (scope : Scope) (id : ExpressionId) (form : ExpressionForm)
+    (requirements : List RequirementId := []) : Prop :=
   ∃ node, ContainsExpression scope.source id node ∧ node.form = form ∧
-    node.requirements = [] ∧ node.coercions = []
+    node.requirements = requirements ∧ node.coercions = []
 
 /-- Forms whose raw evaluation has no expression or callable-body child.
 Their independent atomic Dynamic rules can be reused without bypassing a

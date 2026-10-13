@@ -51,9 +51,9 @@ private theorem no_stage
     (form : node.form = .lambda parameters result body)
     (trace : Staging.Recursive.Size.Expression program registry size scope context environment
       before id (.fault (.stage failedScope call reason)) after) : False := by
-  have actual : ∀ {shape}, Staging.Recursive.Occurrence scope id shape →
+  have actual : ∀ {shape requirements}, Staging.Recursive.Occurrence scope id shape requirements →
       shape = .lambda parameters result body := by
-    intro shape occurrence
+    intro shape requirements occurrence
     obtain ⟨actualNode, contains, sameForm, _requirements, _coercions⟩ := occurrence
     have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
     cases same

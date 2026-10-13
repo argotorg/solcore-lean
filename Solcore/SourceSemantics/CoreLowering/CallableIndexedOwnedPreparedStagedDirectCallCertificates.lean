@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.NamedCallArgumentCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCertificates
 import Solcore.SourceSemantics.CoreLowering.CompatibleSourceInstantiationClosure
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallSelectionCertificates
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionExpressionCertificates
 
 /-! Ordinary declaration calls retain the actual compiler-selected signature,
 physical slot, complete specialization and ordered child actions. Raw Source
@@ -16,6 +17,13 @@ structure Monomorphic (instantiation : DeclarationInstantiation) : Prop where
   substitution : instantiation.parameterSubstitution = []
   predicates : instantiation.predicates = []
 
+/-- Every direct call retains its full closed raw replacement range and the
+original Source parameter order in the actual compilation plan. -/
+structure Supported (plan : SourceCompilationPlan.Plan)
+    (instantiation : DeclarationInstantiation) : Prop where
+  ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution
+  ordered : RecursiveNamedCallSelectionCertificates.Ordered plan instantiation
+
 /-- Ordinary calls keep every raw replacement and the order retained by Source
 inference. The selected compiler row still authenticates the other metadata. -/
 structure Ordinary (plan : SourceCompilationPlan.Plan)
@@ -23,6 +31,25 @@ structure Ordinary (plan : SourceCompilationPlan.Plan)
   predicates : instantiation.predicates = []
   ranges : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution
   ordered : RecursiveNamedCallSelectionCertificates.Ordered plan instantiation
+
+theorem Ordinary.supported {plan : SourceCompilationPlan.Plan} {instantiation : DeclarationInstantiation}
+    (ordinary : Ordinary plan instantiation) : Supported plan instantiation :=
+  ⟨ordinary.ranges, ordinary.ordered⟩
+
+/-- A direct node can retain declaration requirements. Its result projection
+and empty output coercions are common to both compiler branches. -/
+structure Metadata (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSource)
+    (id : ExpressionId) (node : ExpressionNode) (type : Core.Ty) : Prop where
+  found : source.lookupExpression? id = some node
+  owner : id.occurrence.owner = source.owner
+  coercions : node.coercions = []
+  projected : checked.catalog.project node.type = .ok type
+
+theorem Metadata.of_read {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}
+    {id : ExpressionId} {node : ExpressionNode} {type : Core.Ty}
+    (metadata : CompatibleExpressionReads.Metadata checked source id node type) :
+    Metadata checked source id node type :=
+  ⟨metadata.found, metadata.owner, metadata.coercions, metadata.projected⟩
 
 /-- Empty substitutions are a special case of ordinary selection. The actual
 matcher excludes a nonempty selected row even when the plan contains others. -/
@@ -49,16 +76,16 @@ structure Receipt (policy : SourceCoreFunctions.Policy) (body : SourceCoreFuncti
     (ids : List ExpressionId) (instantiation : DeclarationInstantiation)
     (reasonAt : ExpressionId → Word) (lowered : SourceCoreBasic.LoweredExpr) where
   node : ExpressionNode
-  metadata : CompatibleExpressionReads.Metadata values.checked source id node lowered.type
+  metadata : Metadata values.checked source id node lowered.type
   form : node.form = .call callee ids (.declaration instantiation)
-  ordinary : Ordinary compilation.plan instantiation
+  supported : Supported compilation.plan instantiation
   accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1)
     compilation source scope id reasonAt = .ok lowered
   signature : SourceCoreCalls.Signature
   index : Nat
   specialized : SourceSpecialization.SpecializedFunction
-  selected : SourceCoreFunctions.selectedSignature policy compilation source node instantiation false =
-    .ok (index, signature)
+  target : SourceCompilationPlan.exactInstantiationKey compilation.plan instantiation = .ok signature.key
+  global : compilation.globals[index]? = some signature
   record : SourceCompilationPlan.exactSpecialization compilation.plan signature.key = .ok specialized
   arity : ids.length = specialized.function.typedBody.inputs.length
   codes : List SourceCoreBasic.LoweredExpr
@@ -78,7 +105,7 @@ private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α →
 
 /-- The original compatible reader and accepted real lowering supply the
 complete direct-call record before any recursive child certificate is built. -/
-theorem of_ordinary
+theorem of_supported
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {fuel : Nat} {compilation : SourceCoreFunctions.Context}
     {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
@@ -87,7 +114,7 @@ theorem of_ordinary
     {node : ExpressionNode} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
     (found : source.lookupExpression? id = some node)
     (form : node.form = .call callee ids (.declaration instantiation))
-    (ordinary : Ordinary compilation.plan instantiation)
+    (ordinary : Supported compilation.plan instantiation)
     (special : ∀ child budget, (match policy.lowerSpecial? with
       | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
       | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
@@ -115,10 +142,188 @@ theorem of_ordinary
       obtain ⟨index, signature, specialized, codes, selected, record, arity, generated,
         parameter, result, emitted, output⟩ := NamedCalls.Arguments.call_of_accepted
           owner found read form (special _ _) original
-      exact ⟨⟨node, output.symm ▸ metadata, form, ordinary, original, signature,
-        index, specialized, selected, record, arity, codes, generated, parameter,
+      exact ⟨⟨node, output.symm ▸ Metadata.of_read metadata, form, ordinary, original, signature,
+        index, specialized, (NamedCalls.selected_signature_target selected).1,
+        (NamedCalls.selected_signature_target selected).2, record, arity, codes, generated, parameter,
         result.trans output.symm, emitted⟩⟩
   · simp [owner, bind, Except.bind] at accepted
+
+/-- Ordinary sites use the common successful fast-path extraction. -/
+theorem of_ordinary
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {node : ExpressionNode} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .call callee ids (.declaration instantiation))
+    (ordinary : Ordinary compilation.plan instantiation)
+    (special : ∀ child budget, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+    (readPolicy : policy.readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked source id)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1)
+      compilation source scope id reasonAt = .ok lowered) :
+    Nonempty (Receipt policy body fuel compilation values source scope id callee ids instantiation reasonAt lowered) := by
+  exact of_supported found form ordinary.supported special readPolicy accepted
+
+/-- The real fast-path read establishes empty requirements at this exact
+reached node, even when the common receipt also admits authenticated calls. -/
+theorem Receipt.ordinary_facts
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : Receipt policy body fuel compilation values source scope id callee ids instantiation reasonAt lowered)
+    (special : ∀ child budget, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+    (readPolicy : policy.readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked source id) :
+    Ordinary compilation.plan instantiation ∧ receipt.node.requirements = [] := by
+  have accepted := receipt.accepted
+  rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+  simp only [receipt.metadata.owner, ne_eq, not_true_eq_false, ↓reduceIte,
+    receipt.metadata.found, bind, Except.bind, pure, Except.pure] at accepted
+  have bypass := special (fun budget childSource childScope childId childReasonAt =>
+    SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
+      compilation childSource childScope childId childReasonAt) (fuel + 1)
+  cases hook : policy.lowerSpecial? <;> simp only [hook] at accepted bypass
+  all_goals try rw [bypass] at accepted
+  all_goals
+    simp only [receipt.form] at accepted
+    obtain ⟨pair, read, _remaining⟩ := bind_ok accepted
+    rcases pair with ⟨other, type⟩
+    have metadata := CompatibleExpressionReads.metadata_of_read (readPolicy.symm ▸ read)
+    have same := Option.some.inj (metadata.found.symm.trans receipt.metadata.found)
+    subst other
+    obtain ⟨index, signature, specialized, codes, selected, _rest⟩ :=
+      NamedCalls.Arguments.call_of_accepted receipt.metadata.owner receipt.metadata.found read
+        receipt.form (special _ _) receipt.accepted
+    obtain ⟨_, _, matched, empty, _⟩ := CallableNamedMetadata.metadata_of_selected_signature selected
+    exact ⟨⟨matched.predicates.symm.trans empty, receipt.supported.ranges,
+      receipt.supported.ordered⟩, metadata.requirements⟩
+
+/-- Existing profiles recover the exact ordinary restriction from the real
+fast-path selector, including its full Source predicates. -/
+theorem Receipt.ordinary
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : Receipt policy body fuel compilation values source scope id callee ids instantiation reasonAt lowered)
+    (special : ∀ child budget, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+    (readPolicy : policy.readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked source id) :
+    Ordinary compilation.plan instantiation :=
+  (receipt.ordinary_facts special readPolicy).1
+
+theorem Receipt.ordinary_requirements
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    (receipt : Receipt policy body fuel compilation values source scope id callee ids instantiation reasonAt lowered)
+    (special : ∀ child budget, (match policy.lowerSpecial? with
+      | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
+      | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
+    (readPolicy : policy.readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression values.checked source id) :
+    receipt.node.requirements = [] :=
+  (receipt.ordinary_facts special readPolicy).2
+
+/-- Delegation of a direct occurrence retains both empty requirements and
+an empty caller assumption list, as checked by the actual evidence hook. -/
+theorem evidence_none_direct
+    {program : CheckedProgram} {project : SourceCoreEvidence.Projector}
+    {caller : SourceSpecialization.SpecializedFunction} {compilation : SourceCoreFunctions.Context}
+    {child : SourceCoreEvidence.Child} {budget : Nat} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId} {ids : List ExpressionId}
+    {instantiation : DeclarationInstantiation} {reasonAt : ExpressionId → Word}
+    {callables : SourceCoreFunctions.CallablePolicy} {node : ExpressionNode}
+    (found : source.lookupExpression? id = some node)
+    (form : node.form = .call callee ids (.declaration instantiation))
+    (accepted : SourceCoreEvidence.lowerWithProjector program project caller compilation child budget
+      source scope id reasonAt callables = .ok none) :
+    node.requirements = [] ∧ caller.assumptions = [] := by
+  unfold SourceCoreEvidence.lowerWithProjector at accepted
+  simp only [found, form, bind, Except.bind, pure, Except.pure] at accepted
+  split at accepted
+  · rename_i ordinary
+    simp only [Bool.and_eq_true, Bool.or_false, Bool.not_false, Bool.and_true,
+      Bool.not_not] at ordinary
+    exact ⟨List.isEmpty_iff.mp ordinary.1.2, List.isEmpty_iff.mp ordinary.2⟩
+  · repeat first | cases accepted | split at accepted | contradiction
+
+/-- The evidence branch receives the same recursive child callback and actual
+budget as the enclosing expression compiler. -/
+abbrev Child (policy : SourceCoreFunctions.Policy) (body : SourceCoreFunctions.BodyLowerer)
+    (fuel : Nat) (compilation : SourceCoreFunctions.Context) : SourceCoreEvidence.Child :=
+  fun budget childSource childScope childId childReasonAt =>
+    SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
+      compilation childSource childScope childId childReasonAt
+
+/-- Accepted ordinary and authenticated calls expose the same static call
+shape. The authenticated receipt keeps the real compiler branch and all its
+ordered child actions; no dictionary or body meaning is supplied here. -/
+theorem of_evidence
+    {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
+    {fuel : Nat} {compilation : SourceCoreFunctions.Context}
+    {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
+    {scope : SourceCoreLocalCell.Scope} {id callee : ExpressionId}
+    {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {node : ExpressionNode} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
+    {program : CheckedProgram} {project : SourceCoreEvidence.Projector}
+    {caller : SourceSpecialization.SpecializedFunction}
+    (supported : Supported compilation.plan instantiation)
+    (coercions : node.coercions = [])
+    (projected : values.checked.catalog.project node.type = .ok lowered.type)
+    (evidence : CallableCoercionExpressionCertificates.Direct program project caller compilation
+      (Child policy body fuel compilation) (fuel + 1) source scope id callee ids instantiation
+      reasonAt policy.callables node lowered)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1)
+      compilation source scope id reasonAt = .ok lowered) :
+    Nonempty (Receipt policy body fuel compilation values source scope id callee ids instantiation reasonAt lowered) := by
+  have owner : id.occurrence.owner = source.owner := by
+    apply Classical.byContradiction
+    intro mismatch
+    simp [SourceCoreFunctions.lowerExpressionWithPolicy, mismatch, bind, Except.bind] at accepted
+  have member : (evidence.native.signature, evidence.native.index) ∈
+      compilation.globals.zipIdx.filter (fun row => decide (row.1.key = evidence.selection.key)) := by
+    rw [evidence.native.global]
+    exact List.mem_singleton.mpr rfl
+  have selected := List.mem_filter.mp member
+  have key : evidence.native.signature.key = evidence.selection.key := by
+    simpa only [decide_eq_true_eq] using selected.2
+  have target : SourceCompilationPlan.exactInstantiationKey compilation.plan instantiation =
+      .ok evidence.native.signature.key := by
+    rw [evidence.selection.targetSelected]
+    exact congrArg Except.ok (evidence.selection.key_eq.symm.trans key.symm)
+  have record : SourceCompilationPlan.exactSpecialization compilation.plan evidence.native.signature.key =
+      .ok evidence.selection.specialized := by
+    rw [key]
+    exact evidence.selection.selected
+  have unchanged : evidence.operand = lowered := by
+    have suffix := evidence.suffix.accepted
+    simpa only [coercions, SourceCoreEvidence.applyCoercions, pure, Except.pure, Except.ok.injEq] using suffix
+  have emitted := unchanged.symm.trans evidence.native.emitted
+  refine ⟨⟨node, ⟨evidence.found, owner, coercions, projected⟩, evidence.form, supported, accepted,
+    evidence.native.signature, evidence.native.index, evidence.selection.specialized, target,
+    List.mk_mem_zipIdx_iff_getElem?.mp selected.1, record, evidence.arity,
+    evidence.loweredArguments, ?_, evidence.native.inputType, ?_, ?_⟩⟩
+  · simpa only [Child, Nat.min_eq_right (Nat.le_succ fuel)] using evidence.argumentsAccepted
+  · exact (congrArg SourceCoreBasic.LoweredExpr.type emitted).symm
+  · exact congrArg SourceCoreBasic.LoweredExpr.expression emitted
 
 /-- Existing monomorphic callers use the same ordinary extraction. -/
 theorem of_functions

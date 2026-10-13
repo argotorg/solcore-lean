@@ -27,9 +27,9 @@ private theorem no_stage
     (form : node.form = .reference name (.local binder))
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment
       before id (.fault (.stage failedScope call reason)) after) : False := by
-  have reference : ∀ {shape}, Staging.Recursive.Occurrence invocation id shape →
+  have reference : ∀ {shape requirements}, Staging.Recursive.Occurrence invocation id shape requirements →
       shape = .reference name (.local binder) := by
-    intro shape occurrence
+    intro shape requirements occurrence
     obtain ⟨other, contains, sameForm, _, _⟩ := occurrence
     have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
     cases same

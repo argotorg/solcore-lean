@@ -195,7 +195,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨afterTyped, invocationExtends⟩ := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
             runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
           exact ⟨afterTyped, argumentExtends.trans invocationExtends⟩
-  | @directArgumentsFault childrenSize scope context environment before after id callee arguments instantiation name failure
+  | @directArgumentsFault childrenSize scope context environment before after id callee arguments instantiation name failure requirements
       occurrence _calleeOccurrence children =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -203,7 +203,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap argumentsTyped children
   | @directApplied childrenSize invocationSize scope context environment before argumentsHeap after
-      id callee arguments instantiation name values evidence outcome occurrence _calleeOccurrence valid children callEvidence invocation =>
+      id callee arguments instantiation name values evidence outcome requirements occurrence _calleeOccurrence valid children callEvidence invocation =>
       obtain ⟨raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | @directCall _ callee arguments instantiation parameterTypes resultType predicates _calleeTyped application argumentsTyped =>

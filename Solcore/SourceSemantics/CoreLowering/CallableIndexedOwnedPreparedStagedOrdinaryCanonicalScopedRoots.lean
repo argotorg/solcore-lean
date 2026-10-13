@@ -137,6 +137,15 @@ theorem of_child
     callsReady := ready }
   exact ⟨⟨node.type, root.canonical rows complete (by rw [support.compilation]; rfl)
     (by rw [support.compilation]; rfl)
+    (fun compiler path => by
+      have actualTree := CallableIndexedOwnedPreparedStagedRecursiveCallerSyntax.direct_calls_syntax_of path childTree
+      refine ⟨(actualTree.direct_site compiler.metadata.found compiler.form).ordinary code.compilation.plan, ?_⟩
+      have requirements := metadata.requirements _ (by simpa only [sameSource] using actualTree)
+        compiler.node (by simpa only [sameSource] using compiler.metadata.found)
+      rcases requirements with empty | ⟨literal, resolution, form⟩
+      · exact empty
+      · rw [compiler.form] at form
+        cases form)
     (CallableIndexedOwnedPreparedStagedIndexDiagnosticAuthority.ordinary_ready support provenance.body_reasons
       sameSource reached certificate)⟩⟩
 

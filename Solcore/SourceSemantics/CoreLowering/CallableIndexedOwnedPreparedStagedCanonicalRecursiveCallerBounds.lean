@@ -108,7 +108,7 @@ def DirectReady {rootScope : SourceCoreLocalCell.Scope} {rootId : ExpressionId}
     (compiler : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Receipt policy body callFuel compilation
       (.initial compiled.compatible.checked) invocation.source callScope callId actualCallee actualIds
       instantiation reasonAt actualCode), DirectCalls compiler root → Nonempty
-        (CallableIndexedOwnedPreparedStagedDirectCallAuthority.Port compiler headers)
+        (CallableIndexedOwnedPreparedStagedDirectCallAuthority.PortWithEvidence compiler headers context invocation.evidence)
 
 private theorem named_descriptor (header : CallableIndexedOwnedFunctionValues.Header compiled
     (Program.ofChecked compiled.sourceProgram)) :
@@ -459,7 +459,7 @@ theorem preserves_reached
       intro current child code point
       obtain ⟨rfl, rfl, rfl⟩ := point
       exact CallableIndexedOwnedPreparedStagedDirectHeadBounds.preserves
-        owner compiler port callerBridge functions callFaults unique wellFormed runtime covers
+        owner compiler port.toPort port.evidence callerBridge functions callFaults unique wellFormed runtime covers
         size ordered childMeaning (namedChildren size within port.header port.member) ⟨rfl, rfl, rfl⟩
   | @call id callee ids metadata fuel lowered types compiler sequence children ih =>
       intro reached directReady indexReady ports size within
@@ -819,7 +819,7 @@ theorem reflects_reached (stageEq : stages = RecursiveNamedPreparedStageScopes.r
       have reflected : ReflectsAt bridge context model (RecursiveNamedPreparedStageScopes.registry stagePrepared)
           invocation (CallableIndexedOwnedPreparedStagedDirectHeadBounds.Point current child code) callFaults size :=
         CallableIndexedOwnedPreparedStagedDirectHeadBounds.reflects
-        owner compiler port callerBridge functions callFaults unique wellFormed runtime covers
+        owner compiler port.toPort port.evidence callerBridge functions callFaults unique wellFormed runtime covers
         stagePrepared descriptor size ordered (stageEq ▸ childMeaning)
         (stageEq ▸ namedChildren size within port.header port.member)
       have inStages : ReflectsAt bridge context model stages invocation

@@ -47,7 +47,7 @@ theorem of_complete
       header.instantiation.parameterSubstitution.map Prod.fst =
         (header.named.specialized.parameterSubstitution.map Prod.fst).reverse) :
     Nonempty (Ready receipt catalog) := by
-  have selected := (NamedCalls.selected_signature_target receipt.selected).2
+  have selected := receipt.global
   rw [globals] at selected
   obtain ⟨header, member, slot, signature⟩ := complete receipt.index receipt.signature selected
   have record := CallableIndexedActualNamedSourceReceipts.header_record compiled header
@@ -55,12 +55,12 @@ theorem of_complete
   have specialized : header.named.specialized = receipt.specialized :=
     Except.ok.inj (record.symm.trans receipt.record)
   have occurrence := CallableNamedMetadata.matches_of_exact
-    (NamedCalls.selected_signature_target receipt.selected).1 receipt.record
+    receipt.target receipt.record
   have headerTarget := header.target
   rw [signature, ← plan] at headerTarget
   have headerMatch := CallableNamedMetadata.matches_of_exact headerTarget receipt.record
   have occurrenceEq := occurrence.retained_canonical
-    (receipt.ordinary.ordered _ _ (NamedCalls.selected_signature_target receipt.selected).1 receipt.record)
+    (receipt.supported.ordered _ _ receipt.target receipt.record)
   have headerEq := headerMatch.retained_canonical (by
     simpa only [← specialized] using ordered header member)
   exact ⟨⟨header, member, slot, signature, specialized, occurrenceEq.trans headerEq.symm⟩⟩
@@ -96,8 +96,7 @@ structure Port (catalog : List (CallableIndexedOwnedFunctionValues.Header compil
   function : Dynamic.GlobalFunction
   sourceAt : CallableIndexedOwnedFunctionValues.NamedSourceAt toReady.header rawDictionary function
   sourceInstantiation : function.instantiation = instantiation
-  sourceEvidence : function.evidence = []
-  headerEvidence : toReady.header.function.evidence = []
+  dictionary : function.evidence = prepared.view.evidence
 
 /-- The real retained Inventory supplies all preparation and Source provenance.
 No new public execution premise or unrelated native run is needed. -/
@@ -121,9 +120,6 @@ theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
     rw [← same, ← metadata]
     exact aligned
   have sourceAt := packet.sourceAt
-  have empty : packet.header.function.evidence = [] :=
-    CallableIndexedOwnedPreparedOrdinaryNamedEvidenceReceipts.selected_evidence_empty
-      sourceAt plan ((congrArg (fun header => header.named.signature) same).trans ready.signature) receipt.selected
   have sourceMetadata :
       (CallableNamedReversal.global (CallableNamedMetadata.global packet.header.named.specialized
         input.prepared.available)).instantiation = instantiation := by
@@ -141,7 +137,104 @@ theorem of_inventory {inputs : List (Input compiled)} (rows : Inventory inputs)
               (CallableNamedMetadata.global packet.header.named.specialized input.prepared.available)
             sourceAt := same ▸ sourceAt
             sourceInstantiation := sourceMetadata
-            sourceEvidence := sourceAt.dictionary.symm.trans empty
-            headerEvidence := same ▸ empty }⟩
+            dictionary := (same ▸ sourceAt).dictionary.symm.trans
+              (congrArg Dynamic.Closure.evidence aligned.function) }⟩
+
+/-- Full Source evidence is produced and identified at the actual caller
+context. It contains no Source or native body execution premise. -/
+structure EvidenceAt {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
+      (Program.ofChecked compiled.sourceProgram))}
+    (port : Port receipt catalog) (context : SourceSemantics.Context)
+    (caller : Dynamic.EvidenceEnvironment) : Prop where
+  produces : Dynamic.DirectCallProducesEvidence context caller receipt.node.requirements []
+    instantiation.predicates port.function.evidence
+  agrees : ∀ evidence, Dynamic.DirectCallProducesEvidence context caller receipt.node.requirements []
+    instantiation.predicates evidence → evidence = port.function.evidence
+
+structure PortWithEvidence (catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
+      (Program.ofChecked compiled.sourceProgram)))
+    (context : SourceSemantics.Context) (caller : Dynamic.EvidenceEnvironment)
+    extends Port receipt catalog where
+  evidence : EvidenceAt receipt toPort context caller
+
+/-- Empty predicates imply the actual prepared dictionary is empty. The full
+selected metadata, issued Header and resolver establish this equality. -/
+theorem ordinary_evidence
+    {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
+      (Program.ofChecked compiled.sourceProgram))}
+    (port : Port receipt catalog)
+    (ordinary : CallableIndexedOwnedPreparedStagedDirectCallCertificates.Ordinary compilation.plan instantiation)
+    (requirements : receipt.node.requirements = [])
+    (context : SourceSemantics.Context) (caller : Dynamic.EvidenceEnvironment) :
+    EvidenceAt receipt port context caller := by
+  have same : port.row = receipt.specialized :=
+    port.prepared.same.symm.trans
+      ((congrArg (fun named => named.specialized) port.aligned.named).symm.trans port.specialized)
+  have metadata := CallableNamedMetadata.matches_of_exact receipt.target receipt.record
+  have assumptions : port.row.assumptions = [] := by
+    rw [same]
+    exact metadata.predicates.trans ordinary.predicates
+  have empty : port.function.evidence = [] :=
+    port.dictionary.trans (RecursiveNamedPreparedHeaders.Prepared.evidence_empty port.prepared assumptions)
+  constructor
+  · rw [requirements, ordinary.predicates, empty]
+    exact .intro (selected := []) (contextual := []) rfl rfl .nil
+  · intro evidence produced
+    cases produced with
+    | intro _ _ produced =>
+      have length := produced.length_eq.2
+      rw [ordinary.predicates] at length
+      exact (List.length_eq_zero_iff.mp length.symm).trans empty.symm
+
+/-- Re-extraction from the actual named caller supplies its complete resolver
+and authenticated selected dictionary. Caller alignment comes from the reached
+Source frame; arbitrary Source evidence is identified using ledger identities. -/
+theorem authenticated_evidence
+    {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
+      (Program.ofChecked compiled.sourceProgram))}
+    (port : Port receipt catalog)
+    {project : SourceCoreEvidence.Projector} {caller : SourceSpecialization.SpecializedFunction}
+    {child : SourceCoreEvidence.Child} {budget : Nat} {callables : SourceCoreFunctions.CallablePolicy}
+    (actual : CallableCoercionExpressionCertificates.Direct compiled.sourceProgram project caller compilation
+      child budget source scope id callee ids instantiation reasonAt callables receipt.node lowered)
+    (callerPrepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled caller)
+    {context : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    (signatures : context.signatures = compiled.sourceProgram.signatures)
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
+    (unique : RequirementIdsUnique context)
+    (callerDictionary : callerEvidence = callerPrepared.view.evidence) :
+    EvidenceAt receipt port context callerEvidence := by
+  have key : actual.selection.key = receipt.signature.key :=
+    actual.selection.key_eq.trans (Except.ok.inj (actual.selection.targetSelected.symm.trans receipt.target))
+  have record : SourceCompilationPlan.exactSpecialization compilation.plan receipt.signature.key =
+      .ok actual.selection.specialized := by
+    rw [← key]
+    exact actual.selection.selected
+  have same : port.row = actual.selection.specialized :=
+    port.prepared.same.symm.trans
+      ((congrArg (fun named => named.specialized) port.aligned.named).symm.trans
+        (port.specialized.trans (Except.ok.inj (receipt.record.symm.trans record))))
+  have actualKey := (CallableNamedMetadata.specialization_of_exact actual.selection.selected).2
+  have calleeDictionary : actual.selection.actual = port.prepared.available := by
+    apply port.prepared.authenticated_dictionary
+    simpa only [same, actualKey] using actual.selection.authenticated
+  have input : actual.selection.available = callerPrepared.available :=
+    Except.ok.inj (actual.selection.resolved.symm.trans callerPrepared.resolved)
+  have output : CallableNamedMetadata.environment actual.selection.actual = port.function.evidence := by
+    rw [calleeDictionary, port.dictionary]
+    rfl
+  constructor
+  · have produced := actual.selection.direct_produces signatures ledger assumptions
+    simpa only [receipt.metadata.coercions, input, output, callerDictionary,
+      RecursiveNamedPublicSpecializationMeaning.Prepared.view] using produced
+  · intro evidence produced
+    have produced : Dynamic.DirectCallProducesEvidence context
+        (CallableNamedMetadata.environment actual.selection.available) receipt.node.requirements receipt.node.coercions
+        instantiation.predicates evidence := by
+      simpa only [receipt.metadata.coercions, input, callerDictionary,
+        RecursiveNamedPublicSpecializationMeaning.Prepared.view] using produced
+    exact (actual.selection.direct_agrees ledger
+      (CallableCallRequirementLayouts.singletons_of_unique ledger unique) produced).trans output
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority

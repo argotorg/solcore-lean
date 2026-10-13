@@ -78,9 +78,9 @@ private theorem source_prefix
   have same_node : ∀ {actualNode}, ContainsExpression invocation.source id actualNode → actualNode = node := by
     intro actualNode contains
     exact Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
-  have occurrence_form : ∀ {actualForm}, Staging.Recursive.Occurrence invocation id actualForm →
+  have occurrence_form : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements →
       actualForm = .call callee ids (.indirect metadata) := by
-    intro actualForm occurrence
+    intro actualForm requirements occurrence
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
