@@ -1,8 +1,8 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosedMethodSelection
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGenericMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallablePreparedMethodRuntimeProfileFactory
 
-/-! The genuine method selector and closed implementation catalog determine
+/-! The genuine method selector and implementation catalog determine
 its complete caller dictionary. Parameter and lexical contexts preserve the
 actual ledger and requirement identities used by later direct calls. -/
 set_option autoImplicit false
@@ -25,8 +25,8 @@ structure CallerAt (context : SourceSemantics.Context) (evidence : Dynamic.Evide
 
 /-- The selected method's complete assumption list follows from its real
 trait, implementation and method catalog entries. -/
-theorem assumptions_empty
-    (catalog : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram) :
+theorem assumptions_empty_generic
+    (catalog : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram) :
     principal.sourceBody.context.assumptions = [] := by
   obtain ⟨implementation, declaration, trait, definition, substitution, instantiated⟩ := principal.source_instantiation
   cases instantiated with
@@ -39,16 +39,16 @@ theorem assumptions_empty
 
 /-- Actual selection assembles precisely the empty method dictionary; no
 statement about resolver agreement is inferred from coverage alone. -/
-def of_selected
+def of_selected_generic
     (sourceAt : CallablePreparedMethodRuntimeProfileFactory.SourceAt principal.cached.compilation
       (.initial compiled.compatible.checked) principal.sourceBody principal.dictionary)
-    (catalog : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
+    (catalog : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
     {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
     (selected : stages.Closure principal.sourceFunction child)
     {context : SourceSemantics.Context}
     (fields : Dynamic.RuntimeContextFields sourceAt.context context) :
     CallerAt principal context child.evidence := by
-  have empty := assumptions_empty principal catalog
+  have empty := assumptions_empty_generic principal catalog
   have dictionary := RecursiveMethodSelectionIdentity.dictionary_empty principal.selected empty
   have callerEmpty : principal.named.specialized.assumptions = [] := by
     rw [principal.cached.same]
@@ -64,5 +64,24 @@ def of_selected
     rw [callerEmpty] at member
     cases member
   · exact (fields.runtimeRequirementLedger sourceAt.valid.runtime).idsUnique
+
+/-- The closed-catalog entry point retains its original signature. -/
+theorem assumptions_empty
+    (catalog : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram) :
+    principal.sourceBody.context.assumptions = [] :=
+  assumptions_empty_generic principal (CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog.of_closed catalog)
+
+/-- Existing callers use the same authentic selected frame and dictionary. -/
+def of_selected
+    (sourceAt : CallablePreparedMethodRuntimeProfileFactory.SourceAt principal.cached.compilation
+      (.initial compiled.compatible.checked) principal.sourceBody principal.dictionary)
+    (catalog : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
+    {stages : Staging.Recursive.Registry} {child : Staging.Recursive.Scope}
+    (selected : stages.Closure principal.sourceFunction child)
+    {context : SourceSemantics.Context}
+    (fields : Dynamic.RuntimeContextFields sourceAt.context context) :
+    CallerAt principal context child.evidence :=
+  of_selected_generic principal sourceAt
+    (CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog.of_closed catalog) selected fields
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodCallerEvidence

@@ -1,7 +1,8 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodPathTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodArgumentRows
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosedMethodSelection
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGenericMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryCanonicalTerminalSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryEvidenceCallsReady
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodPolicy
@@ -24,6 +25,7 @@ open CallableIndexedOwnedPreparedStagedGeneralBodyViewSyntax
 open CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
 open CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport (Root)
 
+section Generic
 variable {directSites : DeclarationInstantiation → Prop}
   {compiled : SourceCoreUnifiedCompilation.Compiled}
   (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
@@ -49,7 +51,7 @@ variable {directSites : DeclarationInstantiation → Prop}
   {loaded : LoadedProgram}
   (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
   (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
-  (methods : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
+  (methods : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
   {signature : ProgramFunctionSignature}
   (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
   (sourceOwner : function.source.owner = signature.id)
@@ -61,7 +63,7 @@ local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.h
 include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
 /-- The actual binder fields transport typing, ledger and evidence. The root
 retains the concrete Code compiler, including its original prefix and reasons. -/
-theorem of_original_child
+theorem of_original_child_generic
     {child : Staging.Recursive.Scope} (selected : (stages).Closure function child)
     {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields support.body.context context)
     {current : SourceCoreLocalCell.Scope} {fuel : Nat} {id : ExpressionId}
@@ -189,8 +191,6 @@ theorem of_original_child
     rw [(SourceCoreUnifiedPreparationCertificates.compiled_fields compiled).1] at actual
     obtain ⟨sourceReceipt⟩ := CallablePreparedMethodRuntimeMeaning.OperatorSource.of_accepted actual
     let authentic := CallableIndexedOwnedPreparedStagedOperatorMethodIssuance.authentic compiler actual compiler.special
-    have selectionSupport := CallableIndexedOwnedPreparedStagedClosedMethodSelection.selection_support
-      authentic checked wellFormed methods sourceReceipt
     obtain ⟨originalCaller⟩ := provenance.body_caller_receipt
     let caller := (originalCaller.extend fields).with_evidence ((stages).evidence selected)
     have parameters := RecursiveNamedInitialContextValidity.mono_fields support.caller.extended
@@ -210,6 +210,9 @@ theorem of_original_child
     have idsUnique : RequirementIdsUnique context := by
       simpa only [RequirementIdsUnique, caller.fields.solvedRequirements] using
         (RecursiveNamedInitialContextValidity.scoped_ledger support.caller.frame support.caller.extended wellFormed).idsUnique
+    have parentTyped := CallableIndexedOwnedPreparedStagedMethodPathTyping.parent_typed compiler unique childTyped path
+    have selectionSupport := CallableIndexedOwnedPreparedStagedGenericMethodSelection.selection_support
+      authentic checked wellFormed methods sourceReceipt signatures ledger assumptions unique idsUnique parentTyped
     have callerMember := (CallableNamedMetadata.specialization_of_exact
       (CallableIndexedActualNamedSourceReceipts.header_record compiled support.caller)).1
     have sourceEq : child.source = support.caller.named.specialized.function.typedBody :=
@@ -261,7 +264,7 @@ theorem of_original_child
 include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
 /-- The real body-view callback supplies a root for the original Source at its
 actual lexical context, using the unchanged compiler and retained dictionary. -/
-theorem of_child
+theorem of_child_generic
     {child : Staging.Recursive.Scope} (selected : (stages).Closure function child)
     {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields support.body.context context)
     {current : SourceCoreLocalCell.Scope} {fuel : Nat} {id : ExpressionId}
@@ -278,9 +281,84 @@ theorem of_child
   have callables : code.policy.callables = SourceCoreGeneralFunctions.callablePolicy
       compiled.indexed.base.callableContext [] := by
     rw [code.callables, support.active, compiled.indexed.ancestry.graph.inputs.callableSelected]
-  exact of_original_child stagePrepared code support provenance receiver wellFormed supported metadata
+  exact of_original_child_generic stagePrepared code support provenance receiver wellFormed supported metadata
     rows covered checked catalog methods signatureMember sourceOwner selected fields declarations tree reached found typed
     (CallableIndexedOwnedPreparedStagedMethodBodyViewTransport.accepted_original
       code provenance.policy_recipe provenance.body_view callables metadata tree reached accepted)
+
+end Generic
+
+
+section Legacy
+variable {directSites : DeclarationInstantiation → Prop}
+  {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (stagePrepared : RecursiveNamedPreparedStageContracts.Prepared compiled compiled.indexed.ancestry.graph.inputs.callable)
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope} {administrative : Core.Context}
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (code : Code compiled.indexed function scope administrative)
+  (support : CallableIndexedOwnedOrdinaryLambdaSupport.Support code bodyRegistry semanticFaults)
+  (provenance : CallableIndexedOwnedContextualLambdaProvenance.OrdinaryAt code support)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+    completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  (supported : ∀ instantiation, directSites instantiation →
+    CallableIndexedOwnedPreparedStagedDirectCallCertificates.Supported code.compilation.plan instantiation)
+  (metadata : MetadataFor compiled.indexed support.caller.named function.source directSites)
+  {inputs : List (CallableIndexedOwnedPreparedFiniteNamedInventories.Input compiled)}
+  (rows : CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory inputs)
+  (covered : ∀ instantiation, directSites instantiation → ∀ index signature,
+    SourceCompilationPlan.exactInstantiationKey code.compilation.plan instantiation = .ok signature.key →
+    code.compilation.globals[index]? = some signature →
+    ∃ header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows,
+      header.slot = index ∧ header.named.signature = signature)
+  {loaded : LoadedProgram}
+  (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (catalog : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  (methods : CallableIndexedOwnedPreparedStagedClosedMethodSelection.Catalog compiled.sourceProgram)
+  {signature : ProgramFunctionSignature}
+  (signatureMember : signature ∈ compiled.sourceProgram.signatures.functions)
+  (sourceOwner : function.source.owner = signature.id)
+
+local notation "stages" => RecursiveNamedPreparedStageScopes.registry stagePrepared
+local notation "faults" => CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+local notation "headers" => CallableIndexedOwnedPreparedFiniteNamedInventories.headers rows
+
+
+include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
+theorem of_original_child
+    {child : Staging.Recursive.Scope} (selected : (stages).Closure function child)
+    {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields support.body.context context)
+    {current : SourceCoreLocalCell.Scope} {fuel : Nat} {id : ExpressionId}
+    {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (declarations : CompatibleExpressionReads.ScopeDeclarations function.source current context)
+    (tree : GeneralSyntax function.source id directSites)
+    (reached : Reaches function.source (function.body.map NodeId.statement) (.expression id))
+    (found : function.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType function.source context id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody fuel
+      code.compilation function.source current id code.reasonAt = .ok lowered) :
+    Nonempty (Σ rawType, Root compiled headers stages code.policy code.lowerBody code.compilation compiled.indexed.fuel
+      context child code.reasonAt current id lowered rawType faults) := by
+  exact of_original_child_generic stagePrepared code support provenance receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog.of_closed methods) signatureMember sourceOwner selected fields declarations tree reached found typed accepted
+
+include receiver wellFormed supported metadata rows covered checked catalog methods signatureMember sourceOwner provenance in
+theorem of_child
+    {child : Staging.Recursive.Scope} (selected : (stages).Closure function child)
+    {context : SourceSemantics.Context} (fields : Dynamic.RuntimeContextFields support.body.context context)
+    {current : SourceCoreLocalCell.Scope} {fuel : Nat} {id : ExpressionId}
+    {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
+    (declarations : CompatibleExpressionReads.ScopeDeclarations function.source current context)
+    (tree : GeneralSyntax function.source id directSites)
+    (reached : Reaches function.source (function.body.map NodeId.statement) (.expression id))
+    (found : function.source.lookupExpression? id = some node)
+    (typed : ExpressionHasType function.source context id node.type)
+    (accepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody fuel
+      code.compilation code.view current id code.reasonAt = .ok lowered) :
+    Nonempty (Σ rawType, Root compiled headers stages code.policy code.lowerBody code.compilation compiled.indexed.fuel
+      context child code.reasonAt current id lowered rawType faults) := by
+  exact of_child_generic stagePrepared code support provenance receiver wellFormed supported metadata rows covered checked catalog (CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog.of_closed methods) signatureMember sourceOwner selected fields declarations tree reached found typed accepted
+
+end Legacy
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedRoots
