@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected compilation audit boundary (2026-10-14)
+
+The current proof scope is the selected compilation, including its dependencies and admitted callable handles. A checker-accepted marker `Coerce` trait can lack the executable method needed by one function. The registered `SourceCoreCompilationScope` regression verifies that this function fails compilation while an unrelated entry in the same original program executes successfully.
+
+Review obligations for the selected path:
+
+- Keep the complete original checked program and all declaration/method identities.
+- Authenticate ordinary and method body certificates with the actual cache, original definition and complete substitution.
+- Preserve ordered argument types at the reached heap, captured environments, dictionaries and physical caller restoration.
+- Close recursive body laws through the shared strictly smaller grade; do not store an execution result in a static certificate.
+- Keep selected checker typing, supported-fragment admission and stage assumptions explicit until their producers are proved.
+
+The integrated checkpoint checks 106 affected modules and audits 1,267 endpoints. The complete registered runtime suite passes. Endpoint dependencies are limited to `propext`, `Classical.choice` and `Quot.sound`; no additional logical assumptions were introduced. The private build uses a coherent snapshot of exact source and object dependencies. Twelve unrelated workspace changes are excluded from the implementation commits.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.

@@ -4,6 +4,14 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected compilation proof interface (2026-10-14)
+
+Public runtime APIs are unchanged. The new proof entry points use `SelectedCompilationBodyTyping.Bodies compiled`, which retains global signature/identity facts and validity of the original ordinary or method bodies selected by the actual compiled cache. They continue to interpret `Program.ofChecked compiled.sourceProgram`; callers do not construct a filtered program.
+
+`SelectedCompilationCatalog` and `SelectedCompilationSourceSignatureFacts` recover header certificates and ordered parameter rows. `SelectedCompilationPhysicalProgramSupport.Support` carries those certificates with the actual static named, closure and method support. Its shared body family supplies preservation and reflection. The `SelectedCompilationPublicDirectNamedBounds`, `SelectedCompilationPublicDirectClosureBounds`, `SelectedCompilationPublicDirectBuiltinBounds` and `SelectedCompilationPublicDirectCallableBounds` modules expose the corresponding packed-input public bounds.
+
+Selected body typing and complete static support are still premises of this path. The actual checker producer and remaining static issuers are being connected. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.

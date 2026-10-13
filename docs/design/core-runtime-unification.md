@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Current proof target: the selected compilation (2026-10-14)
+
+The semantic-preservation target is the entry selected for compilation, its dependencies, and the callable handles admitted to its public session. Body validity is required for the original definitions in that compilation scope. Signature formation and identity uniqueness remain program-wide. All statements still use the complete original checked program, including its declaration IDs, substitutions, dictionaries and Source semantics.
+
+This scope matters because checker acceptance does not imply that every definition is executable. For example, the checker accepts a marker `Coerce` trait with no `coerce` method and retains a conversion through that trait. Compiling that conversion fails with `missingTraitMethod`; compiling an unrelated `identity` in the same program succeeds. `SourceCoreCompilationScope` checks both outcomes and executes `identity(37)` through Core. Preserve this behavior.
+
+`SelectedCompilationBodyTyping.Bodies` records the selected ordinary and method definitions using their actual cache rows and original checking provenance. The selected catalog constructs exact header certificates and ordered parameter shapes from those records. `SelectedCompilationPhysicalMixedCallerFamily` closes the ordinary, method and indirect-call recursion using a shared finite grade. The selected public bounds carry the original arguments, captures, dictionaries and reached heaps through named, closure and builtin calls.
+
+The runtime proof now consumes this selected body interface. Deriving it from the actual checker, completing compiler-derived static support, covering every compiler form and lifting ordinary Source executions through the stage guards remain work in progress. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.
@@ -16,7 +26,7 @@ Validation: 61 affected modules checked together, full build (7,299 jobs), regis
 
 The common profile now covers the supported constructor case. Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Full syntax, actual-pass preservation and lifting arbitrary ordinary Source executions through stage guards remain unfinished.
 
-Next, derive Source well-formedness from the actual checker success and connect that result to the common public-session entry points.
+This checkpoint preceded the selected-compilation scope above. Derive selected body validity from the actual checker and connect its static support to the public-session entry points.
 
 ## Mapping selection uses the common compiler profile (2026-10-14)
 
@@ -800,7 +810,7 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | Latest completed verification | Full build (7299 jobs), registered tests, kernel policy and 968 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
 | Latest proof scope | Actual constructor child actions preserve ordered callable payloads, closure captures and handle reuse in one certified public session. |
-| Current implementation priority | Derive Source well-formedness from actual checker success and connect it to the public-session entry points; continue full syntax and actual-pass coverage. |
+| Current implementation priority | Derive body validity for the actual selected compilation from checker success, finish compiler-derived static support, and connect both to public sessions; continue full syntax and actual-pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

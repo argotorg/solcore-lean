@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected compilation replaces whole-program body validity (2026-10-14)
+
+The proof target now follows the actual compilation scope, as approved: the selected entry, dependencies and admitted handles. The full original checked program remains the semantic carrier. Global signature and identity facts remain; ordinary and method body validity is requested only for authentic selected cache rows.
+
+The selected catalog constructs complete instance certificates and ordered Source parameter shapes. Named calls retain the actual instantiation order, including when it differs from the canonical cache order. Argument sequencing retains value typing at the reached heap; parameter allocation, captured environments and caller restoration use those exact states. Coercion paths carry the typed successful result into the next conversion while preserving the reached state of failures.
+
+The shared numeric family now closes ordinary, method and indirect body recursion internally. Selected public bounds cover packed named, closure and builtin inputs and preserve the corresponding callable, dictionary, captures and both heaps. The remaining premises include selected body typing and static compiler support. Their actual checker/compiler producers, wider syntax coverage and ordinary-to-staged execution lifting remain unfinished.
+
+The new registered regression checks a program with a marker `Coerce` trait. Its conversion function is rejected by Core compilation, while its unrelated `identity` function compiles and returns `37`. This preserves existing checker/compiler behavior without requiring executable bodies for unrelated definitions.
+
+Validation: 106 affected modules checked as one coherent graph; the complete registered runtime suite and 1,267 theorem audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Canonical build (7,403 jobs), registered tests (14,632 build jobs), kernel policy and the same 1,267 endpoint audits also pass. The twelve unrelated workspace changes remain excluded.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.
