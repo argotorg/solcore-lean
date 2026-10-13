@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected operator methods through public execution (2026-10-13)
+
+`OperatorMethodCertificates`, `OperatorMethodAuthority` and `OperatorMethodIssuance.of_actual` retain actual lowering, the selected implementation and the complete Source dictionary. `ClosedMethodSelection.Catalog` derives Source selection support from the original well-formed program and actual compilation plan.
+
+`PhysicalGlobals.Authority` records every installed cache cell; `PhysicalGlobals.Slots` records every signature reference in the reached environment. `PhysicalCanonicalState` preserves both through parameter entry, allocation and restoration. `PhysicalCallerFamily` closes ordinary direct calls and method calls using shared recursive expression bounds. `PhysicalNamedTerminalSupport`, `InitializedPhysicalArguments` and `RecursiveNamedPublicPhysicalHistory` connect that family to the actual bootstrap and public sessions. The ordinary Header inventory need not cover method slots.
+
+Closed endpoints are `Tests.SourceCoreEvidenceMethod.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public execution API is unchanged.
+
+Validation: all 1,016 affected modules pass coherent checks. The full build (6,803 jobs), all registered tests (13,476 build jobs and the final pass marker), kernel policy and 199 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected fragment uses selected implementations with no implementation parameters or method assumptions, ordinary terminal callers and methods whose bodies return their argument. The shared proof covers both unary and binary method heads; the closed public fixture exercises unary dispatch. Combining these method paths with retained closures and scoped bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing retained closure calls (2026-10-13)
 
 `OrdinaryCallerReceipts.CallerAt` retains actual `Prepared`, `HeaderAt`, runtime context fields and the complete evidence dictionary. Ordinary formation and `OrdinaryAt` carry it through recapture. The existing named and nested formation producers derive it internally from their accepted compiler receipts.

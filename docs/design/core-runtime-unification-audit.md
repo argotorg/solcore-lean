@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected operator methods through public execution (2026-10-13)
+
+Commits `0883d66d`, `aebd8640` and `e963a2a9` connect selected operator methods through genuine Source typing, actual compiler receipts and four successive public calls. A single strong induction supplies called-body meaning; the closed endpoints introduce no assumed method execution or initialized heap relation.
+
+The identity implementation of Word bit-not returns its input, so the regression distinguishes selected method dispatch from primitive bit-not. Its artifact contains six physical slots and four ordinary Headers. Actual physical authority covers both method cells, while the ordinary inventory remains exact for declarations. Selection retains full caller evidence, even though the selected method dictionary is empty in this fragment.
+
+Validation: all 1,016 affected modules pass coherent checks. The full build (6,803 jobs), all registered tests (13,476 build jobs and the final pass marker), kernel policy and 199 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected fragment uses selected implementations with no implementation parameters or method assumptions, ordinary terminal callers and methods whose bodies return their argument. The shared proof covers both unary and binary method heads; the closed public fixture exercises unary dispatch. Combining these method paths with retained closures and scoped bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing retained closure calls (2026-10-13)
 
 Commits `fd39e383` and `a19eac55` close the retained ordinary closure dictionary connection. Full dictionary equality is retained at genuine formation; it is never inferred from dictionary coverage or capture typing alone. Both original Source well-formedness and actual selected compiler evidence are retained in the closed public regression.

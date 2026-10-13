@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Selected operator methods through public execution (2026-10-13)
+
+Selected operator methods now connect independent Source evaluation to actual compiler selection and public execution. A constrained generic caller resolves its operator through the complete inherited dictionary. The proof retains the selected implementation body, its original typing and the actual installed method closure.
+
+The public fixture has four ordinary cached functions and two implementation methods. Four linked calls return Word `11`, Bool `false`, Word `33` and Bool `true`. Each call has exact Source meaning, successive heap and session relations, and Source-derived sufficient execution/output fuel. Physical cache authority covers all six slots; ordinary Headers cover only the ordinary functions.
+
+Validation: all 1,016 affected modules pass coherent checks. The full build (6,803 jobs), all registered tests (13,476 build jobs and the final pass marker), kernel policy and 199 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected fragment uses selected implementations with no implementation parameters or method assumptions, ordinary terminal callers and methods whose bodies return their argument. The shared proof covers both unary and binary method heads; the closed public fixture exercises unary dispatch. Combining these method paths with retained closures and scoped bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing retained closure calls (2026-10-13)
 
 A constrained generic factory can return a closure whose body calls another constrained generic function. The formation receipt retains the actual caller preparation and complete dictionary alongside the captured Source context. Later invocations use that same provenance through parameter entry and lexical changes.
@@ -318,11 +328,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `fd39e383` / `a19eac55`: evidence-bearing retained closure bodies and three distinct handles across seven public calls. |
-| Latest completed verification | Full build (6741 jobs), all registered tests, kernel policy and 73 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `0883d66d` / `aebd8640` / `e963a2a9`: selected operator methods through four linked public calls. |
+| Latest completed verification | Full build (6803 jobs), all registered tests, kernel policy and 199 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual formation retains complete caller evidence and captured context; all seven calls have Source meaning, reusable histories and execution/output-fuel bounds. |
-| Current implementation priority | Trait method dispatch, coercions, remaining grammar and all-pass composition. |
+| Latest proof scope | Actual method selection and all physical cache cells are retained; four public calls have Source meaning, exact successive heaps and execution/output-fuel bounds. |
+| Current implementation priority | Connect method-bearing retained closures and original Source indirect calls, then broader selection, coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

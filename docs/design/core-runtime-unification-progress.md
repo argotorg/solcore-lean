@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected operator methods through public execution (2026-10-13)
+
+`0883d66d` adds independent staged Source rules for selected unary and binary methods, retaining operand order, full requirement lists, selected dictionaries and body faults. `aebd8640` authenticates actual compiler selection and closes ordinary direct calls and method bodies in one numeric induction. Exact physical cache authority and captured slots replace the need to treat implementation methods as ordinary declaration Headers.
+
+`e963a2a9` connects four public calls through Word and Bool specializations of a constrained operator caller. Results are `11 / false / 33 / true`; native store lengths are `7 / 16 / 25 / 34 / 43`. Actual initialization, original inputs, returned sessions and complete histories supply the entry conditions. All four calls have reflection and Source-derived execution/output-fuel bounds, without a supplied body execution law.
+
+Validation: all 1,016 affected modules pass coherent checks. The full build (6,803 jobs), all registered tests (13,476 build jobs and the final pass marker), kernel policy and 199 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected fragment uses selected implementations with no implementation parameters or method assumptions, ordinary terminal callers and methods whose bodies return their argument. The shared proof covers both unary and binary method heads; the closed public fixture exercises unary dispatch. Combining these method paths with retained closures and scoped bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing retained closure calls (2026-10-13)
 
 `fd39e383` retains the actual prepared caller, reached context and complete trait dictionary when an ordinary closure is formed. Recapture and parameter entry preserve that record. Evidence-aware body transport compares the actual compiler hooks, callee validation and ordered child compilation, then feeds the existing Source/public body proof. Public callers supply no extra dictionary-equality or execution premise.
