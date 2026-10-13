@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Actual public calls issue one certified session (2026-10-14)
+
+`7c290567` constructs a common public session from actual checking, compilation, opening, bootstrap and call receipts. `d39d7ad2` connects all seven original evidence-program operations to that session.
+
+The common constructor issues the complete automatic catalog, diagnostic receiver and physical body support. It recovers the initial function from the actual selected public root. Later calls retain the same catalog, Source heap, registry and handle history. Exact cached rows, singleton global slots and complete ordinary eligibility identify each selected function. No assumed catalog order or separately assembled example inventory is needed.
+
+The public companion retains all seven independent SourceCall judgments and sufficient-fuel public conclusions. Three distinct closures survive intervening calls and return `33 / true / 33 / 55`; public store sizes remain `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. Its original source, checker/compiler settings and existing sequence theorem are unchanged. The earlier differing-checker-budget companion remains checked alongside it.
+
+Validation: 10 affected modules checked together, full build (7,251 jobs), registered tests (14,336 build jobs), kernel policy and 747 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connects certified programs to a common public session. Original Source well-formedness, the complete static certificate, ordinary eligibility, typed public inputs and staged Source traces remain explicit. It does not establish that every successful compilation supplies the certificate or cover every actual compiler pass.
+
+Reviews cover actual root recovery, full cached-row identity, unique physical slots, complete ordinary eligibility, internal body support and descriptor construction. The companion recovers actual typed Headers from catalog membership and full named equality. No catalog-order equality or caller-supplied body execution law is introduced. All seven calls and earlier examples pass; SourceCall remains the independent staged judgment.
+
 ## Original checker budgets supply method coherence (2026-10-14)
 
 `4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.

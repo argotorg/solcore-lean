@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Actual public calls issue one certified session (2026-10-14)
+
+`7c290567` constructs a common public session from actual checking, compilation, opening, bootstrap and call receipts. `d39d7ad2` connects all seven original evidence-program operations to that session.
+
+The common constructor issues the complete automatic catalog, diagnostic receiver and physical body support. It recovers the initial function from the actual selected public root. Later calls retain the same catalog, Source heap, registry and handle history. Exact cached rows, singleton global slots and complete ordinary eligibility identify each selected function. No assumed catalog order or separately assembled example inventory is needed.
+
+The public companion retains all seven independent SourceCall judgments and sufficient-fuel public conclusions. Three distinct closures survive intervening calls and return `33 / true / 33 / 55`; public store sizes remain `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. Its original source, checker/compiler settings and existing sequence theorem are unchanged. The earlier differing-checker-budget companion remains checked alongside it.
+
+Validation: 10 affected modules checked together, full build (7,251 jobs), registered tests (14,336 build jobs), kernel policy and 747 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connects certified programs to a common public session. Original Source well-formedness, the complete static certificate, ordinary eligibility, typed public inputs and staged Source traces remain explicit. It does not establish that every successful compilation supplies the certificate or cover every actual compiler pass.
+
+`CertifiedPublicSession.from_initial_start` admits an original valid Source entry; `from_initial_row` uses an authentic eligible cached row. Both issue `Issued` and `Initial` from real public receipts. `Issued.recover_start_row` identifies later selected functions. Initial and later function/scalar forward and reflection endpoints use the same `Issued.State`. Public runtime APIs are unchanged.
+
 ## Original checker budgets supply method coherence (2026-10-14)
 
 `4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.

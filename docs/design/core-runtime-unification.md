@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Actual public calls issue one certified session (2026-10-14)
+
+`7c290567` constructs a common public session from actual checking, compilation, opening, bootstrap and call receipts. `d39d7ad2` connects all seven original evidence-program operations to that session.
+
+The common constructor issues the complete automatic catalog, diagnostic receiver and physical body support. It recovers the initial function from the actual selected public root. Later calls retain the same catalog, Source heap, registry and handle history. Exact cached rows, singleton global slots and complete ordinary eligibility identify each selected function. No assumed catalog order or separately assembled example inventory is needed.
+
+The public companion retains all seven independent SourceCall judgments and sufficient-fuel public conclusions. Three distinct closures survive intervening calls and return `33 / true / 33 / 55`; public store sizes remain `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. Its original source, checker/compiler settings and existing sequence theorem are unchanged. The earlier differing-checker-budget companion remains checked alongside it.
+
+Validation: 10 affected modules checked together, full build (7,251 jobs), registered tests (14,336 build jobs), kernel policy and 747 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connects certified programs to a common public session. Original Source well-formedness, the complete static certificate, ordinary eligibility, typed public inputs and staged Source traces remain explicit. It does not establish that every successful compilation supplies the certificate or cover every actual compiler pass.
+
+Next, extend initial sessions to scalar results and Source faults, and derive remaining method admission from actual compilation.
+
 ## Original checker budgets supply method coherence (2026-10-14)
 
 `4351f151` removes the extra requirement to check all original method bodies at budget `1024`. `66e74cdd` carries the actual checker receipt at budget `1000` through the existing seven-call Source/public sequence.
@@ -684,11 +698,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `4351f151` / `66e74cdd`: actual original checker success derives method coherence at differing budgets and supplies the same seven-call public meaning. |
-| Latest completed verification | Full build (7243 jobs), registered tests, kernel policy and 719 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `7c290567` / `d39d7ad2`: actual public startup issues a common automatic catalog and physical session used by all seven original calls. |
+| Latest completed verification | Full build (7251 jobs), registered tests, kernel policy and 747 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Complete checker results agree across successful budgets; original budget1000 and selected method budget1024 connect through every public step without a separate coherence premise. |
-| Current implementation priority | Connect automatic program support to generic public session steps, then complete compiler and pass coverage. |
+| Latest proof scope | Actual startup and later calls share one certified catalog, preserving all seven Source/public steps, captured environments and retained handles. |
+| Current implementation priority | Connect initial scalar/failure outcomes and actual method admission, then complete compiler and pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
