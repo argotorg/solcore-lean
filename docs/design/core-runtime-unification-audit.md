@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Evidence-bearing generic calls through public execution (2026-10-13)
+
+Commits `8439d72a` and `d5614a9b` connect full direct-call evidence through actual compilation and four successive public executions. Requirement-bearing Source traces preserve their original lists. The actual selected target, complete specialization metadata and physical slot determine the callee; the prepared caller identifies its inherited dictionary. Ledger uniqueness identifies independently produced Source evidence with the actual callee dictionary.
+
+The regression exercises both an implementation-selected root and a generic caller that uses an assumption. It retains all six cached rows, exact successor sessions and Source heaps. The public proofs introduce no assumed called-body execution, dictionary equality or initialized-heap relation.
+
+Validation: all 1,591 affected modules pass coherent checks. The full build (6,668 jobs), all registered tests (13,206 build jobs and the final pass marker), kernel policy and 117 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls with a closed full replacement range, real requirement lists and no coercions. Formation inside retained closure bodies and under other expression forms, broader specialization and method paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Generic direct calls through actual specialization (2026-10-13)
 
 Commits `62158ce7` and `a4e52efd` connect ordinary generic calls through actual compiler selection and public execution. Source and compiler substitution lists have opposite orders. Equality is proved using the successful full matcher and the original domain order; specialization keys and projected types are insufficient. Every raw replacement retains its closedness check, and original Source admissibility provides the corresponding well-formedness at entry.

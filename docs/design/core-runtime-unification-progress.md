@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Evidence-bearing generic calls through public execution (2026-10-13)
+
+`8439d72a` connects requirement-bearing direct calls to the common recursive caller proof. Actual compiler selection and the prepared caller identify the complete callee evidence. Independent Source evidence production is proved equal to that dictionary through the actual requirement ledger. Ordinary calls retain their existing APIs and use the same semantic head.
+
+`d5614a9b` connects `root -> relay -> choose` for Word and Bool specializations. The root resolves an implementation; relay uses its inherited assumption to call choose. The actual artifact contains six cached rows. Four linked public calls return Word `11`, Bool `false`, Word `33` and Bool `true`, with exact predecessor sessions, Source heaps, handle histories and sufficient execution/output fuel at all four checkpoints.
+
+Validation: all 1,591 affected modules pass coherent checks. The full build (6,668 jobs), all registered tests (13,206 build jobs and the final pass marker), kernel policy and 117 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls with a closed full replacement range, real requirement lists and no coercions. Formation inside retained closure bodies and under other expression forms, broader specialization and method paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Generic direct calls through actual specialization (2026-10-13)
 
 `62158ce7` connects generic direct calls to the existing recursive caller and named-body proofs. The complete Source instantiation retains the reverse order produced by inference. Actual signature selection, the exact compiler record and the issued Header determine its meaning. Source admissibility supplies validity for every replacement, including entries that do not occur in the result type.

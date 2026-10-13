@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Evidence-bearing generic calls through public execution (2026-10-13)
+
+Direct declaration calls now retain their actual requirement lists through independent Source evaluation and the shared preservation/reflection proof. The compiler action selects the concrete function, while the prepared caller and requirement ledger establish the complete evidence passed to it. No caller-supplied dictionary equality or called-body execution law is added.
+
+Two public roots call generic relay functions that pass inherited evidence to generic choose functions. Both concrete specializations remain in one compiled artifact. All four successive public calls have Source meaning, exact reached heaps and sufficient execution/output fuel.
+
+Validation: all 1,591 affected modules pass coherent checks. The full build (6,668 jobs), all registered tests (13,206 build jobs and the final pass marker), kernel policy and 117 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls with a closed full replacement range, real requirement lists and no coercions. Formation inside retained closure bodies and under other expression forms, broader specialization and method paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Generic direct calls through actual specialization (2026-10-13)
 
 Ordinary generic direct calls now use the same recursive expression and named-body connection as monomorphic calls. The actual selected specialization authenticates the full call metadata, while the original Source inference order identifies the exact issued Header. Closed replacements and original Source admissibility establish callable validity without deriving nominal types from native representations.
@@ -278,11 +288,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `62158ce7` / `a4e52efd`: two ordinary generic specializations connected through four linked public sessions. |
-| Latest completed verification | Full build (6649 jobs), all registered tests, kernel policy and 52 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `8439d72a` / `d5614a9b`: actual declaration evidence through nested generic calls and four linked public sessions. |
+| Latest completed verification | Full build (6668 jobs), all registered tests, kernel policy and 117 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Word and Bool specializations retain exact Source metadata; all four calls have Source meaning and execution/output fuel bounds. |
-| Current implementation priority | Declaration evidence and remaining formation/compiler alternatives, followed by all-pass composition. |
+| Latest proof scope | Root implementation evidence and inherited generic caller evidence retain full Source meaning; all four calls have execution/output fuel bounds. |
+| Current implementation priority | Remaining formation and compiler alternatives, followed by all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

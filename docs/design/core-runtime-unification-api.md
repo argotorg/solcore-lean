@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Evidence-bearing generic calls through public execution (2026-10-13)
+
+`DirectCallCertificates.Supported` retains the closed replacement range and original Source ordering. `Receipt` records actual target selection and accepts genuine evidence-lowering receipts. `DirectCallAuthority.EvidenceAt` records independent production and identification of the complete dictionary; `PortWithEvidence` carries this fact into the shared numeric proof.
+
+`GeneralCallerEvidenceProfiles` extracts each direct action from its actual compiler policy. `NamedEvidenceCallerFrames.of_selected` obtains caller evidence and ledger conditions from the prepared named function and selected Source scope. `NamedEvidenceTerminalSupport.of_actual` composes these with the genuine finite inventory and original Source typing. Existing ordinary entry points remain available.
+
+Validation: all 1,591 affected modules pass coherent checks. The full build (6,668 jobs), all registered tests (13,206 build jobs and the final pass marker), kernel policy and 117 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls with a closed full replacement range, real requirement lists and no coercions. Formation inside retained closure bodies and under other expression forms, broader specialization and method paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Generic direct calls through actual specialization (2026-10-13)
 
 `DirectCallCertificates.Ordinary` retains empty predicates, the full closed replacement range and the original Source parameter order for the actual plan. `Monomorphic.ordinary` preserves the existing empty-substitution route. `DirectCallAuthority.of_inventory` uses ordered issued Headers, and `DirectArgumentRows.callee_receipt` derives full Source validity from the reached context.
