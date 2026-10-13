@@ -1,11 +1,13 @@
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicSpecializationMeaning
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageProjection
+import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodInstantiation
+import Solcore.SourceSemantics.Staging.RecursiveTrace
 
 /-! The real named codebook entry selects the original analyzed sidecar for
 the actual specialized source view. The registry also retains the existing
 anonymous selections. This is static invocation provenance; it supplies no
-body execution law or native closure capture relation. The current recursive
-stage trace has no global application rule, which is a separate boundary. -/
+body execution law or native closure capture relation. Method scopes additionally retain independent trait-method selection; their
+synthetic compiler rows do not assert ordinary declaration authority. -/
 set_option autoImplicit false
 set_option maxHeartbeats 800000
 namespace Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedStageScopes
@@ -48,7 +50,22 @@ inductive Selected (compiled : SourceCoreUnifiedCompilation.Compiled)
       (same : sidecar.caller = row) :
       Selected compiled native prepared.view (RecursiveStageRegistry.scope sidecar [] prepared.view)
 
-/-- Both cases use the same actual artifact and original plan. The prepared
+  | method {method : ExecutableImplMethods.CheckedMethod}
+      {callerContext : SourceSemantics.Context} {callerEvidence dictionary : Dynamic.EvidenceEnvironment}
+      {traitName methodName : String} {requirements : List RequirementId} {roots : List StatementId}
+      (selection : Dynamic.OperatorMethodSelected (Program.ofChecked compiled.sourceProgram)
+        callerContext callerEvidence traitName methodName requirements
+        (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram method) dictionary)
+      (statements : Dynamic.StatementRoots method.specialized.function.typedBody.roots roots)
+      (sidecar : Sidecar)
+      (issued : prepareSidecar compiled.indexed.base.plan method.specialized.key = .ok sidecar)
+      (same : sidecar.caller = method.specialized) :
+      Selected compiled native
+        (Staging.Recursive.methodView (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram method) dictionary roots)
+        (RecursiveStageRegistry.scope sidecar []
+          (Staging.Recursive.methodView (CallableCoercionMethodInstantiation.bodyInstance compiled.sourceProgram method) dictionary roots))
+
+/-- All cases use the same actual artifact and original plan. The prepared
 table equation is kept with the registry, so an arbitrary table is not used
 as the public invocation registry. -/
 def registry {compiled : SourceCoreUnifiedCompilation.Compiled}
@@ -60,16 +77,19 @@ def registry {compiled : SourceCoreUnifiedCompilation.Compiled}
     cases related with
     | anonymous receipt => exact (RecursiveStageRegistry.registry _ _ _).source receipt
     | named => rfl
+    | method => rfl
   context := by
     intro function scope related
     cases related with
     | anonymous receipt => exact (RecursiveStageRegistry.registry _ _ _).context receipt
     | named => rfl
+    | method => rfl
   evidence := by
     intro function scope related
     cases related with
     | anonymous receipt => exact (RecursiveStageRegistry.registry _ _ _).evidence receipt
     | named => rfl
+    | method => rfl
 
 section Actual
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}

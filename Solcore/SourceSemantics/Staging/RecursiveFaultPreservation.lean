@@ -37,10 +37,26 @@ private theorem expressions_step (wellFormed : ProgramWellFormed program) (size 
             runtime covers (locals.mono headExtends) middleTyped tailTyped tail
           exact ⟨afterTyped, headExtends.trans tailExtends⟩
 
+private theorem unary_dispatch_same
+    {operator : Syntax.UnaryOp} {leftTrait leftMethod rightTrait rightMethod : String}
+    (left : UnaryTraitDispatch operator leftTrait leftMethod)
+    (right : UnaryTraitDispatch operator rightTrait rightMethod) :
+    leftTrait = rightTrait ∧ leftMethod = rightMethod := by
+  cases left <;> cases right
+  exact ⟨rfl, rfl⟩
+
+private theorem binary_dispatch_same
+    {operator : Syntax.BinaryOp} {leftTrait leftMethod rightTrait rightMethod : String}
+    (left : BinaryTraitDispatch operator leftTrait leftMethod)
+    (right : BinaryTraitDispatch operator rightTrait rightMethod) :
+    leftTrait = rightTrait ∧ leftMethod = rightMethod := by
+  cases left <;> cases right <;> exact ⟨rfl, rfl⟩
+
 private theorem expression_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
-    (appliesIH : ∀ smaller, smaller < size → AppliesAt program registry smaller) :
+    (appliesIH : ∀ smaller, smaller < size → AppliesAt program registry smaller)
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
     ExpressionAt program registry size := by
   intro scope context environment before after id failure type runtime covers locals heap typed trace
   cases trace with
@@ -108,7 +124,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_keyTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
             runtime covers (locals.mono firstExtends) middleTyped keyTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
-  | @unaryOperandFault childSize scope context environment before after id operator operand failure occurrence child =>
+  | @unaryOperandFault childSize scope context environment before after id operator operand failure requirements occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | unary operandTyped _ =>
@@ -121,7 +137,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_valueTyped, afterTyped, heapExtends⟩ := expression_value wellFormed
             runtime covers locals heap operandTyped child
           exact ⟨afterTyped, heapExtends⟩
-  | @binaryLeftFault firstSize scope context environment before after id left operator right failure occurrence first =>
+  | @binaryLeftFault firstSize scope context environment before after id left operator right failure requirements occurrence first =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | binary leftTyped _ _ =>
@@ -134,7 +150,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_valueTyped, afterTyped, heapExtends⟩ := expression_value wellFormed
             runtime covers locals heap leftTyped first
           exact ⟨afterTyped, heapExtends⟩
-  | @binaryRightFault firstSize secondSize scope context environment before middle after id left operator right input failure
+  | @binaryRightFault firstSize secondSize scope context environment before middle after id left operator right input failure requirements
       occurrence first _continues second =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -154,6 +170,59 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_secondTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
             runtime covers (locals.mono firstExtends) middleTyped rightTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @unaryMethod operandSize bodySize scope context environment before argumentsHeap bound after id operator operand input
+      requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
+      occurrence dispatch method operandTrace rootsEq selected parameters allocate body resultRule =>
+      obtain ⟨_raw, _plan, formTyped, planValid⟩ := expression_form_plan runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | unary operandTyped operatorTyped =>
+          cases planValid with
+          | ordinary _ _ requirementsEq =>
+              simp [coercionRequirementIds] at requirementsEq
+              subst requirements
+              obtain ⟨inputTyped, argumentsHeapTyped, operandExtends⟩ := expression_value wellFormed
+                runtime covers locals heap operandTyped operandTrace
+              cases operatorTyped with
+              | logicalNot | wordBitNot | integerBitNot => cases method
+              | trait staticDispatch profile requirementsProve =>
+                  have same := unary_dispatch_same staticDispatch dispatch
+                  rcases same with ⟨rfl, rfl⟩
+                  obtain ⟨lexicalContext, facts, certificate, _resultEq⟩ :=
+                    method.certificateOfProfile wellFormed runtime.signatures runtime.requirements.idsUnique
+                      profile requirementsProve
+                  have argumentsTyped := ValuesHaveTypes.cons inputTyped (.nil)
+                  obtain ⟨afterTyped, bodyExtends⟩ := method_body_fault
+                    (statementsIH bodySize (Size.child_lt_stepSize (by simp))) runtime certificate
+                    (by cases method; assumption) argumentsHeapTyped argumentsTyped rootsEq selected parameters allocate body resultRule
+                  exact ⟨afterTyped, operandExtends.trans bodyExtends⟩
+  | @binaryMethod leftSize rightSize bodySize scope context environment before middle argumentsHeap bound after id left operator right a b
+      requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
+      occurrence dispatch method first continues second rootsEq selected parameters allocate body resultRule =>
+      obtain ⟨_raw, _plan, formTyped, planValid⟩ := expression_form_plan runtime.graph.nodeOccurrencesUnique typed occurrence
+      cases formTyped with
+      | binary leftTyped rightTyped operatorTyped =>
+          cases planValid with
+          | ordinary _ _ requirementsEq =>
+              simp [coercionRequirementIds] at requirementsEq
+              subst requirements
+              obtain ⟨leftValueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
+                runtime covers locals heap leftTyped first
+              obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := expression_value wellFormed
+                runtime covers (locals.mono firstExtends) middleTyped rightTyped second
+              cases operatorTyped with
+              | wordArithmetic | integerArithmetic | wordComparison | integerComparison | booleanAnd | booleanOr => cases method
+              | trait staticDispatch profile requirementsProve =>
+                have same := binary_dispatch_same staticDispatch dispatch
+                rcases same with ⟨rfl, rfl⟩
+                obtain ⟨lexicalContext, facts, certificate, _resultEq⟩ :=
+                  method.certificateOfProfile wellFormed runtime.signatures runtime.requirements.idsUnique
+                    profile requirementsProve
+                have argumentsTyped := ValuesHaveTypes.cons (leftValueTyped.mono secondExtends)
+                  (.cons rightValueTyped (.nil))
+                obtain ⟨afterTyped, bodyExtends⟩ := method_body_fault
+                  (statementsIH bodySize (Size.child_lt_stepSize (by simp))) runtime certificate
+                  (by cases method; assumption) argumentsHeapTyped argumentsTyped rootsEq selected parameters allocate body resultRule
+                exact ⟨afterTyped, firstExtends.trans (secondExtends.trans bodyExtends)⟩
   | @conditional testSize branchSize scope context environment before middle after id condition yes no truth outcome
       occurrence test branch =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
@@ -291,7 +360,8 @@ private theorem all (wellFormed : ProgramWellFormed program) (size : Nat) :
   induction size using Nat.strongRecOn with
   | ind size ih =>
       exact ⟨expression_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.1) (fun smaller below => (ih smaller below).2.2.1),
+          (fun smaller below => (ih smaller below).2.1) (fun smaller below => (ih smaller below).2.2.1)
+          (fun smaller below => (ih smaller below).2.2.2.1),
         expressions_step wellFormed size (fun smaller below => (ih smaller below).1)
           (fun smaller below => (ih smaller below).2.1),
         applies_step wellFormed size (fun smaller below => (ih smaller below).2.2.2.1),

@@ -50,6 +50,11 @@ theorem selected_canonical {function : Dynamic.Closure}
         rw [prepared.same, same]
       exact ⟨sidecar, [], by simpa only [same] using issued, rfl,
         by simpa using congrArg eraseRequirements sourceEq⟩
+  | method selection statements sidecar issued same =>
+      have sourceEq := congrArg (fun row : SourceSpecialization.SpecializedFunction => row.function.typedBody) same
+      change sidecar.source = _ at sourceEq
+      exact ⟨sidecar, [], by simpa only [same] using issued, rfl,
+        by simpa [Staging.Recursive.methodView, Staging.Recursive.globalView, CallableCoercionMethodInstantiation.bodyInstance] using congrArg eraseRequirements sourceEq.symm⟩
 
 theorem selected_frame {function : Dynamic.Closure}
     {invocation : Staging.Recursive.Scope}

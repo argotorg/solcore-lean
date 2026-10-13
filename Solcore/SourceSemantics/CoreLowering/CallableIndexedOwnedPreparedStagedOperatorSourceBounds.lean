@@ -101,6 +101,14 @@ private theorem occurrence_form {actualForm : ExpressionForm} {requirements : Li
   have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   exact actualFormEq.symm.trans (congrArg ExpressionNode.form same)
 
+private theorem occurrence_requirements {actualForm : ExpressionForm} {requirements : List RequirementId}
+    (unique : NodeOccurrencesUnique invocation.source)
+    (found : invocation.source.lookupExpression? id = some node)
+    (occurrence : Staging.Recursive.Occurrence invocation id actualForm requirements) : node.requirements = requirements := by
+  obtain ⟨actualNode, contains, _, actualRequirements, _⟩ := occurrence
+  have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+  exact (congrArg ExpressionNode.requirements same).symm.trans actualRequirements
+
 theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
     (metadata : Metadata checked invocation.source id node type)
     (form : node.form = .unary operator operand) (unique : NodeOccurrencesUnique invocation.source)
@@ -113,6 +121,11 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
       cases atomic
+  | unaryMethod occurrence _ selected _ _ _ _ _ _ _ =>
+      have empty := (occurrence_requirements unique metadata.found occurrence).symm.trans metadata.requirements
+      rw [empty] at selected
+      cases selected
+  | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ => cases actual occurrence
   | unary occurrence child applied =>
       obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (actual occurrence)
       refine .value child applied ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
@@ -137,6 +150,11 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
       cases atomic
+  | binaryMethod occurrence _ selected _ _ _ _ _ _ _ _ _ =>
+      have empty := (occurrence_requirements unique metadata.found occurrence).symm.trans metadata.requirements
+      rw [empty] at selected
+      cases selected
+  | unaryMethod occurrence _ _ _ _ _ _ _ _ _ => cases actual occurrence
   | binaryLeftFault occurrence child =>
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (actual occurrence)
       refine .leftFault child ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
@@ -177,6 +195,6 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (actual occurrence)
       refine .fault child ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorSourceBounds

@@ -152,6 +152,21 @@ theorem expression_form {scope : Scope} {context : Context} {id : ExpressionId}
     cases same
     exact ⟨raw, plan, shape ▸ typedForm⟩
 
+/-- The original uncoerced occurrence also retains the exact typing plan. -/
+theorem expression_form_plan {scope : Scope} {context : Context} {id : ExpressionId}
+    {form : ExpressionForm} {type : TypeSystem.Ty} {requirements : List RequirementId}
+    (unique : NodeOccurrencesUnique scope.source)
+    (typed : ExpressionHasType scope.source context id type) (occurrence : Occurrence scope id form requirements) :
+    ∃ raw plan, ExpressionFormHasRawType scope.source context form raw plan ∧
+      ExpressionRequirementPlan.Valid context raw type plan requirements [] := by
+  obtain ⟨node, contains, shape, requirementsEq, coercionsEq⟩ := occurrence
+  cases typed with
+  | @intro _ _ actual raw plan typedContains typedForm _ _ _ valid =>
+    have same := Option.some.inj ((lookupExpression?_complete unique typedContains).symm.trans
+      (lookupExpression?_complete unique contains))
+    cases same
+    exact ⟨raw, plan, shape ▸ typedForm, by simpa only [requirementsEq, coercionsEq] using valid⟩
+
 /-- Atomic failures cannot execute a child or change the source heap. -/
 theorem atomic_fault_heap {scope : Scope} {context : Context} {environment : Environment}
     {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId} {reason : SemanticFault}

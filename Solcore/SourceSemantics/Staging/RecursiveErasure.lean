@@ -360,6 +360,41 @@ private theorem global_body_result {program : Program} {registry : Registry} {sc
       exact ⟨function.evidence, .globalBody instantiates rfl
         (.statements rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body))⟩
 
+private def MethodPlain (program : Program) (bodyInstance : BodyInstance)
+    (dictionary : EvidenceEnvironment) (before : Heap) (arguments : List Value)
+    (outcome : Outcome) (after : Heap) : Prop :=
+  match outcome with
+  | .value value => BodyInvokes program bodyInstance dictionary before arguments value after
+  | .fault (.semantic reason) => BodyFaults program bodyInstance dictionary before arguments reason after
+  | .fault (.stage ..) => True
+
+private theorem method_body_result {program : Program} {registry : Registry} {child : Scope}
+    {bodyContext finalContext : Context} {before bound after : Heap}
+    {bodyInstance : BodyInstance} {dictionary : EvidenceEnvironment}
+    {roots : List StatementId} {arguments : List Value}
+    {environment : Environment} {parameterTypes : List TypeSystem.Ty} {outcome : BodyOutcome} {result : Outcome}
+    (covers : dictionary.Covers bodyInstance.context)
+    (rootsEq : StatementRoots bodyInstance.source.roots roots)
+    (selected : registry.Closure (methodView bodyInstance dictionary roots) child)
+    (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+    (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
+    (body : StatementsPlain program true child bodyContext environment bound roots finalContext outcome after)
+    (resultRule : BodyResult bodyInstance.resultType outcome result) :
+    MethodPlain program bodyInstance dictionary before arguments result after := by
+  have source : child.source = bodyInstance.source := registry.source selected
+  have evidence : child.evidence = dictionary := registry.evidence selected
+  generalize typeEq : bodyInstance.resultType = type at resultRule
+  cases resultRule with
+  | returned =>
+    exact .returned covers rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) rfl
+  | unit =>
+    exact .unit covers typeEq rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩
+  | @fault _ failure =>
+    cases failure with
+    | stage => trivial
+    | semantic =>
+      exact .statements rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body)
+
 private theorem global_applies_evidence {program : Program} {context : Context}
     {callerEvidence invocationEvidence : EvidenceEnvironment} {before after : Heap}
     {function : GlobalFunction} {arguments : List Value} {result : Value}
@@ -475,30 +510,46 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
   case unary occurrence child applies ih =>
     exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
   case unaryOperandFault occurrence child ih =>
-    rename_i failure
+    rename_i failure requirements
     cases failure with
     | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.unaryOperand (owned := []) rfl ih)
+    | semantic => exact fault_occurrence occurrence (.unaryOperand (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
   case unaryInvalid occurrence child invalid ih =>
     exact fault_occurrence occurrence (.unaryApply (owned := []) rfl ih (.primitive invalid))
   case binaryLeftFault occurrence first ih =>
-    rename_i failure
+    rename_i failure requirements
     cases failure with
     | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.binaryLeft (owned := []) rfl ih)
+    | semantic => exact fault_occurrence occurrence (.binaryLeft (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
   case binaryLeftInvalid occurrence first invalid ih =>
     exact fault_occurrence occurrence (.binaryLeftOperand (owned := []) rfl ih invalid)
   case binaryShortCircuit occurrence first circuit ih =>
     exact value_occurrence occurrence (.binaryShortCircuit (owned := []) rfl ih circuit rfl)
   case binaryRightFault occurrence first continues second a b =>
-    rename_i failure
+    rename_i failure requirements
     cases failure with
     | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.binaryRight (owned := []) rfl a continues b)
+    | semantic => exact fault_occurrence occurrence (.binaryRight (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) a continues b)
   case binary occurrence first continues second applies a b =>
     exact value_occurrence occurrence (.binaryEvaluateRight (owned := []) rfl a continues b (.primitive applies))
   case binaryInvalid occurrence first continues second invalid a b =>
     exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.primitive invalid))
+  case unaryMethod occurrence dispatch method operand rootsEq selected parameters allocate body resultRule operandIH bodyIH =>
+    rename_i outcome result
+    have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
+    cases result with
+    | value => exact value_occurrence occurrence (.unary (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
+    | fault failure => cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.unaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
+  case binaryMethod occurrence dispatch method first continues second rootsEq selected parameters allocate body resultRule firstIH secondIH bodyIH =>
+    rename_i outcome result
+    have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
+    cases result with
+    | value => exact value_occurrence occurrence (.binaryEvaluateRight (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
+    | fault failure => cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.binaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
   case conditional occurrence test branch a b =>
     rename_i truth outcome
     cases outcome with

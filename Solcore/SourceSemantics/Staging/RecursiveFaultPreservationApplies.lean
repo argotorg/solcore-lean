@@ -39,6 +39,75 @@ private theorem body_fault {type : Ty} {outcome : BodyOutcome} {failure : Failur
   cases rule
   rfl
 
+/-- A selected method enters its independently typed body with an empty capture
+and the actual operand values; its recursive fault retains the allocated heap. -/
+theorem method_body_fault {size : Nat}
+    (statementsIH : StatementsAt program registry size)
+    {context : Context} {source : TypedSource} {child : Scope}
+    {bodyInstance : BodyInstance} {dictionary : EvidenceEnvironment}
+    {before bound after : Heap} {arguments : List Value} {inputTypes parameterTypes : List Ty}
+    {lexicalContext bodyContext finalContext : Context} {facts : BodyFacts}
+    {roots : List StatementId} {environment : Dynamic.Environment} {outcome : BodyOutcome} {failure : Failure}
+    (runtime : SourceRuntimeValid program context source)
+    (certificate : BodyInstanceTypingCertificate program bodyInstance inputTypes lexicalContext facts)
+    (covers : dictionary.Covers bodyInstance.context)
+    (beforeTyped : HeapWellTyped context before)
+    (argumentsTyped : ValuesHaveTypes context before arguments inputTypes)
+    (rootsEq : StatementRoots bodyInstance.source.roots roots)
+    (selected : registry.Closure (methodView bodyInstance dictionary roots) child)
+    (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+    (allocate : BindersAllocate [] before bodyInstance.source.inputs arguments environment bound)
+    (body : Size.StatementsIn program registry true size child bodyContext environment bound roots finalContext outcome after)
+    (resultRule : BodyResult bodyInstance.resultType outcome (.fault failure)) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  have outcomeEq := body_fault resultRule
+  subst outcome
+  have signaturesEq : bodyInstance.context.signatures = context.signatures :=
+    certificate.signatures_eq.trans runtime.signatures.symm
+  have bodyBeforeTyped := beforeTyped.transportClosed signaturesEq runtime.closed
+    certificate.type_parameters_empty runtime.variables_closed certificate.residual_type_variables_open
+  have bodyArgumentsTyped := argumentsTyped.transportClosed signaturesEq runtime.closed
+    certificate.type_parameters_empty runtime.variables_closed certificate.residual_type_variables_open
+  rcases certificate.typing.body_typed with
+    ⟨staticFinalContext, bodyType, _noExpressionRoots, _completes⟩
+  have alignedBodyType := rootsEq.filterMap_eq ▸ bodyType
+  have inputTypesEq : parameterTypes = inputTypes :=
+    (MonoBindersExtend.bodyTypes_eq parameters).symm.trans
+      (MonoBindersExtend.bodyTypes_eq certificate.typing.inputs_extend)
+  subst parameterTypes
+  have lexicalEq := MonoBindersExtend.functional parameters certificate.typing.inputs_extend
+  subst lexicalEq
+  have binderArgumentsTyped : ValuesHaveTypes bodyInstance.context before arguments
+      (bodyInstance.source.inputs.map fun binder => binder.scheme.body) := by
+    rw [MonoBindersExtend.bodyTypes_eq certificate.typing.inputs_extend]
+    exact bodyArgumentsTyped
+  have boundTyped := allocate.preservesHeapTyping bodyBeforeTyped binderArgumentsTyped
+  have baseEnvironment : EnvironmentAgrees before bodyInstance.context.locals [] := by
+    rw [certificate.locals_empty]
+    exact .nil
+  have boundEnvironment := allocate.preservesEnvironmentAgreement
+    (monoBinders_toBinders certificate.typing.inputs_extend)
+    (monoBinders_monomorphic certificate.typing.inputs_extend) baseEnvironment
+  have fields := MonoBindersExtend.runtimeContextFields certificate.typing.inputs_extend
+  have lexicalClosed := fields.targetClosed certificate.type_parameters_empty
+  have boundAtLexical := boundTyped.transportClosed fields.signatures
+    certificate.type_parameters_empty lexicalClosed certificate.type_variables_empty
+    (fields.targetResidualVariablesOpen certificate.residual_type_variables_open)
+  have childRuntime : SourceRuntimeValid program bodyContext child.source := by
+    rw [registry.source selected]
+    exact certificate.sourceRuntimeValid.transport fields
+  have childCovers : child.evidence.Covers bodyContext := by
+    rw [registry.evidence selected]
+    exact fields.covers covers
+  have childType := alignedBodyType
+  have sourceEq : child.source = bodyInstance.source := registry.source selected
+  rw [← sourceEq] at childType
+  obtain ⟨afterTyped, bodyExtends⟩ := statementsIH childRuntime childCovers
+    boundEnvironment boundAtLexical childType body
+  exact ⟨afterTyped.transportClosed (signaturesEq.symm.trans fields.signatures.symm)
+    lexicalClosed runtime.closed (fields.targetVariablesClosed certificate.type_variables_empty)
+    runtime.residual_variables_open, allocate.extendsHeapTypes.trans bodyExtends⟩
+
 /-- The strict body hypothesis is used only after the real parameter allocation.
 Both semantic faults and nested staging faults keep the resulting heap. -/
 theorem applies_step (wellFormed : ProgramWellFormed program) (size : Nat)

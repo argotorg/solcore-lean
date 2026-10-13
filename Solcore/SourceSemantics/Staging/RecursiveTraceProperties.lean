@@ -64,6 +64,12 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ih s c r rfl
+    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
+    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -106,6 +112,12 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       intro s c r same
       cases same
       exact ih s c r rfl
+    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
+    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -148,6 +160,12 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       intro s c r same
       cases same
       exact ih s c r rfl
+    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
+    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)
@@ -191,6 +209,12 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       intro s c r same
       cases same
       exact ih s c r rfl
+    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
+    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
     case global instantiates covers roots selected parameters allocate body result ih =>
       intro s c r same
       exact ih s c r (body_result_stage result same)

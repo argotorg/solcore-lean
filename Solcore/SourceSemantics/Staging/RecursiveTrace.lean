@@ -45,6 +45,11 @@ def globalView (body : BodyInstance) (evidence : EvidenceEnvironment) (roots : L
   context := body.context
   evidence := evidence
 
+/-- A method body uses a neutral scope view with its selected dictionary.
+This record is neither an ordinary global identity nor a source lambda value. -/
+def methodView (body : BodyInstance) (evidence : EvidenceEnvironment) (roots : List StatementId) : Closure :=
+  globalView body evidence roots
+
 /-- Mapping lookup decides only after both children have finished. This
 independent Source relation keeps the original key and value types. -/
 inductive IndexOutcome (base key : Dynamic.Value) : Outcome → Prop where
@@ -139,7 +144,8 @@ mutual
         (applies : UnaryPrimitiveApplies operator input output) :
         Expression program registry scope context environment before id (.value output) after
     | unaryOperandFault {scope context environment before after id operator operand failure}
-        (occurrence : Occurrence scope id (.unary operator operand))
+        {requirements : List RequirementId}
+        (occurrence : Occurrence scope id (.unary operator operand) requirements)
         (child : Expression program registry scope context environment before operand (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
     | unaryInvalid {scope context environment before after id operator operand input}
@@ -149,7 +155,8 @@ mutual
         Expression program registry scope context environment before id
           (.fault (.semantic (.invalidUnaryOperand operator))) after
     | binaryLeftFault {scope context environment before after id left operator right failure}
-        (occurrence : Occurrence scope id (.binary left operator right))
+        {requirements : List RequirementId}
+        (occurrence : Occurrence scope id (.binary left operator right) requirements)
         (first : Expression program registry scope context environment before left (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
     | binaryLeftInvalid {scope context environment before after id left operator right input}
@@ -164,7 +171,8 @@ mutual
         (circuit : ShortCircuits operator input output) :
         Expression program registry scope context environment before id (.value output) after
     | binaryRightFault {scope context environment before middle after id left operator right input failure}
-        (occurrence : Occurrence scope id (.binary left operator right))
+        {requirements : List RequirementId}
+        (occurrence : Occurrence scope id (.binary left operator right) requirements)
         (first : Expression program registry scope context environment before left (.value input) middle)
         (continues : EvaluatesRightOperand operator input)
         (second : Expression program registry scope context environment middle right (.fault failure) after) :
@@ -184,6 +192,34 @@ mutual
         (invalid : BinaryPrimitiveOperandsInvalid operator a b) :
         Expression program registry scope context environment before id
           (.fault (.semantic (.invalidBinaryOperands operator))) after
+    | unaryMethod {scope context environment before argumentsHeap bound after id operator operand input
+          requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result}
+        (occurrence : Occurrence scope id (.unary operator operand) requirements)
+        (dispatch : UnaryTraitDispatch operator traitName methodName)
+        (method : OperatorMethodSelected program context scope.evidence traitName methodName requirements bodyInstance dictionary)
+        (operandTrace : Expression program registry scope context environment before operand (.value input) argumentsHeap)
+        (rootsEq : StatementRoots bodyInstance.source.roots roots)
+        (selected : registry.Closure (methodView bodyInstance dictionary roots) child)
+        (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+        (allocate : BindersAllocate [] argumentsHeap bodyInstance.source.inputs [input] bodyEnvironment bound)
+        (body : StatementsIn program registry true child bodyContext bodyEnvironment bound roots finalContext outcome after)
+        (resultRule : BodyResult bodyInstance.resultType outcome result) :
+        Expression program registry scope context environment before id result after
+    | binaryMethod {scope context environment before middle argumentsHeap bound after id left operator right a b
+          requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result}
+        (occurrence : Occurrence scope id (.binary left operator right) requirements)
+        (dispatch : BinaryTraitDispatch operator traitName methodName)
+        (method : OperatorMethodSelected program context scope.evidence traitName methodName requirements bodyInstance dictionary)
+        (first : Expression program registry scope context environment before left (.value a) middle)
+        (continues : EvaluatesRightOperand operator a)
+        (second : Expression program registry scope context environment middle right (.value b) argumentsHeap)
+        (rootsEq : StatementRoots bodyInstance.source.roots roots)
+        (selected : registry.Closure (methodView bodyInstance dictionary roots) child)
+        (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+        (allocate : BindersAllocate [] argumentsHeap bodyInstance.source.inputs [a, b] bodyEnvironment bound)
+        (body : StatementsIn program registry true child bodyContext bodyEnvironment bound roots finalContext outcome after)
+        (resultRule : BodyResult bodyInstance.resultType outcome result) :
+        Expression program registry scope context environment before id result after
     | conditional {scope context environment before middle after id condition yes no truth outcome}
         (occurrence : Occurrence scope id (.conditional condition yes no))
         (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)

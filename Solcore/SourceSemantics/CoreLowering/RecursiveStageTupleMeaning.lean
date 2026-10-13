@@ -161,6 +161,10 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
   | unary owned child applied =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible
+  | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _ =>
+    have same := occurrence_form unique metadata.found owned
+    rw [form] at same
+    cases same
   | unaryOperandFault owned child =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible

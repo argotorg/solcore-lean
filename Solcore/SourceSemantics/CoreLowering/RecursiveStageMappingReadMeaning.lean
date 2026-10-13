@@ -174,6 +174,10 @@ private theorem reference_no_stage {invocation : Staging.Recursive.Scope} {id : 
     have same := occurrence_form unique found owned
     rw [form] at same
     cases same
+  | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _ =>
+    have same := occurrence_form unique found owned
+    rw [form] at same
+    cases same
   | unaryOperandFault owned child =>
     have same := occurrence_form unique found owned
     rw [form] at same

@@ -662,9 +662,9 @@ private inductive CallFree (source : TypedSource) : ExpressionId → Prop where
   | pair {id node left right} (found : source.lookupExpression? id = some node)
       (form : node.form = .tuple [left, right]) (first : CallFree source left) (second : CallFree source right) : CallFree source id
   | unary {id node operator operand} (found : source.lookupExpression? id = some node)
-      (form : node.form = .unary operator operand) (child : CallFree source operand) : CallFree source id
+      (form : node.form = .unary operator operand) (requirements : node.requirements = []) (child : CallFree source operand) : CallFree source id
   | binary {id node left operator right} (found : source.lookupExpression? id = some node)
-      (form : node.form = .binary left operator right) (first : CallFree source left) (second : CallFree source right) : CallFree source id
+      (form : node.form = .binary left operator right) (requirements : node.requirements = []) (first : CallFree source left) (second : CallFree source right) : CallFree source id
 
 private theorem occurrence_form {invocation : Staging.Recursive.Scope} {id : ExpressionId}
     {node : ExpressionNode} {form : ExpressionForm} {requirements : List RequirementId}
@@ -685,6 +685,14 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
   induction free generalizing before after with
   | atomic found atomic =>
     cases trace with
+    | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [same] at atomic
+      cases atomic
+    | binaryMethod owned _ selected _ _ _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [same] at atomic
+      cases atomic
     | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
     | constructorFault owned _ =>
       have same := occurrence_form unique found owned
@@ -745,6 +753,14 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases atomic
   | group found form child ih =>
     cases trace with
+    | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+    | binaryMethod owned _ selected _ _ _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
     | constructorFault owned _ =>
       have same := occurrence_form unique found owned
@@ -805,6 +821,14 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | pair found form first second firstIH secondIH =>
     cases trace with
+    | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+    | binaryMethod owned _ selected _ _ _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
     | constructorFault owned _ =>
       have same := occurrence_form unique found owned
@@ -870,8 +894,18 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [form] at same
       cases same
-  | unary found form child ih =>
+  | unary found form requirements child ih =>
     cases trace with
+    | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
+      obtain ⟨other, contains, _, actualRequirements, _⟩ := owned
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      have empty := actualRequirements.symm.trans ((congrArg ExpressionNode.requirements same).trans requirements)
+      rw [empty] at selected
+      cases selected
+    | binaryMethod owned _ selected _ _ _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
     | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
     | constructorFault owned _ =>
       have same := occurrence_form unique found owned
@@ -930,8 +964,18 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [form] at same
       cases same
-  | binary found form first second firstIH secondIH =>
+  | binary found form requirements first second firstIH secondIH =>
     cases trace with
+    | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+    | binaryMethod owned _ selected _ _ _ _ _ _ _ _ _ =>
+      obtain ⟨other, contains, _, actualRequirements, _⟩ := owned
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      have empty := actualRequirements.symm.trans ((congrArg ExpressionNode.requirements same).trans requirements)
+      rw [empty] at selected
+      cases selected
     | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
     | constructorFault owned _ =>
       have same := occurrence_form unique found owned
@@ -1009,8 +1053,8 @@ private theorem Supported.callFree {id : ExpressionId} {code : SourceCoreBasic.L
   | product _ sites => exact sites.callFree
   | group metadata form _ _ _ _ ih => exact .group metadata.found form ih
   | pair metadata form _ _ _ _ _ _ _ firstIH secondIH => exact .pair metadata.found form firstIH secondIH
-  | unary metadata form _ _ _ _ _ _ ih => exact .unary metadata.found form ih
-  | binary metadata form _ _ _ _ _ _ _ _ _ _ firstIH secondIH => exact .binary metadata.found form firstIH secondIH
+  | unary metadata form _ _ _ _ _ _ ih => exact .unary metadata.found form metadata.requirements ih
+  | binary metadata form _ _ _ _ _ _ _ _ _ _ firstIH secondIH => exact .binary metadata.found form metadata.requirements firstIH secondIH
 
 private theorem ProductSupported.literalSites {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : CompatibleExpressionProducts.Tree fuel values source context solved reasonAt scope id code}

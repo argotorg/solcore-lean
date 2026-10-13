@@ -99,6 +99,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
   | constructorValue owned _ _ | constructorFault owned _
   | group owned _
+  | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _
   | binaryLeftFault owned _ | binaryLeftInvalid owned _ _
   | binaryShortCircuit owned _ _ | binaryRightFault owned _ _ _

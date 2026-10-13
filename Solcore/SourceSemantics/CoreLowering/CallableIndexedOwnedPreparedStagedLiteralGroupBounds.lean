@@ -214,6 +214,7 @@ private theorem no_stage
       cases failed
   | group occurrence _
   | pairLeftFault occurrence _ | pairRightFault occurrence _ _
+  | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unaryOperandFault occurrence _
   | binaryLeftFault occurrence _ | binaryRightFault occurrence _ _ _
   | conditional occurrence _ _ | conditionalFault occurrence _
