@@ -1,4 +1,5 @@
 import Solcore.Test.SourceCoreCoercionPublicSeed
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitialForward
 import Solcore.Test.SourceCoreCoercionPublicSelection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicActualRegistryNamedOutputPreservation
 
@@ -31,136 +32,32 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
     (distinct : ([inventory.makeInput, inventory.useInput, inventory.keepInput].map
       (fun input => input.prepared.index)).Nodup)
     (first : ObservedPublicRun fixture observed.makeRow.toObservedRow)
-    (packet : CallableIndexedOwnedPreparedStagedNamedBodies.Body inventory.makeHeader.header)
-    (preservesBodies : ∀ budget {child : Staging.Recursive.Scope},
-      (RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture)).Closure inventory.makeHeader.header.function child →
-      CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
-        (headers := headers inventory.rows) (keys := CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
-        inventory.makeHeader.header (CompatibleAmbientHeap.payloadModel fixture.recipe.compiled.compatible.checked
-          receiver.completion.result.context.registry (inventory.functions receiver))
-        (RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture)) child
-        (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults receiver.completion.result.diagnostics) budget)
+    (program : CallableIndexedOwnedPreparedPhysicalProgramSupport.Support fixture.recipe.compiled
+      (headers inventory.rows) (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled) receiver.completion)
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap} {source : Dynamic.Value}
     (trace : SourceCall inventory inventory.makeHeader.header invocation ⟨[]⟩ [.bool true] (.value source) after) :
     InitialForwardAt inventory receiver first source after := by
-  obtain ⟨artifact, session, checkpoint, root, world, store, native, encodedValues,
-      opened, prepared, sessionAt, checkpointAt, started⟩ := fixture.actual_start first.opened first.started
-  have ready : first.bootstrap.ReadyAt 102400 first.session := .single first.ready
-  obtain ⟨_bootstrap, initialized, _value, _initialStore, _atBootstrap, initial,
-      initializedAt, _done, booted⟩ := ready.indexed opened first.fresh
-  have same : initialized = session := initializedAt.unique sessionAt
-  subst initialized
-  have startupRegistry : encodedValues.registry = fixture.recipe.compiled.compatible.checked.staticRegistry := by
-    exact started.simple_registry (booted.registry_at initial) (bool_simple true)
-  have selected := inventory.selected_row_issued observed.makeRow.toObservedRow
-    inventory.makeHeader inventory.make_member inventory.makeSlot
-    (SourceCoreIndexedSession.Recipe.prepare_roots fixture.recipePrepared (List.mem_of_find?_eq_some started.selected))
-    (of_decide_eq_true (List.find?_some (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled =>
-      decide (candidate.key = observed.makeRow.row.key)) started.selected))
+  obtain ⟨start⟩ := first.initial_start inventory
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
       inventory.makeHeader.header.function.context [.bool true] inventory.makeHeader.header.types := by
     rw [inventory.makeHeader.make_types]
     exact .cons ⟨.bool true, by simp [SourceCoreIndexedSession.DataInput.publicValue], .bool true⟩ .nil
   have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.bool true] [.bool true] :=
     .cons ⟨.bool true, by simp [SourceCoreIndexedSession.DataInput.publicValue], .bool true⟩ .nil
-  have metadata : SourceCoreRawMetadata.Extends encodedValues.registry receiver.completion.result.context.registry := by
-    rw [startupRegistry, receiver.registry]
-    exact .refl _
-  obtain ⟨caller, stable, globalReference, heaps, heapTyped, represented, argumentsTyped⟩ :=
-    CallableIndexedOwnedPreparedStagedInitializedPhysicalClosureArguments.initial_data_arguments
-      (inputs := [inventory.makeInput, inventory.useInput, inventory.keepInput])
-      (rows := inventory.rows) (distinct := distinct) (completion := receiver.completion)
-      (profile := observed.profile) (bodyRegistry := receiver.completion.result.context.registry)
-      (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults receiver.completion.result.diagnostics)
-      (wellFormed := fixture.source_wellFormed) (prepared := prepared) (selected := selected)
-      (opened := opened) (fresh := first.fresh) (ready := ready)
-      (sameRuntime := SourceCoreExecution.Session.SameRuntime.refl first.session) (atSession := sessionAt)
-      (started := started) (inputTypes := inputTypes) (inputMeanings := inputMeanings) (metadata := metadata)
-  obtain ⟨rawD, function, sourceSize, sourceAt, applied⟩ := trace
-  obtain ⟨capture, value, finalStore, finalMap, finalWorld, requiredExecution, enough, result⟩ :=
-    CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.preserves_root
-      (stagePrepared := actualStagePrepared fixture) (completion := receiver.completion)
-      (functions := inventory.functions receiver)
-      (owner := CallableIndexedOwnedPreparedBootstrapRootState.owner fixture.recipe.compiled)
-      (packet := packet) (preservesBodies := preservesBodies)
-      (keyPhysical := CallableIndexedOwnedPreparedPhysicalBootstrap.key_physical _ _)
-      (physical := caller.physical) (wellFormed := fixture.source_wellFormed)
-      (selected := selected) (caller := caller.base.val)
-      (globalReference := globalReference) (stable := stable) (heapTyped := heapTyped)
-      (represented := represented) (argumentsTyped := argumentsTyped) (heaps := heaps)
-      (sourceAt := sourceAt) (supports := (RecursiveNamedPublicReturnedValues.header_context_supports
-        inventory.makeHeader.header inventory.makeHeader.header fixture.source_wellFormed).2) applied
-  obtain ⟨payload, rfl⟩ : ∃ payload, value = .inRight .word payload := by
-    have representedResult := result.2.1
-    cases representedResult with
-    | value represented => exact ⟨_, rfl⟩
-  have completes : ∀ executionFuel, requiredExecution ≤ executionFuel →
-      checkpoint.NativeDone executionFuel (.inRight .word payload) finalStore :=
-    fun fuel bound => started.initial.native_done_iff.mpr (enough fuel bound)
-  have representedResult : CompatiblePayload.ValueRep fixture.recipe.compiled.compatible.checked
-      receiver.completion.result.context.registry (inventory.functions receiver)
-      finalMap finalWorld inventory.makeHeader.header.function.resultType source payload inventory.makeHeader.header.output := by
-    have representedResult := result.2.1
-    cases representedResult with
-    | value related => exact related
-  have shape : SourceCorePublicOutputShapes.Output fixture.recipe.compiled.compatible.checked encodedValues.registry
-      (finalStore.map Core.Value.type) fixture.recipe.program.layouts.definitions inventory.makeHeader.header.function.resultType payload := by
-    have shaped := CompatiblePublicOutputShapes.ValueRep.output representedResult
-    rw [receiver.registry, ← startupRegistry] at shaped
-    rw [result.2.2.1.runtime_hasTypes.world_eq] at shaped
-    exact shaped
-  have checkpointRegistry : checkpoint.RegistryAt encodedValues.registry := by
-    have values := started.values
-    cases checkpoint
-    change _ = encodedValues at values
-    exact congrArg SourceCoreCompatibleValues.Context.registry values
-  have atRecipe : artifact.RecipeAt fixture.recipe := by
-    cases artifact
-    exact started.recipe_eq
-  have requested := started.original.result_type_at atRecipe started.selected
-  have resultType := (RecursiveNamedPublicRootSourceSignature.inputs_and_result selected).2
-  rw [resultType] at requested
-  have checkpointReady := started.original.initial_registry.exportsReady
-    (sessionAt.exportsReady_iff.mp (ready.exportsReady first.authority))
-  obtain ⟨requiredOutput, exports⟩ := first.checkpoint.output_succeeded_uniform
-    checkpointAt atRecipe checkpointRegistry checkpointReady requested shape
-  refine ⟨requiredExecution, max requiredOutput 1, ?_⟩
+  have result : SourceCoreRawMetadata.runtimeType inventory.makeHeader.header.function.resultType =
+      .function .unit .word := by
+    rw [inventory.makeHeader.make_result_type]
+    rfl
+  have enough := RecursiveNamedPublicPhysicalSessionInitialForward.first_function
+    inventory.rows fixture.recipePrepared inventory.makeHeader.header inventory.makeHeader.header
+    program distinct first.as_function_call.toCall.toStartedCall start (bool_simple true)
+    inputTypes inputMeanings result trace
+  obtain ⟨requiredExecution, requiredOutput, enough⟩ := enough
+  refine ⟨requiredExecution, requiredOutput, ?_⟩
   intro executionFuel outputFuel outcome executionBound outputBound resumed
-  obtain ⟨completion, actual, generation, succeeded, exported, actualAt, returnedReady⟩ :=
-    exports executionFuel (completes executionFuel executionBound) outputFuel (Nat.le_trans (Nat.le_max_left _ _) outputBound) outcome resumed
-  have requestedRaw := requested
-  rw [inventory.makeHeader.make_result_type] at requested
-  obtain ⟨exportedCompletion, handle, sameOutcome, functionValue, handleType, _ready⟩ :=
-    SourceCoreExecution.Checkpoint.ResumeAt.runtime_function_succeeded checkpointAt resumed checkpointReady
-      (completes executionFuel executionBound) requested rfl (by omega)
-  have sameCompletion : exportedCompletion = completion :=
-    SourceCoreExecution.Outcome.succeeded.inj (sameOutcome.symm.trans succeeded)
-  subst exportedCompletion
-  let entry : RecursiveNamedPublicFunctionHistory.Entry :=
-    ⟨inventory.makeHeader.header.function.resultType, source, handle, payload, inventory.makeHeader.header.output, outputFuel⟩
-  obtain ⟨reached, related, post⟩ := result.2.2.2.2.2.2.2
-  have retained := RecursiveNamedPublicFunctionHistory.History.first rfl started selected exported result
-    reached ⟨related, post⟩
-    (.remember requestedRaw rfl rfl (actualAt.1.symm.trans functionValue))
-  have physicalRetained := RecursiveNamedPublicPhysicalHistory.physical_of_result caller.physical result
-  have returnedRegistry := started.returned_registry exported
-  rw [startupRegistry, ← receiver.registry] at returnedRegistry
-  let returned : RetainedState inventory receiver completion.session [entry] := {
-    artifact := artifact
-    session := actual.session
-    mapping := finalMap
-    world := finalWorld
-    heap := after
-    store := finalStore
-    caller := reached
-    atSession := actualAt.2.2.2
-    atRecipe := started.recipe_eq
-    receiving := receiver.completion
-    issued := receiver.issued
-    extension := .refl _
-    registry := returnedRegistry
-    history := ⟨retained, physicalRetained⟩ }
-  exact ⟨completion, succeeded, actualAt.2.2.2.exportsReady_iff.mpr returnedReady,
-    entry, inventory.makeHeader.make_result_type, rfl, functionValue, handleType, returned, rfl⟩
+  obtain ⟨completion, succeeded, ready, entry, entryType, sourceEq, returned, handleType, state, heap⟩ :=
+    enough executionFuel outputFuel outcome executionBound outputBound resumed
+  exact ⟨completion, succeeded, ready, entry, entryType.trans inventory.makeHeader.make_result_type,
+    sourceEq, returned, handleType.trans inventory.makeHeader.make_result_type, state, heap⟩
 
 end Tests.SourceCoreCoercionPublic

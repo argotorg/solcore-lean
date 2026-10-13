@@ -67,6 +67,7 @@ theorem RetainedState.factory_meaning {fixture : CompiledFixture} {observed : Ob
     (stages : ObservedStages fixture observed.makeRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (FactoryMeaning state support.makeHeader.header call .word [.bool value] invocation) := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
   obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
     support.toOrdinaryInventory.rows state.atRecipe
@@ -85,11 +86,9 @@ theorem RetainedState.factory_meaning {fixture : CompiledFixture} {observed : Ob
       (.named request.header.named.signature.key) := by
     rw [selected]; exact stages.descriptor_at support.makeHeader
   obtain ⟨entry, entryType, handleEq, _handleType, after, trace⟩ := state.make_typed_handle call request inputs
-    (bool_simple value) descriptor (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
+    (bool_simple value) descriptor program invocation
   exact ⟨⟨request, selected, inputs, raw, entry, entryType.trans raw, handleEq, after,
-    by rw [← selected]; exact trace⟩⟩
+    by simpa only [selected] using trace⟩⟩
 
 theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {receiver : ObservedReceiver fixture observed}
@@ -106,6 +105,7 @@ theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : Observ
     (stages : ObservedStages fixture observed.useRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (CallMeaning state support.useHeader.header (.word value) call [entry.source] invocation) := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
   obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
     support.toOrdinaryInventory.rows state.atRecipe
@@ -127,10 +127,8 @@ theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : Observ
     rw [selected]; exact stages.descriptor_at support.useHeader
   have registry := request.started.function_registry state.registry
   obtain ⟨after, trace⟩ := state.finished_call (.word value) call returned request inputs registry raw native descriptor
-    (support.bodies request.header request.selected.member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods state.issued state.extension
-      request.header request.selected.member selected budget) invocation
-  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by rw [← selected]; exact trace⟩⟩
+    program invocation
+  exact ⟨⟨request, selected, inputs, registry, raw, native, after, by simpa only [selected] using trace⟩⟩
 
 structure SequenceWitness {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (makeStages : ObservedStages fixture observed.makeRow.toObservedRow)
@@ -177,11 +175,10 @@ theorem sequence_meaning {fixture : CompiledFixture} {observed : ObservedProgram
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     Nonempty (SequenceWitness makeStages useStages sequence receiver) := by
   obtain ⟨support⟩ := static_supports fixture observed factories methods receiver.issued
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
   obtain ⟨firstEntry, firstType, firstHandle, initial, firstTrace⟩ := first_meaning_typed_handle
     support.toOrdinaryInventory support.distinct
-    (support.bodies support.makeHeader.header support.toOrdinaryInventory.make_member)
-    (fun budget {child} selected => reflects_bodies receiver support sources bodies methods receiver.issued (.refl _)
-      support.makeHeader.header support.toOrdinaryInventory.make_member selected budget) makeStages sequence.first
+    program makeStages sequence.first
   obtain ⟨second⟩ := RetainedState.factory_meaning support sources bodies methods initial false sequence.second makeStages
     (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
   obtain ⟨firstRead⟩ := RetainedState.use_meaning support sources bodies methods second.after firstEntry

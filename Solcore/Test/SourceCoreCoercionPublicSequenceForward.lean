@@ -24,10 +24,9 @@ theorem CallMeaning.forward {fixture : CompiledFixture} {observed : ObservedProg
     (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
     (ready : session.ExportsReady) :
     ForwardAt (entries := entries) support.toOrdinaryInventory receiver scalar call meaning.after.heap := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
   apply forward_call before scalar call meaning.request meaning.inputs meaning.registry meaning.rawType meaning.nativeType ready
-    (support.bodies meaning.request.header meaning.request.selected.member)
-    (fun budget {child} selected => preserves_bodies receiver support sources bodies methods before.issued before.extension
-      meaning.request.header meaning.request.selected.member selected budget)
+    program
   rw [meaning.headerEq]
   exact meaning.trace
 
@@ -47,10 +46,9 @@ theorem FactoryMeaning.forward {fixture : CompiledFixture} {observed : ObservedP
     (simple : ∀ value ∈ publicArguments, SourceCoreIndexedSession.SimplePublic value)
     (ready : session.ExportsReady) :
     FactoryForwardAt (entries := entries) support.toOrdinaryInventory receiver call resultType meaning.entry.source meaning.after.heap := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
   apply forward_factory before call meaning.request meaning.inputs simple meaning.rawType ready
-    (support.bodies meaning.request.header meaning.request.selected.member)
-    (fun budget {child} selected => preserves_bodies receiver support sources bodies methods before.issued before.extension
-      meaning.request.header meaning.request.selected.member selected budget)
+    program
   rw [meaning.headerEq]
   exact meaning.trace
 
@@ -80,6 +78,7 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
     (meaning : SequenceWitness makeStages useStages sequence receiver)
     (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
     (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled) : ForwardMeaning meaning := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver meaning.support sources bodies methods
   have initialReady : sequence.first.session.ExportsReady :=
     (show sequence.first.bootstrap.ReadyAt 102400 sequence.first.session from .single sequence.first.ready).exportsReady
       sequence.first.authority
@@ -90,9 +89,7 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
   have secondReadReady := sequence.secondRead.executed.exportsReady thirdReady
   have repeatedReady := sequence.repeatedRead.executed.exportsReady secondReadReady
   exact ⟨forward_initial meaning.support.toOrdinaryInventory meaning.support.distinct sequence.first
-      (meaning.support.bodies meaning.support.makeHeader.header meaning.support.toOrdinaryInventory.make_member)
-      (fun budget {child} selected => preserves_bodies receiver meaning.support sources bodies methods receiver.issued (.refl _)
-        meaning.support.makeHeader.header meaning.support.toOrdinaryInventory.make_member selected budget)
+      program
       meaning.firstTrace,
     meaning.secondMeaning.forward sources bodies methods (bool_simple false) firstReady,
     meaning.firstReadMeaning.forward sources bodies methods secondReady,

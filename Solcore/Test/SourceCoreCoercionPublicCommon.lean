@@ -86,40 +86,21 @@ theorem OrdinaryInventory.observations {fixture : CompiledFixture} {observed : O
     observed.profile (registry := metadata)
     (CallableIndexedOwnedPhysicalCellOrigins.functions_include_general observed.profile origin)
 
-structure RetainedState {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+abbrev RetainedState {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (inventory : OrdinaryInventory fixture observed) (receiver : ObservedReceiver fixture observed)
     {publicArtifact : SourceCoreExecution.Artifact} (publicSession : SourceCoreExecution.Session publicArtifact)
-    (entries : List Entry) where
-  artifact : SourceCoreIndexedSession.Artifact
-  session : SourceCoreIndexedSession.Session artifact
-  mapping : GeneralHeap.LocationMap
-  world : Core.StoreTyping
-  heap : Dynamic.Heap
-  store : Core.Store
-  caller : RecursiveNamedPublicFunctionHistory.Caller (headers inventory.rows)
-    (keys fixture.recipe.compiled) mapping world heap store
-  atSession : publicSession.IndexedAt session
-  atRecipe : RecursiveNamedPublicStartMeaning.ArtifactRecipe artifact fixture.recipe
-  receiving : CallableIndexedOwnedPublicFaultReceivers.Receiver fixture.recipe.compiled.indexed
-  issued : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt fixture.recipe.compiled.indexed
-    receiving.entry receiving.result.context.registry receiving.result.extension receiving.result.diagnostics
-  extension : SourceCoreRawMetadata.Extends receiver.completion.result.context.registry receiving.result.context.registry
-  registry : session.RegistryAt receiving.result.context.registry
-  history : RecursiveNamedPublicPhysicalHistory.History (headers := headers inventory.rows)
-    (keys := keys fixture.recipe.compiled) (functions := inventory.functions receiver)
-    (receiving := receiving.result.context.registry) (anchor := inventory.makeHeader.header) session mapping world heap store caller entries
+    (entries : List Entry) :=
+  RecursiveNamedPublicPhysicalSessionState.State inventory.rows inventory.makeHeader.header
+    receiver.completion observed.profile fixture.recipe publicSession entries
 
-def SourceCall {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+abbrev SourceCall {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (inventory : OrdinaryInventory fixture observed)
     (header : CallableIndexedOwnedFunctionValues.Header fixture.recipe.compiled
       (Program.ofChecked fixture.recipe.compiled.sourceProgram))
     (invocation : Staging.Recursive.Scope) (before : Dynamic.Heap) (arguments : List Dynamic.Value)
     (outcome : Staging.Recursive.Outcome) (after : Dynamic.Heap) : Prop :=
-  ∃ rawD function size,
-    CallableIndexedOwnedFunctionValues.NamedSourceAt header rawD function ∧
-    Staging.Recursive.Size.Applies (Program.ofChecked fixture.recipe.compiled.sourceProgram)
-      (RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture)) size invocation
-      inventory.makeHeader.header.function.context before (.global function) arguments outcome after
+  RecursiveNamedPublicPhysicalSessionState.SourceCall inventory.makeHeader.header header
+    invocation before arguments outcome after
 
 theorem bool_inputs {entries : List Entry} {context : SourceSemantics.Context}
     (value : Bool) :
