@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Complete compiler profiles issue public sessions (2026-10-14)
+
+`84536b5b` builds the full program certificate from finite checks of the actual compiled cache. `45b1d994` connects that producer to the original seven-call evidence program at checker budgets `1024` and `1000`.
+
+The executable profile visits every actual cache index and accounts for every original lambda node in each cached source. It checks original forms, operand membership, metadata, direct targets, full replacement ranges and method evidence origins. Actual accepted compiler trees and expression traces then produce the body proofs internally. Callers provide neither a recursive syntax proof nor a completion function for each row.
+
+The public constructor consumes the successful profile and the original checking, compilation, bootstrap and startup receipts. It issues the same automatic catalog and physical session used by later calls. The new seven-call path performs no example-specific program-certificate assembly. Both checker budgets retain twelve cached rows, ten direct targets, three distinct closures, results `33 / true / 33 / 55` and reached public store sizes `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`.
+
+Validation: 8 affected modules checked together, full build (7,272 jobs), registered tests (14,382 build jobs), kernel policy and 840 endpoint audits pass. The original lexical-failure program also passes the profile. Checks reject missing operands and direct targets, invalid metadata, mismatched assignment types, unsupported statements, unaccounted lambdas and outer fallthrough. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The profile remains a supported-fragment condition. It currently accepts scalar/direct/indirect/method expressions, monomorphic lexical declarations, bare assignments, loops and ordinary factories with a singleton-return lambda body. The original scoped-closure example is rejected by that factory check and retains its earlier verified execution path. Independent Source well-formedness, public input typing and finite staged Source traces remain explicit. Full compiler and pass coverage remain unfinished.
+
+The generic producer removes the example's manual assembly of ten ordinary roots, two closure sources and two method bodies from the new public path. The existing example paths remain checked. The twelve unrelated workspace changes remain excluded.
+
 ## Method bodies come from actual cached compilation (2026-10-14)
 
 `fdbd1f8e` derives method body admission from the actual retained selection and cached compilation. `3624d72d` connects both method rows to the existing whole-program certificate and public sequences.

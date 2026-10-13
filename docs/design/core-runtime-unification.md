@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Complete compiler profiles issue public sessions (2026-10-14)
+
+`84536b5b` builds the full program certificate from finite checks of the actual compiled cache. `45b1d994` connects that producer to the original seven-call evidence program at checker budgets `1024` and `1000`.
+
+The executable profile visits every actual cache index and accounts for every original lambda node in each cached source. It checks original forms, operand membership, metadata, direct targets, full replacement ranges and method evidence origins. Actual accepted compiler trees and expression traces then produce the body proofs internally. Callers provide neither a recursive syntax proof nor a completion function for each row.
+
+The public constructor consumes the successful profile and the original checking, compilation, bootstrap and startup receipts. It issues the same automatic catalog and physical session used by later calls. The new seven-call path performs no example-specific program-certificate assembly. Both checker budgets retain twelve cached rows, ten direct targets, three distinct closures, results `33 / true / 33 / 55` and reached public store sizes `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`.
+
+Validation: 8 affected modules checked together, full build (7,272 jobs), registered tests (14,382 build jobs), kernel policy and 840 endpoint audits pass. The original lexical-failure program also passes the profile. Checks reject missing operands and direct targets, invalid metadata, mismatched assignment types, unsupported statements, unaccounted lambdas and outer fallthrough. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The profile remains a supported-fragment condition. It currently accepts scalar/direct/indirect/method expressions, monomorphic lexical declarations, bare assignments, loops and ordinary factories with a singleton-return lambda body. The original scoped-closure example is rejected by that factory check and retains its earlier verified execution path. Independent Source well-formedness, public input typing and finite staged Source traces remain explicit. Full compiler and pass coverage remain unfinished.
+
+Next, connect multi-statement closure bodies to the same generic producer and public session, then expand the remaining compiler coverage.
+
 ## Method bodies come from actual cached compilation (2026-10-14)
 
 `fdbd1f8e` derives method body admission from the actual retained selection and cached compilation. `3624d72d` connects both method rows to the existing whole-program certificate and public sequences.
@@ -726,11 +740,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `fdbd1f8e` / `3624d72d`: both actual cached method bodies complete the same compiler-derived program certificate used by all public sequences. |
-| Latest completed verification | Full build (7266 jobs), registered tests, kernel policy and 792 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `84536b5b` / `45b1d994`: a finite complete compiler profile issues the program certificate and public session internally for the original seven-call evidence program. |
+| Latest completed verification | Full build (7272 jobs), registered tests, kernel policy and 840 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual selected methods retain their full original checked bodies, substitutions and evidence; compiler actions supply body syntax and lexical binding proofs. |
-| Current implementation priority | Build the whole-program certificate from finite checks of every actual cache row and original lambda, then complete compiler and pass coverage. |
+| Latest proof scope | Every actual cache row and original lambda is covered; genuine compiler receipts build all body proofs before the same public-session theorem is applied. |
+| Current implementation priority | Extend the common producer to multi-statement closure bodies, then complete compiler and pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
