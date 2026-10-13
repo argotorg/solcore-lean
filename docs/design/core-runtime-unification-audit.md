@@ -8,6 +8,23 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Final ordinary catalogs and selected public starts (2026-10-13)
+
+Commits `760f1a28` and `7a8a2de8` connect actual final preparation to the ordinary inventory and selected public start. The review checked these boundaries:
+
+- Exact specialization and unique physical slot come from accepted preparation of the complete cached record. An erased native type or a detached key does not establish row identity.
+- Original ordinary provenance is distinguished from selected implementation-method provenance using the well-formed program's declaration identities. Method-discovered ordinary helpers remain eligible.
+- The catalog filters finite actual cache positions by independent Source conditions. It does not require unused or staged rows to satisfy ordinary admission, and it does not renumber the physical cache.
+- Full raw replacement ranges follow Source declaration/entry admission and actual specialization, including replacements absent from native signatures.
+- Public selection follows the actual first matching root, its authentic factory and current session state. `Matches` authenticates the selected function metadata; it does not establish argument, dictionary or heap representation.
+- The existing public proof retains all seven Source/forward endpoints and original histories while replacing hand-built Inputs and whole-root coverage.
+
+The existing seven-call retained-closure sequence still has Source meaning and sufficient execution/output-fuel bounds, with scalar results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. A second regression recovers both Word and Bool identity rows added during method preparation and confirms that they were absent from the initial validation plan.
+
+Validation: all 141 affected modules pass coherent checks. The full build (7,135 jobs), registered tests (14,140 build jobs and the final pass marker), kernel policy and 270 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Existing work remains unchanged.
+
+This constructs a finite semantic inventory by classical existence; it is not an executable classifier of every cached row. Source well-formedness, independent input admission and ordinary stage flags remain required. The start receipt identifies the selected function; argument values, dictionaries and heap representation still use their existing semantic relations. Automatic body syntax/metadata certification and complete preservation across all compiler passes remain unfinished.
+
 ## Output coercions through retained public closures (2026-10-13)
 
 Commits `d82a65a9` and `c48ec7bf` connect a constrained direct call followed by output coercion inside a retained closure. The fixture has four physical cache slots, three ordinary Headers and two public roots. Its selected conversion method has no implementation parameters or method assumptions and returns a conditional Word result from its Bool input.

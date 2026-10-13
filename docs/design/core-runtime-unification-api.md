@@ -4,6 +4,23 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Final ordinary catalogs and selected public starts (2026-10-13)
+
+The public runtime API is unchanged. `760f1a28` adds the following proof entry points; `7a8a2de8` connects them to the existing public sequence.
+
+- `OrdinaryCachedInputs.of_cached` derives a genuine Input at the exact cached position from original ordinary origin, complete Source replacement range and ordinary stage flags. Target and slot are derived internally.
+- `OrdinaryCatalog.of_compiled` returns `Nonempty (Catalog compiled)`. The catalog preserves physical indices, contains every eligible ordinary row and issues genuine Headers through the existing inventory constructor.
+- `OrdinaryCatalog.eligible_of_admissible` and `eligible_of_entry` recover ordinary origin and the complete raw range from actual cached selection and independent Source admission.
+- `OrdinaryCatalog.covers_direct` combines original declaration admission with the actual compiled target and global lookup to obtain Header membership, slot and signature.
+- `OrdinaryCatalog.recover_start_entry` constructs the catalog and returns the actual `Started` receipt with its complete cached-row `Matches`. It requires the real target equation, independent `ProgramEntryValid`, ordinary stage flags and successful public start. The catalog-specific variant is also available.
+- `RecursiveNamedPublicPhysicalFrontdoor.recover_start_at` uses only the selected root; `recover_start_at_with` retains additional static admission at its actual Header. The existing `recover_start_covered` signature is unchanged.
+
+The existing seven-call retained-closure sequence still has Source meaning and sufficient execution/output-fuel bounds, with scalar results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. A second regression recovers both Word and Bool identity rows added during method preparation and confirms that they were absent from the initial validation plan.
+
+Validation: all 141 affected modules pass coherent checks. The full build (7,135 jobs), registered tests (14,140 build jobs and the final pass marker), kernel policy and 270 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Existing work remains unchanged.
+
+This constructs a finite semantic inventory by classical existence; it is not an executable classifier of every cached row. Source well-formedness, independent input admission and ordinary stage flags remain required. The start receipt identifies the selected function; argument values, dictionaries and heap representation still use their existing semantic relations. Automatic body syntax/metadata certification and complete preservation across all compiler passes remain unfinished.
+
 ## Output coercions through retained public closures (2026-10-13)
 
 `d82a65a9` extends the proof API; `c48ec7bf` adds the closed public connection. The public Artifact, Value, Session, Outcome and Checkpoint APIs are unchanged.

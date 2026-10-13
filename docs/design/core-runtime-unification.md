@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Final ordinary catalogs and selected public starts (2026-10-13)
+
+`760f1a28` constructs ordinary function inventories from actual final compilation. `7a8a2de8` connects the common construction to the existing public coercion and retained-closure proofs. This removes per-fixture assembly of prepared Inputs and whole-root coverage from those public calls.
+
+The catalog retains every actual cached position whose original Source origin, complete replacement range and ordinary stage markers are admitted. Omitted method or staged rows keep their physical positions. Actual preparation supplies exact target selection, unique slot, genuine Source body and the complete resolver dictionary, including ordinary helpers discovered during method preparation.
+
+Independent `ProgramEntryValid` and the real compiled target now select the actual public root and recover its current start state through one general endpoint. Direct-call admission similarly supplies the exact Header from the final catalog.
+
+The existing seven-call retained-closure sequence still has Source meaning and sufficient execution/output-fuel bounds, with scalar results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. A second regression recovers both Word and Bool identity rows added during method preparation and confirms that they were absent from the initial validation plan.
+
+Validation: all 141 affected modules pass coherent checks. The full build (7,135 jobs), registered tests (14,140 build jobs and the final pass marker), kernel policy and 270 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Existing work remains unchanged.
+
+This constructs a finite semantic inventory by classical existence; it is not an executable classifier of every cached row. Source well-formedness, independent input admission and ordinary stage flags remain required. The start receipt identifies the selected function; argument values, dictionaries and heap representation still use their existing semantic relations. Automatic body syntax/metadata certification and complete preservation across all compiler passes remain unfinished.
+
 ## Output coercions through retained public closures (2026-10-13)
 
 `d82a65a9` connects output coercions on original direct-call nodes to the shared physical callable proof. `c48ec7bf` verifies the connection through retained closures and seven successive public executions.

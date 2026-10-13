@@ -6,6 +6,24 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Final ordinary catalogs and selected public starts (2026-10-13)
+
+`760f1a28` adds final-cache Input construction, a finite admitted ordinary catalog and public entry recovery. `7a8a2de8` switches the existing coercion sequence to that catalog and local root selection.
+
+- Actual accepted preparation derives the exact specialization, retained target and unique physical slot.
+- Independent Source declaration or entry admission derives the full raw replacement range and original ordinary provenance for the reached row.
+- `OrdinaryCatalog.of_compiled` constructs one catalog containing every eligible cached position. Each issued packet retains its actual row, index and named function.
+- `OrdinaryCatalog.recover_start_entry` constructs that catalog and recovers the successful public start from independent Source entry admission and actual target selection. No supplied Header, selector callback or whole-root coverage is required.
+- The existing seven-call public proof uses packets from that catalog and the actual first matching root. Its body proofs and retained histories remain connected.
+
+The existing seven-call retained-closure sequence still has Source meaning and sufficient execution/output-fuel bounds, with scalar results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. A second regression recovers both Word and Bool identity rows added during method preparation and confirms that they were absent from the initial validation plan.
+
+Validation: all 141 affected modules pass coherent checks. The full build (7,135 jobs), registered tests (14,140 build jobs and the final pass marker), kernel policy and 270 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Existing work remains unchanged.
+
+This constructs a finite semantic inventory by classical existence; it is not an executable classifier of every cached row. Source well-formedness, independent input admission and ordinary stage flags remain required. The start receipt identifies the selected function; argument values, dictionaries and heap representation still use their existing semantic relations. Automatic body syntax/metadata certification and complete preservation across all compiler passes remain unfinished.
+
+Next: generate supported body syntax and metadata receipts from the original cached Source and accepted compiler actions, then feed the existing body collectors and shared numeric proof. Certification success and completeness from compiler acceptance must remain separate claims.
+
 ## Output coercions through retained public closures (2026-10-13)
 
 `d82a65a9` adds independent recursive staged coercion rules and connects their meaning to the actual emitted code. `RawForm` retains the original expression form, requirement list and coercion list. The new expression branches require a nonempty output-coercion list, preserving the existing uncoerced constructor APIs. `CoercionStep` and `CoercionPath` follow actual selected method bodies, parameter allocation, ordered intermediate heaps and failure propagation. Sized rules, erasure, fault preservation and the affected Source inversions are updated together.
