@@ -1934,6 +1934,12 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionD
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionIssuance
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectOutputCollection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectOutputForward
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodySyntax
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyBindings
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodySupport
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedProgramBodyCompletion
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
