@@ -1,0 +1,200 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalCanonicalState
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedLambdaCanonicalEntries
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedCallerSlotForgetting
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedLambdaParameterAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalMetadataBodyBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds
+
+/-! The real closure parameter entry retains every captured global reference
+and every installed cache cell. Terminal expression bounds use the resulting
+physical caller, with the original frame and whole returned pool. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalTerminalLambdaBodyBounds
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedHistory CallableIndexedLambdaValues CallableIndexedOwnedFunctionState
+open SourceCoreCallableIndexedFrames
+open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
+open CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts (Receipt)
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {function : Dynamic.Closure} {scope : SourceCoreLocalCell.Scope}
+  {mapping : LocationMap} {world : StoreTyping} {capturedActual : Environment}
+  (captured : Captures compiled.indexed mapping world scope function.captured capturedActual)
+  (code : Code compiled.indexed function scope captured.administrative) (history : History code)
+  (inputs : CallableIndexedLambdaEntryPrefix.Context (values := .initial compiled.compatible.checked) code)
+  (functions : FunctionModel compiled.compatible.checked.catalog
+    (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {registry : SourceCoreRawMetadata.Registry} {stages : Staging.Recursive.Registry}
+  {faults : RecursiveStageMeaning.FaultRep}
+  {arguments : List Dynamic.Value} {nativeArguments : List Value}
+  {before : Dynamic.Heap} {store : Store} {callerScope : SourceCoreLocalCell.Scope}
+  {callerCanonical : Environment}
+  (owner : CallableIndexedOwnedFunctionValues.OwnedKey keys)
+  (caller : State headers keys ⟨callerScope, mapping, world, before, store, callerCanonical⟩)
+  (callerPrefix : Nat)
+  (capturedSlots : CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix scope captured.canonical)
+  (physical : CallableIndexedOwnedPhysicalGlobals.Authority compiled mapping store)
+  (stable : StableRows caller)
+  (beforeTyped : Dynamic.HeapWellTyped function.context before)
+  (argumentsTyped : Dynamic.ValuesHaveTypes function.context before arguments inputs.types)
+  {policy : SourceCoreLoops.Policy} {fuel : Nat} {expression : ExpressionId}
+  {reasonAt : ExpressionId → Word} {fellThrough escaped : Word}
+  (terminal : Receipt policy fuel code.view
+    (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
+    expression function.body code.receipt.resultCore reasonAt fellThrough escaped code.receipt.body)
+  {certificate : GenericExpressionMeaning.Certificate}
+  (certifies : ∀ lowered,
+    policy.lowerExpression terminal.childFuel code.view
+      (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
+      expression reasonAt = .ok lowered →
+    certificate
+      (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope)
+      expression lowered)
+
+private theorem capturedSlots_after_prefix
+    {bindings : List CallableIndexedParameterCertificates.Binding}
+    {callerPrefix : Nat} {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
+    (slots : CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix scope canonical)
+    (added : Environment) (length : added.length = bindings.length)
+    {final : Environment} (spine : final = added ++ canonical) :
+    CallableIndexedOwnedPhysicalGlobals.Slots compiled callerPrefix
+      (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope) final := by
+  subst final
+  intro slot signature found
+  have offset : (bindings.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope).length + callerPrefix + slot =
+      added.length + (scope.length + callerPrefix + slot) := by simp only [List.length_append, List.length_map, List.length_reverse]; omega
+  rw [offset, List.getElem?_append_right (by omega), Nat.add_sub_cancel_left]
+  exact slots slot signature found
+
+private theorem forget_post {index : ProtectedStateTransition.Index}
+    {context : SourceSemantics.Context} {type : TypeSystem.Ty} {outcome : Staging.Recursive.Outcome}
+    (state : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys callerPrefix).State index)
+    (post : CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+      (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots
+      context type outcome state) :
+    CallableIndexedOwnedAdmittedStagedExpressionBounds.PostAdmission
+      (CallableIndexedOwnedBodyRestorationAdmission.bridge (headers := headers) (keys := keys))
+      context type outcome state.base.val := by
+  cases outcome with
+  | value value => exact ⟨post.rows, post.successful⟩
+  | fault failure =>
+    cases failure with
+    | semantic reason => exact ⟨post.rows, post.successful⟩
+    | stage origin call reason => exact post
+
+include capturedSlots physical stable beforeTyped argumentsTyped terminal certifies in
+/-- The actual Source closure rule supplies its selected scope and frame.
+The same compiler body and parameter pool satisfy the Source body port. -/
+theorem source_body_at
+    (entry : CallableIndexedLambdaEntryPrefix.EntryFor (values := .initial compiled.compatible.checked)
+      captured code history inputs functions registry arguments nativeArguments before store owner.key.frameLocation
+      (caller.rows owner.position).authority.current (caller.rows owner.position).authority.ghost)
+    (added : Environment) (length : added.length = code.receipt.loweredParameters.length)
+    (spine : entry.entry.canonical = added ++ captured.canonical)
+    (reached : State headers keys
+      ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+        entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩)
+    (budget bodySize : Nat) (within : bodySize ≤ budget)
+    (children : ∀ (child : Staging.Recursive.Scope), stages.Closure function child →
+      CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+        (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots inputs.context
+        (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+        stages child certificate faults budget) :
+    CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.SourceBodyAt
+      (stages := stages) (faults := faults)
+      captured code history inputs functions owner caller entry reached bodySize := by
+  intro child finalContext bodyOutcome outcome after selected valid trace matched
+  have view : LambdaMetadataViews.MetadataView child.source code.view := by
+    rw [stages.source selected]
+    exact code.viewOfSource
+  obtain ⟨staticFinal, facts, bodyTyped, completes⟩ :=
+    CallableIndexedOwnedLambdaSourceAdmission.body_typed_at_parameters valid inputs.extended
+  rw [← stages.source selected] at bodyTyped
+  have unique : NodeOccurrencesUnique child.source := by
+    rw [stages.source selected]
+    exact valid.code.graph.nodeOccurrencesUnique
+  have admitted := CallableIndexedOwnedPreparedLambdaParameterAdmission.at_parameters
+    captured code history inputs functions owner caller entry reached valid beforeTyped argumentsTyped stable
+  have slots := capturedSlots_after_prefix capturedSlots added length spine
+  let initial : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys callerPrefix).State
+      ⟨_, entry.entry.mapping, entry.entry.world, entry.entry.heap, entry.entry.store, entry.entry.canonical⟩ := ⟨⟨reached, slots⟩, (physical.install (frameLocation := owner.key.frameLocation)
+        (native := (caller.rows owner.position).authority.current) entry.currentRead entry.next).extend entry.entry.frame⟩
+  obtain ⟨value, bodyStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+      frame, metadata, returned, related, post⟩ :=
+    CallableIndexedOwnedPreparedStagedTerminalMetadataBodyBounds.preserves_body
+    (receipt := terminal) (view := view) (bridge := (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots)
+    (bodyTyped := bodyTyped) (complete := completes) (certifies := certifies)
+    (environments := entry.entry.environments) (heaps := entry.entry.heaps)
+    (locals := entry.entry.locals) (agrees := entry.entry.lookups)
+    (typed := entry.entry.actualTyped) (initial := initial) (admitted := ⟨admitted.heap, admitted.rows⟩)
+    unique budget (children child selected) trace matched within
+  exact ⟨value, bodyStore, finalMap, finalWorld, evaluated, result, heaps, maps, worlds,
+    frame, metadata, returned.base.val, related, forget_post callerPrefix returned post⟩
+
+include capturedSlots physical stable beforeTyped argumentsTyped terminal certifies in
+/-- Native completion uses the same retained parameter prefix and original
+registry scope. Its independently graded Source body is constructed from the
+strict expression reflection at that actual entry. -/
+theorem native_body_at
+    (entry : CallableIndexedLambdaEntryBounds.PrefixFor (values := .initial compiled.compatible.checked)
+      captured code history inputs functions registry arguments before store owner.key.frameLocation
+      (caller.rows owner.position).authority.current)
+    (reached : State headers keys
+      ⟨code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ scope,
+        entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩)
+    (child : Staging.Recursive.Scope) (selected : stages.Closure function child)
+    (valid : Dynamic.ClosureFrame program function)
+    (budget nativeSize : Nat) (within : nativeSize ≤ budget)
+    (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.ReflectsBelow
+      (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots inputs.context
+      (CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions)
+      stages child certificate faults budget) :
+    CallableIndexedOwnedPreparedStagedClosureInvocationPostBounds.NativeBodyAt
+      (stages := stages) (faults := faults)
+      captured code history inputs functions owner caller entry reached child nativeSize := by
+  intro value bodyStore completed
+  have view : LambdaMetadataViews.MetadataView child.source code.view := by
+    rw [stages.source selected]
+    exact code.viewOfSource
+  obtain ⟨staticFinal, facts, bodyTyped, completes⟩ :=
+    CallableIndexedOwnedLambdaSourceAdmission.body_typed_at_parameters valid inputs.extended
+  rw [← stages.source selected] at bodyTyped
+  have unique : NodeOccurrencesUnique child.source := by
+    rw [stages.source selected]
+    exact valid.code.graph.nodeOccurrencesUnique
+  have rawTypes := Dynamic.MonoBindersExtend.bodyTypes_eq inputs.extended
+  have rawArguments : Dynamic.ValuesHaveTypes function.context before arguments
+      (function.parameters.map (fun binder => binder.scheme.body)) := by
+    simpa only [rawTypes] using argumentsTyped
+  have allocated := Dynamic.BindersAllocate.preservesHeapTyping beforeTyped rawArguments entry.allocation
+  have fields := Dynamic.MonoBindersExtend.runtimeContextFields inputs.extended
+  have heapTyped : Dynamic.HeapWellTyped inputs.context entry.heap :=
+    allocated.transportClosed fields.signatures valid.code.closed (fields.targetClosed valid.code.closed)
+      valid.code.variables_closed (fields.targetResidualVariablesOpen valid.code.residual_variables_open)
+  have rows := CallableIndexedOwnedPreparedLambdaParameterAdmission.after_parameters
+    caller reached owner.position stable entry.nextHistory entry.frame
+  obtain ⟨added, length, spine⟩ := entry.spine
+  have slots := capturedSlots_after_prefix capturedSlots added length spine
+  let initial : (CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys callerPrefix).State
+      ⟨_, entry.mapping, entry.world, entry.heap, entry.store, entry.canonical⟩ := ⟨⟨reached, slots⟩, (physical.install (frameLocation := owner.key.frameLocation)
+        (native := (caller.rows owner.position).authority.current)
+        (CallableIndexedOwnedFunctionEntries.reached_frame_read caller owner.position) entry.next).extend entry.frame⟩
+  have admitted : CallableIndexedOwnedSourceAdmission.Admission
+      (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots inputs.context initial := ⟨heapTyped, rows⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, matched, meaning,
+      heaps, maps, worlds, frame, metadata, returned, related, post⟩ :=
+    CallableIndexedOwnedPreparedStagedTerminalMetadataBodyBounds.reflects_body
+      (receipt := terminal) (view := view) (bridge := (CallableIndexedOwnedPhysicalCanonicalState.caller (headers := headers) (keys := keys) callerPrefix).forgetSlots)
+      (bodyTyped := bodyTyped) (complete := completes) (certifies := certifies)
+      (environments := entry.environments) (heaps := entry.heaps)
+      (locals := entry.locals) (agrees := entry.lookups) (typed := entry.actualTyped)
+      (initial := initial) (admitted := admitted) unique budget children completed within
+  exact ⟨sourceSize, inputs.context,
+    CallableIndexedOwnedAdmittedStagedTerminalStatements.control outcome,
+    outcome, after, finalMap, finalWorld, trace, matched, meaning,
+    heaps, maps, worlds, frame, metadata, returned.base.val, related, forget_post callerPrefix returned post⟩
+
+end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalTerminalLambdaBodyBounds
