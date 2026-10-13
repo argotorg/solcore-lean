@@ -1,0 +1,254 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPrimitiveMethodAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedClosedCoercionAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedFactoryAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalProgramSupport
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedPhysicalBootstrap
+
+/-! One finite certificate checks actual cached roots, original lambda bodies,
+method sources and coercion selection. Its issuer constructs the shared static
+program support; independent Source well-formedness remains explicit. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxRecDepth 4096
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload
+open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
+open CallableIndexedOwnedPreparedNamedSyntaxAdmission (TableAligned)
+open CallableIndexedOwnedPreparedNamedSourceAdmissionTransport (statements)
+open CallableIndexedOwnedPreparedBootstrapRootState (keys)
+open CallableIndexedOwnedPreparedPhysicalProgramSupport (stagePrepared stages Support)
+open CallableIndexedOwnedPreparedOrdinaryCatalogReceipts (Catalog)
+
+private def allProof? {α : Type} (predicate : α → Prop)
+    (check : (item : α) → Option (PLift (predicate item))) :
+    (items : List α) → Option (PLift (∀ item ∈ items, predicate item))
+  | [] => some ⟨by intro item member; cases member⟩
+  | first :: rest => do
+    let ⟨head⟩ ← check first
+    let ⟨tail⟩ ← allProof? predicate check rest
+    pure ⟨by
+      intro item member
+      rcases List.mem_cons.mp member with same | member
+      · exact same ▸ head
+      · exact tail item member⟩
+
+inductive RootCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction) where
+  | scoped (source : CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission
+      compiled named named.specialized.function.typedBody (statements named.specialized.function.typedBody)
+      named.specialized.function.inferredBodyType directRows)
+  | formation (source : CallableIndexedOwnedPreparedNamedFactoryAdmission.Certificate compiled named)
+  | excluded (absent : ∀ signature ∈ compiled.sourceProgram.signatures.functions,
+      named.specialized.declaration ≠ signature.id)
+
+def certifyRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction)
+    (fuel : Nat) : Option (RootCertificate compiled named directRows) :=
+  match CallableIndexedOwnedPreparedNamedScopedAdmission.admitSource compiled named
+      named.specialized.function.typedBody (statements named.specialized.function.typedBody)
+      named.specialized.function.inferredBodyType directRows fuel with
+  | some ⟨source⟩ => some (.scoped source)
+  | none =>
+    match CallableIndexedOwnedPreparedNamedFactoryAdmission.certifyCachedFactory compiled named with
+    | some source => some (.formation source)
+    | none =>
+      if absent : compiled.sourceProgram.signatures.functions.all (fun signature =>
+          decide (named.specialized.declaration ≠ signature.id)) = true then
+        some (.excluded (fun signature member => of_decide_eq_true (List.all_eq_true.mp absent signature member)))
+      else none
+
+structure RowCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction) where
+  root : RootCertificate compiled named directRows
+  closures : CallableIndexedOwnedPreparedCoercedClosureAdmission.SourceCertificate compiled named directRows
+
+def certifyRow (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (directRows : List SourceSpecialization.SpecializedFunction)
+    (fuel : Nat) : Option (RowCertificate compiled named directRows) := do
+  let root ← certifyRoot compiled named directRows fuel
+  let ⟨closures⟩ ← CallableIndexedOwnedPreparedCoercedClosureAdmission.certifySource compiled named directRows fuel
+  pure ⟨root, closures⟩
+
+structure Certificate (compiled : SourceCoreUnifiedCompilation.Compiled) where
+  table : CallableIndexedOwnedPreparedOrdinarySyntaxTable.Table compiled
+  rows : ∀ named ∈ compiled.indexed.base.functions, Nonempty (RowCertificate compiled named table.rows)
+  methods : CallableIndexedOwnedPreparedPrimitiveMethodAdmission.Certificate compiled
+  coercions : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog compiled
+  profile : compiled.compatible.checked.catalog.callableContracts = true
+  diagnostics : ∃ program, compiled.indexed.base.diagnostics = some program
+
+/-- A rejected row rejects the whole certificate. The direct-site table may
+omit unused rows, but every actual cached source still receives a root check. -/
+def certify (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+    (fuel : Nat) : Option (Certificate compiled) := do
+  if profile : compiled.compatible.checked.catalog.callableContracts = true then
+    match present : compiled.indexed.base.diagnostics with
+    | none => none
+    | some diagnostics =>
+      let table := CallableIndexedOwnedPreparedOrdinarySyntaxTable.collect compiled wellFormed fuel
+      let ⟨rows⟩ ← allProof? (fun named => Nonempty (RowCertificate compiled named table.rows))
+        (fun named => do
+          let certificate ← certifyRow compiled named table.rows fuel
+          pure ⟨⟨certificate⟩⟩) compiled.indexed.base.functions
+      let methods ← CallableIndexedOwnedPreparedPrimitiveMethodAdmission.certify compiled fuel
+      let ⟨coercions⟩ ← CallableIndexedOwnedPreparedClosedCoercionAdmission.certify compiled
+      pure ⟨table, rows, methods, coercions, profile, diagnostics, present⟩
+  else none
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled}
+  (certificate : Certificate compiled)
+  (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
+  {recipe : SourceCoreIndexedSession.Recipe} (ready : SourceCoreIndexedSession.Recipe.prepare compiled = .ok recipe)
+  {loaded : LoadedProgram} (checked : Frontend.checkLoadedProgram loaded 1024 = .ok compiled.sourceProgram)
+  (identity : CallableCoercionSelectionIdentity.Catalog (Program.ofChecked compiled.sourceProgram))
+  {initial : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+  (issued : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed initial.entry
+    initial.result.context.registry initial.result.extension initial.result.diagnostics)
+  (registry : initial.result.context.registry = compiled.compatible.checked.staticRegistry)
+  {entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts}
+  (entryMember : entry ∈ compiled.indexed.entries)
+  {inputs : List (Input compiled)} (rows : Inventory inputs)
+  (aligned : TableAligned inputs certificate.table.rows)
+
+include certificate wellFormed ready checked identity issued entryMember rows aligned in
+theorem Certificate.named_support (input : Input compiled) (packet : Issued input) :
+    Nonempty (Σ body : CallableIndexedOwnedPreparedStagedNamedBodies.Body packet.header,
+      CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+        (headers := headers rows) (bodyRegistry := initial.result.context.registry)
+        (stages := stages compiled)
+        (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
+        packet.header body) := by
+  obtain ⟨source⟩ := certificate.rows input.prepared.named (List.mem_of_getElem? input.prepared.selected)
+  let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected
+  have diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared :=
+    ⟨packet.selected.diagnostics, packet.selected.found, rfl⟩
+  cases source.root with
+  | «scoped» admission =>
+    have original := CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.source_at_header
+      prepared packet.aligned input.prepared.selected input.prepared.same admission
+    exact CallableIndexedOwnedPreparedNamedScopedAdmission.of_actual prepared packet.aligned rows aligned
+      original ready diagnostic issued wellFormed checked identity
+      (.generic ⟨certificate.coercions.formed, certificate.coercions.assumptions⟩)
+      entryMember (stagePrepared compiled)
+  | formation admission =>
+    obtain ⟨terminal, ⟨supported⟩⟩ := CallableIndexedOwnedPreparedNamedFactoryAdmission.of_actual
+      prepared packet.aligned input.prepared.selected input.prepared.same admission ready diagnostic
+      wellFormed certificate.profile entryMember
+    exact ⟨⟨CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal terminal,
+      .formation terminal supported packet.aligned.globals⟩⟩
+  | excluded absent =>
+    obtain ⟨request, signature, generic, member, _genericMember, _resolved, specialized⟩ := input.prepared.origin
+    have fields := RecursiveNamedSpecializationBodyFacts.identities specialized
+    have declaration : input.prepared.named.specialized.declaration = signature.id :=
+      (congrArg (·.declaration) input.prepared.same).trans (fields.2.2.trans fields.1.symm)
+    exact False.elim (absent signature member declaration)
+
+include certificate wellFormed checked identity issued rows aligned in
+theorem Certificate.closure_support
+    {mapping world function native bindings parameter result}
+    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association (headers rows) (keys compiled)
+      initial.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
+      mapping world function native bindings parameter result) :
+    Nonempty (Σ packet : CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport.PacketFor
+        association.original (stages compiled),
+      CallableIndexedOwnedPreparedStagedPhysicalClosureStaticSupport.SupportFor association.original
+        (stages compiled) packet) := by
+  rcases association with ⟨original, _slots⟩
+  cases original with
+  | ordinary owner captured code history support origin prefixContext globals referenceIndex typed provenance =>
+    obtain ⟨source⟩ := certificate.rows support.caller.named (List.mem_of_getElem? support.caller.selected)
+    have found := code.sourceFound
+    rw [support.source] at found
+    obtain ⟨body⟩ := source.closures.selected found code.sourceForm
+    obtain ⟨⟨packet, supported⟩⟩ := CallableIndexedOwnedPreparedCoercedClosureAdmission.of_actual
+      (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
+      certificate.coercions body
+      (fun principal sourceAt diagnostic => certificate.methods.support principal sourceAt diagnostic issued wellFormed
+        (headers := headers rows) (stages compiled))
+    exact ⟨⟨.terminal packet, supported⟩⟩
+  | principal owner captured code history support origin globals leading referenceIndex typed provenance =>
+    have found := code.sourceFound
+    rw [support.source, support.principal.source_eq] at found
+    exact False.elim (certificate.methods.no_lambda support.principal found code.sourceForm)
+
+private theorem owners_physical (rows : Inventory inputs) :
+    ∀ selected : CallableIndexedOwnedFunctionValues.OwnedKey (keys compiled),
+      CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical selected.key (headers rows) := by
+  intro selected
+  have same : selected = CallableIndexedOwnedPreparedBootstrapRootState.owner compiled := by
+    cases selected with
+    | mk position =>
+      have samePosition : position = (CallableIndexedOwnedPreparedBootstrapRootState.owner compiled).position := by
+        apply Fin.ext
+        have bound := position.isLt
+        change position.val < 1 at bound
+        change position.val = 0
+        omega
+      cases samePosition
+      rfl
+  rw [same]
+  exact CallableIndexedOwnedPreparedPhysicalBootstrap.key_physical _ _
+
+include certificate wellFormed ready checked identity issued registry entryMember rows aligned in
+/-- Finite raw-row alignment is the only inventory adapter. All three semantic
+families are issued internally from the single original-source certificate. -/
+theorem Certificate.issue_for :
+    Nonempty (Support compiled (headers rows) (keys compiled) initial) := by
+  have named : ∀ header, header ∈ headers rows →
+      Nonempty (Σ body : CallableIndexedOwnedPreparedStagedNamedBodies.Body header,
+        CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+          (headers := headers rows) (bodyRegistry := initial.result.context.registry)
+          (stages := stages compiled)
+          (semanticFaults := CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
+          header body) := by
+    intro header member
+    obtain ⟨input, packet, _retained, same⟩ := rows.mem_headers header member
+    cases same
+    exact certificate.named_support wellFormed ready checked identity issued entryMember rows aligned input packet
+  let namedChoice := fun header member => Classical.choice (named header member)
+  let closureChoice := fun {mapping world function native bindings parameter result}
+    (association : CallableIndexedOwnedPhysicalClosureAssociation.Association (headers rows) (keys compiled)
+      initial.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults initial.result.diagnostics)
+      mapping world function native bindings parameter result) =>
+    Classical.choice (certificate.closure_support wellFormed checked identity issued rows aligned association)
+  refine ⟨{
+    profile := certificate.profile
+    wellFormed := wellFormed
+    issued := issued
+    registry := registry
+    diagnostics := certificate.diagnostics
+    bodies := fun header member => (namedChoice header member).1
+    bodySupport := fun header member => (namedChoice header member).2
+    closurePackets := fun association => (closureChoice association).1
+    closureSupport := fun association => (closureChoice association).2
+    owners := owners_physical rows
+    methods := ?_ }⟩
+  intro policy body fuel compilation source scope id reasonAt lowered context caller receipt port
+  obtain ⟨packet, same, supported⟩ := certificate.methods.support port.principal port.sourceAt
+    ⟨port.diagnostics⟩ issued wellFormed (headers := headers rows) (stages compiled)
+  exact ⟨.terminal packet, same, supported⟩
+
+include certificate wellFormed ready issued registry entryMember rows aligned in
+/-- Public checker success supplies the loaded source and finite selection
+identity facts; the caller provides only static raw-row alignment. -/
+theorem Certificate.issue_for_checked {raw : Workspace.RawWorkspace}
+    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+    Nonempty (Support compiled (headers rows) (keys compiled) initial) := by
+  obtain ⟨loaded, _loaded, checked⟩ := checkProgram_success_load accepted
+  exact certificate.issue_for wellFormed ready checked
+    (CallableCoercionSelectionIdentity.Catalog.of_checked accepted) issued registry entryMember rows aligned
+
+include certificate wellFormed ready issued registry entryMember in
+/-- The primary issuer constructs the authentic ordinary catalog and closes
+finite table alignment internally. It requires no body coverage callbacks. -/
+theorem Certificate.issue {raw : Workspace.RawWorkspace}
+    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+    ∃ catalog : Catalog compiled, Nonempty (Support compiled (headers catalog.rows) (keys compiled) initial) := by
+  obtain ⟨catalog⟩ := CallableIndexedOwnedPreparedOrdinaryCatalog.of_compiled compiled wellFormed
+  exact ⟨catalog, certificate.issue_for_checked wellFormed ready issued registry entryMember
+    catalog.rows (certificate.table.aligned catalog) accepted⟩
+
+end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
