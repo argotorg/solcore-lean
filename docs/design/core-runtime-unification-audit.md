@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Generic direct calls through actual specialization (2026-10-13)
+
+Commits `62158ce7` and `a4e52efd` connect ordinary generic calls through actual compiler selection and public execution. Source and compiler substitution lists have opposite orders. Equality is proved using the successful full matcher and the original domain order; specialization keys and projected types are insufficient. Every raw replacement retains its closedness check, and original Source admissibility provides the corresponding well-formedness at entry.
+
+The regression keeps two concrete specializations and their distinct native slots in one compiled artifact. All four linked calls have Source traces and public completion bounds, without a called-body execution premise.
+
+Validation: all 555 affected modules pass coherent checks. The full build (6,649 jobs), all registered tests (13,168 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Calls carrying declaration evidence, further closure formation and expression forms, and composition across every compiler pass remain incomplete. This connection covers ordinary direct calls with empty predicates and a closed full replacement range.
+
 ## Recursive tuple formation and collected closure handles (2026-10-13)
 
 Commits `ed24ea28` and `72744c3f` connect recursively generated tuple closures through real nested output collection and subsequent calls. The root compiler policy is selected once. Child acceptance, original typing, native packed-child typing and lambda metadata determine each formation receipt; the original root policy fuel remains distinct from the child compilation fuel.

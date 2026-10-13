@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generic direct calls through actual specialization (2026-10-13)
+
+`62158ce7` connects generic direct calls to the existing recursive caller and named-body proofs. The complete Source instantiation retains the reverse order produced by inference. Actual signature selection, the exact compiler record and the issued Header determine its meaning. Source admissibility supplies validity for every replacement, including entries that do not occur in the result type.
+
+`a4e52efd` uses one compiled artifact containing two roots and two specializations of `choose<A, B>`. Four linked public sessions return Word `11`, Bool `false`, Word `33` and Bool `true`. Both specializations retain their distinct physical slots and full metadata. Each call has independent Source meaning and public sufficient-fuel bounds.
+
+Validation: all 555 affected modules pass coherent checks. The full build (6,649 jobs), all registered tests (13,168 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Calls carrying declaration evidence, further closure formation and expression forms, and composition across every compiler pass remain incomplete. This connection covers ordinary direct calls with empty predicates and a closed full replacement range.
+
 ## Recursive tuple formation and collected closure handles (2026-10-13)
 
 `ed24ea28` connects ordinary lambda formation beneath groups and ordered tuples in named scoped bodies. Every child retains the original root compiler policy at its actual child fuel. Static formation receives the real native child typing and reached lexical context; the recursive semantic proof preserves the complete caller packet and heap through both children.

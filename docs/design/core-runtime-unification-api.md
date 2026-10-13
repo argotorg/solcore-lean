@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generic direct calls through actual specialization (2026-10-13)
+
+`DirectCallCertificates.Ordinary` retains empty predicates, the full closed replacement range and the original Source parameter order for the actual plan. `Monomorphic.ordinary` preserves the existing empty-substitution route. `DirectCallAuthority.of_inventory` uses ordered issued Headers, and `DirectArgumentRows.callee_receipt` derives full Source validity from the reached context.
+
+The generic fixture connects distinct specializations through the same public session and independent Source relation.
+
+Validation: all 555 affected modules pass coherent checks. The full build (6,649 jobs), all registered tests (13,168 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Calls carrying declaration evidence, further closure formation and expression forms, and composition across every compiler pass remain incomplete. This connection covers ordinary direct calls with empty predicates and a closed full replacement range.
+
 ## Recursive tuple formation and collected closure handles (2026-10-13)
 
 `CanonicalScopedStaticSupport.Certificate.group` and `.tuple` retain genuine child code, ordered compiler rows and static Source validity. `CanonicalNamedBranchingSupport.preserves_children` and `reflects_children` recurse structurally through them. `NamedCanonicalMixedCollectors.of_actual` extracts the tree using the original root policy; `NamedCanonicalScopedRoots.of_policy` constructs general leaves without reselecting a callback.

@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Generic direct calls through actual specialization (2026-10-13)
+
+Ordinary generic direct calls now use the same recursive expression and named-body connection as monomorphic calls. The actual selected specialization authenticates the full call metadata, while the original Source inference order identifies the exact issued Header. Closed replacements and original Source admissibility establish callable validity without deriving nominal types from native representations.
+
+Two specializations of `choose<A, B>` are invoked from Word and Bool roots across four linked public sessions. The result, Source heap and sufficient execution/output fuel are connected at every actual checkpoint.
+
+Validation: all 555 affected modules pass coherent checks. The full build (6,649 jobs), all registered tests (13,168 build jobs and the final pass marker), kernel policy and 52 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Calls carrying declaration evidence, further closure formation and expression forms, and composition across every compiler pass remain incomplete. This connection covers ordinary direct calls with empty predicates and a closed full replacement range.
+
 ## Recursive tuple formation and collected closure handles (2026-10-13)
 
 Ordinary formation now composes beneath groups and ordered tuples in named scoped bodies. The accepted root compiler policy remains fixed through each recursive child, including its special-lowering checks and lambda hooks. The existing tuple and group semantic proofs retain the actual caller packet, heap and independent Source/native grades.
@@ -268,11 +278,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `ed24ea28` / `72744c3f`: recursive tuple formation, collection of both closure handles and later reuse through six public sessions. |
-| Latest completed verification | Full build (6633 jobs), all registered tests, kernel policy and 37 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `62158ce7` / `a4e52efd`: two ordinary generic specializations connected through four linked public sessions. |
+| Latest completed verification | Full build (6649 jobs), all registered tests, kernel policy and 52 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Two factory results contribute four retained handles; all six calls have independent Source meaning and public execution/output fuel bounds. |
-| Current implementation priority | Wider specialization, evidence and formation coverage, then remaining compiler alternatives and all-pass composition. |
+| Latest proof scope | Word and Bool specializations retain exact Source metadata; all four calls have Source meaning and execution/output fuel bounds. |
+| Current implementation priority | Declaration evidence and remaining formation/compiler alternatives, followed by all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
