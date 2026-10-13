@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Scoped implementation methods through public execution (2026-10-13)
+
+Commits `6a1b2416` and `1cc4ad92` connect scoped implementation methods through seven successive public executions. The artifact retains ten physical cache slots, eight ordinary Headers and four public roots. Original Source typing covers both selected implementation bodies, including local freshness, writable assignment targets and the loop context.
+
+The exact method instantiation and its actual closed implementation establish the empty structural substitution used by this fixture. SourceAt retains the complete selected dictionary and accepted compiler body. Native prefix agreement follows from the actual parameter type, physical slots and frame reference. The proof preserves the same Source heap, callable representation and returned pool, without a supplied method execution law.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 93 / 111 / 157 / 203 / 239`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 45 affected modules pass coherent checks. The full build (6,956 jobs), all registered tests (13,782 build jobs and the final pass marker), kernel policy and 140 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers actual implementation method bodies with local allocation, plain assignment and finite loops, using read and Boolean child receipts from the original method nodes. The generic scoped body proof accepts mixed expression roots; deriving such roots for calls and evidence inside methods is the next connection. Broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped named calls through retained closures (2026-10-13)
 
 Commits `71c40c0c` and `f24bbeb7` connect scoped named relays through retained closure captures and seven successive public sessions. The artifact contains ten physical cache slots, eight ordinary Headers and four public roots. Each closure retains its own value, next value and loop flag; the actual input registry authenticates the handle used by the Source indirect caller.

@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Scoped implementation methods through public execution (2026-10-13)
+
+`6a1b2416` adds terminal and scoped method packets while retaining the exact selected method and SourceAt record. Accepted flow and independent Source typing feed the existing imperative engine and footer. The same strong induction supplies every method child; existing terminal APIs remain wrappers.
+
+`1cc4ad92` uses Word and Bool implementations that allocate saved and a Boolean flag, execute a finite while loop with two assignments, then return saved. Their actual original method tables and empty structural substitution supply the scoped receipts. The surrounding closure and named relay sequence stays connected to the same public sessions and Source heaps.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 93 / 111 / 157 / 203 / 239`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 45 affected modules pass coherent checks. The full build (6,956 jobs), all registered tests (13,782 build jobs and the final pass marker), kernel policy and 140 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers actual implementation method bodies with local allocation, plain assignment and finite loops, using read and Boolean child receipts from the original method nodes. The generic scoped body proof accepts mixed expression roots; deriving such roots for calls and evidence inside methods is the next connection. Broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped named calls through retained closures (2026-10-13)
 
 `71c40c0c` retains actual prepared named bodies with terminal, formation and scoped support. Accepted compiler actions issue mixed expression roots at the reached lexical contexts. Actual parameter entry supplies the physical slots and authority used by the existing imperative flow proof. The same numeric induction closes all call kinds, and public adapters accept the resulting body carrier. Existing terminal callers keep their API.

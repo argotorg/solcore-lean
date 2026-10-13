@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Scoped implementation methods through public execution (2026-10-13)
+
+`6a1b2416` connects scoped implementation method bodies to the physical callable family. Actual method selection, its dictionary and marked parameter entry supply the original body context, captured physical slots and reached heap. `1cc4ad92` verifies the connection through seven public calls, retained closures and generic named relays.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 93 / 111 / 157 / 203 / 239`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 45 affected modules pass coherent checks. The full build (6,956 jobs), all registered tests (13,782 build jobs and the final pass marker), kernel policy and 140 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers actual implementation method bodies with local allocation, plain assignment and finite loops, using read and Boolean child receipts from the original method nodes. The generic scoped body proof accepts mixed expression roots; deriving such roots for calls and evidence inside methods is the next connection. Broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped named calls through retained closures (2026-10-13)
 
 `71c40c0c` connects actual scoped named bodies to the physical callable family and public invocation adapters. The same recursive proof now follows an original Source indirect call into a retained closure, a direct generic relay call and selected method calls inside the relay. `f24bbeb7` verifies seven linked public calls across three distinct captures.
@@ -358,11 +368,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `71c40c0c` / `f24bbeb7`: scoped named relays through retained closures and seven linked public calls. |
-| Latest completed verification | Full build (6924 jobs), all registered tests, kernel policy and 121 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `6a1b2416` / `1cc4ad92`: scoped implementation methods through seven linked public calls. |
+| Latest completed verification | Full build (6956 jobs), all registered tests, kernel policy and 140 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Original Source indirect calls, captured environments, generic named relays, selected methods and scoped local mutation share the same proof family, with all seven public execution/output-fuel bounds. |
-| Current implementation priority | Connect scoped implementation method bodies, then broader selection, coercions, remaining grammar and all-pass composition. |
+| Latest proof scope | Original Source method bodies with local allocation, assignment and loops share the physical proof family with named and closure calls, retaining all seven public execution/output-fuel bounds. |
+| Current implementation priority | Connect genuine calls and evidence inside implementation methods, then broader selection, coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

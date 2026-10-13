@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Scoped implementation methods through public execution (2026-10-13)
+
+`MethodScopedStaticSupport` retains the genuine selected principal, SourceAt, accepted flow and footer. `MethodScopedCollectors` uses native typing from the actual cached method and collects original child syntax at each reached lexical context. `MethodScopedRoots` issues read and Boolean child roots from the actual Source nodes.
+
+`MethodBodies.Packet` selects terminal or scoped support with the same SourceAt. `MethodScopedBounds` and `MethodBodyBounds` connect actual parameter allocation to the existing imperative preservation and reflection proofs. `PhysicalMixedCallerFamily.preserves_with_methods` and `reflects_with_methods`, plus the named family ports, use those packets in the existing recursive proof. Earlier method APIs embed terminal packets.
+
+Closed endpoints are `Tests.SourceCoreMethodImplementationScoped.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public runtime API is unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 93 / 111 / 157 / 203 / 239`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 45 affected modules pass coherent checks. The full build (6,956 jobs), all registered tests (13,782 build jobs and the final pass marker), kernel policy and 140 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers actual implementation method bodies with local allocation, plain assignment and finite loops, using read and Boolean child receipts from the original method nodes. The generic scoped body proof accepts mixed expression roots; deriving such roots for calls and evidence inside methods is the next connection. Broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped named calls through retained closures (2026-10-13)
 
 `NamedPhysicalMixedScopedRoots` and `NamedPhysicalMixedScopedCollectors` derive child support from actual named compiler receipts, full caller evidence and per-site Header coverage. `PhysicalMixedNamedScopedStaticSupport` retains the collected statement tree and catalog sites.
