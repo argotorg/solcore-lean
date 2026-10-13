@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Recursive tuple formation and collected closure handles (2026-10-13)
+
+Commits `ed24ea28` and `72744c3f` connect recursively generated tuple closures through real nested output collection and subsequent calls. The root compiler policy is selected once. Child acceptance, original typing, native packed-child typing and lambda metadata determine each formation receipt; the original root policy fuel remains distinct from the child compilation fuel.
+
+Structural certificate induction preserves the actual nested caller packet. Group reflection and singleton tuples may keep the native grade; Source preservation uses the strict child grades supplied by the independent Source rules. Output collection derives both ordered Source leaves and their exact encoder budgets from the actual full result and successful export. All six public checkpoints have sufficient-fuel bounds.
+
+Validation: all 400 affected modules pass coherent checks. The full build (6,633 jobs), all registered tests (13,136 build jobs and the final pass marker), kernel policy and 37 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation inside retained closure bodies and below other expression forms, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct-call initialization and retained closure formation (2026-10-13)
 
 Commits `fac267b5` and `3e578bd2` connect a direct initializer followed by closure formation at its actual extended lexical scope. The collector retains the selected Source node, absence of generalized local lowering, original return shape, native child typing and original evidence/ledger context. It invokes the existing lexical formation producer on that same accepted child.

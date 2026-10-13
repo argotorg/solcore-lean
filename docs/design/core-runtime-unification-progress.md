@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Recursive tuple formation and collected closure handles (2026-10-13)
+
+`ed24ea28` connects ordinary lambda formation beneath groups and ordered tuples in named scoped bodies. Every child retains the original root compiler policy at its actual child fuel. Static formation receives the real native child typing and reached lexical context; the recursive semantic proof preserves the complete caller packet and heap through both children.
+
+`72744c3f` connects six actual calls: `make(10)` returns A/B, `A()` returns `10`, `make(20)` returns C/D, `B()` returns `10`, `C()` returns `20`, and the older `A()` returns `10`. Both lambdas capture the local cell initialized through `relay(seed)`. All four collected handles remain in the ordered history. Each call has independent Source meaning and public sufficient-fuel bounds.
+
+Validation: all 400 affected modules pass coherent checks. The full build (6,633 jobs), all registered tests (13,136 build jobs and the final pass marker), kernel policy and 37 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation inside retained closure bodies and below other expression forms, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct-call initialization and retained closure formation (2026-10-13)
 
 `fac267b5` derives mixed named-body support from the actual compiler collector. General recursive expressions and ordinary lambda formation retain their original typed nodes, accepted compiler actions and reached lexical contexts. The factory initializes `saved` through `relay(seed)`, then returns `lam() { return identity(saved); }`. The emitted closure captures the actual newly allocated local cell.

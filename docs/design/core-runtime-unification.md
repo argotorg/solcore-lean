@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Recursive tuple formation and collected closure handles (2026-10-13)
+
+Ordinary formation now composes beneath groups and ordered tuples in named scoped bodies. The accepted root compiler policy remains fixed through each recursive child, including its special-lowering checks and lambda hooks. The existing tuple and group semantic proofs retain the actual caller packet, heap and independent Source/native grades.
+
+The public fixture exports two fresh lambdas from each factory call, collects both from the product output and invokes older handles after an intervening factory call. Six linked public calls retain all four handles and prove results `10 / 10 / 20 / 10`, exact successive Source heaps and sufficient execution/output fuel at every original checkpoint.
+
+Validation: all 400 affected modules pass coherent checks. The full build (6,633 jobs), all registered tests (13,136 build jobs and the final pass marker), kernel policy and 37 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation inside retained closure bodies and below other expression forms, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct-call initialization and retained closure formation (2026-10-13)
 
 A named body can now combine a direct-call local initializer and ordinary closure formation through the same genuine compiler collector. Formation occurs at the extended lexical context after the initializer. Its captured cell remains related through export, subsequent calls and an intervening closure creation. The retained closure body itself performs a direct `identity` call.
@@ -258,11 +268,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `fac267b5` / `3e578bd2`: direct-call initialization followed by closure formation at the reached lexical context, connected through six public sessions. |
-| Latest completed verification | Full build (6612 jobs), all registered tests, kernel policy and 21 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `ed24ea28` / `72744c3f`: recursive tuple formation, collection of both closure handles and later reuse through six public sessions. |
+| Latest completed verification | Full build (6633 jobs), all registered tests, kernel policy and 37 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Six public calls preserve separate local cells captured after direct initialization; all six have independent Source meaning and public execution/output fuel bounds. |
-| Current implementation priority | Recursive formation and formation inside retained closure bodies, then remaining compiler coverage and all-pass composition. |
+| Latest proof scope | Two factory results contribute four retained handles; all six calls have independent Source meaning and public execution/output fuel bounds. |
+| Current implementation priority | Wider specialization, evidence and formation coverage, then remaining compiler alternatives and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

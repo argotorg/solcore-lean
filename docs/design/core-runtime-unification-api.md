@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Recursive tuple formation and collected closure handles (2026-10-13)
+
+`CanonicalScopedStaticSupport.Certificate.group` and `.tuple` retain genuine child code, ordered compiler rows and static Source validity. `CanonicalNamedBranchingSupport.preserves_children` and `reflects_children` recurse structurally through them. `NamedCanonicalMixedCollectors.of_actual` extracts the tree using the original root policy; `NamedCanonicalScopedRoots.of_policy` constructs general leaves without reselecting a callback.
+
+`PreparedNamedSamePolicyLambdaProducer.of_expression` and `PreparedNamedSamePolicyLambdaFormation.of_expression` retain the actual lambda Site, compiler policy, body recipe, lexical scope and read diagnostics. Public endpoints are `Tests.SourceCoreRecursiveFormation.closed_sequence_meaning` and `closed_forward_meaning`.
+
+Validation: all 400 affected modules pass coherent checks. The full build (6,633 jobs), all registered tests (13,136 build jobs and the final pass marker), kernel policy and 37 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation inside retained closure bodies and below other expression forms, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Direct-call initialization and retained closure formation (2026-10-13)
 
 `CallableIndexedOwnedPreparedNamedCanonicalMixedCollectors.Syntax` admits a general recursive expression or an ordinary return-lambda shape. `of_actual` uses the actual compiler action and original per-context Source typing to construct either a canonical root or the existing lexical formation receipt. The latter derives runtime context and evidence validity from the same real Header.
