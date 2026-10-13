@@ -1,0 +1,252 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodArgumentBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedExpressionSequence
+import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
+
+/-! Ordered staged arguments are constructed from the actual compiler Tree
+and strictly smaller expression results. Each successful child passes its
+actual reached caller state to the next child. Both failure tags retain the
+same originating scope, token and final state. Native reflection reconstructs
+an independent Source grade from the original packed-helper computation. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodArgumentBounds
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open DataPatternValues DataExpressionSequence
+open GenericExpressionMeaning (agree_prefix rename_prefix)
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
+universe u
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects definitions}
+  {context : SourceSemantics.Context} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+  {certificate : GenericExpressionMeaning.Certificate} {faults : RecursiveStageMeaning.FaultRep}
+
+open SelectedCompilationExpressionSequence (PostAdmission)
+open CallableIndexedOwnedPreparedStagedMethodArgumentBounds (Trace)
+
+private def MemberTyping (ids : List ExpressionId) : Prop :=
+  ∀ id, id ∈ ids → ∀ node, invocation.source.lookupExpression? id = some node →
+    ExpressionHasType invocation.source context id node.type
+
+private theorem member_typing {ids : List ExpressionId} {types : List TypeSystem.Ty}
+    (unique : NodeOccurrencesUnique invocation.source)
+    (typing : ExpressionsHaveTypes invocation.source context ids types) :
+    MemberTyping (context := context) (invocation := invocation) ids := by
+  intro id member node found
+  exact CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique typing member found
+
+variable {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId}
+  {sourceTypes : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
+
+private theorem preserves_values_with_members (budget : Nat)
+    (tree : Tree invocation.source certificate scope ids sourceTypes codes)
+    (sourceTyped : MemberTyping (context := context) (invocation := invocation) ids)
+    (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+      bridge context model registry invocation certificate faults budget)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {sources : List Dynamic.Value}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (admitted : Admission bridge context initial)
+    (execution : Trace budget program registry invocation context environment
+      before ids (.values sources) after) :
+    ∃ values finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inRight .word (packValues values)) finalStore ∧
+      Values model finalMap finalWorld sourceTypes (codes.map (·.type)) sources values ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached ∧ PostAdmission bridge sourceTypes (context := context) (.values sources) reached := by
+  induction tree generalizing mapping world actual actualContext before store ξ sources after with
+  | nil =>
+      cases execution
+      exact ⟨[], store, mapping, world, .inRight .unit, .nil, heaps,
+        .refl _, .refl _, .refl _ _, .refl _, initial, callerProtocol.refl initial,
+        admitted.rows, by intro values same; cases same; exact ⟨.nil, admitted⟩⟩
+  | single found generated =>
+      cases execution with
+      | cons head strict tail =>
+          cases tail
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+              maps, worlds, frame, metadata, reached, related, post⟩ :=
+            children _ strict
+              generated found (sourceTyped _ (by simp) _ found) environments heaps locals layout actualTyped
+              initial admitted head
+          cases represented with
+          | value payload =>
+              exact ⟨[_], finalStore, finalMap, finalWorld, evaluated, .cons payload .nil,
+                finalHeaps, maps, worlds, frame, metadata, reached, related, post.rows,
+                by intro values same; cases same; exact ⟨.cons post.at_value.1 .nil, post.at_value.2⟩⟩
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+      cases execution with
+      | cons head strict rest =>
+          obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+              firstMaps, firstWorlds, firstFrame, firstMetadata, middleState, firstRelated, firstPost⟩ :=
+            children _ strict
+              generated found (sourceTyped _ (by simp) _ found) environments heaps locals layout actualTyped
+              initial admitted head
+          cases represented with
+          | @value sourceValue coreValue payload =>
+              obtain ⟨values, finalStore, finalMap, finalWorld, second, restRep, finalHeaps,
+                  maps, worlds, frame, metadata, reached, related, post⟩ :=
+                ih (fun child member => sourceTyped child (List.mem_cons_of_mem _ member))
+                  (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+                  (agree_prefix layout coreValue)
+                  (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                  middleState firstPost.at_value.2 rest
+              have nonempty : values ≠ [] := by
+                intro absent
+                have lengths := restRep.length.2
+                simp [absent] at lengths
+              refine ⟨coreValue :: values, finalStore, finalMap, finalWorld, ?_,
+                .cons (model.extend payload maps worlds) restRep, finalHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+                reached, callerProtocol.trans firstRelated related, post.rows, by intro values same; cases same; exact ⟨.cons (firstPost.at_value.1.mono metadata) post.values_typed, post.at_values⟩⟩
+              rw [rename_prefix] at second
+              have combined := LocalSequence.pair_success lowered.type
+                (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+              simpa [SourceCoreCalls.packArguments, pair_rename, packValues, nonempty] using combined
+
+private theorem preserves_fault_with_members (budget : Nat)
+    (tree : Tree invocation.source certificate scope ids sourceTypes codes)
+    (sourceTyped : MemberTyping (context := context) (invocation := invocation) ids)
+    (children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+      bridge context model registry invocation certificate faults budget)
+    {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
+    {environment : Dynamic.Environment} {canonical actual : Environment} {before after : Dynamic.Heap}
+    {store : Store} {ξ : Renaming} {failure : Staging.Recursive.Failure}
+    (environments : DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions)
+    (heaps : GenericHeap.HeapRepresents model mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (layout : EnvironmentsAgree ξ canonical actual)
+    (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext definitions)
+    (initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (admitted : Admission bridge context initial)
+    (execution : Trace budget program registry invocation context environment
+      before ids (.fault failure) after) :
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults failure token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached ∧ PostAdmission bridge sourceTypes (context := context) (.fault failure) reached := by
+  induction tree generalizing mapping world actual actualContext before store ξ after with
+  | nil => cases execution
+  | single found generated =>
+      cases execution with
+      | headFault failed strict =>
+          obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+              maps, worlds, frame, metadata, reached, related, post⟩ :=
+            children _ strict
+              generated found (sourceTyped _ (by simp) _ found) environments heaps locals layout actualTyped
+              initial admitted failed
+          cases represented with
+          | fault matched =>
+              exact ⟨_, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps,
+                maps, worlds, frame, metadata, reached, related, post.rows, by intro _ impossible; cases impossible⟩
+      | tailFault _ _ failed => cases failed
+  | @cons id node lowered next ids types nextCode codes found generated tail ih =>
+      cases execution with
+      | headFault failed strict =>
+          obtain ⟨value, finalStore, finalMap, finalWorld, first, represented, finalHeaps,
+              maps, worlds, frame, metadata, reached, related, post⟩ :=
+            children _ strict
+              generated found (sourceTyped _ (by simp) _ found) environments heaps locals layout actualTyped
+              initial admitted failed
+          cases represented with
+          | fault matched =>
+              refine ⟨_, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
+                maps, worlds, frame, metadata, reached, related, post.rows, by intro _ impossible; cases impossible⟩
+              simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_left_failure lowered.type
+                (SourceCoreCalls.packArguments (nextCode :: codes)).type first
+      | tailFault head strict failed =>
+          obtain ⟨value, middleStore, middleMap, middleWorld, first, represented, middleHeaps,
+              firstMaps, firstWorlds, firstFrame, firstMetadata, middleState, firstRelated, firstPost⟩ :=
+            children _ strict
+              generated found (sourceTyped _ (by simp) _ found) environments heaps locals layout actualTyped
+              initial admitted head
+          cases represented with
+          | @value sourceValue coreValue payload =>
+              obtain ⟨token, finalStore, finalMap, finalWorld, second, matched, finalHeaps,
+                  maps, worlds, frame, metadata, reached, related, post⟩ :=
+                ih (fun child member => sourceTyped child (List.mem_cons_of_mem _ member))
+                  (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+                  (agree_prefix layout coreValue)
+                  (.cons (model.runtime_hasType payload) (actualTyped.weaken firstWorlds))
+                  middleState firstPost.at_value.2 failed
+              refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans metadata,
+                reached, callerProtocol.trans firstRelated related, post.at_fault_types⟩
+              rw [rename_prefix] at second
+              simpa [SourceCoreCalls.packArguments, pair_rename] using LocalSequence.pair_right_failure lowered.type
+                (SourceCoreCalls.packArguments (nextCode :: codes)).type first second
+
+/-- Actual list typing supplies each used child's stored type. The successful
+prefix retains the same cumulative caller records at every reached state. -/
+theorem preserves_values (budget : Nat) (tree : Tree invocation.source certificate scope ids sourceTypes codes)
+    {originalTypes : List TypeSystem.Ty} (unique : NodeOccurrencesUnique invocation.source)
+    (typing : ExpressionsHaveTypes invocation.source context ids originalTypes) :
+    ∀ (_children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+      bridge context model registry invocation certificate faults budget)
+    {mapping world administrativeContext actualContext environment canonical actual before after store ξ sources},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment → EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+    ∀ initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩,
+    Admission bridge context initial →
+    Trace budget program registry invocation context environment before ids (.values sources) after →
+    ∃ values finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) (.inRight .word (packValues values)) finalStore ∧
+      Values model finalMap finalWorld sourceTypes (codes.map (·.type)) sources values ∧
+      GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached ∧ PostAdmission bridge sourceTypes (context := context) (.values sources) reached :=
+  preserves_values_with_members bridge budget tree (member_typing unique typing)
+
+/-- A failing argument stops the original helper at the same reached caller
+pool; no later argument runs and neither failure tag is relabeled. -/
+theorem preserves_fault (budget : Nat) (tree : Tree invocation.source certificate scope ids sourceTypes codes)
+    {originalTypes : List TypeSystem.Ty} (unique : NodeOccurrencesUnique invocation.source)
+    (typing : ExpressionsHaveTypes invocation.source context ids originalTypes) :
+    ∀ (_children : CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesBelow
+      bridge context model registry invocation certificate faults budget)
+    {mapping world administrativeContext actualContext environment canonical actual before after store ξ failure},
+    DataHeap.EnvRepresents catalog mapping world administrativeContext scope environment canonical definitions →
+    GenericHeap.HeapRepresents model mapping world before store →
+    Dynamic.EnvironmentAgrees before context.locals environment → EnvironmentsAgree ξ canonical actual →
+    RuntimeEnvironmentHasTypes world actual actualContext definitions →
+    ∀ initial : callerProtocol.State ⟨scope, mapping, world, before, store, canonical⟩,
+    Admission bridge context initial →
+    Trace budget program registry invocation context environment before ids (.fault failure) after →
+    ∃ token finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ)
+        (.inLeft (SourceCoreCalls.packArguments codes).type (.word token)) finalStore ∧
+      faults failure token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached ∧ PostAdmission bridge sourceTypes (context := context) (.fault failure) reached :=
+  preserves_fault_with_members bridge budget tree (member_typing unique typing)
+
+end Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodArgumentBounds
