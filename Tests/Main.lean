@@ -1955,6 +1955,7 @@ import Solcore.Test.SourceCoreMethodScopedSequenceForward
 import Solcore.Test.SourceCoreMethodNamedScopedSequenceForward
 import Solcore.Test.SourceCoreMethodImplementationScopedSequenceForward
 import Solcore.Test.SourceCoreMethodOriginEvidenceSequenceForward
+import Solcore.Test.SourceCoreMethodOriginEvidenceFuelForward
 import Solcore.Test.SourceCoreCoercionPublicSequenceForward
 import Solcore.Test.SourceCoreAcceptedBodyBindings
 import Solcore.Test.SourceCoreMethodOwnEvidenceSequenceForward
@@ -3181,6 +3182,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodNamedScoped.runForward
   SourceCoreMethodImplementationScoped.runForward
   SourceCoreMethodOriginEvidence.runForward
+  SourceCoreMethodOriginEvidence.runForwardAt1000
   SourceCoreCoercionPublic.runForward
   SourceCoreAcceptedBodyBindings.run
   SourceCoreFinalCatalogLateRows.runLateRows
