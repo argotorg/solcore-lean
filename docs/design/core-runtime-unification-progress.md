@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Nested callable outputs retain the common physical history (2026-10-14)
+
+`29b42221` connects actual compound output collection to the common physical session. `e744359f` moves the existing constructor-call sequence onto this connection and the complete program certificate.
+
+The unchanged nine operations return a constructor containing a new closure, an earlier closure, a named function and a builtin in that order. Subsequent calls return `20`, export a factory closure capturing `30`, return `10` from the earlier capture and convert `37`. Selection preserves the actual output handle order, repeated handles, captured environments and reached Source heap. Every selected handle receives the same physical authority used by later execution.
+
+The original Source, checker budget and ten outcome declarations are unchanged. One certificate covers the actual two-row cache and direct table, including the constructor's complete substitution range and original payload children. Reflection starts from the actual completed invocation. Preservation starts from accepted public input and independent Source execution, and covers all sufficiently large execution and output budgets.
+
+Validation: 107 affected modules checked together, full build (7,199 jobs), registered tests (14,228 build jobs and final pass marker), kernel policy and 546 endpoint audits pass. Eight constructor-admission cases cover original children, complete substitution ranges, missing nodes and exhausted traversal. Earlier issuance, failure/reuse, method-evidence, coercion and relay sequences still pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next obligation is to obtain static body support from actual accepted compiler actions. Successful finite certification is still an additional condition; compiler-wide coverage and preservation across every actual pass remain unfinished.
+
+The output collector retains the current session and Source heap, and appends the exact ordered entries returned by actual selection. No replacement fixture or reduced output statement is used. The unrelated twelve workspace changes remain excluded.
+
 ## Issued named and builtin handles share physical histories (2026-10-14)
 
 `287c4b29` connects actual named and builtin issuance to the common physical session. `ea787a6a` migrates the existing direct-issued sequence to those producers and the complete program certificate.
