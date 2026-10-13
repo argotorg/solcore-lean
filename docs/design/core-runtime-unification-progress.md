@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Evidence-bearing calls inside implementation methods (2026-10-13)
+
+`8401d7ee` factors direct-call evidence around the actual complete caller resolver result. Method callers derive that receipt from the selected Source method and reached lexical context. Their original call nodes, requirement ledgers and accepted compiler actions supply the callee dictionaries.
+
+The identity specializations are added during method preparation and are absent from the original validation plan. Their actual final cache entries and original specialization requests supply ordinary Headers. Complete final preparation derives their runtime evidence. The four public roots are unchanged.
+
+`358575d6` calls a constrained generic identity function at local initialization, inside the method loop and at return. The existing recursive body proof follows all three call sites, with no added body execution premise.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 728 affected modules pass coherent checks. The full build (6,985 jobs), all registered tests (13,840 build jobs and the final pass marker), kernel policy and 128 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls from scoped implementation methods whose own assumption lists are empty. The callees retain nonempty trait dictionaries. The current method catalog still requires closed implementations without type parameters. Broader method selection and dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped implementation methods through public execution (2026-10-13)
 
 `6a1b2416` adds terminal and scoped method packets while retaining the exact selected method and SourceAt record. Accepted flow and independent Source typing feed the existing imperative engine and footer. The same strong induction supplies every method child; existing terminal APIs remain wrappers.

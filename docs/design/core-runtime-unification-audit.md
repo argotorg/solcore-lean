@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Evidence-bearing calls inside implementation methods (2026-10-13)
+
+Commits `8401d7ee` and `358575d6` connect actual method-to-function evidence calls through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. Each original implementation body has eighteen nodes and three direct calls with genuine solved Mark requirements. Independent Source typing covers the entire original body and its lexical changes.
+
+The caller resolver and dictionary are compared in full. Source evidence production is authenticated by the actual accepted call and selected callee; coverage alone does not establish dictionary equality. Newly discovered ordinary callees retain their actual final cache slots and complete successful Source specialization requests. Their preparation does not require membership in the earlier validation plan.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 728 affected modules pass coherent checks. The full build (6,985 jobs), all registered tests (13,840 build jobs and the final pass marker), kernel policy and 128 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls from scoped implementation methods whose own assumption lists are empty. The callees retain nonempty trait dictionaries. The current method catalog still requires closed implementations without type parameters. Broader method selection and dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped implementation methods through public execution (2026-10-13)
 
 Commits `6a1b2416` and `1cc4ad92` connect scoped implementation methods through seven successive public executions. The artifact retains ten physical cache slots, eight ordinary Headers and four public roots. Original Source typing covers both selected implementation bodies, including local freshness, writable assignment targets and the loop context.

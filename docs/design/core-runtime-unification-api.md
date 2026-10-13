@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Evidence-bearing calls inside implementation methods (2026-10-13)
+
+`DirectCallAuthority.ResolvedCaller` retains the exact resolver output and complete semantic dictionary. `authenticated_evidence_of_resolved` serves both ordinary and method callers; the existing ordinary API delegates to it. `MethodCallerEvidence.of_selected` retains the selected method and reached lexical ledger. `MethodEvidenceScopedRoots.of_actual` derives direct-call roots from original Source metadata, accepted method compilation and the actual ordinary callee inventory.
+
+`RecursiveNamedPreparedFinalPlanOrigins.final_member` derives final-plan membership from the actual cached row. `of_cached_origin` combines that row with genuine Source specialization provenance and derives its complete resolver dictionary from the accepted final preparation pass. It also applies to ordinary helpers discovered after the initial worklist.
+
+Closed endpoints are `Tests.SourceCoreMethodDirectEvidence.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The existing physical recursive family and public runtime API are unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 728 affected modules pass coherent checks. The full build (6,985 jobs), all registered tests (13,840 build jobs and the final pass marker), kernel policy and 128 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers direct declaration calls from scoped implementation methods whose own assumption lists are empty. The callees retain nonempty trait dictionaries. The current method catalog still requires closed implementations without type parameters. Broader method selection and dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Scoped implementation methods through public execution (2026-10-13)
 
 `MethodScopedStaticSupport` retains the genuine selected principal, SourceAt, accepted flow and footer. `MethodScopedCollectors` uses native typing from the actual cached method and collects original child syntax at each reached lexical context. `MethodScopedRoots` issues read and Boolean child roots from the actual Source nodes.
