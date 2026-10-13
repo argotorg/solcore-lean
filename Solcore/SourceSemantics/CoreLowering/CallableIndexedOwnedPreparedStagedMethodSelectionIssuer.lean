@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOriginsMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedEvidenceMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedGenericMethodSelection
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionCoreSupport
@@ -6,7 +7,7 @@ import Solcore.SourceSemantics.CoreLowering.CachedMethodEvidenceCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorMethodIssuance
 
 /-! One issuer dispatches the existing empty-method catalog and the validated
-full-evidence catalog. Named and closure collectors share the same proof bodies. -/
+full-evidence and actual-origin catalogs. Named and closure collectors share the same proof bodies. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodSelectionIssuer
@@ -18,6 +19,7 @@ open CallableNamedMetadata (environment)
 inductive Catalog (compiled : SourceCoreUnifiedCompilation.Compiled) where
   | generic (catalog : CallableIndexedOwnedPreparedStagedGenericMethodSelection.Catalog compiled.sourceProgram)
   | evidence (catalog : CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.Catalog compiled)
+  | origins (catalog : CallableIndexedOwnedPreparedStagedOriginsMethodSelection.Catalog compiled)
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer} {fuel : Nat}
@@ -74,6 +76,10 @@ theorem of_actual
         signatures ledger assumptions unique dictionary actualStages
   | evidence methods =>
       exact CallableIndexedOwnedPreparedStagedEvidenceMethodSelection.of_actual receipt actual special
+        selected methods checked wellFormed catalog prepared callerMember nodeMember samePlan globals
+        signatures ledger assumptions unique dictionary sourceUnique typed actualStages
+  | origins methods =>
+      exact CallableIndexedOwnedPreparedStagedOriginsMethodSelection.of_actual receipt actual special
         selected methods checked wellFormed catalog prepared callerMember nodeMember samePlan globals
         signatures ledger assumptions unique dictionary sourceUnique typed actualStages
 
