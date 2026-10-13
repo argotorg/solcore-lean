@@ -1973,6 +1973,9 @@ import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionI
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitialFailureForward
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionInitialFailureStep
 import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionOutcomes
+import Solcore.SourceSemantics.CoreLowering.AcceptedMethodBodyReceipts
+import Solcore.SourceSemantics.CoreLowering.AcceptedMethodBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedProgramMethodCompletion
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
