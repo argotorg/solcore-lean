@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Scoped evidence-bearing programs through public execution (2026-10-14)
+
+`a6c0c881` extends the finite program certificate to scoped bodies, generic method evidence and ordinary closures. `32717957` connects the existing seven-call method-origin sequence to the common physical session theorems.
+
+The scanner retains original Source nodes and metadata. It handles monomorphic lets, blocks, Unit branches, loops and equal assignment, together with unary and binary expressions. Actual Source typing supplies lexical contexts. Generic implementation formation checks parameter coverage and uniqueness; genuine cached selection supplies the selected method, substitutions and complete resolver dictionary. No caller supplies a method or closure execution law.
+
+One actual certificate covers all 12 cached rows, including two generic methods. Its ten ordinary rows feed the existing header order, and the automatic catalog issuer is also checked on the same certificate. All seven independent Source traces and sufficient execution/output-fuel endpoints pass. Results remain `33 / true / 33 / 55`, with three retained closures and exact store lengths `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. The earlier seven-call coercion sequence and six-call direct relay still pass.
+
+Validation: 74 affected modules checked together, full build (7,163 jobs), registered tests (14,162 build jobs and final pass marker), kernel policy and 410 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The certificate chooses either the existing closed coercion catalog with primitive methods, or the generic origin catalog with scoped methods. Ordinary closures work in both branches; coerced closure bodies currently require the closed branch. Independent Source well-formedness and successful finite certification remain explicit. Complete syntax coverage, broader input/output/failure connections and preservation across all actual compiler passes are still unfinished.
+
+Independent reviews cover the exact production and public source hashes. Rejections include exhausted traversal, missing original nodes or direct targets, duplicate or uncovered implementation parameters, flexible implementation heads and the unsupported generic/coerced combination. No Source metadata is rewritten. The 12 unrelated workspace changes remain excluded from these commits.
+
 ## Whole-program static admission through public execution (2026-10-14)
 
 `4d7992ae` adds finite certification of the actual final cache and original Source nodes. `f232b62a` uses that certificate for the existing seven-call retained-closure sequence.

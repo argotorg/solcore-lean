@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Scoped evidence-bearing programs through public execution (2026-10-14)
+
+`a6c0c881` extends the finite program certificate to scoped bodies, generic method evidence and ordinary closures. `32717957` connects the existing seven-call method-origin sequence to the common physical session theorems.
+
+The scanner retains original Source nodes and metadata. It handles monomorphic lets, blocks, Unit branches, loops and equal assignment, together with unary and binary expressions. Actual Source typing supplies lexical contexts. Generic implementation formation checks parameter coverage and uniqueness; genuine cached selection supplies the selected method, substitutions and complete resolver dictionary. No caller supplies a method or closure execution law.
+
+One actual certificate covers all 12 cached rows, including two generic methods. Its ten ordinary rows feed the existing header order, and the automatic catalog issuer is also checked on the same certificate. All seven independent Source traces and sufficient execution/output-fuel endpoints pass. Results remain `33 / true / 33 / 55`, with three retained closures and exact store lengths `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. The earlier seven-call coercion sequence and six-call direct relay still pass.
+
+Validation: 74 affected modules checked together, full build (7,163 jobs), registered tests (14,162 build jobs and final pass marker), kernel policy and 410 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The certificate chooses either the existing closed coercion catalog with primitive methods, or the generic origin catalog with scoped methods. Ordinary closures work in both branches; coerced closure bodies currently require the closed branch. Independent Source well-formedness and successful finite certification remain explicit. Complete syntax coverage, broader input/output/failure connections and preservation across all actual compiler passes are still unfinished.
+
+The public fixture now aliases the common State, call and result definitions. Its four outcome structures are unchanged; manual named, closure and method family callbacks have been removed from the active route.
+
 ## Whole-program static admission through public execution (2026-10-14)
 
 `4d7992ae` adds finite certification of the actual final cache and original Source nodes. `f232b62a` uses that certificate for the existing seven-call retained-closure sequence.
