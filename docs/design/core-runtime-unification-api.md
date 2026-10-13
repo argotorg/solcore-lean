@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Certified sessions begin with scalar results or Source failures (2026-10-14)
+
+`071edd23` connects initial scalar success and Source failure to the common physical session. `64a72bde` applies those endpoints to the existing lexical-failure program and its identity continuation.
+
+Actual bootstrap and startup receipts supply the initial inputs and physical state. A scalar result creates an empty retained-handle history; a Source failure does the same while preserving the failed heap and decoded reason. Forward theorems use an independent finite Source trace and provide sufficient execution budgets. Successful output also has a sufficient output budget. Reflection starts from the actual finite public outcome. Later failure endpoints preserve the current history and input registry.
+
+The unchanged program is checked at `1000` and compiled at `100`; the complete certificate is accepted at `64`. Its first uninitialized read allocates an absent Word cell. The subsequent `identity(37)` runs in the returned session, allocates its own parameter and preserves the absent cell. A separate fresh bootstrap proves initial `identity(37)`. All three operations retain Source traces and public forward bounds, with genuine automatic catalogs and no fabricated handle.
+
+Validation: 12 affected modules checked together, full build (7,261 jobs), registered tests (14,356 build jobs), kernel policy and 765 endpoint audits pass. Earlier seven-call catalog, checker-budget, handle-reuse and data-output sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Source well-formedness, the complete program certificate, ordinary eligibility, public input typing and staged Source traces remain explicit. Complete compiler coverage and preservation across all actual passes remain unfinished.
+
+`CertifiedPublicSessionOutcomes` adds `Initial.forward_scalar`, `Initial.reflect_scalar`, `Initial.forward_failure` and `Initial.reflect_failure`, plus later `Issued.forward_failure` and `Issued.reflect_failure`. Initial outcomes return states with an empty handle history. Descriptor and body-support construction are internal. Public runtime APIs are unchanged.
+
 ## Actual public calls issue one certified session (2026-10-14)
 
 `7c290567` constructs a common public session from actual checking, compilation, opening, bootstrap and call receipts. `d39d7ad2` connects all seven original evidence-program operations to that session.

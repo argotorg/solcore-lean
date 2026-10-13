@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Certified sessions begin with scalar results or Source failures (2026-10-14)
+
+`071edd23` connects initial scalar success and Source failure to the common physical session. `64a72bde` applies those endpoints to the existing lexical-failure program and its identity continuation.
+
+Actual bootstrap and startup receipts supply the initial inputs and physical state. A scalar result creates an empty retained-handle history; a Source failure does the same while preserving the failed heap and decoded reason. Forward theorems use an independent finite Source trace and provide sufficient execution budgets. Successful output also has a sufficient output budget. Reflection starts from the actual finite public outcome. Later failure endpoints preserve the current history and input registry.
+
+The unchanged program is checked at `1000` and compiled at `100`; the complete certificate is accepted at `64`. Its first uninitialized read allocates an absent Word cell. The subsequent `identity(37)` runs in the returned session, allocates its own parameter and preserves the absent cell. A separate fresh bootstrap proves initial `identity(37)`. All three operations retain Source traces and public forward bounds, with genuine automatic catalogs and no fabricated handle.
+
+Validation: 12 affected modules checked together, full build (7,261 jobs), registered tests (14,356 build jobs), kernel policy and 765 endpoint audits pass. Earlier seven-call catalog, checker-budget, handle-reuse and data-output sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Source well-formedness, the complete program certificate, ordinary eligibility, public input typing and staged Source traces remain explicit. Complete compiler coverage and preservation across all actual passes remain unfinished.
+
+The first-call theorem no longer requires the result to be a function handle. Both scalar success and failure establish the same state used by later calls. The twelve unrelated workspace changes remain excluded.
+
 ## Actual public calls issue one certified session (2026-10-14)
 
 `7c290567` constructs a common public session from actual checking, compilation, opening, bootstrap and call receipts. `d39d7ad2` connects all seven original evidence-program operations to that session.
