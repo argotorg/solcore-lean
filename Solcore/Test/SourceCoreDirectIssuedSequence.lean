@@ -1,4 +1,4 @@
-import Solcore.Test.SourceCoreCapturedReuseCommon
+import Solcore.Test.SourceCoreDirectIssuedCommon
 
 /-! Genuine named and builtin issuances are interleaved with direct public
 calls. Each next operation uses the exact completion of its predecessor. -/

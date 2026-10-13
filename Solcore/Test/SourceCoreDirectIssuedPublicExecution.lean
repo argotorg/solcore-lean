@@ -1,6 +1,6 @@
 import Solcore.Test.SourceCoreDirectIssuedInvocation
-import Solcore.Test.SourceCoreCapturedReuseSeed
-import Solcore.Test.SourceCoreCapturedReuseClosureShape
+import Solcore.Test.SourceCoreDirectIssuedSeed
+import Solcore.Test.SourceCoreDirectIssuedClosureShape
 
 /-! Actual named and builtin public invocation is connected to independent
 Source execution across the same reached session and retained function history. -/
@@ -40,14 +40,12 @@ def SequenceMeaning {fixture : CompiledFixture} {observed : ObservedProgram fixt
 static, input, capture and public continuation premise for this sequence. -/
 theorem sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (readStages : ObservedStages fixture observed.readRow)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     SequenceMeaning makeStages sequence receiver := by
-  obtain ⟨support⟩ := static_supports
-    (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion) fixture observed extra makeStages readStages
-    receiver.completion.result.context.registry
-    (CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
+  obtain ⟨support⟩ := static_supports fixture observed admission makeStages readStages receiver
   let scope := RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function
   obtain ⟨first, firstType, firstHandle, _firstHandleType, firstState, firstTrace⟩ :=
     first_meaning_typed_handle extra support makeStages sequence.first
@@ -82,11 +80,14 @@ def run : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
   let extra ← observeMake fixture observed
+  let admission ← observeProgramCertificate fixture observed
   let makeStages ← observeStages fixture observed.makeRow
   let readStages ← observeStages fixture observed.readRow
   let sequence ← observeSequence fixture observed
-  let receiver ← observeReceiver fixture observed
-  have _meaning := sequence_meaning fixture observed extra makeStages readStages sequence receiver
+  have _automatic := admission.automatic_catalog_initial
+  have _meaning : ∃ receiver : ObservedReceiver fixture observed, SequenceMeaning makeStages sequence receiver := by
+    obtain ⟨receiver⟩ := initial_receiver fixture observed
+    exact ⟨receiver, sequence_meaning fixture observed extra admission makeStages readStages sequence receiver⟩
   IO.println "Actual direct issued calls: named read of captured 10 and builtin conversion 37, Source arguments/results and current histories proved"
 
 end Tests.SourceCoreDirectIssued

@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedPublicExecution
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallableWordPreservation
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectWordForward
 
 /-! The actual two packed calls first establish independent Source traces.
 Those traces then imply public success at every sufficient execution budget
@@ -39,46 +39,18 @@ private theorem forward_word {fixture : CompiledFixture} {observed : ObservedPro
     {argument : SourceCorePublicValues.Value} {source : Dynamic.Value} {word : Core.Word}
     (input : RecursiveNamedPublicFunctionHistoryInputs.Input entries
       support.makeHeader.header.function.context parameter argument source)
-    (simple : SourceCoreIndexedSession.FunctionTreeSimple argument)
+    (_simple : SourceCoreIndexedSession.FunctionTreeSimple argument)
     (call : ObservedInvocation publicSession handle argument)
     {invocation : Staging.Recursive.Scope} {after : Dynamic.Heap}
     (trace : SourceInvocation support invocation state.heap entry.source source word after) :
     ForwardWordAt support publicSession entries handle argument word after := by
   obtain ⟨publicCheckpoint, accepted, _resumed⟩ := call.executed
-  obtain ⟨checkpoint, atCheckpoint, original⟩ :=
-    RecursiveNamedPublicDirectHandleMeaning.recover_handle_start state.atSession accepted
-  have imported := (state.history.current.2.2.2.2 entry member).1
-  rw [entryType, entryHandle] at imported
-  obtain ⟨actualParameter, actualResult, nativeParameter, nativeResult, callable, packed, encodedValues,
-      started, _parameterView, _resultView⟩ :=
-    RecursiveNamedPublicDirectPackedInputMeaning.actual_start_compatible state.atRecipe
-      state.history.current.1 imported original
-  have registryEq := started.function_tree_registry simple state.registry
-  have metadata : SourceCoreRawMetadata.Extends encodedValues.registry receiver.completion.result.context.registry := by
-    rw [registryEq]
-    exact receiver.completion.result.extension
   obtain ⟨size, trace⟩ := trace
-  rw [← entryHandle] at started
-  obtain ⟨required, finalStore, finalMap, finalWorld, _nativeEnough, _fullResult, publicEnough⟩ :=
-    RecursiveNamedPublicDirectCallableWordPreservation.public_resume_has_sufficient_fuel
-      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
-      (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
-      (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
-      (observations := support.observations) (extension := receiver.completion.result.extension)
-      (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := fun header member =>
-        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
-      (wellFormed := fixture.source_wellFormed) (history := state.history)
-      (entry := entry) (member := member) (entryType := entryType)
-      (input := input) started metadata (.singleton source) trace atCheckpoint
-  refine ⟨publicCheckpoint, accepted, required, ?_⟩
-  intro executionFuel outputFuel outcome enough positive resumed
-  obtain ⟨publicCompletion, actual, _generation, reached, succeeded, wordValue, _exported,
-      indexedAt, _related, history, returnedRegistry⟩ := publicEnough executionFuel outputFuel outcome enough positive resumed
-  rw [registryEq] at returnedRegistry
-  exact ⟨publicCompletion, succeeded, wordValue,
-    ⟨state.artifact, actual.session, finalMap, finalWorld, after, finalStore, reached,
-      indexedAt.2.2.2, state.atRecipe, returnedRegistry, history⟩, rfl⟩
+  refine ⟨publicCheckpoint, accepted, ?_⟩
+  exact RecursiveNamedPublicPhysicalSessionDirectWordForward.forward_call support.program
+    fixture.recipePrepared state entry member word entryType input
+    (by simpa only [entryHandle] using accepted) (.singleton source) trace
+
 
 def ForwardSequenceMeaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (makeStages : ObservedStages fixture observed.makeRow)
@@ -113,6 +85,7 @@ def ForwardSequenceMeaning {fixture : CompiledFixture} {observed : ObservedProgr
 then prove public success for all sufficient fuel on those same checkpoints. -/
 theorem sequence_forward_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (extra : ObservedMake fixture observed)
+    (admission : ObservedProgramCertificate fixture observed)
     (makeStages : ObservedStages fixture observed.makeRow)
     (readStages : ObservedStages fixture observed.readRow)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
@@ -120,7 +93,7 @@ theorem sequence_forward_meaning (fixture : CompiledFixture) (observed : Observe
   obtain ⟨support, first, named, builtin, firstType, namedType, builtinType,
     firstHandle, namedHandle, builtinHandle, namedSource, builtinSource,
     firstState, namedState, readState, builtinState, finalState, namedHeap, builtinHeap,
-    firstTrace, readTrace, finalTrace⟩ := sequence_meaning fixture observed extra makeStages readStages sequence receiver
+    firstTrace, readTrace, finalTrace⟩ := sequence_meaning fixture observed extra admission makeStages readStages sequence receiver
   have input : RecursiveNamedPublicFunctionHistoryInputs.Input [first, named]
       support.makeHeader.header.function.context (.function .unit .word)
       (.function sequence.first.handle) first.source := by
@@ -144,11 +117,14 @@ def runForward : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
   let extra ← observeMake fixture observed
+  let admission ← observeProgramCertificate fixture observed
   let makeStages ← observeStages fixture observed.makeRow
   let readStages ← observeStages fixture observed.readRow
   let sequence ← observeSequence fixture observed
-  let receiver ← observeReceiver fixture observed
-  have _meaning := sequence_forward_meaning fixture observed extra makeStages readStages sequence receiver
+  have _automatic := admission.automatic_catalog_initial
+  have _meaning : ∃ receiver : ObservedReceiver fixture observed, ForwardSequenceMeaning makeStages sequence receiver := by
+    obtain ⟨receiver⟩ := initial_receiver fixture observed
+    exact ⟨receiver, sequence_forward_meaning fixture observed extra admission makeStages readStages sequence receiver⟩
   IO.println "Actual direct named and builtin calls: Source reflection and public Word preservation with output fuel 1 proved"
 
 end Tests.SourceCoreDirectIssued

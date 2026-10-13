@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreCapturedReuseCommon
 import Solcore.Test.SourceCoreDirectOutputSequence
 import Solcore.Test.SourceCoreCapturedReuseSelection
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistoryIssuance

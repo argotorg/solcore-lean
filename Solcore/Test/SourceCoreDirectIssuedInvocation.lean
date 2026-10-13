@@ -1,5 +1,5 @@
 import Solcore.Test.SourceCoreDirectIssuedIssuance
-import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicDirectCallablePublicHistory
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicPhysicalSessionDirectScalarStep
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicWordResultMeaning
 
 /-! The same public proof consumes actual named and builtin handles. Argument
@@ -33,44 +33,19 @@ theorem invoke {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     {argument : SourceCorePublicValues.Value} {source : Dynamic.Value}
     (input : RecursiveNamedPublicFunctionHistoryInputs.Input entries
       support.makeHeader.header.function.context parameter argument source)
-    (simple : SourceCoreIndexedSession.FunctionTreeSimple argument)
+    (_simple : SourceCoreIndexedSession.FunctionTreeSimple argument)
     (singleton : ∀ sources, Dynamic.ValuesPack sources source → sources = [source])
     (call : ObservedInvocation publicSession handle argument)
     {word : Core.Word} (returned : call.completion.value = .word word)
     (invocation : Staging.Recursive.Scope) :
     ∃ after : RetainedState support call.completion.session entries,
       SourceInvocation support invocation state.heap entry.source source word after.heap := by
-  obtain ⟨checkpoint, actual, generation, value, finalStore, actualParameter, actualResult,
-      nativeParameter, nativeResult, callable, packed, encodedValues, sources, sourceSize, outcome,
-      after, finalMap, finalWorld, reached, started, _parameterView, _resultView, succeeded,
-      actualAt, packing, trace, result, _related, retained, _encodedRegistry, returnedRegistry⟩ :=
-    RecursiveNamedPublicDirectCallablePublicHistory.public_invoke_succeeded_function_tree
-      (completion := CallableIndexedOwnedPublicFaultReceivers.Receiver.of_completion receiver.completion)
-      (receiver := CallableIndexedOwnedPublicFaultReceiverTables.issued_of_runSource receiver.executed)
-      (stagePrepared := actualStagePrepared fixture) (profile := observed.profile)
-      (observations := support.observations) (extension := receiver.completion.result.extension)
-      (semantic := by intro reason token represented; exact represented)
-      (family := support.family) (namedTerminals := fun header member =>
-        CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (support.terminals header member)) (namedSupport := support.supports)
-      (wellFormed := fixture.source_wellFormed) (history := state.history)
-      (entry := entry) (member := member) (entryType := entryType)
-      (input := input) (atRecipe := state.atRecipe)
-      state.registry receiver.completion.result.extension simple
-      state.atSession (by simpa only [entryHandle] using call.executed) invocation
-  have handleType : entry.handle.sourceType = .function parameter .word := entryHandle ▸ handleType
-  have requested := started.requested_exact handleType
-  have signature := started.selected.signature handleType
-  have projected := started.resultProjection
-  rw [signature.2] at projected
-  have nativeResultEq : nativeResult = .word := (Except.ok.inj projected).symm
-  rw [nativeResultEq] at result
-  have outcomeValue := RecursiveNamedPublicWordResultMeaning.represented_word succeeded requested
-    (actualAt.1.symm.trans returned) result.1
-  have sourcesEq := singleton sources packing
-  let next : RetainedState support call.completion.session entries :=
-    ⟨state.artifact, actual.session, finalMap, finalWorld, after, finalStore, reached,
-      actualAt.2.2.2, state.atRecipe, returnedRegistry, retained⟩
-  refine ⟨next, sourceSize, ?_⟩
-  simpa only [sourcesEq, outcomeValue] using trace
+  obtain ⟨sources, packing, _arity, next, size, trace⟩ :=
+    RecursiveNamedPublicPhysicalSessionDirectScalarStep.State.invoke_scalar support.program
+      fixture.recipePrepared state entry member (.word word) entryType
+      (entryHandle ▸ handleType) input (by simpa only [entryHandle] using call.executed)
+      returned invocation
+  exact ⟨next, size, singleton sources packing ▸ trace⟩
+
 
 end Tests.SourceCoreDirectIssued
