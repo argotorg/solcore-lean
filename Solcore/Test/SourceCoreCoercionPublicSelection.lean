@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreCoercionPublicInventory
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicHistoryFrontdoor
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalogPublicRoots
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreCoercionPublic
@@ -38,6 +39,49 @@ private theorem cast_key {left right : SourceCoreUnifiedCompilation.Compiled}
     (same ▸ root).key = root.key := by
   cases same
   rfl
+
+/-- An actual issued root needs only its selected Header in the local inventory. -/
+theorem OrdinaryInventory.selected_row_issued {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (given : OrdinaryInventory fixture observed) {signature : ProgramFunctionSignature}
+    (row : ObservedRow fixture signature) (header : ActualHeader fixture row.row)
+    (member : header.header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers given.rows)
+    (slot : header.header.slot = row.index)
+    {root : SourceCoreIndexedSession.Root fixture.recipe.compiled}
+    (issued : root.Issued fixture.recipe.compiled) (key : root.key = row.row.key) :
+    RootSelection (values := .initial fixture.recipe.compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions fixture.recipe.compiled.indexed)
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers given.rows) root header.header := by
+  obtain ⟨entry, entryMember, shape⟩ := issued
+  obtain ⟨named, index, first, namedKey, rootKey, rest⟩ := shape
+  have cached := List.mk_mem_zipIdx_iff_getElem?.mp (List.mem_of_find?_eq_some first)
+  have atSlot := row.global_slot (CallableIndexedPreparedInventories.cached_global_at fixture.recipe.compiled cached)
+    (namedKey.trans (rootKey.symm.trans key))
+  exact RecursiveNamedPublicRootMeaning.selection_at member entryMember
+    ⟨named, index, first, namedKey, rootKey, rest⟩ first (slot.trans atSlot.2.symm)
+
+/-- Only the actual first matching public root is selected here. Other public
+entries and physical method slots do not require a coverage premise. -/
+theorem OrdinaryInventory.selected_row {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (given : OrdinaryInventory fixture observed) {signature : ProgramFunctionSignature}
+    (row : ObservedRow fixture signature) (header : ActualHeader fixture row.row)
+    (member : header.header ∈ CallableIndexedOwnedPreparedFiniteNamedInventories.headers given.rows)
+    (slot : header.header.slot = row.index)
+    (root : SourceCoreIndexedSession.Root fixture.recipe.compiled)
+    (found : fixture.recipe.roots.find? (fun candidate => decide (candidate.key = row.row.key)) =
+      some ((SourceCoreIndexedSession.Recipe.prepare_compiled fixture.recipePrepared).symm ▸ root)) :
+    RootSelection (values := .initial fixture.recipe.compiled.compatible.checked)
+      (ambient := CallableIndexedAmbient.ambientDefinitions fixture.recipe.compiled.indexed)
+      (CallableIndexedOwnedPreparedFiniteNamedInventories.headers given.rows) root header.header := by
+  have key : root.key = row.row.key := by
+    have key := of_decide_eq_true (List.find?_some
+      (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled => decide (candidate.key = row.row.key)) found)
+    exact (cast_key (SourceCoreIndexedSession.Recipe.prepare_compiled fixture.recipePrepared).symm root).symm.trans key
+  have issued : root.Issued fixture.recipe.compiled := by
+    have actual := SourceCoreIndexedSession.Recipe.prepare_roots fixture.recipePrepared
+      (List.mem_of_find?_eq_some found)
+    cases SourceCoreIndexedSession.Recipe.prepare_compiled fixture.recipePrepared
+    exact actual
+  exact given.selected_row_issued row header member slot issued key
 
 private theorem started_key {compiled : SourceCoreUnifiedCompilation.Compiled}
     {headers : List (CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram))}

@@ -67,10 +67,12 @@ theorem RetainedState.factory_meaning {fixture : CompiledFixture} {observed : Ob
     (stages : ObservedStages fixture observed.makeRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (FactoryMeaning state support.makeHeader.header call .word [.bool value] invocation) := by
-  obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_covered
+  obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
-    support.toOrdinaryInventory.rows support.toOrdinaryInventory.public_coverage state.atRecipe
-    state.history.semantic.current.1 state.atSession call.started
+    support.toOrdinaryInventory.rows state.atRecipe
+    state.history.semantic.current.1 state.atSession (fun root found =>
+      ⟨support.makeHeader.header, support.toOrdinaryInventory.selected_row observed.makeRow.toObservedRow
+        support.makeHeader support.toOrdinaryInventory.make_member support.makeSlot root found⟩) call.started
   have selected : request.header = support.makeHeader.header :=
     selected_make_at support.makeHeader support.useHeader support.keepHeader support.toOrdinaryInventory.header_list request
   have inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context
@@ -104,10 +106,12 @@ theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : Observ
     (stages : ObservedStages fixture observed.useRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (CallMeaning state support.useHeader.header (.word value) call [entry.source] invocation) := by
-  obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_covered
+  obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
-    support.toOrdinaryInventory.rows support.toOrdinaryInventory.public_coverage state.atRecipe
-    state.history.semantic.current.1 state.atSession call.started
+    support.toOrdinaryInventory.rows state.atRecipe
+    state.history.semantic.current.1 state.atSession (fun root found =>
+      ⟨support.useHeader.header, support.toOrdinaryInventory.selected_row observed.useRow.toObservedRow
+        support.useHeader support.toOrdinaryInventory.use_member support.useSlot root found⟩) call.started
   have selected : request.header = support.useHeader.header :=
     selected_use_at support.makeHeader support.useHeader support.keepHeader support.toOrdinaryInventory.header_list request
   have inputs : RecursiveNamedPublicFunctionHistoryInputs.Inputs entries request.header.function.context

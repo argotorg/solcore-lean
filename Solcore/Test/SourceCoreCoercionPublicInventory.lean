@@ -8,9 +8,11 @@ open Solcore Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
 
 structure OrdinaryInventory (fixture : CompiledFixture) (observed : ObservedProgram fixture) where
+  catalog : CallableIndexedOwnedPreparedOrdinaryCatalogReceipts.Catalog fixture.recipe.compiled
   makeInput : Input fixture.recipe.compiled
   makeSame : makeInput.row = observed.makeRow.row
   makePacket : Issued makeInput
+  makeRetained : Inventory.HasRow makePacket catalog.rows
   makeHeader : ActualHeader fixture observed.makeRow.row
   makeAligned : makeHeader.header = makePacket.header
   makeSlot : makeHeader.header.slot = observed.makeRow.index
@@ -18,6 +20,7 @@ structure OrdinaryInventory (fixture : CompiledFixture) (observed : ObservedProg
   useInput : Input fixture.recipe.compiled
   useSame : useInput.row = observed.useRow.row
   usePacket : Issued useInput
+  useRetained : Inventory.HasRow usePacket catalog.rows
   useHeader : ActualHeader fixture observed.useRow.row
   useAligned : useHeader.header = usePacket.header
   useSlot : useHeader.header.slot = observed.useRow.index
@@ -25,6 +28,7 @@ structure OrdinaryInventory (fixture : CompiledFixture) (observed : ObservedProg
   keepInput : Input fixture.recipe.compiled
   keepSame : keepInput.row = observed.keepRow.row
   keepPacket : Issued keepInput
+  keepRetained : Inventory.HasRow keepPacket catalog.rows
   keepHeader : ActualHeader fixture observed.keepRow.row
   keepAligned : keepHeader.header = keepPacket.header
   keepSlot : keepHeader.header.slot = observed.keepRow.index
@@ -36,10 +40,11 @@ def OrdinaryInventory.rows {fixture observed} (given : OrdinaryInventory fixture
 
 theorem ordinary_inventory (fixture : CompiledFixture) (observed : ObservedProgram fixture) :
     Nonempty (OrdinaryInventory fixture observed) := by
-  obtain ⟨makeInput, makeSame, makePacket, makeHeader, makeAligned, makeSlot, makeSignature⟩ := observed.makeRow.issue
-  obtain ⟨useInput, useSame, usePacket, useHeader, useAligned, useSlot, useSignature⟩ := observed.useRow.issue
-  obtain ⟨keepInput, keepSame, keepPacket, keepHeader, keepAligned, keepSlot, keepSignature⟩ := observed.keepRow.issue
-  exact ⟨{makeInput, makeSame, makePacket, makeHeader, makeAligned, makeSlot, makeSignature, useInput, useSame, usePacket, useHeader, useAligned, useSlot, useSignature, keepInput, keepSame, keepPacket, keepHeader, keepAligned, keepSlot, keepSignature}⟩
+  obtain ⟨catalog⟩ := CallableIndexedOwnedPreparedOrdinaryCatalog.of_compiled fixture.recipe.compiled fixture.source_wellFormed
+  obtain ⟨makeInput, makeSame, makePacket, makeRetained, makeHeader, makeAligned, makeSlot, makeSignature⟩ := observed.makeRow.issue_at catalog
+  obtain ⟨useInput, useSame, usePacket, useRetained, useHeader, useAligned, useSlot, useSignature⟩ := observed.useRow.issue_at catalog
+  obtain ⟨keepInput, keepSame, keepPacket, keepRetained, keepHeader, keepAligned, keepSlot, keepSignature⟩ := observed.keepRow.issue_at catalog
+  exact ⟨{catalog, makeInput, makeSame, makePacket, makeRetained, makeHeader, makeAligned, makeSlot, makeSignature, useInput, useSame, usePacket, useRetained, useHeader, useAligned, useSlot, useSignature, keepInput, keepSame, keepPacket, keepRetained, keepHeader, keepAligned, keepSlot, keepSignature}⟩
 
 theorem OrdinaryInventory.make_member {fixture observed} (given : OrdinaryInventory fixture observed) :
     given.makeHeader.header ∈ headers given.rows := by

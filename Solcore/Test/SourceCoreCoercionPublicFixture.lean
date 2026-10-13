@@ -9,6 +9,7 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedFiniteNa
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedRecursiveCallerBounds
 import Solcore.SourceSemantics.SourceProgramCheckingSoundness
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOrdinaryCatalog
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 3000000
@@ -141,30 +142,37 @@ structure ObservedRow (fixture : CompiledFixture) (signature : ProgramFunctionSi
   keyOwner : row.key.declaration = signature.id
   ordinary : row.function.returnComptime = false
   inputsOrdinary : ∀ binder, binder ∈ row.function.typedBody.inputs → binder.comptime = false
-  target : SourceCompilationPlan.exactInstantiationKey fixture.recipe.compiled.indexed.base.plan
-    (CallableNamedCanonicalOrder.retainedInstantiation row) = .ok row.key
-  global : SourceCoreCalls.Signature
   index : Nat
   named : SourceCoreGeneralFunctions.Function
   cached : fixture.recipe.compiled.indexed.base.functions[index]? = some named
   same : named.specialized = row
-  slot : CallableNamedMetadata.Slot fixture.recipe.compiled.indexed.base.globals index global
-  globalKey : global.key = row.key
+
+def ObservedRow.global {fixture signature} (observed : ObservedRow fixture signature) : SourceCoreCalls.Signature :=
+  observed.named.signature
+
+theorem ObservedRow.globalKey {fixture signature} (observed : ObservedRow fixture signature) :
+    observed.global.key = observed.row.key :=
+  (CallableIndexedOwnedPreparedOrdinaryCachedInputs.cached_key fixture.recipe.compiled observed.cached).trans
+    (congrArg (·.key) observed.same)
+
+theorem ObservedRow.slot {fixture signature} (observed : ObservedRow fixture signature) :
+    CallableNamedMetadata.Slot fixture.recipe.compiled.indexed.base.globals observed.index observed.global :=
+  CallableIndexedOwnedPreparedOrdinaryCachedInputs.cached_slot fixture.recipe.compiled observed.cached
+
+theorem ObservedRow.target {fixture signature} (observed : ObservedRow fixture signature) :
+    SourceCompilationPlan.exactInstantiationKey fixture.recipe.compiled.indexed.base.plan
+      (CallableNamedCanonicalOrder.retainedInstantiation observed.row) = .ok observed.row.key := by
+  have origin : RecursiveNamedPublicSpecializationMeaning.Origin fixture.recipe.compiled.sourceProgram
+      observed.named.specialized := observed.same.symm ▸ observed.origin
+  have target := CallableIndexedOwnedPreparedOrdinaryCachedInputs.retained_target
+    fixture.recipe.compiled fixture.source_wellFormed observed.cached origin
+  rw [observed.same] at target
+  exact target.trans (congrArg Except.ok observed.globalKey)
 
 structure ObservedRoot (fixture : CompiledFixture) (signature : ProgramFunctionSignature) extends ObservedRow fixture signature where
   entry : SourceCoreCallableIndexedPrograms.Entry fixture.recipe.compiled.indexed.layouts
   entryMember : entry ∈ fixture.recipe.compiled.indexed.entries
   entryKey : entry.key = row.key
-
-private def observeTarget (fixture : CompiledFixture) (row : SourceSpecialization.SpecializedFunction) :
-    IO (PLift (SourceCompilationPlan.exactInstantiationKey fixture.recipe.compiled.indexed.base.plan
-      (CallableNamedCanonicalOrder.retainedInstantiation row) = .ok row.key)) := do
-  match accepted : SourceCompilationPlan.exactInstantiationKey fixture.recipe.compiled.indexed.base.plan
-      (CallableNamedCanonicalOrder.retainedInstantiation row) with
-  | .error error => throw (IO.userError (reprStr error))
-  | .ok key =>
-    let ⟨same⟩ ← observed (key = row.key) "reuse exact key"
-    return ⟨by rw [accepted, same]⟩
 
 private def observeOrigin (fixture : CompiledFixture) (row : SourceSpecialization.SpecializedFunction) :
     IO (PLift (RecursiveNamedPublicSpecializationMeaning.Origin fixture.recipe.compiled.sourceProgram row)) := do
@@ -188,23 +196,15 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
     let ⟨keyOwner⟩ ← observed (row.key.declaration = signature.id) "generic row key owner"
     let ⟨ordinary⟩ ← observed (row.function.returnComptime = false) "reuse return marker"
     let ⟨ordinaryInputs⟩ ← observed (row.function.typedBody.inputs.all (fun binder => !binder.comptime) = true) "reuse parameter markers"
-    let ⟨target⟩ ← observeTarget fixture row
-    match slot : fixture.recipe.compiled.indexed.base.globals.zipIdx.filter
-        (fun item => decide (item.1.key = row.key)) with
-    | [(global, index)] =>
-      let ⟨globalKey⟩ ← observed (global.key = row.key) "reuse global key"
-      let ⟨named, cached, same⟩ ← (do
-        match cached : fixture.recipe.compiled.indexed.base.functions[index]? with
-        | none => throw (IO.userError "actual cached declaration missing")
-        | some named =>
-          let ⟨same⟩ ← observed ((named.specialized == row) = true) "actual cached declaration record"
-          return ⟨named, cached, eq_of_beq same⟩ :
-        IO {named : SourceCoreGeneralFunctions.Function //
-          fixture.recipe.compiled.indexed.base.functions[index]? = some named ∧ named.specialized = row})
+    match cached : fixture.recipe.compiled.indexed.base.functions.zipIdx.find?
+        (fun item => item.1.specialized == row) with
+    | none => throw (IO.userError "actual cached declaration missing")
+    | some (named, index) =>
+      have same : named.specialized = row := eq_of_beq (List.find?_some (p := fun item : SourceCoreGeneralFunctions.Function × Nat => item.1.specialized == row) cached)
       return {
         origin := origin
         named := named
-        cached := cached
+        cached := List.mk_mem_zipIdx_iff_getElem?.mp (List.mem_of_find?_eq_some cached)
         same := same
         row := row
         member := List.mem_of_find?_eq_some found
@@ -216,13 +216,7 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
           intro binder member
           have selected := List.all_eq_true.mp ordinaryInputs binder member
           cases same : binder.comptime <;> simp_all
-        target := target
-        global := global
-        index := index
-        slot := by unfold CallableNamedMetadata.Slot; rw [globalKey]; exact slot
-        globalKey := globalKey
-        }
-    | _ => throw (IO.userError "reuse unique global slot")
+        index := index }
 
 
 def observeRootRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature) : IO (ObservedRoot fixture signature) := do
@@ -247,6 +241,48 @@ theorem ObservedRow.prepared_slot {fixture : CompiledFixture} {signature : Progr
   rw [observed.slot] at member
   exact Prod.mk.inj (List.mem_singleton.mp member)
 
+theorem ObservedRow.eligible {fixture signature} (observed : ObservedRow fixture signature) :
+    CallableIndexedOwnedPreparedOrdinaryCatalogReceipts.Eligible fixture.recipe.compiled observed.row := by
+  refine ⟨observed.origin, ?_, observed.ordinary, observed.inputsOrdinary⟩
+  intro parameter replacement member
+  have scalar := of_decide_eq_true (List.all_eq_true.mp observed.scalarRange (parameter, replacement) member)
+  rcases scalar with rfl | rfl
+  · exact ⟨by simp [TypeParameterBindersWellFormed, Context.ofSignatures], .builtin .word⟩
+  · exact ⟨by simp [TypeParameterBindersWellFormed, Context.ofSignatures], .builtin .bool⟩
+
+/-- Select the same issued packet from the complete eligible ordinary catalog. -/
+theorem ObservedRow.issue_at {fixture signature} (observed : ObservedRow fixture signature)
+    (catalog : CallableIndexedOwnedPreparedOrdinaryCatalogReceipts.Catalog fixture.recipe.compiled) :
+    ∃ input : CallableIndexedOwnedPreparedFiniteNamedInventories.Input fixture.recipe.compiled,
+      input.row = observed.row ∧
+      ∃ packet : CallableIndexedOwnedPreparedFiniteNamedInventories.Issued input,
+      CallableIndexedOwnedPreparedFiniteNamedInventories.Inventory.HasRow packet catalog.rows ∧
+      ∃ actual : ActualHeader fixture observed.row,
+        actual.header = packet.header ∧ actual.header.slot = observed.index ∧ actual.header.named.signature = observed.global := by
+  have eligible : CallableIndexedOwnedPreparedOrdinaryCatalogReceipts.Eligible fixture.recipe.compiled
+      observed.named.specialized := observed.same.symm ▸ observed.eligible
+  obtain ⟨input, packet, retained, rowEq, indexEq, namedEq⟩ := catalog.packet_at observed.cached eligible
+  have sameRow : input.row = observed.row := rowEq.trans observed.same
+  refine ⟨input, sameRow, packet, retained, ?_⟩
+  let actual : ActualHeader fixture input.row := {
+    prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected
+    header := packet.header
+    aligned := packet.aligned
+    diagnostic := ⟨⟨packet.selected.diagnostics, packet.selected.found, rfl⟩⟩ }
+  let reindexed : ActualHeader fixture observed.row := sameRow ▸ actual
+  have transport : ∀ {left right : SourceSpecialization.SpecializedFunction}
+      (same : left = right) (header : ActualHeader fixture left),
+      (same ▸ header).header = header.header := by
+    intro left right same header
+    cases same
+    rfl
+  have aligned : reindexed.header = packet.header := transport sameRow actual
+  refine ⟨reindexed, aligned, ?_, ?_⟩
+  · rw [aligned]
+    exact packet.aligned.slot.trans indexEq
+  · rw [aligned]
+    exact congrArg (·.signature) (packet.aligned.named.trans namedEq)
+
 theorem ObservedRow.issue {fixture : CompiledFixture} {signature : ProgramFunctionSignature}
     (observed : ObservedRow fixture signature) :
     ∃ input : CallableIndexedOwnedPreparedFiniteNamedInventories.Input fixture.recipe.compiled,
@@ -254,31 +290,10 @@ theorem ObservedRow.issue {fixture : CompiledFixture} {signature : ProgramFuncti
       ∃ packet : CallableIndexedOwnedPreparedFiniteNamedInventories.Issued input,
       ∃ actual : ActualHeader fixture observed.row,
         actual.header = packet.header ∧ actual.header.slot = observed.index ∧ actual.header.named.signature = observed.global := by
-  obtain ⟨prepared⟩ := RecursiveNamedPreparedFinalPlanOrigins.of_cached_origin fixture.recipe.compiled observed.cached observed.same observed.origin
-  obtain ⟨signatureEq, indexEq⟩ := observed.prepared_slot prepared
-  have range : SourceSemantics.ParameterSubstitution.RangeWellFormed
-      (Context.ofSignatures fixture.recipe.compiled.sourceProgram.signatures) observed.row.parameterSubstitution := by
-    intro parameter replacement member
-    have scalar := of_decide_eq_true (List.all_eq_true.mp observed.scalarRange (parameter, replacement) member)
-    rcases scalar with rfl | rfl
-    · exact ⟨by simp [TypeParameterBindersWellFormed, Context.ofSignatures], .builtin .word⟩
-    · exact ⟨by simp [TypeParameterBindersWellFormed, Context.ofSignatures], .builtin .bool⟩
-  let input : CallableIndexedOwnedPreparedFiniteNamedInventories.Input fixture.recipe.compiled := {
-    row := observed.row
-    prepared := prepared
-    range := range
-    ordinaryReturn := observed.ordinary
-    ordinaryParameters := observed.inputsOrdinary
-    target := by rw [RecursiveNamedPreparedCallEvidence.Prepared.signature_key prepared]; exact observed.target
-    slot := by rw [signatureEq, indexEq]; exact observed.slot }
-  obtain ⟨packet⟩ := CallableIndexedOwnedPreparedFiniteNamedInventories.issue fixture.source_wellFormed input
-  let actual : ActualHeader fixture observed.row := {
-    prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued prepared packet.selected
-    header := packet.header
-    aligned := packet.aligned
-    diagnostic := ⟨⟨packet.selected.diagnostics, packet.selected.found, rfl⟩⟩ }
-  exact ⟨input, rfl, packet, actual, rfl, actual.aligned.slot.trans indexEq,
-    (congrArg (·.signature) actual.aligned.named).trans signatureEq⟩
+  obtain ⟨catalog⟩ := CallableIndexedOwnedPreparedOrdinaryCatalog.of_compiled
+    fixture.recipe.compiled fixture.source_wellFormed
+  obtain ⟨input, same, packet, _retained, actual, aligned, slot, signature⟩ := observed.issue_at catalog
+  exact ⟨input, same, packet, actual, aligned, slot, signature⟩
 
 structure ObservedStages (fixture : CompiledFixture)
     {signature : ProgramFunctionSignature} (observed : ObservedRow fixture signature) where

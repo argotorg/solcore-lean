@@ -52,15 +52,11 @@ theorem forward_initial {fixture : CompiledFixture} {observed : ObservedProgram 
   subst initialized
   have startupRegistry : encodedValues.registry = fixture.recipe.compiled.compatible.checked.staticRegistry := by
     exact started.simple_registry (booted.registry_at initial) (bool_simple true)
-  obtain ⟨selectedHeader, selected⟩ := RecursiveNamedPublicRootCoverage.selection_of_recipe
-    fixture.recipePrepared (List.mem_of_find?_eq_some started.selected) inventory.public_coverage
-  have selectedEq : selectedHeader = inventory.makeHeader.header := by
-    apply selected_make_root inventory.makeHeader inventory.useHeader inventory.keepHeader
-      (root := root) (header := selectedHeader)
-    · exact inventory.header_list ▸ selected
-    · exact of_decide_eq_true (List.find?_some (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled =>
-        decide (candidate.key = observed.makeRow.row.key)) started.selected)
-  subst selectedHeader
+  have selected := inventory.selected_row_issued observed.makeRow.toObservedRow
+    inventory.makeHeader inventory.make_member inventory.makeSlot
+    (SourceCoreIndexedSession.Recipe.prepare_roots fixture.recipePrepared (List.mem_of_find?_eq_some started.selected))
+    (of_decide_eq_true (List.find?_some (p := fun candidate : SourceCoreIndexedSession.Root fixture.recipe.compiled =>
+      decide (candidate.key = observed.makeRow.row.key)) started.selected))
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
       inventory.makeHeader.header.function.context [.bool true] inventory.makeHeader.header.types := by
     rw [inventory.makeHeader.make_types]
