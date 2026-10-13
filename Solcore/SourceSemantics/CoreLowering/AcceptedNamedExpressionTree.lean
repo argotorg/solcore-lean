@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualDirectReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionPolicy
+import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectExpressionReceipt
 
 /-! Original expression trees follow accepted child actions. Unexpanded compiler
 branches retain the actual selected action and its original source occurrence. -/
@@ -27,6 +28,9 @@ theorem LeafForm.view {form : ExpressionForm} (leaf : LeafForm form) :
 def DirectForm (form : ExpressionForm) : Prop :=
   ∃ callee arguments instantiation, form = .call callee arguments (.declaration instantiation)
 
+def IndirectForm (form : ExpressionForm) : Prop :=
+  ∃ callee arguments metadata, form = .call callee arguments (.indirect metadata)
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {named : Named} {diagnostics : SourceCoreDataPlaceFaultSites.Program} {namedCode : Expr}
   {compilation : Compilation compiled.indexed named diagnostics namedCode}
@@ -48,6 +52,7 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
       (actual : AcceptedContextualDirectReceipt.InitializerAt compiled.indexed current id)
   | form (selected : head.special = none)
       (notLeaf : ¬ LeafForm head.node.form) (notDirect : ¬ DirectForm head.node.form)
+      (notIndirect : ¬ IndirectForm head.node.form)
 
 inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
     (reasonAt : ExpressionId → Word) (fuel : Nat) (id : ExpressionId)
@@ -66,6 +71,11 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
         named.specialized current (Child policy body fuel current) (fuel + 1)
         source scope id callee arguments instantiation reasonAt
         (SourceCoreGeneralFunctions.callablePolicy compiled.indexed.base.callableContext []) head.node lowered)
+  | indirect (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none) {callee : ExpressionId} {arguments : List ExpressionId}
+      {metadata : IndirectCallResolution}
+      (receipt : CallableIndirectCallCertificates.Receipt policy body fuel current source scope
+        id callee arguments metadata reasonAt lowered)
   | boundary (head : Head policy body fuel current source scope id reasonAt lowered)
       (cause : Cause root head)
 
@@ -91,6 +101,7 @@ def Step.children : Step root source scope reasonAt fuel id lowered →
   | .leaf .. | .boundary .. => []
   | .ordinary _ _ receipt => ordinaryChildren receipt
   | .evidence _ _ receipt => evidenceChildren receipt
+  | .indirect _ _ receipt => receipt.entries
 
 inductive Trace (root : RootPolicyReceipt (compiled := compiled) named diagnostics namedCode compilation
     rootFuel rootSource rootScope rootId rootReasonAt rootLowered)
@@ -162,6 +173,8 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
     have accepted := (mapM_receipt receipt.argumentsAccepted).2.1 entry member
     simpa only [Child, Nat.min_eq_right (Nat.le_succ fuel)] using accepted
 
+  | indirect head plain receipt => exact receipt.ordered_children.2 entry.1 entry.2 member
+
 variable {directSites : DeclarationInstantiation → Prop}
 
 theorem Step.of_head
@@ -204,7 +217,12 @@ theorem Step.of_head
           obtain ⟨initializer⟩ := initializers
           exact ⟨.boundary head (.initializer selected' initializer)⟩
     · cases selected : head.special with
-      | none => exact ⟨.boundary head (.form selected leaf direct)⟩
+      | none =>
+        by_cases indirect : IndirectForm head.node.form
+        · obtain ⟨callee, arguments, metadata, form⟩ := indirect
+          obtain ⟨receipt⟩ := AcceptedIndirectExpressionReceipt.of_head root head selected form
+          exact ⟨.indirect head selected receipt⟩
+        · exact ⟨.boundary head (.form selected leaf direct indirect)⟩
       | some output =>
         have same := head.result output selected
         have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)

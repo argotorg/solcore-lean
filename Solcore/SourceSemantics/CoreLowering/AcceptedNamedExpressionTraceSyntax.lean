@@ -52,6 +52,13 @@ theorem Trace.syntax_or_boundary
         intro argument member
         obtain ⟨code, present⟩ := (mapM_receipt receipt.argumentsAccepted).2.2 argument member
         exact all (argument, code) present
+      | indirect head plain receipt =>
+        refine .inl (.call receipt.found receipt.originalForm ?_ ?_)
+        · exact all (_, receipt.calleeCode) (by
+            simp only [Step.children, CallableIndirectCallCertificates.Receipt.entries, List.mem_cons_self])
+        · intro argument member
+          obtain ⟨code, present⟩ := (mapM_receipt receipt.argumentsAccepted).2.2 argument member
+          exact all (argument, code) (List.mem_cons_of_mem _ present)
     · obtain ⟨entry, absent⟩ := Classical.not_forall.mp all
       have member : entry ∈ actual.children := Classical.byContradiction fun missing =>
         absent (fun present => False.elim (missing present))
