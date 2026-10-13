@@ -1976,6 +1976,12 @@ import Solcore.SourceSemantics.CoreLowering.CertifiedPublicSessionOutcomes
 import Solcore.SourceSemantics.CoreLowering.AcceptedMethodBodyReceipts
 import Solcore.SourceSemantics.CoreLowering.AcceptedMethodBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.AcceptedProgramMethodCompletion
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerExpressionProfile
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
+import Solcore.SourceSemantics.CoreLowering.CompilerProgramStaticProfile
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerProgramAdmission
+import Solcore.SourceSemantics.CoreLowering.CompilerCertifiedPublicSession
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
