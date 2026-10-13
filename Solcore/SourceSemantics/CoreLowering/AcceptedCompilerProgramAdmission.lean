@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedScopedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.CompilerProgramStaticProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedRefinedBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedClosureAdmission
@@ -137,6 +138,60 @@ private theorem factory_of_header
           [profile.statement]) from ⟨.ordinary closure⟩)
     all_goals simp only [CallableIndexedOwnedPreparedClosureAdmission.NodeReady, form]
 
+private theorem scoped_factory_of_header
+    {row : SourceSpecialization.SpecializedFunction}
+    (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row)
+    {instantiation : DeclarationInstantiation}
+    {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
+    {index : Nat} {named : SourceCoreGeneralFunctions.Function}
+    (selected : compiled.indexed.base.functions[index]? = some named) (same : named.specialized = row)
+    {rows : List SourceSpecialization.SpecializedFunction}
+    (profile : ScopedFactory compiled named rows)
+    (supported : ∀ instantiation, DirectSite rows instantiation → Supported compiled.indexed.base.plan instantiation)
+    (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
+    Nonempty (RowCertificate compiled named rows false) := by
+  have namedEq := CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.cached_named prepared selected same
+  obtain ⟨source, body, _result⟩ :=
+    CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned
+  rw [namedEq] at source body
+  let expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
+      header.function.source rows false := by
+    rw [source, namedEq]
+    exact profile.expressions
+  have ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
+      (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed prepared.named).owner ∧
+        binding.initializer = profile.expression)) = none := by
+    rw [namedEq]
+    exact profile.ordinary
+  have bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids profile.statements := by
+    change AcceptedCompilerBodySubsetProfile.Profile header.function.source
+      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false) profile.statements
+    rw [source]
+    exact profile.body
+  obtain ⟨⟨factory⟩, ⟨closure⟩⟩ := AcceptedNamedScopedFactoryAdmission.of_returning prepared aligned
+    (by rw [body]; exact profile.roots) (by rw [source]; exact profile.outerFound) profile.outerForm
+    (by rw [source]; exact profile.found) profile.form profile.requirements profile.coercions
+    ordinary expressions bodyProfile supported wellFormed
+  obtain ⟨factory⟩ := AcceptedNamedScopedFactoryAdmission.source_of_header prepared aligned selected same factory
+  obtain ⟨closure⟩ := AcceptedNamedScopedFactoryAdmission.closure_of_header prepared selected same closure
+  refine ⟨⟨.scopedFactory factory, ⟨?_⟩⟩⟩
+  intro node member
+  have covered := profile.lambdas node member
+  cases node with
+  | statement statement => exact True.intro
+  | expression expression =>
+    cases form : expression.form
+    case lambda parameters result statements =>
+      simp only [LambdaAllowed, form, Option.some.injEq] at covered
+      subst expression
+      rw [profile.form] at form
+      cases form
+      simpa only [CallableIndexedOwnedPreparedClosureAdmission.NodeReady, profile.form] using
+        (show Nonempty (CallableIndexedOwnedPreparedClosureAdmission.BodyCertificate compiled named rows false
+          profile.statements) from ⟨.scoped closure⟩)
+    all_goals simp only [CallableIndexedOwnedPreparedClosureAdmission.NodeReady, form]
+
 private theorem ordinary_row {index : Nat} {named : SourceCoreGeneralFunctions.Function}
     (selected : compiled.indexed.base.functions[index]? = some named)
     (eligible : CallableIndexedOwnedPreparedOrdinaryCatalogReceipts.Eligible compiled named.specialized)
@@ -156,6 +211,7 @@ private theorem ordinary_row {index : Nat} {named : SourceCoreGeneralFunctions.F
   cases profile with
   | «scoped» profile => exact scoped_of_header prepared aligned selected rfl profile supported wellFormed
   | factory profile => exact factory_of_header prepared aligned selected rfl profile supported wellFormed
+  | scopedFactory profile => exact scoped_factory_of_header prepared aligned selected rfl profile supported wellFormed
 
 private theorem method_origin {index : Nat} {named : SourceCoreGeneralFunctions.Function}
     (selected : compiled.indexed.base.functions[index]? = some named) (excluded : NoOrdinary compiled named) :

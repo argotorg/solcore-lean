@@ -1982,6 +1982,13 @@ import Solcore.SourceSemantics.CoreLowering.CompilerProgramStaticProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerProgramAdmission
 import Solcore.SourceSemantics.CoreLowering.CompilerCertifiedPublicSession
 
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyResultTyping
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedClosureAdmission
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedFactoryAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedScopedLambdaBodyReceipts
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedScopedFactoryAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

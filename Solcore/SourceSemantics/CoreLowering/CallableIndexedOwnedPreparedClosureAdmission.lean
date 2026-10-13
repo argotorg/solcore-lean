@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCoercedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodTerminalSupport
@@ -76,6 +77,8 @@ inductive BodyCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
     (directRows : List SourceSpecialization.SpecializedFunction) (allowCoerced : Bool)
     (body : List StatementId) where
   | ordinary (certificate : OrdinaryBodyCertificate compiled named directRows body)
+  | scoped (certificate : CallableIndexedOwnedPreparedScopedClosureAdmission.SourceBodyCertificate
+      compiled named directRows body)
   | coerced (enabled : allowCoerced = true)
       (certificate : CallableIndexedOwnedPreparedCoercedClosureAdmission.BodyCertificate compiled named directRows body)
 

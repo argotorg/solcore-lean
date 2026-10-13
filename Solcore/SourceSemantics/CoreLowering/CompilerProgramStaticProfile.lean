@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerExpressionProfile
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedProgramAdmission
@@ -143,17 +144,80 @@ def factory? (compiled : SourceCoreUnifiedCompilation.Compiled)
           | _ => none
       | _ => none
 
+/-- The scoped factory retains its complete original lambda body. A flat
+statement subset covers that body's roots and every nested loop child. -/
+structure ScopedFactory (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) where
+  expressions : ExpressionProfile compiled named rows false
+  outer : StatementId
+  rest : List StatementId
+  outerNode : StatementNode
+  expression : ExpressionId
+  node : ExpressionNode
+  parameters : List TypedBinder
+  result : TypeSystem.Ty
+  statements : List StatementId
+  roots : CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.statements named.specialized.function.typedBody = outer :: rest
+  outerFound : named.specialized.function.typedBody.lookupStatement? outer = some outerNode
+  outerForm : outerNode.form = .returnStmt (some expression)
+  found : named.specialized.function.typedBody.lookupExpression? expression = some node
+  form : node.form = .lambda parameters result statements
+  requirements : node.requirements = []
+  coercions : node.coercions = []
+  ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
+    (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
+      binding.initializer = expression)) = none
+  body : AcceptedCompilerBodySubsetProfile.Profile named.specialized.function.typedBody expressions.ids statements
+  lambdas : ∀ actual ∈ named.specialized.function.typedBody.nodes, LambdaAllowed (some node) actual
+
+def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) :
+    Option (ScopedFactory compiled named rows) := do
+  let expressions ← AcceptedCompilerExpressionProfile.certify compiled.indexed named
+    named.specialized.function.typedBody rows false
+  match roots : statements named.specialized.function.typedBody with
+  | [] => none
+  | outer :: rest =>
+    match outerFound : named.specialized.function.typedBody.lookupStatement? outer with
+    | none => none
+    | some outerNode =>
+      match outerForm : outerNode.form with
+      | .returnStmt (some expression) =>
+        match found : named.specialized.function.typedBody.lookupExpression? expression with
+        | none => none
+        | some node =>
+          match form : node.form with
+          | .lambda parameters result bodyRoots =>
+            if requirements : node.requirements = [] then
+              if coercions : node.coercions = [] then
+                if ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
+                    (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
+                      binding.initializer = expression)) = none then do
+                  let ⟨body⟩ ← AcceptedCompilerBodySubsetProfile.validate named.specialized.function.typedBody expressions.ids bodyRoots
+                  let ⟨lambdas⟩ ← lambdas? named.specialized.function.typedBody (some node)
+                  pure ⟨expressions, outer, rest, outerNode, expression, node, parameters, result, bodyRoots,
+                    roots, outerFound, outerForm, found, form, requirements, coercions, ordinary, body, lambdas⟩
+                else none
+              else none
+            else none
+          | _ => none
+      | _ => none
+
 inductive Ordinary (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) where
   | scoped (profile : Scoped compiled named rows false)
   | factory (profile : Factory compiled named rows)
+  | scopedFactory (profile : ScopedFactory compiled named rows)
 
 def ordinary? (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) :
     Option (Ordinary compiled named rows) :=
   match scoped? compiled named rows false with
   | some profile => some (.scoped profile)
-  | none => (factory? compiled named rows).map Ordinary.factory
+  | none =>
+    match factory? compiled named rows with
+    | some profile => some (.factory profile)
+    | none => (scopedFactory? compiled named rows).map Ordinary.scopedFactory
 
 def NoOrdinary (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) : Prop :=

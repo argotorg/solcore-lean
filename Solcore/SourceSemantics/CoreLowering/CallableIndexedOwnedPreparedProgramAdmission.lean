@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedScopedFactoryAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedClosureAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedOriginsMethodAdmission
@@ -43,6 +44,7 @@ inductive RootCertificate (compiled : SourceCoreUnifiedCompilation.Compiled)
       compiled named named.specialized.function.typedBody (statements named.specialized.function.typedBody)
       named.specialized.function.inferredBodyType directRows)
   | formation (source : CallableIndexedOwnedPreparedNamedFactoryAdmission.Certificate compiled named)
+  | scopedFactory (source : CallableIndexedOwnedPreparedScopedFactoryAdmission.Certificate compiled named)
   | excluded (absent : ∀ signature ∈ compiled.sourceProgram.signatures.functions,
       named.specialized.declaration ≠ signature.id)
 
@@ -174,6 +176,12 @@ theorem Certificate.named_support (input : Input compiled) (packet : Issued inpu
       wellFormed certificate.profile entryMember
     exact ⟨⟨CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal terminal,
       .formation terminal supported packet.aligned.globals⟩⟩
+  | scopedFactory admission =>
+    obtain ⟨terminal, ⟨supported⟩⟩ := CallableIndexedOwnedPreparedScopedFactoryAdmission.of_actual
+      prepared packet.aligned input.prepared.selected input.prepared.same admission ready diagnostic
+      wellFormed certificate.profile entryMember
+    exact ⟨⟨CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal terminal,
+      .formation terminal supported packet.aligned.globals⟩⟩
   | excluded absent =>
     obtain ⟨request, signature, generic, member, _genericMember, _resolved, specialized⟩ := input.prepared.origin
     have fields := RecursiveNamedSpecializationBodyFacts.identities specialized
@@ -204,6 +212,11 @@ theorem Certificate.closure_support
         (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
         certificate.selection.operatorCatalog body
       exact ⟨⟨.terminal packet, supported⟩⟩
+    | «scoped» body =>
+      obtain ⟨⟨packet, supported⟩⟩ := CallableIndexedOwnedPreparedScopedClosureAdmission.of_actual
+        (stagePrepared compiled) code support provenance issued wellFormed rows aligned checked identity
+        certificate.selection.operatorCatalog body
+      exact ⟨⟨.branching packet, supported⟩⟩
     | coerced enabled body =>
       cases selectionEq : certificate.selection with
       | closed methods catalog =>
