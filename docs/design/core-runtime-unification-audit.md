@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Scoped closure bodies use the common compiler profile (2026-10-14)
+
+`a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.
+
+The profile checks the original closure body and its statement subset, including loop children and expression operands. Actual compiler actions provide the body tree and expression traces. Original Source typing identifies the closure's result type, and the existing physical closure collector preserves the complete captured environment. The same program certificate covers the factory root and every original lambda node at its actual cached index.
+
+The public sequence retains one automatic catalog and one evolving physical session: create closures with captured values `10` and `20`, invoke the first, create a third with `30`, invoke the second, then reuse the first. All six operations have independent Source traces and sufficient public execution budgets. Results remain `10 / 20 / 11`, with reached public store sizes `4 / 7 / 10 / 44 / 47 / 81 / 106`. Original checking at `1000`, three cached rows, three direct targets and three distinct closure handles are preserved.
+
+Validation: 90 affected modules checked together, full build (7,281 jobs), registered tests (14,400 build jobs), kernel policy and 874 endpoint audits pass. Checks reject missing operands, missing body roots and loop children outside the admitted statement subset. The earlier evidence-program and lexical-failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The common profile still covers a finite compiler fragment. Source well-formedness, public input typing and finite staged Source traces remain explicit. Constructors, mapping indices and other remaining forms still need connections to this producer; their existing independent execution proofs remain available. Complete compiler and actual-pass preservation remain unfinished.
+
+Reviews cover exact original body roots, loop-child membership, compiler action order, the Source result-type derivation, all original lambda nodes and transport to the same cached header. The public consumer retains all six Source heaps and forward conclusions, with complete captured environments and the original handle history.
+
 ## Complete compiler profiles issue public sessions (2026-10-14)
 
 `84536b5b` builds the full program certificate from finite checks of the actual compiled cache. `45b1d994` connects that producer to the original seven-call evidence program at checker budgets `1024` and `1000`.

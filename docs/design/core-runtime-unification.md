@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Scoped closure bodies use the common compiler profile (2026-10-14)
+
+`a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.
+
+The profile checks the original closure body and its statement subset, including loop children and expression operands. Actual compiler actions provide the body tree and expression traces. Original Source typing identifies the closure's result type, and the existing physical closure collector preserves the complete captured environment. The same program certificate covers the factory root and every original lambda node at its actual cached index.
+
+The public sequence retains one automatic catalog and one evolving physical session: create closures with captured values `10` and `20`, invoke the first, create a third with `30`, invoke the second, then reuse the first. All six operations have independent Source traces and sufficient public execution budgets. Results remain `10 / 20 / 11`, with reached public store sizes `4 / 7 / 10 / 44 / 47 / 81 / 106`. Original checking at `1000`, three cached rows, three direct targets and three distinct closure handles are preserved.
+
+Validation: 90 affected modules checked together, full build (7,281 jobs), registered tests (14,400 build jobs), kernel policy and 874 endpoint audits pass. Checks reject missing operands, missing body roots and loop children outside the admitted statement subset. The earlier evidence-program and lexical-failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The common profile still covers a finite compiler fragment. Source well-formedness, public input typing and finite staged Source traces remain explicit. Constructors, mapping indices and other remaining forms still need connections to this producer; their existing independent execution proofs remain available. Complete compiler and actual-pass preservation remain unfinished.
+
+Next, expose ordinary Source outcomes at the public-session boundary and extend the compiler profile to the existing mapping-index sequence.
+
 ## Complete compiler profiles issue public sessions (2026-10-14)
 
 `84536b5b` builds the full program certificate from finite checks of the actual compiled cache. `45b1d994` connects that producer to the original seven-call evidence program at checker budgets `1024` and `1000`.
@@ -740,11 +754,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `84536b5b` / `45b1d994`: a finite complete compiler profile issues the program certificate and public session internally for the original seven-call evidence program. |
-| Latest completed verification | Full build (7272 jobs), registered tests, kernel policy and 840 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `a8e77c30` / `85e95727`: multi-statement closures use the common compiler certificate and public session in the original six-call sequence. |
+| Latest completed verification | Full build (7281 jobs), registered tests, kernel policy and 874 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Every actual cache row and original lambda is covered; genuine compiler receipts build all body proofs before the same public-session theorem is applied. |
-| Current implementation priority | Extend the common producer to multi-statement closure bodies, then complete compiler and pass coverage. |
+| Latest proof scope | Actual factory and closure compilation supplies scoped body proofs; one public session retains all three captured environments across six calls. |
+| Current implementation priority | Connect ordinary Source outcomes at the public boundary and expand the common compiler profile, then complete actual-pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
