@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Constructor payloads use the common compiler profile (2026-10-14)
+
+`2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.
+
+The compiler receipt retains every original payload position, its actual child compilation and the complete raw parameter substitution. The finite profile checks closed replacements, including unused substitution entries, and preserves the original metadata. The resulting trace uses the existing constructor semantics without adding a Core instruction.
+
+The original program retains checker fuel `1000`, two cached rows and two direct targets. One automatic catalog follows nine operations: six actual executions and three named or builtin handle issuances. The six executions have ordinary Dynamic meanings and sufficient-fuel public conclusions. The three issuances preserve the Source callable identities and both heaps. Constructor output collection retains payload order, closure captures and aliases; later calls return `20`, export a closure capturing `30`, reuse the older closure returning `10`, and call the builtin returning `37`. Public store sizes remain `3 / 6 / 6 / 6 / 6 / 21 / 21 / 24 / 24 / 24`.
+
+Validation: 61 affected modules checked together, full build (7,299 jobs), registered tests (14,436 build jobs), kernel policy and 968 endpoint audits pass. Earlier mapping-selection, evidence-program, scoped-closure and failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The common profile now covers the supported constructor case. Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Full syntax, actual-pass preservation and lifting arbitrary ordinary Source executions through stage guards remain unfinished.
+
+Reviews check original payload ordering, all raw substitutions, metadata and compiler child actions. Public proofs retain arbitrary valid output selections and later callable invocations in the same physical history. Negative checks cover open unused substitutions, each missing payload child and dirty metadata.
+
 ## Mapping selection uses the common compiler profile (2026-10-14)
 
 `37daf672` connects accepted index compilation to the expression proof producer. `cd154b59` carries the original nine-operation mapping-selection sequence through the common certified public session.

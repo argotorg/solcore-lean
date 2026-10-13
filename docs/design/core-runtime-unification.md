@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Constructor payloads use the common compiler profile (2026-10-14)
+
+`2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.
+
+The compiler receipt retains every original payload position, its actual child compilation and the complete raw parameter substitution. The finite profile checks closed replacements, including unused substitution entries, and preserves the original metadata. The resulting trace uses the existing constructor semantics without adding a Core instruction.
+
+The original program retains checker fuel `1000`, two cached rows and two direct targets. One automatic catalog follows nine operations: six actual executions and three named or builtin handle issuances. The six executions have ordinary Dynamic meanings and sufficient-fuel public conclusions. The three issuances preserve the Source callable identities and both heaps. Constructor output collection retains payload order, closure captures and aliases; later calls return `20`, export a closure capturing `30`, reuse the older closure returning `10`, and call the builtin returning `37`. Public store sizes remain `3 / 6 / 6 / 6 / 6 / 21 / 21 / 24 / 24 / 24`.
+
+Validation: 61 affected modules checked together, full build (7,299 jobs), registered tests (14,436 build jobs), kernel policy and 968 endpoint audits pass. Earlier mapping-selection, evidence-program, scoped-closure and failure paths remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The common profile now covers the supported constructor case. Source well-formedness, original metadata, typed public inputs and finite staged Source traces remain explicit. Full syntax, actual-pass preservation and lifting arbitrary ordinary Source executions through stage guards remain unfinished.
+
+Next, derive Source well-formedness from the actual checker success and connect that result to the common public-session entry points.
+
 ## Mapping selection uses the common compiler profile (2026-10-14)
 
 `37daf672` connects accepted index compilation to the expression proof producer. `cd154b59` carries the original nine-operation mapping-selection sequence through the common certified public session.
@@ -782,11 +796,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `37daf672` / `cd154b59`: accepted mapping indices use the common compiler certificate and all nine public-session operations. |
-| Latest completed verification | Full build (7294 jobs), registered tests, kernel policy and 933 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `2d82255c` / `fc157381`: constructor payloads use the common compiler certificate and preserve six executions plus three handle issuances. |
+| Latest completed verification | Full build (7299 jobs), registered tests, kernel policy and 968 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual base/key compiler actions supply index semantics; retained closure inputs, missing-key failure and subsequent old-handle reuse share one certified session. |
-| Current implementation priority | Connect constructor payloads to the common producer, then complete remaining syntax and actual-pass coverage. |
+| Latest proof scope | Actual constructor child actions preserve ordered callable payloads, closure captures and handle reuse in one certified public session. |
+| Current implementation priority | Derive Source well-formedness from actual checker success and connect it to the public-session entry points; continue full syntax and actual-pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
