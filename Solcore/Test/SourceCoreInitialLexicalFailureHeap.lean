@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.Test.SourceCoreInitialLexicalFailureBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationPreservation
 import Solcore.SourceSemantics.Staging.RecursiveErasure
@@ -14,6 +15,7 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
     (unique : NodeOccurrencesUnique scope.source)
     (found : scope.source.lookupExpression? id = some node)
     (form : node.form = .reference name (.local binder))
+    (coercions : node.coercions = [])
     (lookup : Dynamic.Environment.LooksUp environment binder location)
     (read : Dynamic.Heap.Reads before location {type := .word, value := none})
     (trace : Staging.Recursive.Size.Expression program registry size scope context environment before id (.fault failure) after) :
@@ -21,6 +23,8 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
   have same {other : ExpressionNode} (contains : ContainsExpression scope.source id other) : other = node :=
     Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | atomicFault contains atomic uncoerced raw =>
     have nodeEq := same contains
     cases nodeEq
@@ -147,7 +151,7 @@ theorem ActualHeader.failed_heap
     simp only [observed.failedShape.binderScheme, TypeSystem.Scheme.mono] at cell
     obtain ⟨failureEq, heapEq⟩ := local_fault unique
       (by rw [sourceEq, actual.source]; exact observed.failedShape.readFound)
-      observed.failedShape.readForm .head cell expression
+      observed.failedShape.readForm observed.failedShape.readCoercions .head cell expression
     subst after
     refine ⟨location, failureEq, ?_, cell⟩
     simpa only [observed.failedShape.binderScheme, TypeSystem.Scheme.mono] using allocated

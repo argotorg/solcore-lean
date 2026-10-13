@@ -26,7 +26,7 @@ structure SelectedBody {compiled : SourceCoreUnifiedCompilation.Compiled}
   readFuel : Nat
   «prefix» : code.compilation.administrativePrefix = 1
   roots : ∀ (child : Staging.Recursive.Scope), stages.Closure function child →
-    CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.Root compiled headers stages code.policy code.lowerBody code.compilation readFuel inputs.context child
+    CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootChoice compiled headers stages code.policy code.lowerBody code.compilation readFuel inputs.context child
       code.reasonAt
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ localScope)
       packet.expression packet.receipt.child function.resultType semanticFaults
@@ -46,7 +46,7 @@ def SelectedBody.rootAt {compiled : SourceCoreUnifiedCompilation.Compiled}
     CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt compiled headers stages inputs.context child
       (code.receipt.loweredParameters.reverse.map (fun binding => (binding.1.id, binding.2)) ++ localScope)
       packet.expression packet.receipt.child semanticFaults :=
-  CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofRoot (support.roots child selected)
+  CallableIndexedOwnedPreparedStagedPhysicalMixedRootStaticSupport.RootAt.ofChoice (support.roots child selected)
 
 /-- Terminal and scoped flow packets both refer to the identical retained Code. -/
 inductive Packet {compiled : SourceCoreUnifiedCompilation.Compiled}

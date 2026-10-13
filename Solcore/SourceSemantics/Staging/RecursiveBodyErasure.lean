@@ -20,6 +20,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
     (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
     (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
+    (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
@@ -216,6 +219,9 @@ theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_6 := fun _ _ _ _ _ _ _ _ => True)
     (motive_7 := fun _ _ _ _ _ _ _ _ _ => True)
     (motive_8 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case done test _ih => exact .done test.value_plain
   case conditionFault test _ih =>
@@ -269,6 +275,9 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_5 := fun _ _ _ _ _ _ _ _ _ => True)
     (motive_6 := fun _ _ _ _ _ _ _ _ => True)
     (motive_8 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case empty => exact .nil
   case absent mono extended allocated next nextIH =>
@@ -310,6 +319,9 @@ theorem ForLoop.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_5 := fun _ _ _ _ _ _ _ _ _ => True)
     (motive_6 := fun _ _ _ _ _ _ _ _ => True)
     (motive_7 := fun _ _ _ _ _ _ _ _ _ => True)
+    (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_10 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_11 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case testFault test _testIH =>
     rename_i failure

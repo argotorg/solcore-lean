@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionContextualReads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 
@@ -25,6 +26,7 @@ private theorem no_stage
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
     (form : node.form = .reference name (.local binder))
+    (coercions : node.coercions = [])
     (trace : Staging.Recursive.Size.Expression program registry size invocation context environment
       before id (.fault (.stage failedScope call reason)) after) : False := by
   have reference : ∀ {shape requirements}, Staging.Recursive.Occurrence invocation id shape requirements →
@@ -35,6 +37,8 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | group occurrence _
   | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
@@ -164,7 +168,7 @@ theorem preserves_local (size : Nat) :
     | fault failure => cases failure with
       | semantic reason => exact ⟨.fault reason, .fault trace.sound.semanticFault_plain, rfl⟩
       | stage failedScope call reason =>
-        exact False.elim (no_stage unique found (nodeEq ▸ certificate.form) trace)
+        exact False.elim (no_stage unique found (nodeEq ▸ certificate.form) (nodeEq ▸ certificate.metadata.coercions) trace)
   obtain ⟨plainOutcome, plainTrace, outcomeEq⟩ := plain
   obtain ⟨value, finalStore, evaluated, represented, finalHeaps, frame, metadata⟩ :=
     certificate.preserves functions extension program context invocation.evidence binding

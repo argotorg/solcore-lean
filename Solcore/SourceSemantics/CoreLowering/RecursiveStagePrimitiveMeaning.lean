@@ -655,15 +655,15 @@ theorem reflects (sameLedger : context.solvedRequirements = solved) (runtime : R
 is harmless here; the compiler support above still admits only actual literals
 and ordinary local reads. -/
 private inductive CallFree (source : TypedSource) : ExpressionId → Prop where
-  | atomic {id node} (found : source.lookupExpression? id = some node)
+  | atomic {id node} (found : source.lookupExpression? id = some node) (empty : node.coercions = [])
       (shape : Staging.Recursive.AtomicForm node.form) : CallFree source id
-  | group {id node inner} (found : source.lookupExpression? id = some node)
+  | group {id node inner} (found : source.lookupExpression? id = some node) (empty : node.coercions = [])
       (form : node.form = .group inner) (child : CallFree source inner) : CallFree source id
-  | pair {id node left right} (found : source.lookupExpression? id = some node)
+  | pair {id node left right} (found : source.lookupExpression? id = some node) (empty : node.coercions = [])
       (form : node.form = .tuple [left, right]) (first : CallFree source left) (second : CallFree source right) : CallFree source id
-  | unary {id node operator operand} (found : source.lookupExpression? id = some node)
+  | unary {id node operator operand} (found : source.lookupExpression? id = some node) (empty : node.coercions = [])
       (form : node.form = .unary operator operand) (requirements : node.requirements = []) (child : CallFree source operand) : CallFree source id
-  | binary {id node left operator right} (found : source.lookupExpression? id = some node)
+  | binary {id node left operator right} (found : source.lookupExpression? id = some node) (empty : node.coercions = [])
       (form : node.form = .binary left operator right) (requirements : node.requirements = []) (first : CallFree source left) (second : CallFree source right) : CallFree source id
 
 private theorem occurrence_form {invocation : Staging.Recursive.Scope} {id : ExpressionId}
@@ -683,8 +683,12 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
     (trace : Staging.Recursive.Expression program stages invocation context environment before id
       (.fault (.stage failedScope call reason)) after) : False := by
   induction free generalizing before after with
-  | atomic found atomic =>
+  | atomic found empty atomic =>
     cases trace with
+    | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact nonempty empty
     | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
       have same := occurrence_form unique found owned
       rw [same] at atomic
@@ -751,8 +755,12 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [same] at atomic
       cases atomic
-  | group found form child ih =>
+  | group found empty form child ih =>
     cases trace with
+    | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact nonempty empty
     | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -819,8 +827,12 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [form] at same
       cases same
-  | pair found form first second firstIH secondIH =>
+  | pair found empty form first second firstIH secondIH =>
     cases trace with
+    | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact nonempty empty
     | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -894,8 +906,12 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [form] at same
       cases same
-  | unary found form requirements child ih =>
+  | unary found empty form requirements child ih =>
     cases trace with
+    | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact nonempty empty
     | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
       obtain ⟨other, contains, _, actualRequirements, _⟩ := owned
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
@@ -964,8 +980,12 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       have same := occurrence_form unique found owned
       rw [form] at same
       cases same
-  | binary found form requirements first second firstIH secondIH =>
+  | binary found empty form requirements first second firstIH secondIH =>
     cases trace with
+    | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      cases same
+      exact nonempty empty
     | unaryMethod owned _ selected _ _ _ _ _ _ _ =>
       have same := occurrence_form unique found owned
       rw [form] at same
@@ -1040,21 +1060,23 @@ private theorem ProductSupported.callFree {id : ExpressionId} {code : SourceCore
     {tree : CompatibleExpressionProducts.Tree fuel values source context solved reasonAt scope id code}
     (supported : ProductSupported tree) : CallFree source id := by
   induction supported with
-  | literal receipt leaf => obtain ⟨node, found, _, _, atomic⟩ := leaf; exact .atomic found atomic
+  | literal receipt leaf =>
+    obtain ⟨node, found, literal, _, atomic⟩ := leaf
+    exact .atomic found (literal_uncoerced literal) atomic
   | read receipt ordinary =>
     obtain ⟨certificate, _, _, _⟩ := ordinary
-    exact .atomic certificate.metadata.found (certificate.form ▸ .reference _ _)
-  | group metadata form _ _ _ _ ih => exact .group metadata.found form ih
-  | pair metadata form _ _ _ _ _ _ _ firstIH secondIH => exact .pair metadata.found form firstIH secondIH
+    exact .atomic certificate.metadata.found certificate.metadata.coercions (certificate.form ▸ .reference _ _)
+  | group metadata form _ _ _ _ ih => exact .group metadata.found metadata.coercions form ih
+  | pair metadata form _ _ _ _ _ _ _ firstIH secondIH => exact .pair metadata.found metadata.coercions form firstIH secondIH
 
 private theorem Supported.callFree {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : Tree fuel values source context solved reasonAt scope id code} (supported : Supported tree) : CallFree source id := by
   induction supported with
   | product _ sites => exact sites.callFree
-  | group metadata form _ _ _ _ ih => exact .group metadata.found form ih
-  | pair metadata form _ _ _ _ _ _ _ firstIH secondIH => exact .pair metadata.found form firstIH secondIH
-  | unary metadata form _ _ _ _ _ _ ih => exact .unary metadata.found form metadata.requirements ih
-  | binary metadata form _ _ _ _ _ _ _ _ _ _ firstIH secondIH => exact .binary metadata.found form metadata.requirements firstIH secondIH
+  | group metadata form _ _ _ _ ih => exact .group metadata.found metadata.coercions form ih
+  | pair metadata form _ _ _ _ _ _ _ firstIH secondIH => exact .pair metadata.found metadata.coercions form firstIH secondIH
+  | unary metadata form _ _ _ _ _ _ ih => exact .unary metadata.found metadata.coercions form metadata.requirements ih
+  | binary metadata form _ _ _ _ _ _ _ _ _ _ firstIH secondIH => exact .binary metadata.found metadata.coercions form metadata.requirements firstIH secondIH
 
 private theorem ProductSupported.literalSites {id : ExpressionId} {code : SourceCoreBasic.LoweredExpr}
     {tree : CompatibleExpressionProducts.Tree fuel values source context solved reasonAt scope id code}

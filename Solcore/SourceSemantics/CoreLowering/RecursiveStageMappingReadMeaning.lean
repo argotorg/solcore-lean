@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionReadCompletion
 
@@ -151,12 +152,15 @@ private theorem reference_no_stage {invocation : Staging.Recursive.Scope} {id : 
     {node : ExpressionNode} {name : String} {binder : Resolved.LocalId}
     (unique : NodeOccurrencesUnique invocation.source) (found : invocation.source.lookupExpression? id = some node)
     (form : node.form = .reference name (.local binder))
+    (coercions : node.coercions = [])
     {program : Program} {stages : Staging.Recursive.Registry} {context : SourceSemantics.Context}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {failedScope : Staging.Recursive.Scope} {call : ExpressionId} {reason : Staging.CallGuard.Fault}
     (trace : Staging.Recursive.Expression program stages invocation context environment before id
       (.fault (.stage failedScope call reason)) after) : False := by
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
   | constructorFault owned children | tupleFault owned children =>
     have same := occurrence_form unique found owned
@@ -261,6 +265,6 @@ theorem preserves (unique : NodeOccurrencesUnique source)
         refine ⟨_, finalStore, mapping, world, evaluated, ?_, finalHeaps, .refl _, .refl _, frame, metadata⟩
         simpa only [sameType] using (RecursiveStagePrimitiveMeaning.Result.fault (functions := functions) (registry := registry) matched)
     | stage failedScope call reason =>
-      exact False.elim (reference_no_stage (sameSource ▸ unique) found (nodeEq ▸ certificate.form) trace)
+      exact False.elim (reference_no_stage (sameSource ▸ unique) found (nodeEq ▸ certificate.form) (nodeEq ▸ certificate.metadata.coercions) trace)
 
 end Solcore.SourceSemantics.CoreLowering.RecursiveStageMappingReadMeaning

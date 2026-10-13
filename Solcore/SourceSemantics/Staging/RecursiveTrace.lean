@@ -1,17 +1,18 @@
 import Solcore.SourceSemantics.Staging.RecursiveBareTarget
 
-/-! A finite recursive staged profile. Every callee, argument and closure body
-uses these same mutually recursive judgments. Staging rejection is propagated
-unchanged through lexical scopes and call returns, with exact prefix heaps.
+/-! A finite recursive staged profile. Every callee, argument and selected body
+uses these same mutually recursive judgments. Staging rejection propagates
+unchanged through lexical scopes and call returns, retaining exact prefix heaps.
 
-The initial profile covers atomic forms, groups, ordered tuples of every arity, nominal constructor payloads, ordered mapping index children, uncoerced primitive unary/binary operators, conditionals,
-direct declaration calls and indirect calls without argument/output coercions, builtins, and closure/global bodies
-containing monomorphic lets, bare plain assignments, discards, scoped blocks, conditional statements, finite while and for loops, ordered match arms, and returns.
-Blocks and conditional arms use scoped fallthrough: their local bindings are restored while
-heap changes remain visible to the following statements. The profile has no plain
-Dynamic fallback for unsupported expressions or bodies. Method calls,
-evidence-selected operator methods, coercion paths, projected or compound assignments, loop-control transfers require later recursive rules. These
-judgments do not assert coverage of the full current compiler. -/
+The profile covers atomic forms, groups, ordered tuples, nominal constructor
+payloads, mapping indices, primitive and evidence-selected operators,
+conditionals, direct declarations, indirect calls and builtins. Output coercion
+paths on atomic forms and direct calls retain their original source metadata.
+Bodies cover monomorphic lets, bare plain assignments, discards, scoped blocks,
+conditional statements, finite while and for loops, ordered match arms and returns.
+Blocks and conditional arms restore lexical bindings while keeping heap effects.
+Projected or compound assignments and loop-control transfers require further
+rules. These judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
@@ -290,6 +291,20 @@ mutual
         (arity : arguments.length = metadata.argumentCount)
         (invocation : Applies program registry scope context argumentsHeap value values outcome after) :
         Expression program registry scope context environment before id outcome after
+
+    | coercedValue {scope context environment before middle after id node value outcome}
+        (contains : ContainsExpression scope.source id node)
+        (nonempty : node.coercions ≠ [])
+        (raw : RawForm program registry scope context environment before node.form
+          node.requirements node.coercions (.value value) middle)
+        (path : CoercionPath program registry scope context middle node.coercions value outcome after) :
+        Expression program registry scope context environment before id outcome after
+    | coercedFault {scope context environment before after id node failure}
+        (contains : ContainsExpression scope.source id node)
+        (nonempty : node.coercions ≠ [])
+        (raw : RawForm program registry scope context environment before node.form
+          node.requirements node.coercions (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
 
   inductive Expressions (program : Program) (registry : Registry) :
       Scope → Context → Environment → Heap → List ExpressionId → ValuesOutcome → Heap → Prop where
@@ -671,6 +686,80 @@ mutual
         (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
         (next : ForLoop program registry scope context environment postHeap condition post body outcome after) :
         ForLoop program registry scope context environment before condition post body outcome after
+
+  /-- The original form before its retained output path. Child expressions keep
+  the same source scope, full requirements and actual coercion partition. -/
+  inductive RawForm (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → ExpressionForm → List RequirementId →
+      List SourceInference.CoercionStep → Outcome → Heap → Prop where
+    | rawAtomicValue {scope context environment before after form requirements coercions value}
+        (atomic : AtomicForm form)
+        (valueRule : ExpressionFormEvaluates program context scope.evidence scope.source environment before
+          form requirements coercions value after) :
+        RawForm program registry scope context environment before form requirements coercions (.value value) after
+    | rawAtomicFault {scope context environment before after form requirements coercions reason}
+        (atomic : AtomicForm form)
+        (faultRule : ExpressionFormFaults program context scope.evidence scope.source environment before
+          form requirements coercions reason after) :
+        RawForm program registry scope context environment before form requirements coercions (.fault (.semantic reason)) after
+    | rawDirectArgumentsFault {scope context environment before after callee arguments instantiation name failure requirements coercions}
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
+        RawForm program registry scope context environment before (.call callee arguments (.declaration instantiation))
+          requirements coercions (.fault failure) after
+    | rawDirectApplied {scope context environment before argumentsHeap after callee arguments instantiation name values evidence outcome requirements coercions}
+        (calleeOccurrence : Occurrence scope callee (.reference name (.declaration instantiation)))
+        (valid : SourceSemantics.DeclarationInstantiation.Valid context instantiation)
+        (children : Expressions program registry scope context environment before arguments (.values values) argumentsHeap)
+        (callEvidence : DirectCallProducesEvidence context scope.evidence requirements coercions instantiation.predicates evidence)
+        (invocation : Applies program registry scope context argumentsHeap (.global ⟨instantiation, evidence⟩) values outcome after) :
+        RawForm program registry scope context environment before (.call callee arguments (.declaration instantiation))
+          requirements coercions outcome after
+
+  /-- An actual conversion edge uses either the independent primitive rule or
+  a selected method body in its authentic staged scope. -/
+  inductive CoercionStep (program : Program) (registry : Registry) :
+      Scope → Context → Heap → SourceInference.CoercionStep → Value → Outcome → Heap → Prop where
+    | coercionPrimitive {scope context heap step input output}
+        (noSourceMethod : ∀ bodyInstance dictionary,
+          ¬ OperatorMethodSelected program context scope.evidence "Coerce" "coerce"
+            step.requirements bodyInstance dictionary)
+        (applies : CoercionApplies context step input output) :
+        CoercionStep program registry scope context heap step input (.value output) heap
+    | coercionRequirement {scope context heap step input failed}
+        (fault : RequirementListFaults context scope.evidence step.requirements failed) :
+        CoercionStep program registry scope context heap step input (.fault (.semantic (.unsatisfiedRequirement failed))) heap
+    | coercionPrimitiveInput {scope context heap step input actual}
+        (noSourceMethod : ∀ bodyInstance dictionary,
+          ¬ OperatorMethodSelected program context scope.evidence "Coerce" "coerce"
+            step.requirements bodyInstance dictionary)
+        (invalid : PrimitiveCoercionInputInvalid step input)
+        (actualType : ValueRuntimeType input actual) :
+        CoercionStep program registry scope context heap step input (.fault (.semantic (.typeMismatch step.source actual))) heap
+    | coercionMethod {scope context before bound after step input bodyInstance dictionary roots child
+          parameterTypes bodyContext finalContext bodyEnvironment outcome result}
+        (method : OperatorMethodSelected program context scope.evidence "Coerce" "coerce"
+          step.requirements bodyInstance dictionary)
+        (rootsEq : StatementRoots bodyInstance.source.roots roots)
+        (selected : registry.Closure (methodView bodyInstance dictionary roots) child)
+        (parameters : MonoBindersExtend bodyInstance.source.owner bodyInstance.context bodyInstance.source.inputs parameterTypes bodyContext)
+        (allocate : BindersAllocate [] before bodyInstance.source.inputs [input] bodyEnvironment bound)
+        (body : StatementsIn program registry true child bodyContext bodyEnvironment bound roots finalContext outcome after)
+        (resultRule : BodyResult bodyInstance.resultType outcome result) :
+        CoercionStep program registry scope context before step input result after
+
+  /-- Ordered retained edges stop at the first semantic or staged failure. -/
+  inductive CoercionPath (program : Program) (registry : Registry) :
+      Scope → Context → Heap → List SourceInference.CoercionStep → Value → Outcome → Heap → Prop where
+    | coercionsNil {scope context heap value} :
+        CoercionPath program registry scope context heap [] value (.value value) heap
+    | coercionsCons {scope context before middle after step steps input converted outcome}
+        (head : CoercionStep program registry scope context before step input (.value converted) middle)
+        (tail : CoercionPath program registry scope context middle steps converted outcome after) :
+        CoercionPath program registry scope context before (step :: steps) input outcome after
+    | coercionsFault {scope context before after step steps input failure}
+        (head : CoercionStep program registry scope context before step input (.fault failure) after) :
+        CoercionPath program registry scope context before (step :: steps) input (.fault failure) after
 
 end
 

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionBounds
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedExpressionSourceBounds
 
@@ -117,6 +118,8 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .unary operator operand :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
@@ -146,6 +149,8 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .binary left operator right :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic
@@ -184,6 +189,8 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .conditional condition thenId elseId :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       rw [same, form] at atomic

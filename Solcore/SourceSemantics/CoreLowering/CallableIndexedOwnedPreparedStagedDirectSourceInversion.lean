@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.WellFormed
 
@@ -32,6 +33,7 @@ theorem children
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
     (form : node.form = .call callee arguments (.declaration instantiation))
+    (coercions : node.coercions = [])
     (trace : Size.Expression program registry size invocation context environment before id outcome after) :
     (∃ sequenceSize invocationSize argumentsHeap values name evidence,
       size = Size.stepSize [sequenceSize, invocationSize] ∧
@@ -47,6 +49,8 @@ theorem children
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .call callee arguments (.declaration instantiation) :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       rw [same, form] at atomic

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedContextualLambdaFormationReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalLambdaFormationHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPhysicalNestedCanonicalState
@@ -48,6 +49,7 @@ private theorem no_stage
     (unique : NodeOccurrencesUnique scope.source)
     (found : scope.source.lookupExpression? id = some node)
     (form : node.form = .lambda parameters result body)
+    (coercions : node.coercions = [])
     (trace : Staging.Recursive.Size.Expression program registry size scope context environment
       before id (.fault (.stage failedScope call reason)) after) : False := by
   have actual : ∀ {shape requirements}, Staging.Recursive.Occurrence scope id shape requirements →
@@ -58,6 +60,8 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | group occurrence _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | constructorFault occurrence _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
@@ -110,7 +114,7 @@ theorem preserves (size : Nat) :
         simpa only [sameSource, code, head, Formation.code, Formation.function,
           CallableIndexedLambdaGeneration.closure, recaptureCode, receipt.identifier] using trace.sound.semanticFault_plain
       | stage failedScope call reason =>
-        exact False.elim (no_stage unique sourceFound receipt.site.code.sourceForm trace)
+        exact False.elim (no_stage unique sourceFound receipt.site.code.sourceForm receipt.coercions trace)
   obtain ⟨rfl, rfl⟩ := changed
   obtain ⟨payload, native, represented⟩ := CallableIndexedOwnedPreparedStagedPhysicalLambdaFormationHeads.forms caller owner context invocation profile globals slots
     prefixZero receipt environments heaps agrees nativeTyped initial.base.property initial.base.val

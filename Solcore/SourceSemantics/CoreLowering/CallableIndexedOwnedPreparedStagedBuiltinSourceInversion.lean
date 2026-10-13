@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.Staging.RecursiveTraceSize
 import Solcore.SourceSemantics.WellFormed
 
@@ -58,6 +59,13 @@ theorem children
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .call callee arguments (.builtinFunction function) :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | coercedValue contains _ raw _ | coercedFault contains _ raw =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
+      rw [same, form] at shape
+      rcases shape with atomic | ⟨_, _, _, impossible⟩
+      · cases atomic
+      · cases impossible
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       rw [same, form] at atomic

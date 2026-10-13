@@ -7,6 +7,9 @@ import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMe
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalCoercedDirectRawBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercedDirectExpressionBounds
 
 /-! One strong induction closes ordinary calls, selected methods and retained indirect callees
 at actual complete physical cache states. Every body continuation comes from
@@ -160,63 +163,82 @@ theorem preserves_with_methods (size : Nat) :
       exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
         (bodySupport header member) profile wellFormed extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-    have directHeads : PreservesDirect callerBridge.forgetSlots model stages callFaults budget root.support.certificate := by
-      intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.directReady compiler path
-      have rows := CallableIndexedOwnedPreparedStagedDirectCallAuthority.Ready.source_types
-        compiler port.toReady wellFormed root.support.runtime.signatures application
-      have ordered := rows.1 ▸ sequence
-      intro current child code point
+    cases root.support with
+    | ordinary support =>
+      have directHeads : PreservesDirect callerBridge.forgetSlots model stages callFaults budget support.certificate := by
+        intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
+        obtain ⟨port⟩ := support.directReady compiler path
+        have rows := CallableIndexedOwnedPreparedStagedDirectCallAuthority.Ready.source_types
+          compiler port.toReady wellFormed support.runtime.signatures application
+        have ordered := rows.1 ▸ sequence
+        intro current child code point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds.preserves
+          owner compiler port.toPort port.evidence callerBridge keyPhysical (fun state => state.physical)
+          functions callFaults support.unique wellFormed support.runtime support.covers
+          size ordered childMeaning
+          (fun selected => namedBodies size within port.header port.member selected) ⟨rfl, rfl, rfl⟩
+      have methodHeads : PreservesMethod callerBridge.forgetSlots model stages callFaults budget support.certificate := by
+        intro fuel current id code types compiler path sequence size within childMeaning
+        obtain ⟨port⟩ := support.methodReady compiler path
+        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
+        have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.SourceBodies
+            (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
+          intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
+            heapTyped argumentsTyped stable child selected
+          have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
+            simpa only [sourceAtEq] using argumentsTyped
+          simpa only [sourceAtEq] using
+            CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation
+              port.principal packet static wellFormed functions selected installed owner keyPhysical caller
+              heapTyped packetArguments stable extension size
+              (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
+        intro actualScope actualId actualCode point actual found typed
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        cases Option.some.inj (found.symm.trans compiler.metadata.found)
+        have rows := CallableIndexedOwnedPreparedStagedMethodArgumentRows.raw_types compiler port
+          wellFormed support.runtime support.unique typed
+        have ordered := tree_types sequence support.unique rows.1 ▸ sequence
+        intro mapping world administrativeContext environment canonical actualEnvironment actualContext before store ξ outcome after
+        exact CallableIndexedOwnedPreparedStagedMethodHeadBounds.preserves
+          owner compiler port callerBridge keyPhysical.frame (fun state => state.physical)
+          (fun state => state.base.property) functions callFaults support.unique wellFormed
+          support.runtime support.covers size ordered childMeaning bodies ⟨rfl, rfl, rfl⟩ found typed
+      have indirectHeads : PreservesIndirect callerBridge.forgetSlots model stages callFaults budget support.certificate := by
+        intro fuel current id callee ids metadata code types compiler path sequence size within childMeaning
+        obtain ⟨port⟩ := support.callsReady compiler path
+        have calleeCertified : RecursiveStageTupleMeaning.Entries current compiler.entries
+            current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+        intro actualScope actualId actualCode point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.preserves
+          callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
+          wellFormed support.runtime support.covers support.unique support.actualFunctionType
+          observations closurePackets closureSupport bodies
+          compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
+      intro current id code point
+      exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.preserves_reached_with_functions
+        callerBridge.forgetSlots receiver functions wellFormed support.runtime support.covers support.unique
+        observations extension semantic support.sameLedger support.runtimeLedger support.uninitialized
+        budget support.certificate (.root (by simp)) directHeads methodHeads support.indexReady indirectHeads
+        budget (Nat.le_refl _) point
+    | coercedDirect support =>
+      have rawMeaning := CallableIndexedOwnedPreparedStagedPhysicalCoercedDirectRawBounds.preserves
+        support owner keyPhysical functions callFaults
+        budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
+      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.source_bodies
+        owner keyPhysical functions callFaults wellFormed extension support.chain support.methods budget ih
+      intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds.preserves
-        owner compiler port.toPort port.evidence callerBridge keyPhysical (fun state => state.physical)
-        functions callFaults root.support.unique wellFormed root.support.runtime root.support.covers
-        size ordered childMeaning
-        (fun selected => namedBodies size within port.header port.member selected) ⟨rfl, rfl, rfl⟩
-    have methodHeads : PreservesMethod callerBridge.forgetSlots model stages callFaults budget root.support.certificate := by
-      intro fuel current id code types compiler path sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.methodReady compiler path
-      obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
-      have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.SourceBodies
-          (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
-        intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
-          heapTyped argumentsTyped stable child selected
-        have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
-          simpa only [sourceAtEq] using argumentsTyped
-        simpa only [sourceAtEq] using
-          CallableIndexedOwnedPreparedStagedMethodBodyBounds.source_continuation
-            port.principal packet static wellFormed functions selected installed owner keyPhysical caller
-            heapTyped packetArguments stable extension size
-            (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-      intro actualScope actualId actualCode point actual found typed
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      cases Option.some.inj (found.symm.trans compiler.metadata.found)
-      have rows := CallableIndexedOwnedPreparedStagedMethodArgumentRows.raw_types compiler port
-        wellFormed root.support.runtime root.support.unique typed
-      have ordered := tree_types sequence root.support.unique rows.1 ▸ sequence
+      cases Option.some.inj (found.symm.trans support.actual.found)
       intro mapping world administrativeContext environment canonical actualEnvironment actualContext before store ξ outcome after
-      exact CallableIndexedOwnedPreparedStagedMethodHeadBounds.preserves
-        owner compiler port callerBridge keyPhysical.frame (fun state => state.physical)
-        (fun state => state.base.property) functions callFaults root.support.unique wellFormed
-        root.support.runtime root.support.covers size ordered childMeaning bodies ⟨rfl, rfl, rfl⟩ found typed
-    have indirectHeads : PreservesIndirect callerBridge.forgetSlots model stages callFaults budget root.support.certificate := by
-      intro fuel current id callee ids metadata code types compiler path sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.callsReady compiler path
-      have calleeCertified : RecursiveStageTupleMeaning.Entries current compiler.entries
-          current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
-      intro actualScope actualId actualCode point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.preserves
-        callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
-        wellFormed root.support.runtime root.support.covers root.support.unique root.support.actualFunctionType
-        observations closurePackets closureSupport bodies
-        compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
-    intro current id code point
-    exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.preserves_reached_with_functions
-      callerBridge.forgetSlots receiver functions wellFormed root.support.runtime root.support.covers root.support.unique
-      observations extension semantic root.support.sameLedger root.support.runtimeLedger root.support.uninitialized
-      budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
-      budget (Nat.le_refl _) point
+        environments heaps locals agrees actualTyped initial admitted trace
+      exact CallableIndexedOwnedPreparedStagedCoercedDirectExpressionBounds.preserves
+        owner support.actual callerBridge (fun state => state.physical) (fun state => state.base.property)
+        keyPhysical.frame functions callFaults support.chain support.nonempty support.unique wellFormed
+        support.runtime support.covers support.ledger typed environments heaps locals agrees actualTyped initial admitted
+        budget rawMeaning conversionBodies trace (Nat.le_refl _)
+
 
 include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport mixedMethodSupport in
 /-- Every ordinary and method body uses only strictly smaller native grades. -/
@@ -236,64 +258,85 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
       exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
         (bodySupport header member) profile wellFormed extension selected
         (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-    have directHeads : ReflectsDirect callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget root.support.certificate := by
-      intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.directReady compiler path
-      have rows := CallableIndexedOwnedPreparedStagedDirectCallAuthority.Ready.source_types
-        compiler port.toReady wellFormed root.support.runtime.signatures application
-      have ordered := rows.1 ▸ sequence
-      obtain ⟨descriptor⟩ := named_descriptor port.header
-      intro current child code point
+    cases root.support with
+    | ordinary support =>
+      have directHeads : ReflectsDirect callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget support.certificate := by
+        intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
+        obtain ⟨port⟩ := support.directReady compiler path
+        have rows := CallableIndexedOwnedPreparedStagedDirectCallAuthority.Ready.source_types
+          compiler port.toReady wellFormed support.runtime.signatures application
+        have ordered := rows.1 ▸ sequence
+        obtain ⟨descriptor⟩ := named_descriptor port.header
+        intro current child code point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds.reflects
+          owner compiler port.toPort port.evidence callerBridge keyPhysical (fun state => state.physical)
+          functions callFaults support.unique wellFormed support.runtime support.covers stagePrepared descriptor
+          size ordered childMeaning
+          (fun selected => namedBodies size within port.header port.member selected) ⟨rfl, rfl, rfl⟩
+      have methodHeads : ReflectsMethod callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget support.certificate := by
+        intro fuel current id code types compiler path sequence size within childMeaning
+        obtain ⟨port⟩ := support.methodReady compiler path
+        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
+        have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.NativeBodies
+            (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
+          intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
+            heapTyped argumentsTyped stable child selected
+          have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
+            simpa only [sourceAtEq] using argumentsTyped
+          simpa only [sourceAtEq] using
+            CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation
+              port.principal packet static wellFormed functions selected installed owner keyPhysical caller
+              heapTyped packetArguments stable extension size
+              (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
+        intro actualScope actualId actualCode point actual found typed
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        cases Option.some.inj (found.symm.trans compiler.metadata.found)
+        have rows := CallableIndexedOwnedPreparedStagedMethodArgumentRows.raw_types compiler port
+          wellFormed support.runtime support.unique typed
+        have ordered := tree_types sequence support.unique rows.1 ▸ sequence
+        intro mapping world administrativeContext environment canonical actualEnvironment actualContext before store ξ value finalStore
+        exact CallableIndexedOwnedPreparedStagedMethodHeadBounds.reflects
+          owner compiler port callerBridge keyPhysical.frame (fun state => state.physical)
+          (fun state => state.base.property) functions callFaults support.unique wellFormed
+          support.runtime support.covers size ordered childMeaning bodies ⟨rfl, rfl, rfl⟩ found typed
+      have indirectHeads : ReflectsIndirect callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget support.certificate := by
+        intro fuel current id callee ids metadata code types compiler path sequence size within childMeaning
+        obtain ⟨port⟩ := support.callsReady compiler path
+        have calleeCertified : RecursiveStageTupleMeaning.Entries current compiler.entries
+            current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
+        intro actualScope actualId actualCode point
+        obtain ⟨rfl, rfl, rfl⟩ := point
+        exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.reflects
+          callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
+          wellFormed support.runtime support.covers support.unique support.actualFunctionType
+          observations closurePackets closureSupport bodies
+          rfl compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
+      intro current id code point
+      exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.reflects_reached_with_functions
+        callerBridge.forgetSlots receiver functions wellFormed support.runtime support.covers support.unique
+        observations extension semantic support.sameLedger support.runtimeLedger support.uninitialized
+        budget support.certificate (.root (by simp)) directHeads methodHeads support.indexReady indirectHeads
+        budget (Nat.le_refl _) point
+    | coercedDirect support =>
+      obtain ⟨descriptor⟩ := named_descriptor support.port.header
+      have rawMeaning := CallableIndexedOwnedPreparedStagedPhysicalCoercedDirectRawBounds.reflects
+        support owner keyPhysical functions callFaults
+        stagePrepared rfl descriptor
+        budget ih (fun size within {_} selected => namedBodies size within support.port.header support.port.member selected)
+      have conversionBodies := CallableIndexedOwnedPreparedStagedPhysicalCoercionMethodBounds.native_bodies
+        owner keyPhysical functions callFaults wellFormed extension support.chain support.methods budget ih
+      intro current id code point actual found typed
       obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds.reflects
-        owner compiler port.toPort port.evidence callerBridge keyPhysical (fun state => state.physical)
-        functions callFaults root.support.unique wellFormed root.support.runtime root.support.covers stagePrepared descriptor
-        size ordered childMeaning
-        (fun selected => namedBodies size within port.header port.member selected) ⟨rfl, rfl, rfl⟩
-    have methodHeads : ReflectsMethod callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget root.support.certificate := by
-      intro fuel current id code types compiler path sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.methodReady compiler path
-      obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
-      have bodies : CallableIndexedOwnedPreparedStagedMethodHeadBounds.NativeBodies
-          (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
-        intro mapping world heap store callerScope canonical administrative arguments payloads caller installed _parameters
-          heapTyped argumentsTyped stable child selected
-        have packetArguments : Dynamic.ValuesHaveTypes port.principal.sourceFunction.context heap arguments packet.sourceAt.types := by
-          simpa only [sourceAtEq] using argumentsTyped
-        simpa only [sourceAtEq] using
-          CallableIndexedOwnedPreparedStagedMethodBodyBounds.native_continuation
-            port.principal packet static wellFormed functions selected installed owner keyPhysical caller
-            heapTyped packetArguments stable extension size
-            (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-      intro actualScope actualId actualCode point actual found typed
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      cases Option.some.inj (found.symm.trans compiler.metadata.found)
-      have rows := CallableIndexedOwnedPreparedStagedMethodArgumentRows.raw_types compiler port
-        wellFormed root.support.runtime root.support.unique typed
-      have ordered := tree_types sequence root.support.unique rows.1 ▸ sequence
+      cases Option.some.inj (found.symm.trans support.actual.found)
       intro mapping world administrativeContext environment canonical actualEnvironment actualContext before store ξ value finalStore
-      exact CallableIndexedOwnedPreparedStagedMethodHeadBounds.reflects
-        owner compiler port callerBridge keyPhysical.frame (fun state => state.physical)
-        (fun state => state.base.property) functions callFaults root.support.unique wellFormed
-        root.support.runtime root.support.covers size ordered childMeaning bodies ⟨rfl, rfl, rfl⟩ found typed
-    have indirectHeads : ReflectsIndirect callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget root.support.certificate := by
-      intro fuel current id callee ids metadata code types compiler path sequence size within childMeaning
-      obtain ⟨port⟩ := root.support.callsReady compiler path
-      have calleeCertified : RecursiveStageTupleMeaning.Entries current compiler.entries
-          current callee compiler.calleeCode := ⟨rfl, by simp [CallableIndirectCallCertificates.Receipt.entries]⟩
-      intro actualScope actualId actualCode point
-      obtain ⟨rfl, rfl, rfl⟩ := point
-      exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.reflects
-        callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
-        wellFormed root.support.runtime root.support.covers root.support.unique root.support.actualFunctionType
-        observations closurePackets closureSupport bodies
-        rfl compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
-    intro current id code point
-    exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.reflects_reached_with_functions
-      callerBridge.forgetSlots receiver functions wellFormed root.support.runtime root.support.covers root.support.unique
-      observations extension semantic root.support.sameLedger root.support.runtimeLedger root.support.uninitialized
-      budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
-      budget (Nat.le_refl _) point
+        environments heaps locals agrees actualTyped initial admitted trace
+      exact CallableIndexedOwnedPreparedStagedCoercedDirectExpressionBounds.reflects
+        owner support.actual callerBridge (fun state => state.physical) (fun state => state.base.property)
+        keyPhysical.frame functions callFaults support.chain support.nonempty support.unique wellFormed
+        support.runtime support.covers typed environments heaps locals agrees actualTyped initial admitted
+        budget rawMeaning conversionBodies trace (Nat.le_refl _)
+
 
 include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
 /-- The existing named-body API embeds its terminal method packets. -/

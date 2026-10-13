@@ -39,21 +39,8 @@ private theorem body_result_stage {type : TypeSystem.Ty} {outcome : BodyOutcome}
   | unit => cases failed
   | fault => exact congrArg BodyOutcome.fault (Outcome.fault.inj failed)
 
-theorem Expression.stage_origin {program : Program} {registry : Registry} {scope : Scope}
-    {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
-    (trace : Expression program registry scope context environment before id outcome after)
-    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
-    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
-  have origin : ExpressionOrigin outcome := by
-    clear failed
-    induction trace using Expression.rec
-      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
-      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
-      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
-      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+local macro "retain_stage_origin" : tactic =>
+  `(tactic| (
     case rejected occurrence child guard ih =>
       intro s c r same
       cases same
@@ -64,6 +51,9 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       intro s c r same
       cases same
       exact ih s c r rfl
+    case coercionMethod method roots selected parameters allocate body result bodyIH =>
+      intro s c r same
+      exact bodyIH s c r (body_result_stage result same)
     case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
       intro s c r same
       exact bodyIH s c r (body_result_stage result same)
@@ -85,6 +75,27 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
     case indexResult occurrence first second result ih_first ih_second =>
       cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
+  ))
+
+theorem Expression.stage_origin {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
+    (trace : Expression program registry scope context environment before id outcome after)
+    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
+    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
+  have origin : ExpressionOrigin outcome := by
+    clear failed
+    induction trace using Expression.rec
+      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
+      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
   exact origin originScope call reason failed
 
 theorem Expressions.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -102,37 +113,10 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-    case rejected occurrence child guard ih =>
-      intro s c r same
-      cases same
-      exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih
-      | builtinArgumentsFault occurrence children ih
-      | directArgumentsFault occurrence calleeOccurrence children ih =>
-      intro s c r same
-      cases same
-      exact ih s c r rfl
-    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case global instantiates covers roots selected parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case closure selected valid parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case indexResult occurrence first second result ih_first ih_second =>
-      cases result <;> simp_all [ExpressionOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
   exact origin originScope call reason failed
 
 theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -150,37 +134,10 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-    case rejected occurrence child guard ih =>
-      intro s c r same
-      cases same
-      exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih
-      | builtinArgumentsFault occurrence children ih
-      | directArgumentsFault occurrence calleeOccurrence children ih =>
-      intro s c r same
-      cases same
-      exact ih s c r rfl
-    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case global instantiates covers roots selected parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case closure selected valid parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case indexResult occurrence first second result ih_first ih_second =>
-      cases result <;> simp_all [ExpressionOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
   exact origin originScope call reason failed
 
 theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : Registry} {scope : Scope}
@@ -199,37 +156,10 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
-    case rejected occurrence child guard ih =>
-      intro s c r same
-      cases same
-      exact ⟨_, _, _, _, occurrence, guard⟩
-    case tupleFault occurrence children ih | constructorFault occurrence children ih
-      | builtinArgumentsFault occurrence children ih
-      | directArgumentsFault occurrence calleeOccurrence children ih =>
-      intro s c r same
-      cases same
-      exact ih s c r rfl
-    case unaryMethod occurrence dispatch method operand roots selected parameters allocate body result operandIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case binaryMethod occurrence dispatch method first continues second roots selected parameters allocate body result firstIH secondIH bodyIH =>
-      intro s c r same
-      exact bodyIH s c r (body_result_stage result same)
-    case global instantiates covers roots selected parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case closure selected valid parameters allocate body result ih =>
-      intro s c r same
-      exact ih s c r (body_result_stage result same)
-    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
-      rename_i outcome
-      cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
-    case indexResult occurrence first second result ih_first ih_second =>
-      cases result <;> simp_all [ExpressionOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
   exact origin originScope call reason failed
 
 namespace Statements
@@ -261,5 +191,71 @@ theorem Applies.closure_scope {program : Program} {registry : Registry} {scope :
   | closureArity mismatch => exact False.elim (mismatch arity)
   | closure selected _ _ _ _ _ =>
     exact ⟨_, selected, registry.source selected, registry.context selected, registry.evidence selected⟩
+
+theorem RawForm.stage_origin {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {form : ExpressionForm} {requirements : List RequirementId} {coercions : List SourceInference.CoercionStep} {outcome : Outcome}
+    (trace : RawForm program registry scope context environment before form requirements coercions outcome after)
+    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
+    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
+  have origin : ExpressionOrigin outcome := by
+    clear failed
+    induction trace using RawForm.rec
+      (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
+      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
+  exact origin originScope call reason failed
+
+theorem CoercionStep.stage_origin {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {step : SourceInference.CoercionStep}
+    {input : Value} {outcome : Outcome}
+    (trace : CoercionStep program registry scope context before step input outcome after)
+    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
+    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
+  have origin : ExpressionOrigin outcome := by
+    clear failed
+    induction trace using CoercionStep.rec
+      (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
+      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
+  exact origin originScope call reason failed
+
+theorem CoercionPath.stage_origin {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {steps : List SourceInference.CoercionStep}
+    {input : Value} {outcome : Outcome}
+    (trace : CoercionPath program registry scope context before steps input outcome after)
+    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
+    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
+  have origin : ExpressionOrigin outcome := by
+    clear failed
+    induction trace using CoercionPath.rec
+      (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
+      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+    retain_stage_origin
+  exact origin originScope call reason failed
 
 end Solcore.SourceSemantics.Staging.Recursive

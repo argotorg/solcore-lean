@@ -102,6 +102,35 @@ def ForLoopAt (size : Nat) : Prop :=
     Size.ForLoop program registry size scope context environment before condition post body (.fault failure) after →
     HeapWellTyped context after ∧ HeapTypesExtend before after
 
+def RawFormAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context : Context} {environment : Environment}
+    {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId}
+    {coercions : List SourceInference.CoercionStep} {failure : Failure}
+    {rawType finalType : TypeSystem.Ty} {plan : ExpressionRequirementPlan},
+    SourceRuntimeValid program context scope.source → scope.evidence.Covers context →
+    EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+    (∃ id node, ContainsExpression scope.source id node ∧ node.form = form ∧ node.rawType = rawType) →
+    ExpressionFormHasRawType scope.source context form rawType plan →
+    ExpressionRequirementPlan.Valid context rawType finalType plan requirements coercions →
+    Size.RawForm program registry size scope context environment before form requirements coercions (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
+def CoercionStepAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context : Context} {before after : Heap} {step : SourceInference.CoercionStep}
+    {input : Value} {failure : Failure},
+    SourceRuntimeValid program context scope.source → HeapWellTyped context before →
+    ValueHasType context before input step.source → CoercionStepValid context step →
+    Size.CoercionStep program registry size scope context before step input (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
+def CoercionPathAt (size : Nat) : Prop :=
+  ∀ {scope : Scope} {context : Context} {before after : Heap} {steps : List SourceInference.CoercionStep}
+    {input : Value} {failure : Failure} {sourceType targetType : TypeSystem.Ty},
+    SourceRuntimeValid program context scope.source → HeapWellTyped context before →
+    ValueHasType context before input sourceType → CoercionPathValid context sourceType targetType steps →
+    Size.CoercionPath program registry size scope context before steps input (.fault failure) after →
+    HeapWellTyped context after ∧ HeapTypesExtend before after
+
 variable {program registry}
 
 /-- A typed successful prefix uses its actual erasure; no completion is added
@@ -138,6 +167,29 @@ theorem expressions_values (wellFormed : ProgramWellFormed program)
   termination_by size
   decreasing_by exact Size.child_lt_stepSize (by simp)
 
+theorem raw_form_value (wellFormed : ProgramWellFormed program)
+    {size : Nat} {scope : Scope} {context : Context} {environment : Environment}
+    {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId}
+    {coercions : List SourceInference.CoercionStep} {value : Value}
+    {rawType finalType : TypeSystem.Ty} {plan : ExpressionRequirementPlan}
+    (runtime : SourceRuntimeValid program context scope.source) (covers : scope.evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
+    (occurrence : ∃ id node, ContainsExpression scope.source id node ∧ node.form = form ∧ node.rawType = rawType)
+    (typed : ExpressionFormHasRawType scope.source context form rawType plan)
+    (valid : ExpressionRequirementPlan.Valid context rawType finalType plan requirements coercions)
+    (trace : Size.RawForm program registry size scope context environment before form requirements coercions (.value value) after) :
+    ValueHasType context after value rawType ∧ HeapWellTyped context after ∧ HeapTypesExtend before after :=
+  trace.sound.value_plain.preserved wellFormed runtime covers locals heap occurrence typed valid
+
+theorem coercion_step_value (wellFormed : ProgramWellFormed program)
+    {size : Nat} {scope : Scope} {context : Context} {before after : Heap}
+    {step : SourceInference.CoercionStep} {input value : Value}
+    (runtime : SourceRuntimeValid program context scope.source) (heap : HeapWellTyped context before)
+    (typed : ValueHasType context before input step.source) (valid : CoercionStepValid context step)
+    (trace : Size.CoercionStep program registry size scope context before step input (.value value) after) :
+    ValueHasType context after value step.target ∧ HeapWellTyped context after ∧ HeapTypesExtend before after :=
+  trace.sound.value_plain.preserved wellFormed runtime heap typed valid
+
 /-- The used occurrence and source typing identify one actual raw form. -/
 theorem expression_form {scope : Scope} {context : Context} {id : ExpressionId}
     {form : ExpressionForm} {type : TypeSystem.Ty} {requirements : List RequirementId}
@@ -170,9 +222,10 @@ theorem expression_form_plan {scope : Scope} {context : Context} {id : Expressio
 /-- Atomic failures cannot execute a child or change the source heap. -/
 theorem atomic_fault_heap {scope : Scope} {context : Context} {environment : Environment}
     {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId} {reason : SemanticFault}
+    {coercions : List SourceInference.CoercionStep}
     (atomic : AtomicForm form)
     (trace : ExpressionFormFaults program context scope.evidence scope.source environment before
-      form requirements [] reason after) : after = before := by
+      form requirements coercions reason after) : after = before := by
   cases atomic <;> cases trace <;> try rfl
   case unit.tuple children => cases children
 

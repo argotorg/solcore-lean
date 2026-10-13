@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPositiveFunctionModels
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedIndirectValuesPrefix
@@ -85,6 +86,13 @@ private theorem source_prefix
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | coercedValue contains _ raw _ | coercedFault contains _ raw =>
+      have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+      have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
+      rw [same, form] at shape
+      rcases shape with atomic | ⟨_, _, _, impossible⟩
+      · cases atomic
+      · cases impossible
   | atomicValue contains atomic _ _ | atomicFault contains atomic _ _ =>
       have actualForm := (congrArg ExpressionNode.form (same_node contains)).trans form
       rw [actualForm] at atomic

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageArguments
 import Solcore.SourceSemantics.CoreLowering.RecursiveStagePrimitiveMeaning
 import Solcore.SourceSemantics.CoreLowering.CompatibleExpressionTupleCertificates
@@ -115,6 +116,8 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
     ∃ sequence, Staging.Recursive.Expressions program stages invocation context environment before ids sequence after ∧
       PacksOutcome sequence outcome := by
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic uncoerced raw =>
     have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
     subst node

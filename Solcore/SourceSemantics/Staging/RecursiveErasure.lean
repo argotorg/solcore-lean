@@ -30,6 +30,29 @@ private def AppliesPlain (program : Program) (scope : Scope) (context : Context)
   | .fault (.semantic reason) => ∃ invocationEvidence, CallableFaults program context scope.evidence invocationEvidence before callee arguments reason after
   | .fault (.stage ..) => True
 
+private def RawFormPlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (form : ExpressionForm)
+    (requirements : List RequirementId) (coercions : List SourceInference.CoercionStep)
+    (outcome : Outcome) (after : Heap) : Prop :=
+  match outcome with
+  | .value value => ExpressionFormEvaluates program context scope.evidence scope.source environment before form requirements coercions value after
+  | .fault (.semantic reason) => ExpressionFormFaults program context scope.evidence scope.source environment before form requirements coercions reason after
+  | .fault (.stage ..) => True
+
+private def CoercionStepPlain (program : Program) (scope : Scope) (context : Context)
+    (before : Heap) (step : SourceInference.CoercionStep) (input : Value) (outcome : Outcome) (after : Heap) : Prop :=
+  match outcome with
+  | .value value => CoercionStepExecutes program context scope.evidence before step input value after
+  | .fault (.semantic reason) => CoercionStepFaults program context scope.evidence before step input reason after
+  | .fault (.stage ..) => True
+
+private def CoercionPathPlain (program : Program) (scope : Scope) (context : Context)
+    (before : Heap) (steps : List SourceInference.CoercionStep) (input : Value) (outcome : Outcome) (after : Heap) : Prop :=
+  match outcome with
+  | .value value => CoercionPathExecutes program context scope.evidence before steps input value after
+  | .fault (.semantic reason) => CoercionPathFaults program context scope.evidence before steps input reason after
+  | .fault (.stage ..) => True
+
 def StatementsPlain (program : Program) (mode : Bool) (scope : Scope) (context : Context)
     (environment : Environment) (before : Heap) (ids : List StatementId) (finalContext : Context)
     (outcome : BodyOutcome) (after : Heap) : Prop :=
@@ -441,6 +464,433 @@ private theorem builtin_fault_evidence {program : Program} {context : Context}
   | builtinArity mismatch => exact .builtinArity mismatch
   | builtinArgumentType arity mismatch => exact .builtinArgumentType arity mismatch
 
+local macro "erase_recursive_plain" : tactic =>
+  `(tactic| (
+    case coercedValue contains _nonempty raw path rawIH pathIH =>
+      rename_i outcome
+      cases outcome with
+      | value => exact .intro contains rawIH pathIH
+      | fault failure => cases failure with
+        | semantic => exact .coercion contains rawIH pathIH
+        | stage => trivial
+    case coercedFault contains _nonempty raw rawIH =>
+      rename_i failure
+      cases failure with
+      | semantic => exact .form contains rawIH
+      | stage => trivial
+    case rawAtomicValue _ valueRule => exact valueRule
+    case rawAtomicFault _ faultRule => exact faultRule
+    case rawDirectArgumentsFault calleeOccurrence children childrenIH =>
+      rename_i failure requirements coercions
+      cases failure with
+      | stage => trivial
+      | semantic =>
+        obtain ⟨node, found, form, _requirements, _coercions⟩ := calleeOccurrence
+        exact .directArguments found form childrenIH
+    case rawDirectApplied calleeOccurrence valid children callEvidence invocation childrenIH invocationIH =>
+      rename_i evidence outcome requirements coercions
+      cases outcome with
+      | value =>
+        obtain ⟨_, applied⟩ := invocationIH
+        obtain ⟨node, found, form, requirements, coercions⟩ := calleeOccurrence
+        exact .directCall found form requirements coercions valid childrenIH callEvidence (global_applies_evidence applied)
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic =>
+          obtain ⟨_, fault⟩ := invocationIH
+          exact .directApply childrenIH callEvidence (global_fault_evidence fault)
+    case coercionPrimitive noSource applies => exact .primitive noSource applies
+    case coercionRequirement fault => exact .requirement fault
+    case coercionPrimitiveInput noSource invalid actual => exact .primitiveInput noSource invalid actual
+    case coercionMethod method roots selected parameters allocate body result bodyIH =>
+      rename_i outcome resultOutcome
+      have plain := method_body_result (by cases method; assumption) roots selected parameters allocate bodyIH result
+      cases resultOutcome with
+      | value => exact .method method plain
+      | fault failure => cases failure with
+        | semantic => exact .method method plain
+        | stage => trivial
+    case coercionsNil => exact .nil
+    case coercionsCons head tail headIH tailIH =>
+      rename_i outcome
+      cases outcome with
+      | value => exact .cons headIH tailIH
+      | fault failure => cases failure with
+        | semantic => exact .tail headIH tailIH
+        | stage => trivial
+    case coercionsFault head headIH =>
+      rename_i failure
+      cases failure with
+      | semantic => exact .head headIH
+      | stage => trivial
+    case atomicValue contains _ uncoerced valueRule =>
+      exact .intro contains (by simpa only [uncoerced] using valueRule) (by simpa only [uncoerced] using CoercionPathExecutes.nil)
+    case atomicFault contains _ uncoerced faultRule =>
+      exact .form contains (by simpa only [uncoerced] using faultRule)
+    case group occurrence child ih =>
+      rename_i outcome
+      cases outcome with
+      | value => exact value_occurrence occurrence (.group rfl ih)
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic => exact fault_occurrence occurrence (.group rfl ih)
+    case pair occurrence first second a b =>
+      exact value_occurrence occurrence (.tuple rfl (.cons a (.cons b .nil)) (.cons (.singleton _)))
+    case pairLeftFault occurrence child ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.tuple rfl (.head ih))
+    case pairRightFault occurrence first second a b =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.tuple rfl (.tail a (.head b)))
+    case tupleValue occurrence children pack ih =>
+      exact value_occurrence occurrence (.tuple rfl ih pack)
+    case tupleFault occurrence children ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.tuple rfl ih)
+    case constructorValue occurrence valid children ih =>
+      exact value_occurrence occurrence (.constructor rfl valid ih)
+    case constructorFault occurrence children ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.constructorArgument rfl ih)
+    case indexBaseFault occurrence first a =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.indexBase rfl a)
+    case indexKeyFault occurrence first second a b =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.indexKey rfl a b)
+    case indexResult occurrence first second result a b =>
+      cases result with
+      | found shape located => cases shape; exact value_occurrence occurrence (.indexFound rfl a b located)
+      | default shape absent defaulted => cases shape; exact value_occurrence occurrence (.indexDefault rfl a b absent defaulted)
+      | shape invalid => exact fault_occurrence occurrence (.indexShape rfl a b invalid)
+      | keyType shape typed mismatch => cases shape; exact fault_occurrence occurrence (.indexKeyType rfl a b typed mismatch)
+      | unavailable shape typed absent missing => cases shape; exact fault_occurrence occurrence (.indexDefaultUnavailable rfl a b typed absent missing)
+    case unary occurrence child applies ih =>
+      exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
+    case unaryOperandFault occurrence child ih =>
+      rename_i failure requirements
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.unaryOperand (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
+    case unaryInvalid occurrence child invalid ih =>
+      exact fault_occurrence occurrence (.unaryApply (owned := []) rfl ih (.primitive invalid))
+    case binaryLeftFault occurrence first ih =>
+      rename_i failure requirements
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.binaryLeft (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
+    case binaryLeftInvalid occurrence first invalid ih =>
+      exact fault_occurrence occurrence (.binaryLeftOperand (owned := []) rfl ih invalid)
+    case binaryShortCircuit occurrence first circuit ih =>
+      exact value_occurrence occurrence (.binaryShortCircuit (owned := []) rfl ih circuit rfl)
+    case binaryRightFault occurrence first continues second a b =>
+      rename_i failure requirements
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.binaryRight (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) a continues b)
+    case binary occurrence first continues second applies a b =>
+      exact value_occurrence occurrence (.binaryEvaluateRight (owned := []) rfl a continues b (.primitive applies))
+    case binaryInvalid occurrence first continues second invalid a b =>
+      exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.primitive invalid))
+    case unaryMethod occurrence dispatch method operand rootsEq selected parameters allocate body resultRule operandIH bodyIH =>
+      rename_i outcome result
+      have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
+      cases result with
+      | value => exact value_occurrence occurrence (.unary (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic => exact fault_occurrence occurrence (.unaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
+    case binaryMethod occurrence dispatch method first continues second rootsEq selected parameters allocate body resultRule firstIH secondIH bodyIH =>
+      rename_i outcome result
+      have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
+      cases result with
+      | value => exact value_occurrence occurrence (.binaryEvaluateRight (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic => exact fault_occurrence occurrence (.binaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
+    case conditional occurrence test branch a b =>
+      rename_i truth outcome
+      cases outcome with
+      | value => cases truth with
+        | false => exact value_occurrence occurrence (.conditionalFalse rfl a b)
+        | true => exact value_occurrence occurrence (.conditionalTrue rfl a b)
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic => cases truth with
+          | false => exact fault_occurrence occurrence (.conditionalFalseBranch rfl a b)
+          | true => exact fault_occurrence occurrence (.conditionalTrueBranch rfl a b)
+    case conditionalFault occurrence test ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.conditionalCondition rfl ih)
+    case builtinArgumentsFault occurrence children ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.builtinArguments rfl ih)
+    case builtinApplied occurrence children invocation a b =>
+      rename_i outcome
+      cases outcome with
+      | value =>
+        obtain ⟨_, applied⟩ := b
+        exact value_occurrence occurrence (.builtinCall rfl a (builtin_applies_evidence applied))
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic =>
+          obtain ⟨_, fault⟩ := b
+          exact fault_occurrence occurrence (.builtinApply rfl a (builtin_fault_evidence fault))
+    case directArgumentsFault occurrence calleeOccurrence children ih =>
+      rename_i failure requirements
+      cases failure with
+      | stage => trivial
+      | semantic =>
+        obtain ⟨node, found, form, _requirements, _coercions⟩ := calleeOccurrence
+        exact fault_occurrence occurrence (.directArguments found form ih)
+    case directApplied occurrence calleeOccurrence valid children callEvidence invocation a b =>
+      rename_i evidence outcome requirements
+      cases outcome with
+      | value =>
+        obtain ⟨_, applied⟩ := b
+        obtain ⟨node, found, form, requirements, coercions⟩ := calleeOccurrence
+        exact value_occurrence occurrence (.directCall found form requirements coercions valid a
+          callEvidence (global_applies_evidence applied))
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic =>
+          obtain ⟨_, fault⟩ := b
+          exact fault_occurrence occurrence (.directApply a callEvidence (global_fault_evidence fault))
+    case calleeFault occurrence child ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.indirectCallee ih)
+    case notCallable occurrence child invalid ih => exact fault_occurrence occurrence (.indirectNotCallable ih invalid)
+    case rejected => trivial
+    case argumentsFault occurrence child guard children a b =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact fault_occurrence occurrence (.indirectArguments a guard.callable b)
+    case sourceArity occurrence child guard children mismatch a b =>
+      exact fault_occurrence occurrence (.indirectSourceArity a b (Ne.symm mismatch))
+    case applied occurrence uncoerced child guard children arity invocation a b c =>
+      rename_i values outcome
+      obtain ⟨packed, pack⟩ := ValuesPack.exists_pack values
+      have appliedArity := children.length.symm.trans arity
+      cases outcome with
+      | value =>
+        obtain ⟨invocationEvidence, applied⟩ := c
+        exact value_occurrence occurrence (.indirectCall (by simp [uncoerced, coercionRequirementIds]) a b pack
+          (by simpa only [uncoerced] using CoercionPathExecutes.nil) pack arity appliedArity applied)
+      | fault failure => cases failure with
+        | stage => trivial
+        | semantic =>
+          obtain ⟨invocationEvidence, applied⟩ := c
+          exact fault_occurrence occurrence (.indirectApply a b pack (by simpa only [uncoerced] using CoercionPathExecutes.nil) pack arity appliedArity applied)
+    case nil => exact ExpressionsEvaluate.nil
+    case cons head tail a b => exact .cons a b
+    case headFault head ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head ih
+    case tailFault head tail a b =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .tail a b
+    case builtin primitive => exact ⟨[], .builtin primitive⟩
+    case builtinArity mismatch => exact ⟨[], .builtinArity mismatch⟩
+    case builtinType arity mismatch => exact ⟨[], .builtinArgumentType arity mismatch⟩
+    case closureArity mismatch => exact ⟨[], .closureArity mismatch⟩
+    case globalArity instantiates mismatch => exact ⟨[], .globalArity instantiates mismatch⟩
+    case global instantiates covers roots selected parameters allocate body result ih =>
+      exact global_body_result instantiates covers roots selected parameters allocate ih result
+    case closure selected valid parameters allocate body result ih => exact body_result selected valid parameters allocate ih result
+    case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
+    case returnUnit contains form => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnUnit contains form)
+    case returnValue contains form child ih => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnValue contains form ih)
+    case returnFault contains form child ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.returnValue contains form ih)
+    case tail contains form child ih => exact .tailExpression contains form ih
+    case discard contains form child next a b => exact StatementsPlain.prepend contains (by intro e; simp [form]) (.expression contains form a) b
+    case discardValue contains form child next a b => exact StatementsPlain.discard_value contains form a b
+    case ifConditionFault contains form test ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.ifCondition contains form ih)
+    case ifReturned contains form test branch a b =>
+      exact StatementsPlain.terminal contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b)
+    case ifFault contains form test branch a b =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (StatementsPlain.if_fault contains form a b)
+    case ifFallthrough contains form test branch next a b c =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b) c
+    case expressionFault contains form child ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.expression contains form ih)
+    case assignBare contains form snapshot child write _next childIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
+    case assignBareFault contains form snapshot child childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignValue contains form
+          (.rhs (snapshot.resolves _ _ _ _) childIH))
+    case assignBareUnbound contains form _bare missing =>
+      exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
+    case assignBareDangling contains form _bare lookup missing =>
+      exact StatementsPlain.head_fault (.assignValue contains form (.target (.dangling lookup missing)))
+    case letUninitialized contains form mono extension allocate next ih =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (.letUninitialized contains form mono extension allocate) ih
+    case letInitialized contains form child mono extension allocate next a b =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (.letInitialized contains form a mono extension allocate) b
+    case letFault contains form mono child ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono ih)
+
+    case blockReturned contains form inner ih =>
+      exact StatementsPlain.terminal contains (by intro e; simp [form]) (.block contains form ih)
+    case blockFault contains form inner ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.block contains form ih)
+    case blockFallthrough contains form inner next innerIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (.block contains form innerIH) nextIH
+    case whileReturned contains form loop ih =>
+      exact StatementsPlain.terminal contains (by intro e; simp [form]) (.whileLoop contains form ih)
+    case whileFault contains form loop ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.whileIteration contains form ih)
+    case whileFallthrough contains form loop next loopIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (.whileLoop contains form loopIH) nextIH
+    case done test ih => exact .done ih
+    case conditionFault test ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .condition ih
+    case returned test body testIH bodyIH => exact .returns testIH bodyIH
+    case bodyFault test body testIH bodyIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .body testIH bodyIH
+    case next test body next testIH bodyIH nextIH => exact WhilePlain.next testIH bodyIH nextIH
+
+    case matchReturned contains form matched ih =>
+      exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
+    case matchFault contains form matched ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (ih _ _ contains form)
+    case matchFallthrough contains form matched next matchIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro e; simp [form]) (matchIH _ _ contains form) nextIH
+    case scrutineeFault scrutinee ih =>
+      rename_i failure
+      intro id node contains form
+      cases failure with
+      | stage => trivial
+      | semantic => exact .matchScrutinee contains form ih
+    case patternFault contains scrutinee allocated invalid ih =>
+      intro id node found form
+      exact .matchPattern found form contains ih allocated invalid
+    case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
+      exact MatchPlain.arm contains scrutineeIH hidden selected extended allocated bodyIH
+    case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
+      exact MatchPlain.default contains scrutineeIH hidden selected bodyIH
+    case noBranch contains scrutinee hidden selected ih =>
+      intro id node found form
+      exact .matchNoBranch found form contains ih hidden selected
+
+    case forInitializerFault contains form initial initialIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.forInitializer contains form initialIH)
+    case forReturned contains form initial loop initialIH loopIH =>
+      exact StatementsPlain.terminal contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH)
+    case forFault contains form initial loop initialIH loopIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.forIteration contains form initialIH loopIH)
+    case forFallthrough contains form initial loop next initialIH loopIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH) nextIH
+    case empty => exact .nil
+    case absent mono extended allocated next nextIH =>
+      exact ForItemsPlain.prepend (.letUninitialized mono extended allocated) nextIH
+    case initialized mono extended child allocated next childIH nextIH =>
+      exact ForItemsPlain.prepend (.letInitialized childIH mono extended allocated) nextIH
+    case initializerFault mono child childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.letInitializer mono childIH)
+    case expression child next childIH nextIH => exact ForItemsPlain.prepend (.expression childIH) nextIH
+    case expressionFailure child childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.expression childIH)
+    case assignment snapshot child write next childIH nextIH =>
+      exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
+    case assignmentFailure snapshot child childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) childIH))
+    case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
+    case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
+    case testFault test testIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .condition testIH
+    case finished test testIH => exact .done testIH
+    case bodyFailure test branch testIH branchIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .body testIH branchIH
+    case returnedFromBody test branch testIH branchIH => exact .returns testIH branchIH
+    case postFailure test branch postTrace testIH branchIH postIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .postFallthrough testIH branchIH postIH
+    case iterate test branch postTrace next testIH branchIH postIH nextIH =>
+      exact ForLoopPlain.next testIH branchIH postIH nextIH
+  ))
+
 private theorem projection {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {outcome : Outcome}
     (trace : Expression program registry scope context environment before id outcome after) :
@@ -453,372 +903,100 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
     (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
     (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
-  case atomicValue contains _ uncoerced valueRule =>
-    exact .intro contains (by simpa only [uncoerced] using valueRule) (by simpa only [uncoerced] using CoercionPathExecutes.nil)
-  case atomicFault contains _ uncoerced faultRule =>
-    exact .form contains (by simpa only [uncoerced] using faultRule)
-  case group occurrence child ih =>
-    rename_i outcome
-    cases outcome with
-    | value => exact value_occurrence occurrence (.group rfl ih)
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic => exact fault_occurrence occurrence (.group rfl ih)
-  case pair occurrence first second a b =>
-    exact value_occurrence occurrence (.tuple rfl (.cons a (.cons b .nil)) (.cons (.singleton _)))
-  case pairLeftFault occurrence child ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.tuple rfl (.head ih))
-  case pairRightFault occurrence first second a b =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.tuple rfl (.tail a (.head b)))
-  case tupleValue occurrence children pack ih =>
-    exact value_occurrence occurrence (.tuple rfl ih pack)
-  case tupleFault occurrence children ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.tuple rfl ih)
-  case constructorValue occurrence valid children ih =>
-    exact value_occurrence occurrence (.constructor rfl valid ih)
-  case constructorFault occurrence children ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.constructorArgument rfl ih)
-  case indexBaseFault occurrence first a =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.indexBase rfl a)
-  case indexKeyFault occurrence first second a b =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.indexKey rfl a b)
-  case indexResult occurrence first second result a b =>
-    cases result with
-    | found shape located => cases shape; exact value_occurrence occurrence (.indexFound rfl a b located)
-    | default shape absent defaulted => cases shape; exact value_occurrence occurrence (.indexDefault rfl a b absent defaulted)
-    | shape invalid => exact fault_occurrence occurrence (.indexShape rfl a b invalid)
-    | keyType shape typed mismatch => cases shape; exact fault_occurrence occurrence (.indexKeyType rfl a b typed mismatch)
-    | unavailable shape typed absent missing => cases shape; exact fault_occurrence occurrence (.indexDefaultUnavailable rfl a b typed absent missing)
-  case unary occurrence child applies ih =>
-    exact value_occurrence occurrence (.unary (owned := []) rfl ih (.primitive applies))
-  case unaryOperandFault occurrence child ih =>
-    rename_i failure requirements
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.unaryOperand (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
-  case unaryInvalid occurrence child invalid ih =>
-    exact fault_occurrence occurrence (.unaryApply (owned := []) rfl ih (.primitive invalid))
-  case binaryLeftFault occurrence first ih =>
-    rename_i failure requirements
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.binaryLeft (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) ih)
-  case binaryLeftInvalid occurrence first invalid ih =>
-    exact fault_occurrence occurrence (.binaryLeftOperand (owned := []) rfl ih invalid)
-  case binaryShortCircuit occurrence first circuit ih =>
-    exact value_occurrence occurrence (.binaryShortCircuit (owned := []) rfl ih circuit rfl)
-  case binaryRightFault occurrence first continues second a b =>
-    rename_i failure requirements
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.binaryRight (owned := requirements) (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) a continues b)
-  case binary occurrence first continues second applies a b =>
-    exact value_occurrence occurrence (.binaryEvaluateRight (owned := []) rfl a continues b (.primitive applies))
-  case binaryInvalid occurrence first continues second invalid a b =>
-    exact fault_occurrence occurrence (.binaryApply (owned := []) rfl a continues b (.primitive invalid))
-  case unaryMethod occurrence dispatch method operand rootsEq selected parameters allocate body resultRule operandIH bodyIH =>
-    rename_i outcome result
-    have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
-    cases result with
-    | value => exact value_occurrence occurrence (.unary (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic => exact fault_occurrence occurrence (.unaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) operandIH (.method dispatch method plain))
-  case binaryMethod occurrence dispatch method first continues second rootsEq selected parameters allocate body resultRule firstIH secondIH bodyIH =>
-    rename_i outcome result
-    have plain := method_body_result (by cases method; assumption) rootsEq selected parameters allocate bodyIH resultRule
-    cases result with
-    | value => exact value_occurrence occurrence (.binaryEvaluateRight (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic => exact fault_occurrence occurrence (.binaryApply (by simp [OrdinaryRequirementLayout, coercionRequirementIds]) firstIH continues secondIH (.method dispatch method plain))
-  case conditional occurrence test branch a b =>
-    rename_i truth outcome
-    cases outcome with
-    | value => cases truth with
-      | false => exact value_occurrence occurrence (.conditionalFalse rfl a b)
-      | true => exact value_occurrence occurrence (.conditionalTrue rfl a b)
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic => cases truth with
-        | false => exact fault_occurrence occurrence (.conditionalFalseBranch rfl a b)
-        | true => exact fault_occurrence occurrence (.conditionalTrueBranch rfl a b)
-  case conditionalFault occurrence test ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.conditionalCondition rfl ih)
-  case builtinArgumentsFault occurrence children ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.builtinArguments rfl ih)
-  case builtinApplied occurrence children invocation a b =>
-    rename_i outcome
-    cases outcome with
-    | value =>
-      obtain ⟨_, applied⟩ := b
-      exact value_occurrence occurrence (.builtinCall rfl a (builtin_applies_evidence applied))
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic =>
-        obtain ⟨_, fault⟩ := b
-        exact fault_occurrence occurrence (.builtinApply rfl a (builtin_fault_evidence fault))
-  case directArgumentsFault occurrence calleeOccurrence children ih =>
-    rename_i failure requirements
-    cases failure with
-    | stage => trivial
-    | semantic =>
-      obtain ⟨node, found, form, _requirements, _coercions⟩ := calleeOccurrence
-      exact fault_occurrence occurrence (.directArguments found form ih)
-  case directApplied occurrence calleeOccurrence valid children callEvidence invocation a b =>
-    rename_i evidence outcome requirements
-    cases outcome with
-    | value =>
-      obtain ⟨_, applied⟩ := b
-      obtain ⟨node, found, form, requirements, coercions⟩ := calleeOccurrence
-      exact value_occurrence occurrence (.directCall found form requirements coercions valid a
-        callEvidence (global_applies_evidence applied))
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic =>
-        obtain ⟨_, fault⟩ := b
-        exact fault_occurrence occurrence (.directApply a callEvidence (global_fault_evidence fault))
-  case calleeFault occurrence child ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.indirectCallee ih)
-  case notCallable occurrence child invalid ih => exact fault_occurrence occurrence (.indirectNotCallable ih invalid)
-  case rejected => trivial
-  case argumentsFault occurrence child guard children a b =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact fault_occurrence occurrence (.indirectArguments a guard.callable b)
-  case sourceArity occurrence child guard children mismatch a b =>
-    exact fault_occurrence occurrence (.indirectSourceArity a b (Ne.symm mismatch))
-  case applied occurrence uncoerced child guard children arity invocation a b c =>
-    rename_i values outcome
-    obtain ⟨packed, pack⟩ := ValuesPack.exists_pack values
-    have appliedArity := children.length.symm.trans arity
-    cases outcome with
-    | value =>
-      obtain ⟨invocationEvidence, applied⟩ := c
-      exact value_occurrence occurrence (.indirectCall (by simp [uncoerced, coercionRequirementIds]) a b pack
-        (by simpa only [uncoerced] using CoercionPathExecutes.nil) pack arity appliedArity applied)
-    | fault failure => cases failure with
-      | stage => trivial
-      | semantic =>
-        obtain ⟨invocationEvidence, applied⟩ := c
-        exact fault_occurrence occurrence (.indirectApply a b pack (by simpa only [uncoerced] using CoercionPathExecutes.nil) pack arity appliedArity applied)
-  case nil => exact ExpressionsEvaluate.nil
-  case cons head tail a b => exact .cons a b
-  case headFault head ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .head ih
-  case tailFault head tail a b =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .tail a b
-  case builtin primitive => exact ⟨[], .builtin primitive⟩
-  case builtinArity mismatch => exact ⟨[], .builtinArity mismatch⟩
-  case builtinType arity mismatch => exact ⟨[], .builtinArgumentType arity mismatch⟩
-  case closureArity mismatch => exact ⟨[], .closureArity mismatch⟩
-  case globalArity instantiates mismatch => exact ⟨[], .globalArity instantiates mismatch⟩
-  case global instantiates covers roots selected parameters allocate body result ih =>
-    exact global_body_result instantiates covers roots selected parameters allocate ih result
-  case closure selected valid parameters allocate body result ih => exact body_result selected valid parameters allocate ih result
-  case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
-  case returnUnit contains form => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnUnit contains form)
-  case returnValue contains form child ih => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnValue contains form ih)
-  case returnFault contains form child ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.returnValue contains form ih)
-  case tail contains form child ih => exact .tailExpression contains form ih
-  case discard contains form child next a b => exact StatementsPlain.prepend contains (by intro e; simp [form]) (.expression contains form a) b
-  case discardValue contains form child next a b => exact StatementsPlain.discard_value contains form a b
-  case ifConditionFault contains form test ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.ifCondition contains form ih)
-  case ifReturned contains form test branch a b =>
-    exact StatementsPlain.terminal contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b)
-  case ifFault contains form test branch a b =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (StatementsPlain.if_fault contains form a b)
-  case ifFallthrough contains form test branch next a b c =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b) c
-  case expressionFault contains form child ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.expression contains form ih)
-  case assignBare contains form snapshot child write _next childIH nextIH =>
-    exact StatementsPlain.prepend contains (by intro expression; simp [form])
-      (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
-  case assignBareFault contains form snapshot child childIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.assignValue contains form
-        (.rhs (snapshot.resolves _ _ _ _) childIH))
-  case assignBareUnbound contains form _bare missing =>
-    exact StatementsPlain.head_fault (.assignValue contains form (.target (.unbound missing)))
-  case assignBareDangling contains form _bare lookup missing =>
-    exact StatementsPlain.head_fault (.assignValue contains form (.target (.dangling lookup missing)))
-  case letUninitialized contains form mono extension allocate next ih =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.letUninitialized contains form mono extension allocate) ih
-  case letInitialized contains form child mono extension allocate next a b =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.letInitialized contains form a mono extension allocate) b
-  case letFault contains form mono child ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.letInitializer contains form mono ih)
+    (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
+    (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
+    (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+  erase_recursive_plain
 
-  case blockReturned contains form inner ih =>
-    exact StatementsPlain.terminal contains (by intro e; simp [form]) (.block contains form ih)
-  case blockFault contains form inner ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.block contains form ih)
-  case blockFallthrough contains form inner next innerIH nextIH =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.block contains form innerIH) nextIH
-  case whileReturned contains form loop ih =>
-    exact StatementsPlain.terminal contains (by intro e; simp [form]) (.whileLoop contains form ih)
-  case whileFault contains form loop ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.whileIteration contains form ih)
-  case whileFallthrough contains form loop next loopIH nextIH =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (.whileLoop contains form loopIH) nextIH
-  case done test ih => exact .done ih
-  case conditionFault test ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .condition ih
-  case returned test body testIH bodyIH => exact .returns testIH bodyIH
-  case bodyFault test body testIH bodyIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .body testIH bodyIH
-  case next test body next testIH bodyIH nextIH => exact WhilePlain.next testIH bodyIH nextIH
+private theorem rawform_projection {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {form : ExpressionForm} {requirements : List RequirementId} {coercions : List SourceInference.CoercionStep} {outcome : Outcome}
+    (trace : RawForm program registry scope context environment before form requirements coercions outcome after) :
+    RawFormPlain program scope context environment before form requirements coercions outcome after := by
+  induction trace using RawForm.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ExpressionPlain program scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ExpressionsPlain program scope context environment before ids outcome after)
+    (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
+    (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
+    (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
+    (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+  erase_recursive_plain
 
-  case matchReturned contains form matched ih =>
-    exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
-  case matchFault contains form matched ih =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (ih _ _ contains form)
-  case matchFallthrough contains form matched next matchIH nextIH =>
-    exact StatementsPlain.prepend contains (by intro e; simp [form]) (matchIH _ _ contains form) nextIH
-  case scrutineeFault scrutinee ih =>
-    rename_i failure
-    intro id node contains form
-    cases failure with
-    | stage => trivial
-    | semantic => exact .matchScrutinee contains form ih
-  case patternFault contains scrutinee allocated invalid ih =>
-    intro id node found form
-    exact .matchPattern found form contains ih allocated invalid
-  case arm contains scrutinee hidden selected extended allocated body scrutineeIH bodyIH =>
-    exact MatchPlain.arm contains scrutineeIH hidden selected extended allocated bodyIH
-  case default contains scrutinee hidden selected body scrutineeIH bodyIH =>
-    exact MatchPlain.default contains scrutineeIH hidden selected bodyIH
-  case noBranch contains scrutinee hidden selected ih =>
-    intro id node found form
-    exact .matchNoBranch found form contains ih hidden selected
+theorem RawForm.value_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {form : ExpressionForm} {requirements : List RequirementId} {coercions : List SourceInference.CoercionStep} {value : Value}
+    (trace : RawForm program registry scope context environment before form requirements coercions (.value value) after) :
+    ExpressionFormEvaluates program context scope.evidence scope.source environment before form requirements coercions value after := rawform_projection trace
 
-  case forInitializerFault contains form initial initialIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.forInitializer contains form initialIH)
-  case forReturned contains form initial loop initialIH loopIH =>
-    exact StatementsPlain.terminal contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH)
-  case forFault contains form initial loop initialIH loopIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact StatementsPlain.head_fault (.forIteration contains form initialIH loopIH)
-  case forFallthrough contains form initial loop next initialIH loopIH nextIH =>
-    exact StatementsPlain.prepend contains (by intro expression; simp [form]) (.forLoop contains form initialIH loopIH) nextIH
-  case empty => exact .nil
-  case absent mono extended allocated next nextIH =>
-    exact ForItemsPlain.prepend (.letUninitialized mono extended allocated) nextIH
-  case initialized mono extended child allocated next childIH nextIH =>
-    exact ForItemsPlain.prepend (.letInitialized childIH mono extended allocated) nextIH
-  case initializerFault mono child childIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .head (.letInitializer mono childIH)
-  case expression child next childIH nextIH => exact ForItemsPlain.prepend (.expression childIH) nextIH
-  case expressionFailure child childIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .head (.expression childIH)
-  case assignment snapshot child write next childIH nextIH =>
-    exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
-  case assignmentFailure snapshot child childIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .head (.assignValue (.rhs (snapshot.resolves _ _ _ _) childIH))
-  case unbound _bare missing => exact .head (.assignValue (.target (.unbound missing)))
-  case dangling _bare lookup missing => exact .head (.assignValue (.target (.dangling lookup missing)))
-  case testFault test testIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .condition testIH
-  case finished test testIH => exact .done testIH
-  case bodyFailure test branch testIH branchIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .body testIH branchIH
-  case returnedFromBody test branch testIH branchIH => exact .returns testIH branchIH
-  case postFailure test branch postTrace testIH branchIH postIH =>
-    rename_i failure
-    cases failure with
-    | stage => trivial
-    | semantic => exact .postFallthrough testIH branchIH postIH
-  case iterate test branch postTrace next testIH branchIH postIH nextIH =>
-    exact ForLoopPlain.next testIH branchIH postIH nextIH
+theorem RawForm.semanticFault_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {form : ExpressionForm} {requirements : List RequirementId} {coercions : List SourceInference.CoercionStep} {reason : SemanticFault}
+    (trace : RawForm program registry scope context environment before form requirements coercions (.fault (.semantic reason)) after) :
+    ExpressionFormFaults program context scope.evidence scope.source environment before form requirements coercions reason after := rawform_projection trace
+
+private theorem coercionstep_projection {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {step : SourceInference.CoercionStep}
+    {input : Value} {outcome : Outcome}
+    (trace : CoercionStep program registry scope context before step input outcome after) :
+    CoercionStepPlain program scope context before step input outcome after := by
+  induction trace using CoercionStep.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ExpressionPlain program scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ExpressionsPlain program scope context environment before ids outcome after)
+    (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
+    (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
+    (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
+    (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+  erase_recursive_plain
+
+theorem CoercionStep.value_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {step : SourceInference.CoercionStep}
+    {input : Value} {value : Value}
+    (trace : CoercionStep program registry scope context before step input (.value value) after) :
+    CoercionStepExecutes program context scope.evidence before step input value after := coercionstep_projection trace
+
+theorem CoercionStep.semanticFault_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {step : SourceInference.CoercionStep}
+    {input : Value} {reason : SemanticFault}
+    (trace : CoercionStep program registry scope context before step input (.fault (.semantic reason)) after) :
+    CoercionStepFaults program context scope.evidence before step input reason after := coercionstep_projection trace
+
+private theorem coercionpath_projection {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {steps : List SourceInference.CoercionStep}
+    {input : Value} {outcome : Outcome}
+    (trace : CoercionPath program registry scope context before steps input outcome after) :
+    CoercionPathPlain program scope context before steps input outcome after := by
+  induction trace using CoercionPath.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ExpressionPlain program scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ExpressionsPlain program scope context environment before ids outcome after)
+    (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
+    (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
+    (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
+    (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
+  erase_recursive_plain
+
+theorem CoercionPath.value_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {steps : List SourceInference.CoercionStep}
+    {input : Value} {value : Value}
+    (trace : CoercionPath program registry scope context before steps input (.value value) after) :
+    CoercionPathExecutes program context scope.evidence before steps input value after := coercionpath_projection trace
+
+theorem CoercionPath.semanticFault_plain {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {before after : Heap} {steps : List SourceInference.CoercionStep}
+    {input : Value} {reason : SemanticFault}
+    (trace : CoercionPath program registry scope context before steps input (.fault (.semantic reason)) after) :
+    CoercionPathFaults program context scope.evidence before steps input reason after := coercionpath_projection trace
 
 /-- Successful recursively staged expressions retain their ordinary source
 meaning, including all nested closure-body computations. -/

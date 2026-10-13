@@ -91,7 +91,7 @@ theorem preserves {children : GenericExpressionMeaning.Certificate}
   have parameter := parameter_type receipt port
   have originalTrace := trace
   rcases CallableIndexedOwnedPreparedStagedDirectSourceInversion.children
-      unique receipt.metadata.found receipt.form trace with
+      unique receipt.metadata.found receipt.form receipt.metadata.coercions trace with
     ⟨sequenceSize, invocationSize, argumentsHeap, sources, name, evidence, sameSize,
       calleeOccurrence, valid, sourceTrace, produced, invoked⟩ |
     ⟨sequenceSize, failure, sameSize, outcomeEq, sourceTrace⟩

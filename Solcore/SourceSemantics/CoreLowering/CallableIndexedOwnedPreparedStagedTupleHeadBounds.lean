@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPairBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedExpressionSequence
 import Solcore.SourceSemantics.CoreLowering.RecursiveStageTupleMeaning
@@ -50,6 +51,8 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
         environment before ids sequence after ∧
       RecursiveStageTupleMeaning.PacksOutcome sequence outcome := by
   cases trace with
+  | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
+      exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic uncoerced raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
       subst node

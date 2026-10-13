@@ -3753,3 +3753,50 @@ theorem preserved
 end ForItemsExecute
 
 end Solcore.SourceSemantics.Dynamic
+
+namespace Solcore.SourceSemantics.Dynamic
+open Frontend SourceInference TypeSystem
+
+/-- The existing whole-language proof applies to the actual raw form and its retained requirement plan. -/
+theorem ExpressionFormEvaluates.preserved
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context : Context} {evidence : EvidenceEnvironment}
+      {source : TypedSource} {environment : Environment}
+      {before after : Heap} {form : ExpressionForm}
+      {requirements : List RequirementId} {coercions : List CoercionStep}
+      {raw : Value} {rawType finalType : Ty} {plan : ExpressionRequirementPlan}
+      (runtime : SourceRuntimeValid program context source)
+      (evidence_covers : evidence.Covers context)
+      (environment_agrees : EnvironmentAgrees before context.locals environment)
+      (before_typed : HeapWellTyped context before)
+      (occurrence : exists id node,
+        ContainsExpression source id node /\ node.form = form /\
+          node.rawType = rawType)
+      (typing : ExpressionFormHasRawType source context form rawType plan)
+      (requirements_valid : ExpressionRequirementPlan.Valid context rawType
+        finalType plan requirements coercions)
+      (evaluation : ExpressionFormEvaluates program context evidence source
+        environment before form requirements coercions raw after) :
+      ValueHasType context after raw rawType /\
+        HeapWellTyped context after /\ HeapTypesExtend before after :=
+  preserveFormRec program_well_formed runtime evidence_covers environment_agrees before_typed occurrence typing requirements_valid evaluation
+
+/-- The existing whole-language proof applies to one actual selected conversion edge. -/
+theorem CoercionStepExecutes.preserved
+      {program : Program}
+      (program_well_formed : ProgramWellFormed program)
+      {context : Context} {evidence : EvidenceEnvironment}
+      {source : TypedSource} {before after : Heap} {step : CoercionStep}
+      {input output : Value}
+      (runtime : SourceRuntimeValid program context source)
+      (before_typed : HeapWellTyped context before)
+      (input_typed : ValueHasType context before input step.source)
+      (typing : CoercionStepValid context step)
+      (evaluation : CoercionStepExecutes program context evidence before step input
+        output after) :
+      ValueHasType context after output step.target /\
+        HeapWellTyped context after /\ HeapTypesExtend before after :=
+  preserveStepRec program_well_formed runtime before_typed input_typed typing evaluation
+
+end Solcore.SourceSemantics.Dynamic

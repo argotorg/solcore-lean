@@ -52,14 +52,104 @@ private theorem binary_dispatch_same
     leftTrait = rightTrait ∧ leftMethod = rightMethod := by
   cases left <;> cases right <;> exact ⟨rfl, rfl⟩
 
+private theorem raw_form_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
+    (appliesIH : ∀ smaller, smaller < size → AppliesAt program registry smaller) :
+    RawFormAt program registry size := by
+  intro scope context environment before after form requirements coercions failure rawType finalType plan
+    runtime covers locals heap _occurrence typed _valid trace
+  cases trace with
+  | rawAtomicFault atomic faultRule =>
+      have same := atomic_fault_heap atomic faultRule
+      subst after
+      exact ⟨heap, .refl _⟩
+  | @rawDirectArgumentsFault childrenSize scope context environment before after callee arguments instantiation name failure requirements coercions _calleeOccurrence children =>
+      cases typed with
+      | directCall _calleeTyped _application argumentsTyped =>
+          exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap argumentsTyped children
+  | @rawDirectApplied childrenSize invocationSize scope context environment before argumentsHeap after callee arguments instantiation name values evidence outcome requirements coercions _calleeOccurrence valid children callEvidence invocation =>
+      cases typed with
+      | @directCall _ callee arguments instantiation parameterTypes resultType predicates _calleeTyped application argumentsTyped =>
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values wellFormed
+            runtime covers locals heap argumentsTyped children
+          cases application with
+          | intro _signature _admissible _declaration _parameters _result functionType _predicates =>
+              cases callEvidence with
+              | intro _coercions _requirements produces =>
+                  have calleeTyped : ValueHasType context argumentsHeap (.global ⟨instantiation, evidence⟩)
+                      (.function (Ty.productMany parameterTypes) rawType) := by
+                    rw [← functionType]
+                    exact .global valid ⟨produces.valid, by
+                      intro predicate member
+                      exact produces.supplies predicate member⟩
+                  obtain ⟨packed, packing⟩ := ValuesPack.exists_pack values
+                  have argumentTyped := packing.hasType valuesTyped
+                  obtain ⟨afterTyped, invocationExtends⟩ := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
+                    runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
+                  exact ⟨afterTyped, argumentExtends.trans invocationExtends⟩
+
+private theorem coercion_step_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
+    CoercionStepAt program registry size := by
+  intro scope context before after step input failure runtime heap typed valid trace
+  cases trace with
+  | coercionRequirement _ | coercionPrimitiveInput _ _ _ => exact ⟨heap, .refl _⟩
+  | @coercionMethod bodySize scope context before bound after step input bodyInstance dictionary roots child
+      parameterTypes bodyContext finalContext bodyEnvironment outcome result method rootsEq selected parameters allocate body resultRule =>
+      cases valid with
+      | intro profile requirementsProve =>
+          obtain ⟨lexicalContext, facts, certificate, _resultEq⟩ :=
+            method.coercionCertificateOfProfile wellFormed runtime.signatures runtime.requirements.idsUnique profile requirementsProve
+          exact method_body_fault
+            (statementsIH bodySize (Size.child_lt_stepSize (by simp))) runtime certificate
+            (by cases method; assumption) heap (.cons typed .nil) rootsEq selected parameters allocate body resultRule
+
+private theorem coercion_path_step (wellFormed : ProgramWellFormed program) (size : Nat)
+    (stepIH : ∀ smaller, smaller < size → CoercionStepAt program registry smaller)
+    (pathIH : ∀ smaller, smaller < size → CoercionPathAt program registry smaller) :
+    CoercionPathAt program registry size := by
+  intro scope context before after steps input failure sourceType targetType runtime heap typed valid trace
+  cases trace with
+  | @coercionsFault headSize scope context before after step steps input failure head =>
+      cases valid with
+      | cons headValid _ =>
+          exact stepIH headSize (Size.child_lt_stepSize (by simp)) runtime heap typed headValid head
+  | @coercionsCons headSize tailSize scope context before middle after step steps input converted outcome head tail =>
+      cases valid with
+      | cons headValid tailValid =>
+          obtain ⟨convertedTyped, middleTyped, headExtends⟩ := coercion_step_value wellFormed runtime heap typed headValid head
+          obtain ⟨afterTyped, tailExtends⟩ := pathIH tailSize (Size.child_lt_stepSize (by simp)) runtime middleTyped convertedTyped tailValid tail
+          exact ⟨afterTyped, headExtends.trans tailExtends⟩
+
 private theorem expression_step (wellFormed : ProgramWellFormed program) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
     (appliesIH : ∀ smaller, smaller < size → AppliesAt program registry smaller)
-    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
+    (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller)
+    (rawIH : ∀ smaller, smaller < size → RawFormAt program registry smaller)
+    (pathIH : ∀ smaller, smaller < size → CoercionPathAt program registry smaller) :
     ExpressionAt program registry size := by
   intro scope context environment before after id failure type runtime covers locals heap typed trace
   cases trace with
+  | @coercedFault rawSize scope context environment before after id node failure contains _nonempty raw =>
+      cases typed with
+      | @intro _ _ actual rawType plan typedContains typedForm rawTypeEq _ _ valid =>
+          have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+            (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+          subst actual
+          exact rawIH rawSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap
+            ⟨id, node, contains, rfl, rawTypeEq⟩ typedForm valid raw
+  | @coercedValue rawSize pathSize scope context environment before middle after id node value outcome contains _nonempty raw path =>
+      cases typed with
+      | @intro _ _ actual rawType plan typedContains typedForm rawTypeEq _ _ valid =>
+          have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
+            (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
+          subst actual
+          obtain ⟨valueTyped, middleTyped, rawExtends⟩ := raw_form_value wellFormed runtime covers locals heap
+            ⟨id, node, contains, rfl, rawTypeEq⟩ typedForm valid raw
+          obtain ⟨afterTyped, pathExtends⟩ := pathIH pathSize (Size.child_lt_stepSize (by simp))
+            runtime middleTyped valueTyped valid.outputPath path
+          exact ⟨afterTyped, rawExtends.trans pathExtends⟩
   | atomicFault _ atomic _ faultRule =>
       have same := atomic_fault_heap atomic faultRule
       subst after
@@ -353,61 +443,102 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
                 runtime argumentsHeapTyped (valueTyped.mono argumentExtends) packing argumentTyped invocation
               exact ⟨afterTyped, calleeExtends.trans (argumentExtends.trans invocationExtends)⟩
 
+private structure PreservedAt (program : Program) (registry : Registry) (size : Nat) : Prop where
+  expression : ExpressionAt program registry size
+  expressions : ExpressionsAt program registry size
+  applies : AppliesAt program registry size
+  statements : StatementsAt program registry size
+  whileLoop : WhileAt program registry size
+  matchArms : MatchAt program registry size
+  forItems : ForItemsAt program registry size
+  forLoop : ForLoopAt program registry size
+  rawForm : RawFormAt program registry size
+  coercionStep : CoercionStepAt program registry size
+  coercionPath : CoercionPathAt program registry size
+
 private theorem all (wellFormed : ProgramWellFormed program) (size : Nat) :
-    ExpressionAt program registry size ∧ ExpressionsAt program registry size ∧
-    AppliesAt program registry size ∧ StatementsAt program registry size ∧ WhileAt program registry size ∧ MatchAt program registry size ∧
-    ForItemsAt program registry size ∧ ForLoopAt program registry size := by
+    PreservedAt program registry size := by
   induction size using Nat.strongRecOn with
   | ind size ih =>
-      exact ⟨expression_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.1) (fun smaller below => (ih smaller below).2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.1),
-        expressions_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.1),
-        applies_step wellFormed size (fun smaller below => (ih smaller below).2.2.2.1),
-        statements_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.2.2),
-        while_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.1),
-        match_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.2.2.1),
-        for_items_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.2.1),
-        for_loop_step wellFormed size (fun smaller below => (ih smaller below).1)
-          (fun smaller below => (ih smaller below).2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.2.1)
-          (fun smaller below => (ih smaller below).2.2.2.2.2.2.2)⟩
+      exact {
+        expression := expression_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).expressions)
+          (fun smaller below => (ih smaller below).applies)
+          (fun smaller below => (ih smaller below).statements)
+          (fun smaller below => (ih smaller below).rawForm)
+          (fun smaller below => (ih smaller below).coercionPath)
+        expressions := expressions_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).expressions)
+        applies := applies_step wellFormed size
+          (fun smaller below => (ih smaller below).statements)
+        statements := statements_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).statements)
+          (fun smaller below => (ih smaller below).whileLoop)
+          (fun smaller below => (ih smaller below).matchArms)
+          (fun smaller below => (ih smaller below).forItems)
+          (fun smaller below => (ih smaller below).forLoop)
+        whileLoop := while_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).statements)
+          (fun smaller below => (ih smaller below).whileLoop)
+        matchArms := match_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).statements)
+        forItems := for_items_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).forItems)
+        forLoop := for_loop_step wellFormed size
+          (fun smaller below => (ih smaller below).expression)
+          (fun smaller below => (ih smaller below).statements)
+          (fun smaller below => (ih smaller below).forItems)
+          (fun smaller below => (ih smaller below).forLoop)
+        rawForm := raw_form_step wellFormed size
+          (fun smaller below => (ih smaller below).expressions)
+          (fun smaller below => (ih smaller below).applies)
+        coercionStep := coercion_step_step wellFormed size
+          (fun smaller below => (ih smaller below).statements)
+        coercionPath := coercion_path_step wellFormed size
+          (fun smaller below => (ih smaller below).coercionStep)
+          (fun smaller below => (ih smaller below).coercionPath)
+      }
 
 /-- Any supported staged expression fault retains a deeply typed heap and all
 heap type identities from its initial state. -/
 theorem expression (wellFormed : ProgramWellFormed program) {size : Nat} :
-    ExpressionAt program registry size := (all wellFormed size).1
+    ExpressionAt program registry size := (all wellFormed size).expression
 
 /-- Ordered expression faults retain every successful prefix's effects. -/
 theorem expressions (wellFormed : ProgramWellFormed program) {size : Nat} :
-    ExpressionsAt program registry size := (all wellFormed size).2.1
+    ExpressionsAt program registry size := (all wellFormed size).expressions
 
 /-- Callable faults preserve the original caller's heap typing, including
 faults raised by a recursively selected global or closure body. -/
 theorem applies (wellFormed : ProgramWellFormed program) {size : Nat} :
-    AppliesAt program registry size := (all wellFormed size).2.2.1
+    AppliesAt program registry size := (all wellFormed size).applies
 
 /-- Faulting bodies preserve the original entry context and every executed
 initializer and allocation prefix. -/
 theorem statements (wellFormed : ProgramWellFormed program) {size : Nat} :
-    StatementsAt program registry size := (all wellFormed size).2.2.2.1
+    StatementsAt program registry size := (all wellFormed size).statements
 
 /-- Header faults preserve the initial heap typing across every visited item. -/
 theorem for_items (wellFormed : ProgramWellFormed program) {size : Nat} :
-    ForItemsAt program registry size := (all wellFormed size).2.2.2.2.2.2.1
+    ForItemsAt program registry size := (all wellFormed size).forItems
 
 /-- Finite for faults retain all real iteration and post-header effects. -/
 theorem for_loop (wellFormed : ProgramWellFormed program) {size : Nat} :
-    ForLoopAt program registry size := (all wellFormed size).2.2.2.2.2.2.2
+    ForLoopAt program registry size := (all wellFormed size).forLoop
+
+theorem raw_form (wellFormed : ProgramWellFormed program) {size : Nat} :
+    RawFormAt program registry size := (all wellFormed size).rawForm
+
+theorem coercion_step (wellFormed : ProgramWellFormed program) {size : Nat} :
+    CoercionStepAt program registry size := (all wellFormed size).coercionStep
+
+theorem coercion_path (wellFormed : ProgramWellFormed program) {size : Nat} :
+    CoercionPathAt program registry size := (all wellFormed size).coercionPath
 
 end Solcore.SourceSemantics.Staging.Recursive.FaultPreservation
