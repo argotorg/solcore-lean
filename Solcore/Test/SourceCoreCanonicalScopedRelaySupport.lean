@@ -1,6 +1,5 @@
-import Solcore.Test.SourceCoreCanonicalScopedMetadata
 import Solcore.Test.SourceCoreCanonicalScopedTypes
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEvidenceAdmission
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBodies
 set_option autoImplicit false
 set_option Elab.async false
@@ -17,23 +16,12 @@ theorem ActualHeader.relay_body {fixture : CompiledFixture} {observed : Observed
   rw [actual.prepared.same, observed.relayShape.roots] at accepted
   exact (Except.ok.inj accepted).symm
 
-theorem ActualHeader.relay_syntax {fixture : CompiledFixture} {observed : ObservedProgram fixture}
-    (actual : ActualHeader fixture observed.relayRow.row) :
-    GenericImperativeMatch.Syntax actual.header.function.source (GeneralSyntax actual.header.function.source)
-      actual.header.context (.statements true actual.header.function.body) actual.header.function.resultType := by
-  obtain ⟨facts, final, typed, _roots, _complete⟩ := actual.aligned.bodyTyped
-  rw [actual.source, observed.relayShape.roots, actual.relay_result_type] at typed
-  simp only [List.filterMap_cons, List.filterMap_nil] at typed
-  rw [actual.source, actual.relay_body, actual.relay_result_type]
-  exact observed.relay_body_syntax (actual.source ▸ actual.header.unique) observed.relay_initial_syntax
-    (.leaf (.read observed.relayShape.finalRead.found observed.relayShape.finalRead.form)) typed
-
 theorem ActualHeader.relay_receipt {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (actual : ActualHeader fixture observed.relayRow.row) :
     Nonempty (CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.Receipt actual.header) := by
-  apply CallableIndexedOwnedPreparedStagedNamedBranchingReceipts.of_accepted actual.aligned.accepted _ actual.aligned.projection
-  rw [actual.source, actual.relay_body]
-  exact observed.relay_body_shape
+  exact CallableIndexedOwnedPreparedNamedEvidenceAdmission.receipt
+    actual.prepared actual.aligned observed.relayAdmission.selected observed.relayAdmission.same
+    observed.relayAdmission.certificate
 
 def ActualHeader.relay_bundle {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (actual : ActualHeader fixture observed.relayRow.row)
@@ -63,10 +51,10 @@ def ActualHeader.relay_support {fixture : CompiledFixture} {observed : ObservedP
       (CallableIndexedOwnedPreparedBootstrapRootState.keys fixture.recipe.compiled)
       registry actual.header (RecursiveNamedPreparedStageScopes.registry stagePrepared) receipt
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
-  apply CallableIndexedOwnedPreparedNamedCanonicalScopedCollectors.of_actual actual.prepared actual.aligned
-    fixture.recipePrepared actual.diagnostic receiver fixture.source_wellFormed _ rows complete
-    (bootstrap_zero fixture.recipe.compiled) observed.relayRow.entryMember receipt stagePrepared actual.relay_syntax
-  rw [actual.source]
-  exact .of_ordinary (observed.relay_metadata actual.prepared.named (by rw [actual.prepared.same]; exact observed.relayRow.assumptions))
+  exact CallableIndexedOwnedPreparedNamedEvidenceAdmission.of_receipt
+    actual.prepared actual.aligned observed.relayAdmission.selected observed.relayAdmission.same
+    observed.relayAdmission.certificate rows complete fixture.recipePrepared actual.diagnostic
+    receiver fixture.source_wellFormed (bootstrap_zero fixture.recipe.compiled)
+    observed.relayRow.entryMember receipt stagePrepared
 
 end Tests.SourceCoreCanonicalScoped

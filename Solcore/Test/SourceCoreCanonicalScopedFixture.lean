@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedEvidenceAdmission
 import Solcore.Test.SourceCoreCanonicalScopedSource
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPublicExecutionMeaning
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicDiagnosticReceipts
@@ -198,10 +199,34 @@ def observeRow (fixture : CompiledFixture) (signature : ProgramFunctionSignature
           entryKey := entryKey }
     | _ => throw (IO.userError "reuse unique global slot")
 
+/-- This receipt executes only the actual cached named row and source tables.
+The later Header is connected by its authentic cached selection. -/
+structure ObservedRelayAdmission (fixture : CompiledFixture)
+    (row : ObservedRow fixture fixture.relaySignature) where
+  named : SourceCoreGeneralFunctions.Function
+  selected : fixture.recipe.compiled.indexed.base.functions[row.index]? = some named
+  same : named.specialized = row.row
+  certificate : CallableIndexedOwnedPreparedNamedEvidenceAdmission.Certificate fixture.recipe.compiled named
+  accepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.certifySource
+    fixture.recipe.compiled fixture.source_wellFormed named 100 = some certificate
+
+def observeRelayAdmission (fixture : CompiledFixture)
+    (row : ObservedRow fixture fixture.relaySignature) : IO (ObservedRelayAdmission fixture row) := do
+  match selected : fixture.recipe.compiled.indexed.base.functions[row.index]? with
+  | none => throw (IO.userError "actual relay cache row missing")
+  | some named =>
+    let ⟨sameRaw⟩ ← observed ((named.specialized == row.row) = true) "actual relay full cache metadata"
+    have same : named.specialized = row.row := eq_of_beq sameRaw
+    match accepted : CallableIndexedOwnedPreparedNamedEvidenceAdmission.certifySource
+        fixture.recipe.compiled fixture.source_wellFormed named 100 with
+    | none => throw (IO.userError "actual let/direct relay source admission failed")
+    | some certificate => return ⟨named, selected, same, certificate, accepted⟩
+
 structure ObservedProgram (fixture : CompiledFixture) where
   identityRow : ObservedRow fixture fixture.identitySignature
   makeRow : ObservedRow fixture fixture.makeSignature
   relayRow : ObservedRow fixture fixture.relaySignature
+  relayAdmission : ObservedRelayAdmission fixture relayRow
   globalsLength : fixture.recipe.compiled.indexed.base.globals.length = 3
   identityMake : identityRow.index ≠ makeRow.index
   identityRelay : identityRow.index ≠ relayRow.index
@@ -219,6 +244,7 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
   let identityRow ← observeRow fixture fixture.identitySignature
   let makeRow ← observeRow fixture fixture.makeSignature
   let relayRow ← observeRow fixture fixture.relaySignature
+  let relayAdmission ← observeRelayAdmission fixture relayRow
   let identityShape ← Tests.SourceCoreRecursiveIndex.observeIdentity identityRow.row.function fixture.identitySignature .word
   let makeShape ← observeFactory makeRow.row.function fixture.makeSignature fixture.identitySignature fixture.relaySignature
   let relayShape ← observeRelay relayRow.row.function fixture.relaySignature fixture.identitySignature
@@ -231,7 +257,7 @@ def observeProgram (fixture : CompiledFixture) : IO (ObservedProgram fixture) :=
   let ⟨relayNodes⟩ ← observed (relayRow.row.function.typedBody.nodes = relayShape.nodeList) "direct compiled relayNodes"
   let ⟨noLocals⟩ ← observed (fixture.recipe.compiled.indexed.base.locals.bindings = []) "direct compiled noLocals"
   let ⟨profile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true) "direct compiled profile"
-  return {identityRow, makeRow, relayRow, identityShape, makeShape, relayShape, globalsLength, identityMake, identityRelay, makeRelay, identityNodes, makeNodes, relayNodes, noLocals, profile}
+  return {identityRow, makeRow, relayRow, relayAdmission, identityShape, makeShape, relayShape, globalsLength, identityMake, identityRelay, makeRelay, identityNodes, makeNodes, relayNodes, noLocals, profile}
 
 /-- The actual unique global slot identifies the complete prepared signature
 and index, without choosing a new prepared row. -/
