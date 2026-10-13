@@ -134,6 +134,19 @@ def expression?
               let ⟨first⟩ ← expression? inputs source fuel left
               let ⟨second⟩ ← expression? inputs source fuel right
               pure ⟨.binary found form first second⟩
+          | .index base key =>
+              match keyFound : source.lookupExpression? key with
+              | none => none
+              | some keyNode => do
+                  let scalar : Option (PLift (CompatibleExpressionIndices.SourceScalar keyNode.type)) :=
+                    if same : keyNode.type = .bool then some ⟨same ▸ .bool⟩
+                    else if same : keyNode.type = .word then some ⟨same ▸ .word⟩
+                    else if same : keyNode.type = .integer then some ⟨same ▸ .integer⟩
+                    else none
+                  let ⟨scalar⟩ ← scalar
+                  let ⟨container⟩ ← expression? inputs source fuel base
+                  let ⟨lookup⟩ ← expression? inputs source fuel key
+                  pure ⟨.index found form keyFound scalar container lookup⟩
           | .call _callee ids (.declaration instantiation) => do
               let ⟨site⟩ ← directSite? inputs instantiation
               let ⟨children⟩ ← allProof? (fun child => GeneralSyntax source child (DirectSite inputs))
