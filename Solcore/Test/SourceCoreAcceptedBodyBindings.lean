@@ -30,7 +30,8 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
       have tail := remaining.at_return reader returnFound returnForm
       simp only [Tree.closed, Tree.bindings, List.map_cons, tail.1, tail.2.1, List.map_nil,
         and_self]
-  | returning read form | returnUnit read form | absent read form =>
+  | returning read form | returnUnit read form | absent read form
+  | assigning read form | assigned read form | whileLoop read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans initialFound)
       cases same
       simp_all

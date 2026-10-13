@@ -32,7 +32,8 @@ private theorem returned_child {policy : SourceCoreLoops.Policy} {checked : Sour
       rw [form] at actualForm
       cases actualForm
       rfl
-  | initialized read actualForm | returnUnit read actualForm | absent read actualForm =>
+  | initialized read actualForm | returnUnit read actualForm | absent read actualForm
+  | assigning read actualForm | assigned read actualForm | whileLoop read actualForm =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
       simp_all
@@ -66,7 +67,8 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
       have children := returned_child remaining reader returnFound returnForm
       simp only [Tree.closed, Tree.bindings, Tree.children, List.map_cons, tail.1, tail.2.1,
         List.map_nil, children, and_self]
-  | returning read form | returnUnit read form | absent read form =>
+  | returning read form | returnUnit read form | absent read form
+  | assigning read form | assigned read form | whileLoop read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans initialFound)
       cases same
       simp_all

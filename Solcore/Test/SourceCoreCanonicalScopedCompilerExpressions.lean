@@ -51,6 +51,15 @@ variable (actual : ActualHeader fixture observed.relayRow.row)
     actual.prepared.code actual.prepared.compilation rootFuel actual.header.function.source
     rootScope rootId actual.header.reasonAt rootLowered)
 
+private theorem no_method {id : ExpressionId} {node : ExpressionNode}
+    (reached : RelayReached observed id)
+    (found : actual.header.function.source.lookupExpression? id = some node)
+    (method : MethodForm node.form) : False := by
+  rcases actual.relay_reached_form reached found with ⟨name, binder, form⟩ | ⟨callee, instantiation, form⟩
+  all_goals
+    rcases method with ⟨operator, operand, operatorForm⟩ | ⟨operator, left, right, operatorForm⟩
+    all_goals rw [form] at operatorForm; cases operatorForm
+
 private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (head : Head root.selected.policy root.selected.lowerBody fuel
@@ -59,7 +68,7 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     (reached : RelayReached observed id) (cause : Cause root head) : False := by
   have forms := actual.relay_reached_form reached head.found
   cases cause with
-  | form _ notLeaf notDirect _notIndirect =>
+  | form _ notLeaf notDirect _notIndirect _notMethod =>
       rcases forms with ⟨name, binder, form⟩ | ⟨callee, instantiation, form⟩
       · exact notLeaf (form ▸ LeafForm.read name binder)
       · exact notDirect ⟨_, _, _, form⟩
@@ -67,7 +76,7 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
       have found := selected.found
       simp only [observed.noLocals, List.find?_nil, Option.filter_none] at found
       cases found
-  | special selected outside =>
+  | special selected outside _outsideMethod =>
       rcases forms with ⟨name, binder, form⟩ | ⟨callee, instantiation, form⟩
       · have profile := AcceptedNamedExpressionPolicy.leaf_profile root.compilerPolicy
           actual.relay_metadata head.found (.inr ⟨name, binder, form⟩)
@@ -79,6 +88,8 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
         rw [selected] at same
         cases same
       · exact outside ⟨_, _, _, form⟩
+  | operatorOrdinary _ operator _ | operatorCoercions _ operator _ =>
+      exact no_method actual reached head.found operator
 
 private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
@@ -106,6 +117,12 @@ private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope
         cases form
       · rw [directForm] at form
         cases form
+  | method _head _selected receipt =>
+      apply False.elim
+      apply no_method actual reached receipt.metadata.found
+      rcases receipt.operator.form with ⟨operator, operand, form, _⟩ | ⟨operator, left, right, form, _⟩
+      · exact .inl ⟨operator, operand, form⟩
+      · exact .inr ⟨operator, left, right, form⟩
 
 /-- Only accepted argument edges are followed. The stored declaration callee
 is preserved in Source, but is never substituted for an executed child. -/
