@@ -1,8 +1,9 @@
 import Solcore.Test.SourceCoreMethodOriginEvidenceCommon
 import Solcore.Test.SourceCoreMethodOriginEvidenceRootCompilerSupport
+import Solcore.Test.SourceCoreMethodOriginEvidenceUseCompilerSupport
 import Solcore.SourceSemantics.CoreLowering.AcceptedProgramRootCompletion
 
-/-! The original cache is checked with both actual entry roots pending.
+/-! The original cache is checked with four actual caller roots pending.
 Their accepted compiler actions complete the same shared program certificate. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -12,21 +13,33 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 
 structure ObservedProgramCertificate (fixture : CompiledFixture) (observed : ObservedProgram fixture) where
   pending : AcceptedProgramRootCompletion.Pending fixture.recipe.compiled
-    [observed.wordRow.index, observed.boolRow.index]
+    [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index]
   accepted : AcceptedProgramRootCompletion.certify fixture.recipe.compiled
-    fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index] 64 = some pending
+    fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index] 64 = some pending
   wordSite : CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows observed.wordShape.call.instantiation
   wordAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite?
     pending.table.rows observed.wordShape.call.instantiation = some ⟨wordSite⟩
   boolSite : CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows observed.boolShape.call.instantiation
   boolAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite?
     pending.table.rows observed.boolShape.call.instantiation = some ⟨boolSite⟩
+  useWordMetadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+    fixture.recipe.compiled.indexed observed.useWordRow.named observed.useWordRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows)
+  useWordMetadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+    fixture.recipe.compiled.indexed observed.useWordRow.named observed.useWordRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows) = some ⟨useWordMetadata⟩
+  useBoolMetadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
+    fixture.recipe.compiled.indexed observed.useBoolRow.named observed.useBoolRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows)
+  useBoolMetadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+    fixture.recipe.compiled.indexed observed.useBoolRow.named observed.useBoolRow.row.function.typedBody
+    (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows) = some ⟨useBoolMetadata⟩
   rows : ∀ row ∈ pending.table.rows, row ∈ [observed.wordRow.row, observed.boolRow.row, observed.makeWordRow.row, observed.makeBoolRow.row, observed.relayWordRow.row, observed.relayBoolRow.row, observed.useWordRow.row, observed.useBoolRow.row, observed.identityWordRow.row, observed.identityBoolRow.row]
 
 def observeProgramCertificate (fixture : CompiledFixture) (observed : ObservedProgram fixture) :
     IO (ObservedProgramCertificate fixture observed) := do
   match accepted : AcceptedProgramRootCompletion.certify fixture.recipe.compiled
-      fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index] 64 with
+      fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index] 64 with
   | none => throw (IO.userError "original method-origin complementary certification rejected")
   | some pending =>
       match wordAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite?
@@ -37,13 +50,24 @@ def observeProgramCertificate (fixture : CompiledFixture) (observed : ObservedPr
             pending.table.rows observed.boolShape.call.instantiation with
         | none => throw (IO.userError "original bool direct target missing")
         | some ⟨boolSite⟩ =>
-          if rows : pending.table.rows.all (fun row =>
-              [observed.wordRow.row, observed.boolRow.row, observed.makeWordRow.row, observed.makeBoolRow.row, observed.relayWordRow.row, observed.relayBoolRow.row, observed.useWordRow.row, observed.useBoolRow.row, observed.identityWordRow.row, observed.identityBoolRow.row].any (fun expected => row == expected)) = true then
-            pure ⟨pending, accepted, wordSite, wordAccepted, boolSite, boolAccepted, by
-              intro row member
-              obtain ⟨expected, present, same⟩ := List.any_eq_true.mp (List.all_eq_true.mp rows row member)
-              exact (eq_of_beq same).symm ▸ present⟩
-          else throw (IO.userError "actual direct table contains an unselected ordinary row")
+          match useWordMetadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+              fixture.recipe.compiled.indexed observed.useWordRow.named observed.useWordRow.row.function.typedBody
+              (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows) with
+          | none => throw (IO.userError "original word indirect metadata rejected")
+          | some useWordMetadata =>
+              match useBoolMetadataAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+                  fixture.recipe.compiled.indexed observed.useBoolRow.named observed.useBoolRow.row.function.typedBody
+                  (CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows) with
+              | none => throw (IO.userError "original bool indirect metadata rejected")
+              | some useBoolMetadata =>
+                  if rows : pending.table.rows.all (fun row =>
+                      [observed.wordRow.row, observed.boolRow.row, observed.makeWordRow.row, observed.makeBoolRow.row, observed.relayWordRow.row, observed.relayBoolRow.row, observed.useWordRow.row, observed.useBoolRow.row, observed.identityWordRow.row, observed.identityBoolRow.row].any (fun expected => row == expected)) = true then
+                    pure ⟨pending, accepted, wordSite, wordAccepted, boolSite, boolAccepted,
+                      useWordMetadata.down, useWordMetadataAccepted, useBoolMetadata.down, useBoolMetadataAccepted, by
+                      intro row member
+                      obtain ⟨expected, present, same⟩ := List.any_eq_true.mp (List.all_eq_true.mp rows row member)
+                      exact (eq_of_beq same).symm ▸ present⟩
+                  else throw (IO.userError "actual direct table contains an unselected ordinary row")
 
 theorem ObservedProgramCertificate.aligned_pending {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (admission : ObservedProgramCertificate fixture observed) (inventory : OrdinaryInventory fixture observed) :
@@ -90,8 +114,32 @@ theorem ObservedProgramCertificate.bool_source_admission {fixture : CompiledFixt
     (inventory.boolHeader.root_compiler_admission observed.boolShape observed.boolNodes observed.noLocals
       admission.boolSite (fun _ site => site.supported (admission.aligned_pending inventory)))
 
+theorem ObservedProgramCertificate.useWord_source_admission {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (admission : ObservedProgramCertificate fixture observed) :
+    CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission fixture.recipe.compiled
+      observed.useWordRow.named observed.useWordRow.named.specialized.function.typedBody
+      (CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.statements observed.useWordRow.named.specialized.function.typedBody)
+      observed.useWordRow.named.specialized.function.inferredBodyType admission.pending.table.rows := by
+  obtain ⟨inventory⟩ := ordinary_inventory fixture observed
+  exact AcceptedNamedBodyAdmission.source_of_header inventory.useWordHeader.prepared inventory.useWordHeader.aligned
+    observed.useWordRow.cached observed.useWordRow.same
+    (inventory.useWordHeader.use_compiler_admission observed.useWordShape observed.useWordNodes observed.noLocals
+      admission.useWordMetadata admission.useWordMetadataAccepted (fun _ site => site.supported (admission.aligned_pending inventory)))
+
+theorem ObservedProgramCertificate.useBool_source_admission {fixture : CompiledFixture} {observed : ObservedProgram fixture}
+    (admission : ObservedProgramCertificate fixture observed) :
+    CallableIndexedOwnedPreparedNamedScopedAdmission.SourceAdmission fixture.recipe.compiled
+      observed.useBoolRow.named observed.useBoolRow.named.specialized.function.typedBody
+      (CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.statements observed.useBoolRow.named.specialized.function.typedBody)
+      observed.useBoolRow.named.specialized.function.inferredBodyType admission.pending.table.rows := by
+  obtain ⟨inventory⟩ := ordinary_inventory fixture observed
+  exact AcceptedNamedBodyAdmission.source_of_header inventory.useBoolHeader.prepared inventory.useBoolHeader.aligned
+    observed.useBoolRow.cached observed.useBoolRow.same
+    (inventory.useBoolHeader.use_compiler_admission observed.useBoolShape observed.useBoolNodes observed.noLocals
+      admission.useBoolMetadata admission.useBoolMetadataAccepted (fun _ site => site.supported (admission.aligned_pending inventory)))
+
 /-- Selection uses actual cache indices. The original complete Certificate is
-constructed only after both accepted compiler roots fill their own positions. -/
+constructed only after every accepted compiler root fills its own position. -/
 def ObservedProgramCertificate.certificate {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (admission : ObservedProgramCertificate fixture observed) :
     CallableIndexedOwnedPreparedProgramAdmission.Certificate fixture.recipe.compiled :=
@@ -101,13 +149,23 @@ def ObservedProgramCertificate.certificate {fixture : CompiledFixture} {observed
         Option.some.inj ((word ▸ selected).symm.trans observed.wordRow.cached)
       subst named
       exact admission.word_source_admission)
-    else .scoped (by
-      have bool : position = observed.boolRow.index := by
-        simpa only [List.mem_cons, List.not_mem_nil, or_false, word, false_or] using member
+    else if bool : position = observed.boolRow.index then .scoped (by
       have same : named = observed.boolRow.named :=
         Option.some.inj ((bool ▸ selected).symm.trans observed.boolRow.cached)
       subst named
       exact admission.bool_source_admission)
+    else if useWord : position = observed.useWordRow.index then .scoped (by
+      have same : named = observed.useWordRow.named :=
+        Option.some.inj ((useWord ▸ selected).symm.trans observed.useWordRow.cached)
+      subst named
+      exact admission.useWord_source_admission)
+    else .scoped (by
+      have useBool : position = observed.useBoolRow.index := by
+        simpa only [List.mem_cons, List.not_mem_nil, or_false, word, bool, useWord, false_or] using member
+      have same : named = observed.useBoolRow.named :=
+        Option.some.inj ((useBool ▸ selected).symm.trans observed.useBoolRow.cached)
+      subst named
+      exact admission.useBool_source_admission)
 
 theorem ObservedProgramCertificate.aligned {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (admission : ObservedProgramCertificate fixture observed) (inventory : OrdinaryInventory fixture observed) :

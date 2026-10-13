@@ -59,7 +59,7 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     (reached : RelayReached observed id) (cause : Cause root head) : False := by
   have forms := actual.relay_reached_form reached head.found
   cases cause with
-  | form _ notLeaf notDirect =>
+  | form _ notLeaf notDirect _notIndirect =>
       rcases forms with ⟨name, binder, form⟩ | ⟨callee, instantiation, form⟩
       · exact notLeaf (form ▸ LeafForm.read name binder)
       · exact notDirect ⟨_, _, _, form⟩
@@ -98,6 +98,14 @@ private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope
       have present := (List.of_mem_zip member).1
       rw [args] at present
       exact .inr (.inl (List.mem_singleton.mp present))
+  | indirect _head _plain receipt =>
+      have form := receipt.originalForm
+      rcases actual.relay_reached_form reached receipt.found with
+        ⟨name, binder, localForm⟩ | ⟨callee, instantiation, directForm⟩
+      · rw [localForm] at form
+        cases form
+      · rw [directForm] at form
+        cases form
 
 /-- Only accepted argument edges are followed. The stored declaration callee
 is preserved in Source, but is never substituted for an executed child. -/
