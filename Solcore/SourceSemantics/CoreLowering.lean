@@ -1949,6 +1949,9 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionResidual
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionTraceSyntax
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionSyntax
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyExpressionAdmission
+import Solcore.SourceSemantics.CoreLowering.AcceptedProgramRootCompletion
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionBoundaryExclusion
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedReturningExpressionAdmission
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/
