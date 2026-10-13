@@ -8,6 +8,28 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Output coercions through retained public closures (2026-10-13)
+
+Commits `d82a65a9` and `c48ec7bf` connect a constrained direct call followed by output coercion inside a retained closure. The fixture has four physical cache slots, three ordinary Headers and two public roots. Its selected conversion method has no implementation parameters or method assumptions and returns a conditional Word result from its Bool input.
+
+The audit checked the following boundaries:
+
+- The raw call and conversion path retain the original Source node, complete requirement partition and coercion list. No sanitized Source body is substituted for the original staged scope.
+- Actual accepted lowering, selector actions, full retained metadata and dictionaries identify the ordinary callee and conversion method. The method remains a physical cached method with genuine Source typing and parameter entry.
+- Sized raw and path traces provide strict recursive child bounds. The existing shared family derives the internal body callbacks; no public execution or dictionary-equality premise is added.
+- Native suffix composition uses the actual intermediate heap, pool and physical authority. Failure skips only the remaining work and retains effects already performed. Restoration returns to the original caller frame while retaining the resulting heap, pool and stage-fault identity.
+- Public reflection follows all seven original calls. Source-derived forward bounds apply at every original checkpoint, and every sufficiently fueled factory result appends its actual new handle to a reusable history.
+
+The public sequence creates `A` from `make(true)`, creates `B` from `make(false)`, calls `use(A)`, creates `C` from `make(false)`, then calls `use(B)`, `use(A)` and `use(C)`. The four scalar results are `41 / 7 / 41 / 7`; native store lengths are `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficiently fueled factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 2,693 affected modules pass coherent checks. The full build (7,128 jobs), all registered tests (14,126 build jobs and the final pass marker), kernel policy and 235 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The seven public calls produce the stated results, and the existing work remains intact.
+
+The coherent graph includes compatibility repairs for exhaustive consumers of the extended Source relation. Reused validation records were accepted only when their source and transitive dependency identities matched; the affected-module count is not a claim that every module was rebuilt in the final append.
+
+The connected coercion branch covers original direct-call expressions with nonempty output coercions, argument roots supported by the existing uncoerced grammar, and terminal conversion bodies. Its conversion catalog requires implementations without type parameters and with empty method assumptions. It does not yet cover coercions at every expression position or every conversion-body shape. Compilation success still does not supply all required static support or establish completeness of the finite selection/evidence checks. Remaining expression and control forms, generalized local functions and composition across all actual compiler passes remain incomplete.
+
+The largest remaining generality gap is the connection from compiler success to static certification. `CallablePreparedFinalCatalogOrigins.of_preparation` already identifies all final rows as genuine ordinary or method origins. The next producer should use those receipts to construct the ordinary inventory and public/direct slot coverage, then derive supported body syntax and metadata before invoking existing collectors. General closure support must follow actual formation origins, and method support must follow actual Principal/SourceAt receipts. The final theorem still needs justified input admission, complete replacement ranges and certification completeness; finite fixture coverage supplies none of those universally.
+
 ## Nested method evidence through public execution (2026-10-13)
 
 Commits `749acda1` and `d671b4e3` remove the leaf-rule restriction from the connected method evidence proof. The fixture has three original implementation declarations, twelve physical cache slots, ten ordinary Headers and four public roots. Each selected Word/Bool BitNot body retains a Mark tree with its actual Seed premise.

@@ -6,6 +6,24 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Output coercions through retained public closures (2026-10-13)
+
+`d82a65a9` adds independent recursive staged coercion rules and connects their meaning to the actual emitted code. `RawForm` retains the original expression form, requirement list and coercion list. The new expression branches require a nonempty output-coercion list, preserving the existing uncoerced constructor APIs. `CoercionStep` and `CoercionPath` follow actual selected method bodies, parameter allocation, ordered intermediate heaps and failure propagation. Sized rules, erasure, fault preservation and the affected Source inversions are updated together.
+
+`RawDirectAuthority` authenticates the selected ordinary callee and its full dictionary at the original coerced call. Actual conversion selection supplies a cached method, genuine Source body, full dictionary, physical slot and emitted suffix. The invocation and path bounds reuse existing parameter-entry and restoration proofs. A failed raw call skips the suffix; a failed conversion skips the remaining path. Both retain the effects already performed and the original semantic or stage-fault identity.
+
+The static `RootChoice` and retained-closure support feed the new case into `PhysicalMixedCallerFamily.preserves_with_methods` and `reflects_with_methods`. The same induction discharges argument, named-body and conversion-body callbacks. No new execution premise is exposed by the public endpoints.
+
+`c48ec7bf` connects the actual fixture `make(value) { return lam() { return keep(value); }; }` and its original indirect caller `use`. The constrained `keep` call returns raw Bool; its original output coercion calls the selected `Coerce Bool Word` method. That method returns `41` for true and `7` for false through an actual conditional expression. The cache has four physical slots, three ordinary Headers and two public roots.
+
+The public sequence creates `A` from `make(true)`, creates `B` from `make(false)`, calls `use(A)`, creates `C` from `make(false)`, then calls `use(B)`, `use(A)` and `use(C)`. The four scalar results are `41 / 7 / 41 / 7`; native store lengths are `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficiently fueled factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 2,693 affected modules pass coherent checks. The full build (7,128 jobs), all registered tests (14,126 build jobs and the final pass marker), kernel policy and 235 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The seven public calls produce the stated results, and the existing work remains intact.
+
+The connected coercion branch covers original direct-call expressions with nonempty output coercions, argument roots supported by the existing uncoerced grammar, and terminal conversion bodies. Its conversion catalog requires implementations without type parameters and with empty method assumptions. It does not yet cover coercions at every expression position or every conversion-body shape. Compilation success still does not supply all required static support or establish completeness of the finite selection/evidence checks. Remaining expression and control forms, generalized local functions and composition across all actual compiler passes remain incomplete.
+
+The next work should generate the current static support package from the final compiler catalog and accepted body actions. Actual catalog-origin theorems already distinguish ordinary specializations from selected implementation methods, including ordinary helpers added during preparation. A general issuer should produce inventory coverage and syntax/metadata certificates, then reuse the current body collectors and numeric family. A successful additional certificate checker is useful intermediate coverage; it must not be reported as completeness from compilation success.
+
 ## Nested method evidence through public execution (2026-10-13)
 
 `749acda1` proves that independent Source selections for the same original requirement IDs have identical primary and method roots. The finite validator compares complete caller entries and subtrees of those actual roots at the reached assumptions. Ordered Source assembly then yields the complete dictionary equality.

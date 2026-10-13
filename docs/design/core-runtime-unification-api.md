@@ -4,6 +4,25 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Output coercions through retained public closures (2026-10-13)
+
+`d82a65a9` extends the proof API; `c48ec7bf` adds the closed public connection. The public Artifact, Value, Session, Outcome and Checkpoint APIs are unchanged.
+
+- `Staging.Recursive.RawForm`, `CoercionStep` and `CoercionPath`, with their sized counterparts, describe evaluation of the original raw expression and its ordered conversion suffix. The new expression constructors require nonempty coercion metadata. Existing uncoerced constructors retain their APIs.
+- `RawDirectAuthority.PortWithEvidence` is indexed by the actual coerced-direct compiler receipt. It retains the selected ordinary callee, original requirement/coercion partition and complete dictionary agreement. Existing uncoerced direct-call metadata keeps its empty-coercion condition.
+- `CoercionAuthority`, `CoercionIssuance` and `CoercionChainIssuance` derive actual selected-method and emitted-chain receipts. `CoercionPathBounds` and `CoercedDirectExpressionBounds` compose the native executions with independent Source traces and the actual reached physical state.
+- `PhysicalMixedRootStaticSupport.RootChoice` selects existing ordinary support or `CoercedDirectRoot`. `OrdinaryCoercedDirectRoots` and `OrdinaryCoercedTerminalSupport` issue the retained-closure support from authentic compiler actions and the original Source view. The existing `PhysicalMixedCallerFamily.preserves_with_methods` and `reflects_with_methods` close the internal callbacks.
+
+Closed endpoints are `Tests.SourceCoreCoercionPublic.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The registered runner is `Tests.SourceCoreCoercionPublic.runForward`, imported through `SourceCoreCoercionPublicSequenceForward`. Handle inputs use the actual encoder registry; all sufficient factory outputs append the returned Entry to the history used by later calls.
+
+The public sequence creates `A` from `make(true)`, creates `B` from `make(false)`, calls `use(A)`, creates `C` from `make(false)`, then calls `use(B)`, `use(A)` and `use(C)`. The four scalar results are `41 / 7 / 41 / 7`; native store lengths are `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficiently fueled factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 2,693 affected modules pass coherent checks. The full build (7,128 jobs), all registered tests (14,126 build jobs and the final pass marker), kernel policy and 235 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The seven public calls produce the stated results, and the existing work remains intact.
+
+The connected coercion branch covers original direct-call expressions with nonempty output coercions, argument roots supported by the existing uncoerced grammar, and terminal conversion bodies. Its conversion catalog requires implementations without type parameters and with empty method assumptions. It does not yet cover coercions at every expression position or every conversion-body shape. Compilation success still does not supply all required static support or establish completeness of the finite selection/evidence checks. Remaining expression and control forms, generalized local functions and composition across all actual compiler passes remain incomplete.
+
+The next general entry point should accept actual compilation and input-admission receipts, build the final ordinary inventory and static certificates internally, and invoke these existing public adapters. It must not ask a public caller to supply the body preservation laws that the family is intended to prove. Completeness of this certification step from compiler acceptance remains pending.
+
 ## Nested method evidence through public execution (2026-10-13)
 
 `RecursiveMethodOriginIdentity.RootsProduced.functional` identifies complete primary and ordered method roots from the original requirement IDs. `same_from_origins` combines authentic body identity with coherence of actual caller/root entries to prove full ordered dictionary equality.

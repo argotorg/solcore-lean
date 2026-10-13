@@ -4,6 +4,22 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Output coercions through retained public closures (2026-10-13)
+
+`d82a65a9` connects output coercions on original direct-call nodes to the shared physical callable proof. `c48ec7bf` verifies the connection through retained closures and seven successive public executions.
+
+Independent staged `RawForm` evaluates the original expression before its output conversion. `CoercionStep` and `CoercionPath` retain actual method selection, complete dictionaries, method bodies and intermediate heaps. Their sized counterparts supply strict child bounds, and their erasure results connect successful execution and semantic faults to the existing Dynamic semantics. A stage fault keeps its original scope and identity. The original node, requirements and coercion list remain intact throughout the proof.
+
+Actual compiler actions issue the raw named-call port and ordered conversion chain. `PhysicalMixedRootStaticSupport.RootChoice` adds the coerced-direct case to the existing family. Both directions compose raw-call and conversion-body proofs using the same strict induction, physical cache and caller restoration. Closed public callers supply no method execution law or dictionary-equality premise.
+
+The public sequence creates `A` from `make(true)`, creates `B` from `make(false)`, calls `use(A)`, creates `C` from `make(false)`, then calls `use(B)`, `use(A)` and `use(C)`. The four scalar results are `41 / 7 / 41 / 7`; native store lengths are `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficiently fueled factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 2,693 affected modules pass coherent checks. The full build (7,128 jobs), all registered tests (14,126 build jobs and the final pass marker), kernel policy and 235 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The seven public calls produce the stated results, and the existing work remains intact.
+
+The connected coercion branch covers original direct-call expressions with nonempty output coercions, argument roots supported by the existing uncoerced grammar, and terminal conversion bodies. Its conversion catalog requires implementations without type parameters and with empty method assumptions. It does not yet cover coercions at every expression position or every conversion-body shape. Compilation success still does not supply all required static support or establish completeness of the finite selection/evidence checks. Remaining expression and control forms, generalized local functions and composition across all actual compiler passes remain incomplete.
+
+The next priority is a general producer of inventories and static support from the actual final compilation catalog. It must include ordinary callees discovered during method preparation, classify genuine named and method rows, and derive body, closure and method support from accepted compiler receipts. Connecting that producer to the existing public theorems will remove repeated fixture-specific support assembly. Proving that successful compilation supplies every certification condition remains a separate obligation.
+
 ## Nested method evidence through public execution (2026-10-13)
 
 `749acda1` derives ordered method dictionary equality from the actual caller and selected requirement roots. `d671b4e3` connects nested Mark(Seed) evidence through retained closures, scoped method bodies and seven successive public executions. Existing empty-method and global-coherence adapters keep their signatures.
