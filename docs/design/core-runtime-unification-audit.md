@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct invocation and failure retain the common physical session (2026-10-14)
+
+`82517c33` extracts the exact checked-method receipt. `7546d7ad` adds common public adapters for actual input registry extensions, direct packed calls and failures. `c40caab7` connects the existing recursive-index sequence to those adapters and the complete program certificate.
+
+The original nine events create captures for `10` and `20`, select and invoke the first through a mapping, create a third capture for `30`, select and invoke the second, fail on a missing key, and invoke the oldest capture again. All nine independent Source traces and sufficient-fuel public endpoints remain. The failed call retains its original diagnostic and the reached heap, and the final call reads `10` from the original capture.
+
+The program certificate covers all four actual cached rows. Its automatic catalog issuer is checked on that same certificate. Source code, the original checker budget of `1000`, the call sequence and the outcome definitions are unchanged. No caller supplies a body execution law. The index scanner validates the original base and key nodes and their scalar-key type.
+
+Validation: 2,057 affected modules checked together, full build (7,185 jobs), registered tests (14,202 build jobs and final pass marker), kernel policy and 493 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The earlier seven-call method-evidence and coercion sequences and six-call direct relay still pass.
+
+Independent Source well-formedness and successful finite certification remain explicit. Nonempty implementation methods still require their exact checked-method coherence receipt when the original checker budget differs. Full syntax coverage, further public input/output boundaries and meaning preservation across every actual compiler pass remain unfinished.
+
+Independent exact-source reviews cover the production and public adapters. All 115 theorem declarations in the thirty legacy compatibility files are unchanged. Original `SequenceWitness`, `SuccessfulForwardMeaning`, `ForwardMeaning` and the retained output guarantees are preserved. The private runtime checks also reject missing key nodes, nonscalar keys and zero traversal fuel. Coherent object reuse checks source hashes and complete dependency ancestry; no proof check reads a changing live build library.
+
 ## Scoped evidence-bearing programs through public execution (2026-10-14)
 
 `a6c0c881` extends the finite program certificate to scoped bodies, generic method evidence and ordinary closures. `32717957` connects the existing seven-call method-origin sequence to the common physical session theorems.

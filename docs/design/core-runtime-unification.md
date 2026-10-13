@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Direct invocation and failure retain the common physical session (2026-10-14)
+
+`82517c33` extracts the exact checked-method receipt. `7546d7ad` adds common public adapters for actual input registry extensions, direct packed calls and failures. `c40caab7` connects the existing recursive-index sequence to those adapters and the complete program certificate.
+
+The original nine events create captures for `10` and `20`, select and invoke the first through a mapping, create a third capture for `30`, select and invoke the second, fail on a missing key, and invoke the oldest capture again. All nine independent Source traces and sufficient-fuel public endpoints remain. The failed call retains its original diagnostic and the reached heap, and the final call reads `10` from the original capture.
+
+The program certificate covers all four actual cached rows. Its automatic catalog issuer is checked on that same certificate. Source code, the original checker budget of `1000`, the call sequence and the outcome definitions are unchanged. No caller supplies a body execution law. The index scanner validates the original base and key nodes and their scalar-key type.
+
+Validation: 2,057 affected modules checked together, full build (7,185 jobs), registered tests (14,202 build jobs and final pass marker), kernel policy and 493 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The earlier seven-call method-evidence and coercion sequences and six-call direct relay still pass.
+
+Independent Source well-formedness and successful finite certification remain explicit. Nonempty implementation methods still require their exact checked-method coherence receipt when the original checker budget differs. Full syntax coverage, further public input/output boundaries and meaning preservation across every actual compiler pass remain unfinished.
+
+The new endpoints use the registry actually returned by public input encoding, so registry growth is derived from the accepted start. Direct calls dispatch on authentic named, builtin or closure representations and retain physical captures. The existing specialized common endpoints remain available. The next public connection carries actual named and builtin issuance into this same physical history; the final theorem still needs the full criteria in Section 10.
+
 ## Scoped evidence-bearing programs through public execution (2026-10-14)
 
 `a6c0c881` extends the finite program certificate to scoped bodies, generic method evidence and ordinary closures. `32717957` connects the existing seven-call method-origin sequence to the common physical session theorems.
@@ -526,11 +540,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `749acda1` / `d671b4e3`: nested method evidence through seven public executions. |
-| Latest completed verification | Full build (7082 jobs), all registered tests, kernel policy and 144 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `82517c33` / `7546d7ad` / `c40caab7`: actual checked-method coherence and nine public events through the common physical session. |
+| Latest completed verification | Full build (7185 jobs), registered tests, kernel policy and 493 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual generic methods retain complete nested dictionaries through all seven public execution/output-fuel bounds. The static catalog validates materializer/resolver agreement and actual caller/root coherence. |
-| Current implementation priority | Connect coercions and remaining grammar through public execution, then close static support and all-pass composition from accepted compilation. |
+| Latest proof scope | One actual full-cache certificate supplies body support; original mapping selection, direct closure invocation, failure and capture reuse retain independent Source traces and sufficient-fuel public bounds. |
+| Current implementation priority | Connect actual named/builtin issuance and remaining public boundaries to the common physical state, then close static coverage and all-pass composition from accepted compilation. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
