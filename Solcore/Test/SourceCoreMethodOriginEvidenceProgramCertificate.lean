@@ -3,9 +3,10 @@ import Solcore.Test.SourceCoreMethodOriginEvidenceRootCompilerSupport
 import Solcore.Test.SourceCoreMethodOriginEvidenceUseCompilerSupport
 import Solcore.Test.SourceCoreMethodOriginEvidenceRelayCompilerSupport
 import Solcore.Test.SourceCoreMethodOriginEvidenceIdentityCompilerSupport
+import Solcore.Test.SourceCoreMethodOriginEvidenceFactoryCompilerSupport
 import Solcore.SourceSemantics.CoreLowering.AcceptedProgramRootCompletion
 
-/-! The original cache is checked with eight actual ordinary roots pending.
+/-! The original cache is checked with all ten actual ordinary roots pending.
 Their accepted compiler actions complete the same shared program certificate. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -15,9 +16,9 @@ open CallableIndexedOwnedPreparedFiniteNamedInventories (headers)
 
 structure ObservedProgramCertificate (fixture : CompiledFixture) (observed : ObservedProgram fixture) where
   pending : AcceptedProgramRootCompletion.Pending fixture.recipe.compiled
-    [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index]
+    [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index, observed.makeWordRow.index, observed.makeBoolRow.index]
   accepted : AcceptedProgramRootCompletion.certify fixture.recipe.compiled
-    fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index] 64 = some pending
+    fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index, observed.makeWordRow.index, observed.makeBoolRow.index] 64 = some pending
   wordSite : CallableIndexedOwnedPreparedNamedSyntaxAdmission.DirectSite pending.table.rows observed.wordShape.call.instantiation
   wordAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite?
     pending.table.rows observed.wordShape.call.instantiation = some ⟨wordSite⟩
@@ -81,7 +82,7 @@ private def observeMetadata (compiled : SourceCoreUnifiedCompilation.Compiled)
 def observeProgramCertificate (fixture : CompiledFixture) (observed : ObservedProgram fixture) :
     IO (ObservedProgramCertificate fixture observed) := do
   match accepted : AcceptedProgramRootCompletion.certify fixture.recipe.compiled
-      fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index] 64 with
+      fixture.source_wellFormed [observed.wordRow.index, observed.boolRow.index, observed.useWordRow.index, observed.useBoolRow.index, observed.relayWordRow.index, observed.relayBoolRow.index, observed.identityWordRow.index, observed.identityBoolRow.index, observed.makeWordRow.index, observed.makeBoolRow.index] 64 with
   | none => throw (IO.userError "original method-origin complementary certification rejected")
   | some pending =>
       match wordAccepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.directSite?
@@ -240,50 +241,52 @@ constructed only after every accepted compiler root fills its own position. -/
 def ObservedProgramCertificate.certificate {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (admission : ObservedProgramCertificate fixture observed) :
     CallableIndexedOwnedPreparedProgramAdmission.Certificate fixture.recipe.compiled :=
-  admission.pending.complete fun position member named selected =>
-    if word : position = observed.wordRow.index then .scoped (by
-      have same : named = observed.wordRow.named :=
-        Option.some.inj ((word ▸ selected).symm.trans observed.wordRow.cached)
+  admission.pending.complete_receipts (by
+    intro position member named selected
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+    · have same : named = observed.wordRow.named :=
+        Option.some.inj (selected.symm.trans observed.wordRow.cached)
       subst named
-      exact admission.word_source_admission)
-    else if bool : position = observed.boolRow.index then .scoped (by
-      have same : named = observed.boolRow.named :=
-        Option.some.inj ((bool ▸ selected).symm.trans observed.boolRow.cached)
+      exact ⟨.scoped admission.word_source_admission⟩
+    · have same : named = observed.boolRow.named :=
+        Option.some.inj (selected.symm.trans observed.boolRow.cached)
       subst named
-      exact admission.bool_source_admission)
-    else if useWord : position = observed.useWordRow.index then .scoped (by
-      have same : named = observed.useWordRow.named :=
-        Option.some.inj ((useWord ▸ selected).symm.trans observed.useWordRow.cached)
+      exact ⟨.scoped admission.bool_source_admission⟩
+    · have same : named = observed.useWordRow.named :=
+        Option.some.inj (selected.symm.trans observed.useWordRow.cached)
       subst named
-      exact admission.useWord_source_admission)
-    else if useBool : position = observed.useBoolRow.index then .scoped (by
-      have same : named = observed.useBoolRow.named :=
-        Option.some.inj ((useBool ▸ selected).symm.trans observed.useBoolRow.cached)
+      exact ⟨.scoped admission.useWord_source_admission⟩
+    · have same : named = observed.useBoolRow.named :=
+        Option.some.inj (selected.symm.trans observed.useBoolRow.cached)
       subst named
-      exact admission.useBool_source_admission)
-    else if relayWord : position = observed.relayWordRow.index then .scoped (by
-      have same : named = observed.relayWordRow.named :=
-        Option.some.inj ((relayWord ▸ selected).symm.trans observed.relayWordRow.cached)
+      exact ⟨.scoped admission.useBool_source_admission⟩
+    · have same : named = observed.relayWordRow.named :=
+        Option.some.inj (selected.symm.trans observed.relayWordRow.cached)
       subst named
-      exact admission.relayWord_source_admission)
-    else if relayBool : position = observed.relayBoolRow.index then .scoped (by
-      have same : named = observed.relayBoolRow.named :=
-        Option.some.inj ((relayBool ▸ selected).symm.trans observed.relayBoolRow.cached)
+      exact ⟨.scoped admission.relayWord_source_admission⟩
+    · have same : named = observed.relayBoolRow.named :=
+        Option.some.inj (selected.symm.trans observed.relayBoolRow.cached)
       subst named
-      exact admission.relayBool_source_admission)
-    else if identityWord : position = observed.identityWordRow.index then .scoped (by
-      have same : named = observed.identityWordRow.named :=
-        Option.some.inj ((identityWord ▸ selected).symm.trans observed.identityWordRow.cached)
+      exact ⟨.scoped admission.relayBool_source_admission⟩
+    · have same : named = observed.identityWordRow.named :=
+        Option.some.inj (selected.symm.trans observed.identityWordRow.cached)
       subst named
-      exact admission.identityWord_source_admission)
-    else .scoped (by
-      have identityBool : position = observed.identityBoolRow.index := by
-        simpa only [List.mem_cons, List.not_mem_nil, or_false, word, bool, useWord, useBool,
-          relayWord, relayBool, identityWord, false_or] using member
-      have same : named = observed.identityBoolRow.named :=
-        Option.some.inj ((identityBool ▸ selected).symm.trans observed.identityBoolRow.cached)
+      exact ⟨.scoped admission.identityWord_source_admission⟩
+    · have same : named = observed.identityBoolRow.named :=
+        Option.some.inj (selected.symm.trans observed.identityBoolRow.cached)
       subst named
-      exact admission.identityBool_source_admission)
+      exact ⟨.scoped admission.identityBool_source_admission⟩
+    · have same : named = observed.makeWordRow.named :=
+        Option.some.inj (selected.symm.trans observed.makeWordRow.cached)
+      subst named
+      obtain ⟨certificate⟩ := observed.makeWord_factory_certificate
+      exact ⟨.formation certificate⟩
+    · have same : named = observed.makeBoolRow.named :=
+        Option.some.inj (selected.symm.trans observed.makeBoolRow.cached)
+      subst named
+      obtain ⟨certificate⟩ := observed.makeBool_factory_certificate
+      exact ⟨.formation certificate⟩)
 
 theorem ObservedProgramCertificate.aligned {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (admission : ObservedProgramCertificate fixture observed) (inventory : OrdinaryInventory fixture observed) :
