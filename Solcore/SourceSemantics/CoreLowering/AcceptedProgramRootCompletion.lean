@@ -119,4 +119,40 @@ theorem Pending.complete_selection {compiled : SourceCoreUnifiedCompilation.Comp
         RootCertificate compiled named pending.table.rows) :
     (pending.complete roots).selection = pending.selection := rfl
 
+
+/-- Compiler producers may retain data certificates in a proposition. Each
+receipt is opened only inside the existing cached-row proof. -/
+def Pending.complete_receipts {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {positions : List Nat} (pending : Pending compiled positions)
+    (roots : ∀ position ∈ positions, ∀ named,
+      compiled.indexed.base.functions[position]? = some named →
+        Nonempty (RootCertificate compiled named pending.table.rows)) : Certificate compiled := {
+  table := pending.table
+  selection := pending.selection
+  rows := by
+    intro named member
+    obtain ⟨index, found⟩ := List.mem_iff_getElem?.mp member
+    obtain ⟨row⟩ := pending.rows (named, index) (List.mk_mem_zipIdx_iff_getElem?.mpr found)
+    cases row.root with
+    | checked checked => exact ⟨⟨checked, row.closures⟩⟩
+    | chosen selected =>
+        obtain ⟨root⟩ := roots index selected named found
+        exact ⟨⟨root, row.closures⟩⟩
+  profile := pending.profile
+  diagnostics := pending.diagnostics }
+
+theorem Pending.complete_receipts_table {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {positions : List Nat} (pending : Pending compiled positions)
+    (roots : ∀ position ∈ positions, ∀ named,
+      compiled.indexed.base.functions[position]? = some named →
+        Nonempty (RootCertificate compiled named pending.table.rows)) :
+    (pending.complete_receipts roots).table = pending.table := rfl
+
+theorem Pending.complete_receipts_selection {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {positions : List Nat} (pending : Pending compiled positions)
+    (roots : ∀ position ∈ positions, ∀ named,
+      compiled.indexed.base.functions[position]? = some named →
+        Nonempty (RootCertificate compiled named pending.table.rows)) :
+    (pending.complete_receipts roots).selection = pending.selection := rfl
+
 end Solcore.SourceSemantics.CoreLowering.AcceptedProgramRootCompletion
