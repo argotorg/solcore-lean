@@ -1,0 +1,5 @@
+import Solcore.Test.SourceCoreEvidenceDirectResults
+set_option autoImplicit false
+namespace Tests.SourceCoreMethodOwnEvidence
+export Tests.SourceCoreEvidenceDirect (ScalarOutput)
+end Tests.SourceCoreMethodOwnEvidence
