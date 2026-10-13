@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreMethodOriginEvidenceCompilerProfile
 import Solcore.Test.SourceCoreOrdinarySyntaxTable
 import Solcore.Test.SourceCoreFinalCatalogLateRows
 import Solcore.Test.SourceCoreClosedReadyNamedWhile
@@ -3187,6 +3188,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreMethodOriginEvidence.runForwardAt1000
   SourceCoreMethodOriginEvidence.Certified.runForward
   SourceCoreCertifiedLexicalFailure.run
+  SourceCoreMethodOriginEvidence.CompilerProfile.runForward
   SourceCoreCoercionPublic.runForward
   SourceCoreAcceptedBodyBindings.run
   SourceCoreFinalCatalogLateRows.runLateRows
