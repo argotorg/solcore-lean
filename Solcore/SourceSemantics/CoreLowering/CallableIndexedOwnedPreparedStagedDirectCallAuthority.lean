@@ -13,6 +13,15 @@ open Core Frontend SourceInference
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt)
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Inventory headers)
 
+/-- A caller's exact executable resolver result and complete semantic dictionary.
+This receipt does not require an ordinary Source declaration or Header. -/
+structure ResolvedCaller (program : CheckedProgram)
+    (caller : SourceSpecialization.SpecializedFunction)
+    (evidence : Dynamic.EvidenceEnvironment) where
+  available : SourceTypedRuntime.RuntimeEvidenceEnvironment
+  resolved : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available
+  dictionary : evidence = CallableNamedMetadata.environment available
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {program : Program}
   {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
@@ -206,9 +215,54 @@ theorem ordinary_evidence
       rw [ordinary.predicates] at length
       exact (List.length_eq_zero_iff.mp length.symm).trans empty.symm
 
-/-- Re-extraction from the actual named caller supplies its complete resolver
-and authenticated selected dictionary. Caller alignment comes from the reached
-Source frame; arbitrary Source evidence is identified using ledger identities. -/
+/-- The exact caller resolver and genuine selected callee identify the full
+produced dictionary. Reached lexical fields retain the original ledger IDs. -/
+theorem authenticated_evidence_of_resolved
+    {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
+      (Program.ofChecked compiled.sourceProgram))}
+    (port : Port receipt catalog)
+    {project : SourceCoreEvidence.Projector} {caller : SourceSpecialization.SpecializedFunction}
+    {child : SourceCoreEvidence.Child} {budget : Nat} {callables : SourceCoreFunctions.CallablePolicy}
+    (actual : CallableCoercionExpressionCertificates.Direct compiled.sourceProgram project caller compilation
+      child budget source scope id callee ids instantiation reasonAt callables receipt.node lowered)
+    {context : SourceSemantics.Context} {callerEvidence : Dynamic.EvidenceEnvironment}
+    (resolvedCaller : ResolvedCaller compiled.sourceProgram caller callerEvidence)
+    (signatures : context.signatures = compiled.sourceProgram.signatures)
+    (ledger : context.solvedRequirements = caller.function.solvedRequirements)
+    (assumptions : ∀ goal, goal ∈ caller.assumptions → goal ∈ context.assumptions)
+    (unique : RequirementIdsUnique context) :
+    EvidenceAt receipt port context callerEvidence := by
+  have key : actual.selection.key = receipt.signature.key :=
+    actual.selection.key_eq.trans (Except.ok.inj (actual.selection.targetSelected.symm.trans receipt.target))
+  have record : SourceCompilationPlan.exactSpecialization compilation.plan receipt.signature.key =
+      .ok actual.selection.specialized := by
+    rw [← key]
+    exact actual.selection.selected
+  have same : port.row = actual.selection.specialized :=
+    port.prepared.same.symm.trans
+      ((congrArg (fun named => named.specialized) port.aligned.named).symm.trans
+        (port.specialized.trans (Except.ok.inj (receipt.record.symm.trans record))))
+  have actualKey := (CallableNamedMetadata.specialization_of_exact actual.selection.selected).2
+  have calleeDictionary : actual.selection.actual = port.prepared.available := by
+    apply port.prepared.authenticated_dictionary
+    simpa only [same, actualKey] using actual.selection.authenticated
+  have input : actual.selection.available = resolvedCaller.available :=
+    Except.ok.inj (actual.selection.resolved.symm.trans resolvedCaller.resolved)
+  have output : CallableNamedMetadata.environment actual.selection.actual = port.function.evidence := by
+    rw [calleeDictionary, port.dictionary]
+    rfl
+  constructor
+  · have produced := actual.selection.direct_produces signatures ledger assumptions
+    simpa only [receipt.metadata.coercions, input, output, resolvedCaller.dictionary] using produced
+  · intro evidence produced
+    have produced : Dynamic.DirectCallProducesEvidence context
+        (CallableNamedMetadata.environment actual.selection.available) receipt.node.requirements receipt.node.coercions
+        instantiation.predicates evidence := by
+      simpa only [receipt.metadata.coercions, input, resolvedCaller.dictionary] using produced
+    exact (actual.selection.direct_agrees ledger
+      (CallableCallRequirementLayouts.singletons_of_unique ledger unique) produced).trans output
+
+/-- The ordinary prepared caller supplies the same general resolver receipt. -/
 theorem authenticated_evidence
     {catalog : List (CallableIndexedOwnedFunctionValues.Header compiled
       (Program.ofChecked compiled.sourceProgram))}
@@ -225,36 +279,8 @@ theorem authenticated_evidence
     (unique : RequirementIdsUnique context)
     (callerDictionary : callerEvidence = callerPrepared.view.evidence) :
     EvidenceAt receipt port context callerEvidence := by
-  have key : actual.selection.key = receipt.signature.key :=
-    actual.selection.key_eq.trans (Except.ok.inj (actual.selection.targetSelected.symm.trans receipt.target))
-  have record : SourceCompilationPlan.exactSpecialization compilation.plan receipt.signature.key =
-      .ok actual.selection.specialized := by
-    rw [← key]
-    exact actual.selection.selected
-  have same : port.row = actual.selection.specialized :=
-    port.prepared.same.symm.trans
-      ((congrArg (fun named => named.specialized) port.aligned.named).symm.trans
-        (port.specialized.trans (Except.ok.inj (receipt.record.symm.trans record))))
-  have actualKey := (CallableNamedMetadata.specialization_of_exact actual.selection.selected).2
-  have calleeDictionary : actual.selection.actual = port.prepared.available := by
-    apply port.prepared.authenticated_dictionary
-    simpa only [same, actualKey] using actual.selection.authenticated
-  have input : actual.selection.available = callerPrepared.available :=
-    Except.ok.inj (actual.selection.resolved.symm.trans callerPrepared.resolved)
-  have output : CallableNamedMetadata.environment actual.selection.actual = port.function.evidence := by
-    rw [calleeDictionary, port.dictionary]
-    rfl
-  constructor
-  · have produced := actual.selection.direct_produces signatures ledger assumptions
-    simpa only [receipt.metadata.coercions, input, output, callerDictionary,
-      RecursiveNamedPublicSpecializationMeaning.Prepared.view] using produced
-  · intro evidence produced
-    have produced : Dynamic.DirectCallProducesEvidence context
-        (CallableNamedMetadata.environment actual.selection.available) receipt.node.requirements receipt.node.coercions
-        instantiation.predicates evidence := by
-      simpa only [receipt.metadata.coercions, input, callerDictionary,
-        RecursiveNamedPublicSpecializationMeaning.Prepared.view] using produced
-    exact (actual.selection.direct_agrees ledger
-      (CallableCallRequirementLayouts.singletons_of_unique ledger unique) produced).trans output
+  exact authenticated_evidence_of_resolved receipt port actual
+    ⟨callerPrepared.available, callerPrepared.resolved, callerDictionary⟩
+    signatures ledger assumptions unique
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedDirectCallAuthority
