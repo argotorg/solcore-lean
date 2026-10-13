@@ -4,6 +4,22 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Nested method evidence through public execution (2026-10-13)
+
+`RecursiveMethodOriginIdentity.RootsProduced.functional` identifies complete primary and ordered method roots from the original requirement IDs. `same_from_origins` combines authentic body identity with coherence of actual caller/root entries to prove full ordered dictionary equality.
+
+`CallableMethodOriginCoherence.validate` compares full raw trees at the selected assumptions. `CallableMethodSelectedRoots` recovers the exact primary and method roots from the real selector action. `CallableMethodOriginTable.validate` traverses the actual final specialization table and retains materializer/resolver agreement, caller coverage and origin coherence.
+
+`OriginsMethodSelection.Catalog` contains original method formation and the validated table. `MethodSelectionIssuer.Catalog.origins` routes it through existing `_with_catalog` support APIs. `OperatorMethodIssuance.of_actual_with_origins` derives independent Source equality internally; the two earlier issuer APIs are unchanged.
+
+Closed endpoints are `Tests.SourceCoreMethodOriginEvidence.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public runtime API and Source evaluation rules are unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 106 affected modules pass coherent checks. The full build (7,082 jobs), all registered tests (14,034 build jobs and the final pass marker), kernel policy and 144 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected catalog supports evidence with premises and no longer requires a premise-free rule or global uniqueness of every valid evidence tree. It checks complete trees reachable from the actual caller and selected requirements. The finite materializer/resolver, caller-coverage and origin checks can still reject compiler-accepted selections outside their supported conditions. Their completeness from compilation success, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Methods with their own evidence through public execution (2026-10-13)
 
 `CallableMethodResolverEvidence.Materialized` relates the complete ordered materialized method dictionary to the actual fresh resolver result. `CallableMethodResolverTable.validate` checks the finite final plan and produces `Ready`; its operator receipt includes actual caller coverage.

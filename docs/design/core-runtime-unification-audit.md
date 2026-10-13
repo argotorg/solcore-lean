@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Nested method evidence through public execution (2026-10-13)
+
+Commits `749acda1` and `d671b4e3` remove the leaf-rule restriction from the connected method evidence proof. The fixture has three original implementation declarations, twelve physical cache slots, ten ordinary Headers and four public roots. Each selected Word/Bool BitNot body retains a Mark tree with its actual Seed premise.
+
+The proof fixes primary and method roots using independent Source requirement production and original requirement-ID uniqueness. It compares complete reachable raw trees; evidence order and repeated assumptions are retained in Source assembly. The finite validator deliberately rejects conflicting actual origins. The negative regression uses actual checked/worklist data, and its whole program is also rejected by the existing compiler. It is not a counterexample for the compile-success theorem.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 106 affected modules pass coherent checks. The full build (7,082 jobs), all registered tests (14,034 build jobs and the final pass marker), kernel policy and 144 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected catalog supports evidence with premises and no longer requires a premise-free rule or global uniqueness of every valid evidence tree. It checks complete trees reachable from the actual caller and selected requirements. The finite materializer/resolver, caller-coverage and origin checks can still reject compiler-accepted selections outside their supported conditions. Their completeness from compilation success, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Methods with their own evidence through public execution (2026-10-13)
 
 Commits `92b3848c` and `890ebedc` connect a selected method with its own nonempty dictionary through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. The actual Word and Bool method rows each retain one type replacement and one Mark dictionary entry. Their original eighteen-node bodies retain all three constrained direct calls.
