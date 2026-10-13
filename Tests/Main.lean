@@ -1944,6 +1944,7 @@ import Solcore.Test.SourceCoreChosenOrdinaryAcceptedLiteralInputs
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicInvocationExitAdmission
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicRootExitAdmission
 import Solcore.Test.SourceCoreChosenOrdinaryAcceptedPublicProgramOutcomeWithExit
+import Solcore.Test.SourceCoreNestedFormationForward
 set_option autoImplicit false
 
 open Solcore
@@ -3156,6 +3157,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreRecursiveFormation.runForward
   SourceCoreGenericDirect.runForward
   SourceCoreEvidenceDirect.runForward
+  SourceCoreNestedFormation.runForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
