@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct-call initialization and retained closure formation (2026-10-13)
+
+Commits `fac267b5` and `3e578bd2` connect a direct initializer followed by closure formation at its actual extended lexical scope. The collector retains the selected Source node, absence of generalized local lowering, original return shape, native child typing and original evidence/ledger context. It invokes the existing lexical formation producer on that same accepted child.
+
+The public sequence creates distinct closures over newly allocated `saved` cells, invokes A, creates C, invokes B and reuses A. Every call uses its preceding returned session and reached Source heap. All six Source traces and sufficient-fuel bounds are proved; whole-body meaning and runtime captures are not static assumptions.
+
+Validation: all 21 affected modules pass coherent checks. The full build (6,612 jobs), all registered tests (13,094 build jobs and the final pass marker), kernel policy and 21 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation below recursive expression nodes and inside retained closure bodies, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Canonical calls through scoped bodies and capture mutation (2026-10-13)
 
 Commits `37591075` and `59fdf839` connect direct/index children inside actual scoped bodies to public sessions. Named entry derives its canonical packet from the genuine parameter prefix and complete Header inventory. Ordinary entry derives its global slots from the retained capture and actual parameter binding spine.

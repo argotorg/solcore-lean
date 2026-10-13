@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct-call initialization and retained closure formation (2026-10-13)
+
+`fac267b5` derives mixed named-body support from the actual compiler collector. General recursive expressions and ordinary lambda formation retain their original typed nodes, accepted compiler actions and reached lexical contexts. The factory initializes `saved` through `relay(seed)`, then returns `lam() { return identity(saved); }`. The emitted closure captures the actual newly allocated local cell.
+
+`3e578bd2` connects `make(10); make(20); A(); make(30); B(); A()` to independent Source meaning and all six public sufficient-fuel bounds. Results are `10 / 20 / 10`, using distinct captures, exact successive heaps and the complete reusable handle history.
+
+Validation: all 21 affected modules pass coherent checks. The full build (6,612 jobs), all registered tests (13,094 build jobs and the final pass marker), kernel policy and 21 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation below recursive expression nodes and inside retained closure bodies, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Canonical calls through scoped bodies and capture mutation (2026-10-13)
 
 `37591075` connects canonical direct and index expression children through the existing named and ordinary scoped flow engine. The actual parameter entry supplies captured global slots. Marked local allocation and caller restoration retain those slots, the reached Source heap and complete ordered handle history through assignments and finite loops.

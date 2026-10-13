@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Direct-call initialization and retained closure formation (2026-10-13)
+
+`CallableIndexedOwnedPreparedNamedCanonicalMixedCollectors.Syntax` admits a general recursive expression or an ordinary return-lambda shape. `of_actual` uses the actual compiler action and original per-context Source typing to construct either a canonical root or the existing lexical formation receipt. The latter derives runtime context and evidence validity from the same real Header.
+
+The public endpoints are `Tests.SourceCoreCanonicalFormation.closed_sequence_meaning` and `closed_forward_meaning`. The static packet combines the actual three-row named inventory and the ordinary canonical closure-body family; no execution law is a packet field.
+
+Validation: all 21 affected modules pass coherent checks. The full build (6,612 jobs), all registered tests (13,094 build jobs and the final pass marker), kernel policy and 21 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation below recursive expression nodes and inside retained closure bodies, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Canonical calls through scoped bodies and capture mutation (2026-10-13)
 
 `CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport` provides additive named and ordinary scoped packets. `CanonicalNamedBranchingSupport` and `CanonicalBranchingLambdaBodyBounds` use the existing scoped imperative engine with strict canonical child bounds. `CanonicalBranchingLambdaApplicationBounds` retains the actual parameter binding spine and caller post.

@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Direct-call initialization and retained closure formation (2026-10-13)
+
+A named body can now combine a direct-call local initializer and ordinary closure formation through the same genuine compiler collector. Formation occurs at the extended lexical context after the initializer. Its captured cell remains related through export, subsequent calls and an intervening closure creation. The retained closure body itself performs a direct `identity` call.
+
+The six-session public fixture returns `10 / 20 / 10` and proves independent Source traces, exact successive heaps, complete handle histories and sufficient execution/output fuel at all six original checkpoints.
+
+Validation: all 21 affected modules pass coherent checks. The full build (6,612 jobs), all registered tests (13,094 build jobs and the final pass marker), kernel policy and 21 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Formation below recursive expression nodes and inside retained closure bodies, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Canonical calls through scoped bodies and capture mutation (2026-10-13)
 
 Canonical expression children now pass through named and ordinary scoped bodies. The existing flow engine covers real lexical allocation, assignment and finite loops, while preserving the actual captured global slots used by direct calls. Static roots come from original Source typing and the retained compiler action at each reached context.
@@ -248,11 +258,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `37591075` / `59fdf839`: canonical calls through actual scoped bodies retain capture mutation across distinct handles and intervening calls. |
-| Latest completed verification | Full build (6593 jobs), all registered tests, kernel policy and 35 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `fac267b5` / `3e578bd2`: direct-call initialization followed by closure formation at the reached lexical context, connected through six public sessions. |
+| Latest completed verification | Full build (6612 jobs), all registered tests, kernel policy and 21 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Six public calls preserve distinct captures and a prior captured-cell update across intervening executions; all six have Source-to-public execution/output fuel bounds. |
-| Current implementation priority | Combine canonical initializers and closure formation at the same named lexical scope, then recursive formation and remaining compiler coverage. |
+| Latest proof scope | Six public calls preserve separate local cells captured after direct initialization; all six have independent Source meaning and public execution/output fuel bounds. |
+| Current implementation priority | Recursive formation and formation inside retained closure bodies, then remaining compiler coverage and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
