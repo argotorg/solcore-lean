@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Public outcomes retain ordinary Source applications (2026-10-14)
+
+`da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
+
+The application proof retains the original callable, ordered arguments, complete invocation dictionary and exact initial and final Source heaps. Named calls keep their original selected header and Source instantiation. Anonymous calls keep their captured environment. Initial and later public reflection endpoints return the same certified session state and handle history with the ordinary Source outcome.
+
+Semantic failures retain their original reason and reached heap. A stage rejection instead retains the actual rejected guard and its public diagnostic relation. This distinction is preserved in the public failure result.
+
+Validation: 10 affected modules checked together, full build (7,289 jobs), registered tests (14,416 build jobs), kernel policy and 902 endpoint audits pass. The original public results, captured closures, failure continuation and sufficient-fuel conclusions remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The new direction starts with actual finite public completion and yields an ordinary Source outcome. Forward public completion still uses the existing finite staged Source trace. Lifting an arbitrary ordinary Source execution through genuine stage guards remains open, as do complete compiler syntax and actual-pass coverage. Source well-formedness, the static compiler profile and typed public inputs remain explicit.
+
+The public conclusions now expose ordinary Source applications as well as their staged witnesses. This strengthens the external theorem statement without changing the execution backend. The twelve unrelated workspace changes remain excluded.
+
 ## Scoped closure bodies use the common compiler profile (2026-10-14)
 
 `a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.

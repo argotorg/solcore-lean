@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Public outcomes retain ordinary Source applications (2026-10-14)
+
+`da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
+
+The application proof retains the original callable, ordered arguments, complete invocation dictionary and exact initial and final Source heaps. Named calls keep their original selected header and Source instantiation. Anonymous calls keep their captured environment. Initial and later public reflection endpoints return the same certified session state and handle history with the ordinary Source outcome.
+
+Semantic failures retain their original reason and reached heap. A stage rejection instead retains the actual rejected guard and its public diagnostic relation. This distinction is preserved in the public failure result.
+
+Validation: 10 affected modules checked together, full build (7,289 jobs), registered tests (14,416 build jobs), kernel policy and 902 endpoint audits pass. The original public results, captured closures, failure continuation and sufficient-fuel conclusions remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The new direction starts with actual finite public completion and yields an ordinary Source outcome. Forward public completion still uses the existing finite staged Source trace. Lifting an arbitrary ordinary Source execution through genuine stage guards remains open, as do complete compiler syntax and actual-pass coverage. Source well-formedness, the static compiler profile and typed public inputs remain explicit.
+
+Next, extend the common compiler profile and session connection to mapping indices and constructor payloads, retaining their existing execution order and callable histories.
+
 ## Scoped closure bodies use the common compiler profile (2026-10-14)
 
 `a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.
@@ -754,11 +768,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `a8e77c30` / `85e95727`: multi-statement closures use the common compiler certificate and public session in the original six-call sequence. |
-| Latest completed verification | Full build (7281 jobs), registered tests, kernel policy and 874 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `da668e8f` / `b50005da`: actual public completions retain ordinary Source applications, semantic failures and genuine stage rejection. |
+| Latest completed verification | Full build (7289 jobs), registered tests, kernel policy and 902 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual factory and closure compilation supplies scoped body proofs; one public session retains all three captured environments across six calls. |
-| Current implementation priority | Connect ordinary Source outcomes at the public boundary and expand the common compiler profile, then complete actual-pass coverage. |
+| Latest proof scope | Ordinary Source outcomes retain original callable evidence, ordered arguments, captured environments and exact reached heaps in the common public session. |
+| Current implementation priority | Extend the common compiler profile to mapping indices and constructors, then complete remaining syntax and actual-pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

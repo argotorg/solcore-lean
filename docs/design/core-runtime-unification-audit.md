@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Public outcomes retain ordinary Source applications (2026-10-14)
+
+`da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
+
+The application proof retains the original callable, ordered arguments, complete invocation dictionary and exact initial and final Source heaps. Named calls keep their original selected header and Source instantiation. Anonymous calls keep their captured environment. Initial and later public reflection endpoints return the same certified session state and handle history with the ordinary Source outcome.
+
+Semantic failures retain their original reason and reached heap. A stage rejection instead retains the actual rejected guard and its public diagnostic relation. This distinction is preserved in the public failure result.
+
+Validation: 10 affected modules checked together, full build (7,289 jobs), registered tests (14,416 build jobs), kernel policy and 902 endpoint audits pass. The original public results, captured closures, failure continuation and sufficient-fuel conclusions remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The new direction starts with actual finite public completion and yields an ordinary Source outcome. Forward public completion still uses the existing finite staged Source trace. Lifting an arbitrary ordinary Source execution through genuine stage guards remains open, as do complete compiler syntax and actual-pass coverage. Source well-formedness, the static compiler profile and typed public inputs remain explicit.
+
+Reviews trace the actual child Source, full dictionary, parameter allocation and body outcome into the existing Dynamic rules. Failure projection follows the original failure constructor. Public consumers retain reached heaps, session history and the existing sufficient-fuel proofs; no global staging premise or converse projection is assumed.
+
 ## Scoped closure bodies use the common compiler profile (2026-10-14)
 
 `a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.

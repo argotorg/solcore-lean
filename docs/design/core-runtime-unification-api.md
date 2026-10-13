@@ -4,6 +4,20 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Public outcomes retain ordinary Source applications (2026-10-14)
+
+`da668e8f` projects successful staged calls and semantic failures to independent ordinary Source applications. `b50005da` carries those outcomes through the actual evidence-program, scoped-closure and lexical-failure public sequences.
+
+The application proof retains the original callable, ordered arguments, complete invocation dictionary and exact initial and final Source heaps. Named calls keep their original selected header and Source instantiation. Anonymous calls keep their captured environment. Initial and later public reflection endpoints return the same certified session state and handle history with the ordinary Source outcome.
+
+Semantic failures retain their original reason and reached heap. A stage rejection instead retains the actual rejected guard and its public diagnostic relation. This distinction is preserved in the public failure result.
+
+Validation: 10 affected modules checked together, full build (7,289 jobs), registered tests (14,416 build jobs), kernel policy and 902 endpoint audits pass. The original public results, captured closures, failure continuation and sufficient-fuel conclusions remain checked. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The new direction starts with actual finite public completion and yields an ordinary Source outcome. Forward public completion still uses the existing finite staged Source trace. Lifting an arbitrary ordinary Source execution through genuine stage guards remains open, as do complete compiler syntax and actual-pass coverage. Source well-formedness, the static compiler profile and typed public inputs remain explicit.
+
+`Staging.Recursive.Applies.value_plain` and `semanticFault_plain` preserve ordinary callable outcomes. `SourceCall.value_plain`, `semanticFault_plain` and `failure_plain` retain the selected named Source function. `CertifiedPublicSessionSourceOutcomes` provides initial and later `reflect_function_plain`, `reflect_scalar_plain` and `reflect_failure_plain` endpoints. `Issued.reflect_direct_scalar_plain` connects retained named, builtin and closure handles to the same paired Source outcomes after packed input validation. Public runtime APIs are unchanged.
+
 ## Scoped closure bodies use the common compiler profile (2026-10-14)
 
 `a8e77c30` extends the compiler-derived program certificate to closures with lexical declarations, assignments and loops. `85e95727` connects the original six-call scoped-closure sequence to the common public-session constructor.
