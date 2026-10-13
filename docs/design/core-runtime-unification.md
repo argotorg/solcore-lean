@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Evidence-bearing calls in scoped named bodies (2026-10-13)
+
+Evidence-bearing declaration calls now compose with the existing named scoped body proof. Local allocation and control flow preserve the caller signature catalog, requirement ledger and full dictionary. Actual compiler receipts construct the child certificates at each lexical context; the shared body and public execution proofs consume them unchanged.
+
+The closed six-row artifact uses generic calls before, inside and after a loop. Its four successive public sessions preserve both concrete specializations, exact Source heaps and sufficient execution and output fuel.
+
+Validation: all 23 affected modules pass coherent checks. The full build (6,716 jobs), all registered tests (13,302 build jobs and the final pass marker), kernel policy and 65 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers supported direct declaration calls in the existing named scoped grammar, including local allocation, plain assignment and finite loops. It retains the full closed replacement range and excludes coercions and generalized local functions. Evidence-bearing formation and retained closure bodies, method paths, remaining expression/control forms and composition across every compiler pass remain incomplete.
+
 ## Nested closure formation through retained public handles (2026-10-13)
 
 A retained ordinary closure can now allocate a local value through a named call and return another closure that captures that value. The same original compiler policy and reached Source scope determine the inner formation. The shared body proof retains the actual enclosing frame and global slots while evaluating the body and restoring its caller.
@@ -298,11 +308,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `0de590b2` / `df6f8314`: nested ordinary closure formation and four retained handles across seven public calls. |
-| Latest completed verification | Full build (6695 jobs), all registered tests, kernel policy and 59 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `8a433c18` / `55db5d43`: evidence-bearing generic calls through named local allocation and finite loops. |
+| Latest completed verification | Full build (6716 jobs), all registered tests, kernel policy and 65 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Inner closure creation retains the original compiler policy and actual captured frame; all seven calls have Source meaning and execution/output fuel bounds. |
-| Current implementation priority | Evidence-aware scoped callers, then remaining grammar and all-pass composition. |
+| Latest proof scope | All three generic call sites retain the actual dictionary through scoped execution; four public calls have Source meaning and execution/output fuel bounds. |
+| Current implementation priority | Remaining evidence and method paths, expression/control forms and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

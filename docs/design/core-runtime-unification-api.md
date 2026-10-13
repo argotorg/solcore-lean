@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Evidence-bearing calls in scoped named bodies (2026-10-13)
+
+`NamedEvidenceScopedCallerFrames.of_selected` derives the full caller frame from Prepared, HeaderAt, selected Source scope and RuntimeContextFields. It has no terminal-body restriction. `NamedEvidenceScopedRoots.of_policy_sites` authenticates every direct-call action using that actual frame and inventory; `of_accepted_sites` extracts the same root from real child acceptance.
+
+`NamedEvidenceScopedCollectors.of_actual` passes these roots into the existing `NamedCanonicalScopedCollectors.of_imperative_compiler`. The actual statement tree supplies each local context, expression typing and native child proof. The resulting canonical branching support uses the existing numeric and public theorem family.
+
+Validation: all 23 affected modules pass coherent checks. The full build (6,716 jobs), all registered tests (13,302 build jobs and the final pass marker), kernel policy and 65 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers supported direct declaration calls in the existing named scoped grammar, including local allocation, plain assignment and finite loops. It retains the full closed replacement range and excludes coercions and generalized local functions. Evidence-bearing formation and retained closure bodies, method paths, remaining expression/control forms and composition across every compiler pass remain incomplete.
+
 ## Nested closure formation through retained public handles (2026-10-13)
 
 `PolicyRecipe` retains the actual type projector and source-cell allocator. `OrdinarySamePolicyLambdaProducer.of_expression` constructs the inner producer from the retained Code and its real reached child. `OrdinarySamePolicyLambdaFormation.of_expression` derives the Source frame and body-view receipts at that lexical context. `ReturnLambdaBodySupport.of_return_view` retains the individual original and prepared-view lookup facts required by the generated body.

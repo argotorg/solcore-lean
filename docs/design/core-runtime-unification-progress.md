@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Evidence-bearing calls in scoped named bodies (2026-10-13)
+
+`8a433c18` derives complete caller evidence at every reached lexical context from the actual prepared Header and selected Source scope. Evidence-aware scoped roots retain the genuine compiler action and feed the existing imperative body collector. Public callers supply no additional body execution or dictionary-equality premise.
+
+`55db5d43` connects two generic relay specializations with local initialization, a while loop, two assignments and a final return. The initializer, loop body and final return each call choose with the inherited trait evidence. Four linked public calls return `11 / false / 33 / true`; their loop flags exercise one, zero, zero and one iteration. Each original checkpoint has Source meaning, its exact reached heap and sufficient execution/output fuel.
+
+Validation: all 23 affected modules pass coherent checks. The full build (6,716 jobs), all registered tests (13,302 build jobs and the final pass marker), kernel policy and 65 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers supported direct declaration calls in the existing named scoped grammar, including local allocation, plain assignment and finite loops. It retains the full closed replacement range and excludes coercions and generalized local functions. Evidence-bearing formation and retained closure bodies, method paths, remaining expression/control forms and composition across every compiler pass remain incomplete.
+
 ## Nested closure formation through retained public handles (2026-10-13)
 
 `0de590b2` connects ordinary closure formation inside a retained closure body. The actual retained compiler policy supplies type projection and cell allocation; original Source metadata and the reached lexical context produce the inner closure receipt. Authentic global-slot provenance and the existing nested runtime packet preserve the captured frame through local allocation.

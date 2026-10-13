@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Evidence-bearing calls in scoped named bodies (2026-10-13)
+
+Commits `8a433c18` and `55db5d43` extend genuine declaration evidence beyond terminal bodies. Every direct-call occurrence is reconstructed from the selected compiler policy. The independently produced Source dictionary agrees with the actual compiler dictionary through the original ledger, including after local allocation and inside the loop.
+
+The four-call regression retains all six cached rows and their distinct specializations. The initial state comes from actual initialization, later states from the preceding returned sessions, and every call has reflection plus a sufficient-fuel result at its original checkpoint. No assumed called-body execution or initialized heap relation is introduced.
+
+Validation: all 23 affected modules pass coherent checks. The full build (6,716 jobs), all registered tests (13,302 build jobs and the final pass marker), kernel policy and 65 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers supported direct declaration calls in the existing named scoped grammar, including local allocation, plain assignment and finite loops. It retains the full closed replacement range and excludes coercions and generalized local functions. Evidence-bearing formation and retained closure bodies, method paths, remaining expression/control forms and composition across every compiler pass remain incomplete.
+
 ## Nested closure formation through retained public handles (2026-10-13)
 
 Commits `0de590b2` and `df6f8314` connect inner closure generation to the same Source/public proof family used for later handle invocation. No supplied body execution law or initialized heap relation replaces the compiler receipts. Original Source typing, precise reached metadata, retained policy fields and actual global-slot provenance construct the static support.
