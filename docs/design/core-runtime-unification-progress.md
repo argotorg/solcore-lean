@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Canonical calls through scoped bodies and capture mutation (2026-10-13)
+
+`37591075` connects canonical direct and index expression children through the existing named and ordinary scoped flow engine. The actual parameter entry supplies captured global slots. Marked local allocation and caller restoration retain those slots, the reached Source heap and complete ordered handle history through assignments and finite loops.
+
+`59fdf839` proves six actual public calls: `make(10); make(20); A(11,true,false); make(30); B(21,true,false); A(12,false,false)`. The named `relay` uses a direct call in a local initializer. Each closure initializes `previous` through `relay(seed)`, updates its captured `seed` through `relay(next)` inside a finite while loop, and returns `identity(previous)`. Results are `10 / 20 / 11`, with distinct captures and all six Source-to-public sufficient-fuel bounds.
+
+Validation: all 422 affected modules pass coherent checks. The full build (6,593 jobs), all registered tests (13,056 build jobs and the final pass marker), kernel policy and 35 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection combines a direct-call local initializer with closure formation in the same named body. Formation below recursive expression nodes, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Recursive mapping operands and retained failures (2026-10-13)
 
 `6a73f02f` adds independently graded Source index rules and their erasure and fault-typing proofs. `544751f6` connects both recursive index operands to the shared numeric proof. The actual compiler occurrence and diagnostic issuer establish missing-default behavior in the current receiving registry.

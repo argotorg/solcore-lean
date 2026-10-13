@@ -4,6 +4,18 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Canonical calls through scoped bodies and capture mutation (2026-10-13)
+
+`CallableIndexedOwnedPreparedStagedCanonicalScopedStaticSupport` provides additive named and ordinary scoped packets. `CanonicalNamedBranchingSupport` and `CanonicalBranchingLambdaBodyBounds` use the existing scoped imperative engine with strict canonical child bounds. `CanonicalBranchingLambdaApplicationBounds` retains the actual parameter binding spine and caller post.
+
+`PreparedNamedCanonicalScopedCollectors.of_actual` and `OrdinaryCanonicalScopedSupport.of_actual` construct the packets from genuine compiler trees. `NamedCanonicalScopedRoots` and `OrdinaryCanonicalScopedRoots` preserve original typing, ledger, evidence, reached scope and diagnostic authority at each expression child. `NamedBodies.Compilation.canonicalBranching` and `MixedBodyStaticSupport.Packet.canonicalBranching` select these paths.
+
+The public endpoints are `Tests.SourceCoreCanonicalScoped.closed_sequence_meaning` and `closed_forward_meaning`. `forward_word` constructs the actual Word/Bool/Bool packed input relation and retains the exact mutated Source heap.
+
+Validation: all 422 affected modules pass coherent checks. The full build (6,593 jobs), all registered tests (13,056 build jobs and the final pass marker), kernel policy and 35 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection combines a direct-call local initializer with closure formation in the same named body. Formation below recursive expression nodes, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Recursive mapping operands and retained failures (2026-10-13)
 
 `Staging.Recursive.IndexOutcome` records the independent terminal index behavior. `CallableIndexedOwnedPreparedStagedIndexSourceInversion` and `IndexHeadBounds` connect strict base/key children to the actual lookup suffix. `IndexDiagnosticAuthority.Port.missing` uses the actual receiving registry and diagnostics; named and ordinary producers derive `IndexReady` from the original compiler receipt and reached Source occurrence.

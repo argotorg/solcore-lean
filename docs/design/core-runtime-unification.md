@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Canonical calls through scoped bodies and capture mutation (2026-10-13)
+
+Canonical expression children now pass through named and ordinary scoped bodies. The existing flow engine covers real lexical allocation, assignment and finite loops, while preserving the actual captured global slots used by direct calls. Static roots come from original Source typing and the retained compiler action at each reached context.
+
+The public fixture updates A and B through separate handles, creates another closure between those invocations, then calls A again from the actual later session. Its `10 / 20 / 11` results show that A keeps its updated captured cell. Reflection follows the actual Source heap chain, and all six calls have independent public sufficient-fuel bounds.
+
+Validation: all 422 affected modules pass coherent checks. The full build (6,593 jobs), all registered tests (13,056 build jobs and the final pass marker), kernel policy and 35 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection combines a direct-call local initializer with closure formation in the same named body. Formation below recursive expression nodes, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Recursive mapping operands and retained failures (2026-10-13)
 
 Index expressions now evaluate the base and key as independent recursive children. Their actual intermediate heaps, native caller restoration and original diagnostic occurrence connect to the public session proof. Successful lookup, default lookup, invalid shape or key type, and unavailable default have explicit Source outcomes.
@@ -238,11 +248,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `6a73f02f` / `544751f6` / `f517e1cd`: recursive mapping operands and missing-key failure connect through exact returned sessions to retained-handle reuse. |
-| Latest completed verification | Full build (6565 jobs), all registered tests, kernel policy and 91 endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive constructors, operators, named and builtin calls, and mapping index operands share the proof family. |
-| Latest proof scope | Nine consecutive public events include recursive mapping operands, separate callable payloads, an intervening factory call, missing-key failure and reuse of an old closure; every event has a Source-to-public fuel bound. |
-| Current implementation priority | Connect canonical expressions through named and ordinary scoped bodies, including local allocation, assignment and finite loops, then remaining expression/control and compiler coverage. |
+| Latest verified implementation | `37591075` / `59fdf839`: canonical calls through actual scoped bodies retain capture mutation across distinct handles and intervening calls. |
+| Latest completed verification | Full build (6593 jobs), all registered tests, kernel policy and 35 endpoint audits pass with only the standard three axioms. |
+| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
+| Latest proof scope | Six public calls preserve distinct captures and a prior captured-cell update across intervening executions; all six have Source-to-public execution/output fuel bounds. |
+| Current implementation priority | Combine canonical initializers and closure formation at the same named lexical scope, then recursive formation and remaining compiler coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Canonical calls through scoped bodies and capture mutation (2026-10-13)
+
+Commits `37591075` and `59fdf839` connect direct/index children inside actual scoped bodies to public sessions. Named entry derives its canonical packet from the genuine parameter prefix and complete Header inventory. Ordinary entry derives its global slots from the retained capture and actual parameter binding spine.
+
+Both paths reuse the existing scoped flow induction. The marked allocator, administrative transport and lexical restoration preserve the original canonical slots alongside the reached owned pool. The footer restores the exact returned pool and Source postcondition. Actual compiler collectors derive the child support; no whole-body meaning is a static packet field or public premise.
+
+The six-session fixture executes a direct call in a named local initializer, direct calls before and inside closure while loops, and a direct return call. Its final reuse observes the earlier captured-cell update after an intervening closure creation and a call of another handle. All six independent Source traces connect to their original public checkpoints at sufficient execution and output fuel.
+
+Validation: all 422 affected modules pass coherent checks. The full build (6,593 jobs), all registered tests (13,056 build jobs and the final pass marker), kernel policy and 35 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The next connection combines a direct-call local initializer with closure formation in the same named body. Formation below recursive expression nodes, wider specialization and evidence paths, remaining expression and control forms, and composition across every compiler pass remain incomplete.
+
 ## Recursive mapping operands and retained failures (2026-10-13)
 
 Commits `6a73f02f`, `544751f6` and `f517e1cd` connect independent recursive indexing to actual public execution. The base runs before the key; each strict child uses its actual reached heap and current owned pool. Lookup suffix allocations restore the same physical caller while retaining the complete ordered record history.
