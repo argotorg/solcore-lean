@@ -56,12 +56,12 @@ private theorem scoped_of_header
     CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned
   rw [namedEq] at source body
   let expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source rows false true := by
+      header.function.source rows false true true := by
     rw [source, namedEq]
     exact profile.expressions
   have flatBody : AcceptedCompilerBodyProfile.Profile header.function.source expressions.Reached := by
     change AcceptedCompilerBodyProfile.Profile header.function.source
-      (fun id => id ∈ AcceptedCompilerExpressionProfile.supportedIds header.function.source false true)
+      (fun id => id ∈ AcceptedCompilerExpressionProfile.supportedIds header.function.source false true true)
     rw [source]
     exact profile.body
   have returns : AcceptedCompilerBodyProfile.HasReturn header.function.source header.function.body := by
@@ -75,8 +75,8 @@ private theorem scoped_of_header
     (by
       intro child member residual
       obtain ⟨residual⟩ := residual
-      exact residual.impossible_indices expressions.metadata expressions.indexForms expressions.noInitializer
-        expressions.indexArguments expressions.indexMetadata expressions.requirements expressions.indexOperands (children child member)) wellFormed
+      exact residual.impossible_constructors expressions.metadata expressions.constructorForms expressions.noInitializer
+        expressions.constructorArguments expressions.constructorMetadata expressions.requirements expressions.indexOperands expressions.constructorRanges (children child member)) wellFormed
   exact ⟨⟨.scoped (AcceptedNamedBodyAdmission.source_of_header prepared aligned selected same admission),
     no_lambdas profile.lambdas⟩⟩
 
@@ -156,7 +156,7 @@ private theorem scoped_factory_of_header
     CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned
   rw [namedEq] at source body
   let expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source rows false true := by
+      header.function.source rows false true true := by
     rw [source, namedEq]
     exact profile.expressions
   have ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
@@ -166,7 +166,7 @@ private theorem scoped_factory_of_header
     exact profile.ordinary
   have bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids profile.statements := by
     change AcceptedCompilerBodySubsetProfile.Profile header.function.source
-      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false true) profile.statements
+      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false true true) profile.statements
     rw [source]
     exact profile.body
   obtain ⟨⟨factory⟩, ⟨closure⟩⟩ := AcceptedNamedScopedFactoryAdmission.of_returning prepared aligned

@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedContextualDirectReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionPolicy
 import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedIndexExpressionReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedConstructorExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualOperatorReceipt
 
 /-! Original expression trees follow accepted child actions. Unexpanded compiler
@@ -32,6 +33,9 @@ def DirectForm (form : ExpressionForm) : Prop :=
 
 def IndexForm (form : ExpressionForm) : Prop := ∃ base key, form = .index base key
 
+def ConstructorForm (form : ExpressionForm) : Prop :=
+  ∃ instantiation ids, form = .constructor instantiation ids
+
 abbrev MethodForm := AcceptedContextualOperatorReceipt.Form
 
 def IndirectForm (form : ExpressionForm) : Prop :=
@@ -60,7 +64,10 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
   | form (selected : head.special = none)
       (notLeaf : ¬ LeafForm head.node.form) (notDirect : ¬ DirectForm head.node.form)
       (notIndirect : ¬ IndirectForm head.node.form) (notMethod : ¬ MethodForm head.node.form)
-      (notIndex : ¬ IndexForm head.node.form)
+      (notIndex : ¬ IndexForm head.node.form) (notConstructor : ¬ ConstructorForm head.node.form)
+  | constructorRange (selected : head.special = none) {instantiation : DataConstructorInstantiation} {ids : List ExpressionId}
+      (form : head.node.form = .constructor instantiation ids)
+      (missing : ¬ CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
   | indexOperands (selected : head.special = none) {base key : ExpressionId}
       (form : head.node.form = .index base key)
       (missing : ¬ AcceptedIndexExpressionReceipt.Operands source base key)
@@ -98,6 +105,9 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
   | index (head : Head policy body fuel current source scope id reasonAt lowered)
       (plain : head.special = none) {base key : ExpressionId}
       (receipt : AcceptedIndexExpressionReceipt.Receipt root source scope reasonAt fuel id base key lowered)
+  | constructor (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none) {instantiation : DataConstructorInstantiation} {ids : List ExpressionId}
+      (receipt : AcceptedConstructorExpressionReceipt.Receipt root source scope reasonAt fuel id instantiation ids lowered)
   | boundary (head : Head policy body fuel current source scope id reasonAt lowered)
       (cause : Cause root head)
 
@@ -126,6 +136,7 @@ def Step.children : Step root source scope reasonAt fuel id lowered →
   | .indirect _ _ receipt => receipt.entries
   | .method _ _ receipt => receipt.arguments.zip receipt.codes
   | .index (base := base) (key := key) _ _ receipt => [(base, receipt.first), (key, receipt.second)]
+  | .constructor (ids := ids) _ _ receipt => ids.zip receipt.codes
 
 inductive Trace (root : RootPolicyReceipt (compiled := compiled) named diagnostics namedCode compilation
     rootFuel rootSource rootScope rootId rootReasonAt rootLowered)
@@ -199,6 +210,7 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
 
   | indirect head plain receipt => exact receipt.ordered_children.2 entry.1 entry.2 member
   | method head selected receipt => exact (mapM_receipt receipt.generated).2.1 entry member
+  | constructor head plain receipt => exact (mapM_receipt (receipt.generated root)).2.1 entry member
   | index head plain receipt =>
     rcases List.mem_cons.mp member with same | member
     · exact same ▸ receipt.firstAccepted
@@ -276,7 +288,13 @@ theorem Step.of_head
                 obtain ⟨receipt⟩ := AcceptedIndexExpressionReceipt.of_head root head selected form baseFound keyFound scalar
                 exact ⟨.index head selected receipt⟩
               · exact ⟨.boundary head (.indexOperands selected form operands)⟩
-            · exact ⟨.boundary head (.form selected leaf direct indirect method index)⟩
+            · by_cases constructor : ConstructorForm head.node.form
+              · obtain ⟨instantiation, ids, form⟩ := constructor
+                by_cases range : CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution
+                · obtain ⟨receipt⟩ := AcceptedConstructorExpressionReceipt.of_head root head selected form range
+                  exact ⟨.constructor head selected receipt⟩
+                · exact ⟨.boundary head (.constructorRange selected form range)⟩
+              · exact ⟨.boundary head (.form selected leaf direct indirect method index constructor)⟩
         | some output =>
           have same := head.result output selected
           have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)

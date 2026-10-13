@@ -58,6 +58,18 @@ private theorem not_index {form : ExpressionForm}
   · simp [IndexForm]
   · rcases method with ⟨operator, operand, rfl⟩ | ⟨operator, left, right, rfl⟩ <;> simp [IndexForm]
 
+private theorem not_constructor {form : ExpressionForm}
+    (allowed : (LeafForm form ∨ DirectForm form ∨ IndirectForm form ∨ MethodForm form) ∨ IndexForm form) :
+    ¬ ConstructorForm form := by
+  rcases allowed with (leaf | ⟨callee, args, inst, rfl⟩ | ⟨callee, args, metadata, rfl⟩ | method) | ⟨base, key, rfl⟩
+  · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
+    · cases atomic <;> simp [ConstructorForm]
+    · simp [ConstructorForm]
+  · simp [ConstructorForm]
+  · simp [ConstructorForm]
+  · rcases method with ⟨operator, operand, rfl⟩ | ⟨operator, left, right, rfl⟩ <;> simp [ConstructorForm]
+  · simp [ConstructorForm]
+
 private theorem receipt_method_form
     (receipt : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt
       root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
@@ -83,7 +95,7 @@ theorem Cause.impossible
     (cause : Cause root head) (present : reached id) : False := by
   have form := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect _ _ _ =>
+  | form _ notLeaf notDirect _ _ _ _ =>
     rcases form with leaf | direct
     · exact notLeaf leaf
     · exact notDirect direct
@@ -102,6 +114,8 @@ theorem Cause.impossible
     exact forms_not_method forms present head.found operator
 
   | indexOperands _ indexForm _ => exact not_index (by rcases form with leaf | direct; exact .inl leaf; exact .inr (.inl direct)) ⟨_, _, indexForm⟩
+
+  | constructorRange _ constructorForm _ => exact not_constructor (by rcases form with leaf | direct; exact .inl (.inl leaf); exact .inl (.inr (.inl direct))) ⟨_, _, constructorForm⟩
 
 theorem Step.child_reached
     (forms : ReachedForms source reached)
@@ -132,6 +146,9 @@ theorem Step.child_reached
 
   | index head plain receipt =>
     exact False.elim (not_index (by rcases forms id receipt.node present receipt.found with leaf | direct; exact .inl leaf; exact .inr (.inl direct)) ⟨_, _, receipt.form⟩)
+
+  | constructor head plain receipt =>
+    exact False.elim (not_constructor (by rcases forms id receipt.node present receipt.found with leaf | direct; exact .inl (.inl leaf); exact .inl (.inr (.inl direct))) ⟨_, _, receipt.form⟩)
 
 /-- The excluded endpoint belongs to this same trace and its actual child path. -/
 theorem Boundary.impossible
@@ -210,7 +227,7 @@ theorem Cause.impossible_calls
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect _ _ =>
+  | form _ notLeaf notDirect notIndirect _ _ _ =>
     rcases original with leaf | direct | indirect
     · exact notLeaf leaf
     · exact notDirect direct
@@ -241,6 +258,8 @@ theorem Cause.impossible_calls
 
   | indexOperands _ indexForm _ => exact not_index (by rcases original with leaf | direct | indirect; exact .inl leaf; exact .inr (.inl direct); exact .inr (.inr (.inl indirect))) ⟨_, _, indexForm⟩
 
+  | constructorRange _ constructorForm _ => exact not_constructor (by rcases original with leaf | direct | indirect; exact .inl (.inl leaf); exact .inl (.inr (.inl direct)); exact .inl (.inr (.inr (.inl indirect)))) ⟨_, _, constructorForm⟩
+
 theorem Step.child_reached_calls
     (forms : ReachedCallForms source reached)
     (arguments : ReachedCallArguments source reached)
@@ -267,6 +286,9 @@ theorem Step.child_reached_calls
 
   | index head plain receipt =>
     exact False.elim (not_index (by rcases forms id receipt.node present receipt.found with leaf | direct | indirect; exact .inl leaf; exact .inr (.inl direct); exact .inr (.inr (.inl indirect))) ⟨_, _, receipt.form⟩)
+
+  | constructor head plain receipt =>
+    exact False.elim (not_constructor (by rcases forms id receipt.node present receipt.found with leaf | direct | indirect; exact .inl (.inl leaf); exact .inl (.inr (.inl direct)); exact .inl (.inr (.inr (.inl indirect)))) ⟨_, _, receipt.form⟩)
 
 theorem Boundary.impossible_calls
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -346,7 +368,7 @@ theorem Cause.impossible_methods
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect notMethod _ =>
+  | form _ notLeaf notDirect notIndirect notMethod _ _ =>
     rcases original with leaf | direct | indirect | method
     · exact notLeaf leaf
     · exact notDirect direct
@@ -378,6 +400,8 @@ theorem Cause.impossible_methods
     · exact outsideMethod method
 
   | indexOperands _ indexForm _ => exact not_index (original) ⟨_, _, indexForm⟩
+
+  | constructorRange _ constructorForm _ => exact not_constructor (.inl (original)) ⟨_, _, constructorForm⟩
 
 theorem Step.child_reached_methods
     (forms : ReachedMethodForms source reached)
@@ -417,6 +441,9 @@ theorem Step.child_reached_methods
 
   | index head plain receipt =>
     exact False.elim (not_index (forms id receipt.node present receipt.found) ⟨_, _, receipt.form⟩)
+
+  | constructor head plain receipt =>
+    exact False.elim (not_constructor (.inl (forms id receipt.node present receipt.found)) ⟨_, _, receipt.form⟩)
 
 theorem Boundary.impossible_methods
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -493,7 +520,7 @@ theorem Cause.impossible_indices
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect notMethod notIndex =>
+  | form _ notLeaf notDirect notIndirect notMethod notIndex _ =>
     rcases original with (leaf | direct | indirect | method) | index
     · exact notLeaf leaf
     · exact notDirect direct
@@ -533,7 +560,10 @@ theorem Cause.impossible_indices
 
   | indexOperands _ indexForm missing => exact missing (operands id head.node present head.found _ _ indexForm)
 
+  | constructorRange _ constructorForm _ => exact not_constructor (original) ⟨_, _, constructorForm⟩
+
 theorem Step.child_reached_indices
+    (forms : ReachedIndexForms source reached)
     (arguments : ReachedIndexArguments source reached)
     (step : Step root source scope reasonAt fuel id lowered)
     (present : reached id) {entry : ExpressionId × SourceCoreBasic.LoweredExpr}
@@ -574,6 +604,9 @@ theorem Step.child_reached_indices
     · exact same ▸ children.1
     · exact (List.mem_singleton.mp member) ▸ children.2
 
+  | constructor head plain receipt =>
+    exact False.elim (not_constructor (forms id receipt.node present receipt.found) ⟨_, _, receipt.form⟩)
+
 theorem Boundary.impossible_indices
     (metadata : MetadataFor compiled.indexed named source directSites)
     (forms : ReachedIndexForms source reached)
@@ -587,7 +620,7 @@ theorem Boundary.impossible_indices
     (boundary : Boundary tree) (present : reached id) : False := by
   induction boundary with
   | here head cause children => exact cause.impossible_indices metadata forms initializers rawMetadata requirements operands present
-  | child step children entry member next ih => exact ih (step.child_reached_indices arguments present member)
+  | child step children entry member next ih => exact ih (step.child_reached_indices forms arguments present member)
 
 theorem Residual.impossible_indices {row : SourceSpecialization.SpecializedFunction}
     {prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row}
@@ -603,5 +636,181 @@ theorem Residual.impossible_indices {row : SourceSpecialization.SpecializedFunct
     (operands : ReachedIndexOperands source reached)
     (present : reached id) : False :=
   residual.boundary.impossible_indices metadata forms initializers arguments rawMetadata requirements operands present
+
+/-- Constructors add their complete ordered payload list to the existing lane. -/
+def ReachedConstructorForms (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ((LeafForm node.form ∨ DirectForm node.form ∨ IndirectForm node.form ∨ MethodForm node.form) ∨ IndexForm node.form) ∨ ConstructorForm node.form
+
+def ReachedConstructorArguments (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ReachedIndexArguments source reached ∧
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ∀ instantiation ids, node.form = .constructor instantiation ids → ∀ child ∈ ids, reached child
+
+def ReachedConstructorRanges (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ∀ instantiation ids, node.form = .constructor instantiation ids →
+      CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution
+
+def ReachedConstructorMetadata {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named)
+    (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ReachedIndexMetadata prepared named source reached ∧
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ∀ instantiation ids, node.form = .constructor instantiation ids →
+      CallableIndexedOwnedPreparedNamedSyntaxAdmission.MetadataTest prepared named node
+
+theorem ReachedConstructorMetadata.of_accepted {checked : SourceCoreCompatibleCatalog.Checked}
+    {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : Named}
+    {source : TypedSource} {reached : ExpressionId → Prop}
+    {directSites : DeclarationInstantiation → Prop}
+    {receipt : PLift (MetadataFor prepared named source directSites)}
+    (accepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+      prepared named source directSites = some receipt) :
+    ReachedConstructorMetadata prepared named source reached := by
+  refine ⟨ReachedIndexMetadata.of_accepted accepted, ?_⟩
+  intro id node _ found instantiation ids form
+  exact AcceptedNamedExpressionMetadata.at_of_accepted accepted found (form ▸ .constructor instantiation ids)
+
+theorem Cause.impossible_constructors
+    (metadata : MetadataFor compiled.indexed named source directSites)
+    (forms : ReachedConstructorForms source reached)
+    (initializers : ∀ id, reached id →
+      ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
+    (rawMetadata : ReachedConstructorMetadata compiled.indexed named source reached)
+    (requirements : ReachedMethodRequirements source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
+      source scope id reasonAt lowered}
+    (cause : Cause root head) (present : reached id) : False := by
+  have original := forms id head.node present head.found
+  cases cause with
+  | form _ notLeaf notDirect notIndirect notMethod notIndex notConstructor =>
+    rcases original with ((leaf | direct | indirect | method) | index) | constructor
+    · exact notLeaf leaf
+    · exact notDirect direct
+    · exact notIndirect indirect
+    · exact notMethod method
+    · exact notIndex index
+    · exact notConstructor constructor
+  | initializer _ selected => exact initializers id present ⟨selected⟩
+  | operatorOrdinary _ form empty => exact requirements id head.node present head.found form empty
+  | operatorCoercions _ form nonempty => exact nonempty (rawMetadata.1.1.2 id head.node present head.found form).1
+  | special selected outside outsideMethod =>
+    rcases original with ((leaf | direct | ⟨callee, arguments, callMetadata, form⟩ | method) | ⟨base, key, form⟩) | ⟨instantiation, ids, form⟩
+    · have profile := AcceptedNamedExpressionPolicy.leaf_profile root.compilerPolicy metadata
+        head.found leaf.view (Child root.selected.policy root.selected.lowerBody fuel
+          (context compiled.indexed named)) (fuel + 1) scope reasonAt
+      have same := head.selected.symm.trans profile.2.2
+      rw [selected] at same
+      cases same
+    · exact outside direct
+    · have clean := rawMetadata.1.1.1 id head.node present head.found callee arguments callMetadata form
+      have profile := CallableIndexedOwnedContextualCompilerPolicyProfiles.indirect_policy root
+        (scope := scope) (reasonAt := reasonAt) head.found form
+        (by simpa only [form] using clean.2.2.1) clean.1
+        (by simpa only [form] using clean.2.2.2.1)
+        (by simpa only [(lookupExpression?_sound head.found).2] using clean.2.1)
+      have noneSelected := profile.special
+        (Child root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)) (fuel + 1)
+      have same := head.selected.symm.trans noneSelected
+      rw [selected] at same
+      cases same
+    · exact outsideMethod method
+    · have clean := rawMetadata.1.2 id head.node present head.found base key form
+      have noneSelected := AcceptedIndexExpressionReceipt.special_none root (scope := scope) (reasonAt := reasonAt) head.found form clean
+        (Child root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)) (fuel + 1)
+      have same := head.selected.symm.trans noneSelected
+      rw [selected] at same
+      cases same
+
+    · have clean := rawMetadata.2 id head.node present head.found instantiation ids form
+      have noneSelected := AcceptedConstructorExpressionReceipt.special_none root (scope := scope) (reasonAt := reasonAt)
+        head.found form clean
+        (Child root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)) (fuel + 1)
+      have same := head.selected.symm.trans noneSelected
+      rw [selected] at same
+      cases same
+  | indexOperands _ indexForm missing => exact missing (operands id head.node present head.found _ _ indexForm)
+
+  | constructorRange _ constructorForm missing => exact missing (ranges id head.node present head.found _ _ constructorForm)
+
+theorem Step.child_reached_constructors
+    (arguments : ReachedConstructorArguments source reached)
+    (step : Step root source scope reasonAt fuel id lowered)
+    (present : reached id) {entry : ExpressionId × SourceCoreBasic.LoweredExpr}
+    (member : entry ∈ step.children) : reached entry.1 := by
+  cases step with
+  | leaf => cases member
+  | boundary => cases member
+  | ordinary head _ receipt =>
+    exact arguments.1.1.1.1 id receipt.node present receipt.metadata.found _ _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+  | evidence head _ receipt =>
+    exact arguments.1.1.1.1 id head.node present receipt.found _ _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+  | indirect head _ receipt =>
+    have children := arguments.1.1.1.2 id receipt.original present receipt.found _ _ _ receipt.originalForm
+    rcases List.mem_cons.mp member with same | member
+    · exact same ▸ children.1
+    · exact children.2 entry.1 (List.of_mem_zip member).1
+  | method head _ receipt =>
+    have child := (List.of_mem_zip member).1
+    rcases receipt.operator.form with ⟨operator, operand, form, actual⟩ |
+      ⟨operator, left, right, form, actual⟩
+    · have same : entry.1 = operand := by
+        simpa only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+          actual, List.mem_singleton] using child
+      exact same ▸ arguments.1.1.2.1 id receipt.node present receipt.metadata.found operator operand form
+    · have cases : entry.1 = left ∨ entry.1 = right := by
+        simpa only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+          actual, List.mem_cons, List.not_mem_nil, or_false] using child
+      have children := arguments.1.1.2.2 id receipt.node present receipt.metadata.found operator left right form
+      rcases cases with same | same
+      · exact same ▸ children.1
+      · exact same ▸ children.2
+
+  | index head plain receipt =>
+    have children := arguments.1.2 id receipt.node present receipt.found _ _ receipt.form
+    rcases List.mem_cons.mp member with same | member
+    · exact same ▸ children.1
+    · exact (List.mem_singleton.mp member) ▸ children.2
+
+  | constructor head plain receipt =>
+    exact arguments.2 id receipt.node present receipt.found _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+
+theorem Boundary.impossible_constructors
+    (metadata : MetadataFor compiled.indexed named source directSites)
+    (forms : ReachedConstructorForms source reached)
+    (initializers : ∀ id, reached id →
+      ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
+    (arguments : ReachedConstructorArguments source reached)
+    (rawMetadata : ReachedConstructorMetadata compiled.indexed named source reached)
+    (requirements : ReachedMethodRequirements source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    {tree : Trace root source scope reasonAt fuel id lowered}
+    (boundary : Boundary tree) (present : reached id) : False := by
+  induction boundary with
+  | here head cause children => exact cause.impossible_constructors metadata forms initializers rawMetadata requirements operands ranges present
+  | child step children entry member next ih => exact ih (step.child_reached_constructors arguments present member)
+
+theorem Residual.impossible_constructors {row : SourceSpecialization.SpecializedFunction}
+    {prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row}
+    {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (residual : Residual prepared header directSites fuel source scope id lowered)
+    (metadata : MetadataFor compiled.indexed prepared.named source directSites)
+    (forms : ReachedConstructorForms source reached)
+    (initializers : ∀ id, reached id → ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt
+      compiled.indexed (context compiled.indexed prepared.named) id))
+    (arguments : ReachedConstructorArguments source reached)
+    (rawMetadata : ReachedConstructorMetadata compiled.indexed prepared.named source reached)
+    (requirements : ReachedMethodRequirements source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    (present : reached id) : False :=
+  residual.boundary.impossible_constructors metadata forms initializers arguments rawMetadata requirements operands ranges present
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow

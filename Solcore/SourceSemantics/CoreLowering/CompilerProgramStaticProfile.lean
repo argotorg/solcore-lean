@@ -51,7 +51,7 @@ def lambdas? (source : TypedSource) (allowed : Option ExpressionNode) :
 abbrev ExpressionProfile (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction)
     (directOnly : Bool) := AcceptedCompilerExpressionProfile.Profile compiled.indexed named
-      named.specialized.function.typedBody rows directOnly (!directOnly)
+      named.specialized.function.typedBody rows directOnly (!directOnly) (!directOnly)
 
 structure Scoped (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction)
@@ -66,7 +66,7 @@ def scoped? (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction)
     (directOnly : Bool) : Option (Scoped compiled named rows directOnly) := do
   let expressions ← AcceptedCompilerExpressionProfile.certify compiled.indexed named
-    named.specialized.function.typedBody rows directOnly (!directOnly)
+    named.specialized.function.typedBody rows directOnly (!directOnly) (!directOnly)
   let ⟨body⟩ ← AcceptedCompilerBodyProfile.validate named.specialized.function.typedBody expressions.Reached
   let ⟨returns⟩ ← AcceptedCompilerBodyProfile.hasReturn? named.specialized.function.typedBody
     (statements named.specialized.function.typedBody)
@@ -174,7 +174,7 @@ def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) :
     Option (ScopedFactory compiled named rows) := do
   let expressions ← AcceptedCompilerExpressionProfile.certify compiled.indexed named
-    named.specialized.function.typedBody rows false true
+    named.specialized.function.typedBody rows false true true
   match roots : statements named.specialized.function.typedBody with
   | [] => none
   | outer :: rest =>
