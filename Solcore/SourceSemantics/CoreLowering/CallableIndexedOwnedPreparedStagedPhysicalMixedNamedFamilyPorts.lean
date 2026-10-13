@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily
 
 /-! The closed physical mixed family supplies named body ports for actual
-terminal expressions or genuine lambda formation at every reached registry. -/
+terminal expressions, genuine lambda formation or scoped statements at every reached registry. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts
@@ -38,6 +38,11 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
       { _support : CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.Support
           (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults)
           header (terminals header member) // header.globals = compiled.indexed.base.globals.length })
+  (bodies : ∀ header, header ∈ headers → CallableIndexedOwnedPreparedStagedNamedBodies.Body header)
+  (bodySupport : ∀ header (member : header ∈ headers),
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+      (headers := headers) (bodyRegistry := bodyRegistry) (stages := stages)
+      (semanticFaults := semanticFaults) header (bodies header member))
   (closurePackets : ∀ {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
@@ -53,39 +58,58 @@ local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
-theorem preserves (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+theorem preserves_with_bodies
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  cases namedSupport header member with
-  | inl static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.preserves
-      static selected wellFormed
-      (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves
-        receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport
-        closurePackets closureSupport owners methodSupport size)
-  | inr static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.preserves
-      profile static.val selected wellFormed static.property
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
+    (bodySupport header member) profile wellFormed extension selected
+    (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.preserves_with_bodies
+      receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
+      closurePackets closureSupport owners methodSupport size)
 
-include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
+theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
     (header : Header compiled (Program.ofChecked compiled.sourceProgram))
     (member : header ∈ headers) {child : Staging.Recursive.Scope}
     (selected : stages.Closure header.function child) (budget : Nat) :
     CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
       (headers := headers) (keys := keys) header model stages child callFaults budget := by
-  cases namedSupport header member with
-  | inl static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.reflects
-      static selected wellFormed
-      (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects
-        receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport
-        closurePackets closureSupport owners methodSupport stageEq size)
-  | inr static =>
-    exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.reflects
-      profile static.val selected wellFormed static.property
+  exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
+    (bodySupport header member) profile wellFormed extension selected
+    (fun size _ => CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily.reflects_with_bodies
+      receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport
+      closurePackets closureSupport owners methodSupport stageEq size)
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+/-- The previous terminal family keeps its original public body-port API. -/
+theorem preserves
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (member : header ∈ headers) {child : Staging.Recursive.Scope}
+    (selected : stages.Closure header.function child) (budget : Nat) :
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
+      (headers := headers) (keys := keys) header model stages child callFaults budget :=
+  preserves_with_bodies receiver stagePrepared profile wellFormed observations extension semantic
+    (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+    (fun header member => CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.of_terminal_support
+      (terminals header member) (namedSupport header member))
+    closurePackets closureSupport owners methodSupport header member selected budget
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+/-- The previous terminal family keeps its original public body-port API. -/
+theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared)
+    (header : Header compiled (Program.ofChecked compiled.sourceProgram))
+    (member : header ∈ headers) {child : Staging.Recursive.Scope}
+    (selected : stages.Closure header.function child) (budget : Nat) :
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
+      (headers := headers) (keys := keys) header model stages child callFaults budget :=
+  reflects_with_bodies receiver stagePrepared profile wellFormed observations extension semantic
+    (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+    (fun header member => CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.of_terminal_support
+      (terminals header member) (namedSupport header member))
+    closurePackets closureSupport owners methodSupport stageEq header member selected budget
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedNamedFamilyPorts

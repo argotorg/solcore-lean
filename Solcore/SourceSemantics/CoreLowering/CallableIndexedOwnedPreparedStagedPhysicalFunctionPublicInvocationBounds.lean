@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedInvocationPreservation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedGlobalDispatch
@@ -96,38 +97,26 @@ theorem preserves_root
           (registry := completion.result.context.registry) (payloads := payloads)
           (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
           rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
-  obtain ⟨capture⟩ := CallableIndexedOwnedNamedPhysicalCaptures.of_headerAt
-    packet.prepared packet.aligned selected.member keyPhysical physical heaps.runtime_hasTypes
-  let nativeCapture := capture.named
-  obtain ⟨value, finalStore, finalMap, finalWorld, result⟩ :=
-    CallableIndexedOwnedPreparedStagedPhysicalNamedInvocationPreservation.preserves_invocation
-      (functions := rootFunctions) (registry := completion.result.context.registry)
-      (owner := owner) (caller := caller) (header := header) (physicalCapture := capture)
-      (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
-      (sourceAt := sourceAt)
-      packet.layouts physical selected.member wellFormed stable heapTyped argumentsTyped represented heaps
-      supports size (fun {child} selected => preservesBodies size selected) trace (Nat.le_refl _)
-  have argumentsEvaluated := selected.arguments_evaluate represented store
-  have actualReference :
-      (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)[header.slot + root.types.length]? =
-      some (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) := by
-    simpa only [selected.argument_length represented, RecursiveGlobalInitializationMeaning.shift] using
-      (RecursiveNamedPublicRootMeaning.globals_agree payloads
-        (SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed) globalReference)
-  have read := OptionalCell.read_success Word.zero
-    (show Evaluates
-      (DataPatternValues.packValues payloads :: payloads.reverse ++
-        SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed) store
-      (.var (header.slot + root.types.length + 1))
-      (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) store
-      from .var actualReference) capture.read
-  have called := SourceCoreCalls.call_success argumentsEvaluated read result.1
-  have rootEvaluation : Evaluates
-      (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
-      store root.body value finalStore := by
-    simpa only [selected.shape.2] using called
-  obtain ⟨required, run⟩ := evaluation_runStateful_complete_with_sufficient_fuel rootEvaluation
-  exact ⟨nativeCapture, value, finalStore, finalMap, finalWorld, required, run, result⟩
+  exact CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.preserves_root
+    (stagePrepared := stagePrepared)
+    (functions := functions)
+    (packet := CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal packet)
+    (keyPhysical := keyPhysical)
+    (physical := physical)
+    (wellFormed := wellFormed)
+    (selected := selected)
+    (owner := owner)
+    (caller := caller)
+    (globalReference := globalReference)
+    (stable := stable)
+    (heapTyped := heapTyped)
+    (argumentsTyped := argumentsTyped)
+    (represented := represented)
+    (heaps := heaps)
+    (sourceAt := sourceAt)
+    (supports := supports)
+    (preservesBodies := preservesBodies)
+    (trace := trace)
 
 include packet keyPhysical physical wellFormed reflectsBodies
   selected owner caller globalReference stable heapTyped argumentsTyped represented heaps sourceAt supports in
@@ -151,30 +140,27 @@ theorem reflects_root
           (registry := completion.result.context.registry) (payloads := payloads)
           (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
           rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
-  obtain ⟨capture⟩ := CallableIndexedOwnedNamedPhysicalCaptures.of_headerAt
-    packet.prepared packet.aligned selected.member keyPhysical physical heaps.runtime_hasTypes
-  let nativeCapture := capture.named
-  have argumentsEvaluated := selected.arguments_evaluate represented store
-  have actualReference :
-      (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)[header.slot + root.types.length]? =
-      some (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) := by
-    simpa only [selected.argument_length represented, RecursiveGlobalInitializationMeaning.shift] using
-      (RecursiveNamedPublicRootMeaning.globals_agree payloads
-        (SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed) globalReference)
-  obtain ⟨size, measured⟩ := evaluation_has_size (runStateful_evaluation_sound completed)
-  rw [selected.shape.2] at measured
-  obtain ⟨bodySize, smaller, bodyEvaluation⟩ := RecursiveNamedCallBounds.call_body
-    argumentsEvaluated actualReference capture.read measured
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, result⟩ :=
-    CallableIndexedOwnedPreparedStagedPhysicalNamedInvocationBounds.reflects_invocation
-      (functions := rootFunctions) (registry := completion.result.context.registry)
-      (owner := owner) (caller := caller) (header := header) (physicalCapture := capture)
-      (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
-      (prepared := packet.prepared) (aligned := packet.aligned) (stagePrepared := stagePrepared)
-      (descriptor := descriptor) (sourceAt := sourceAt)
-      packet.layouts physical selected.member wellFormed stable heapTyped argumentsTyped represented heaps
-      supports size (fun {child} selected => reflectsBodies size selected) bodyEvaluation (Nat.le_of_lt smaller)
-  exact ⟨nativeCapture, sourceSize, outcome, after, finalMap, finalWorld, trace, result⟩
+  exact CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.reflects_root
+    (stagePrepared := stagePrepared)
+    (functions := functions)
+    (packet := CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal packet)
+    (keyPhysical := keyPhysical)
+    (physical := physical)
+    (wellFormed := wellFormed)
+    (selected := selected)
+    (owner := owner)
+    (caller := caller)
+    (globalReference := globalReference)
+    (stable := stable)
+    (heapTyped := heapTyped)
+    (argumentsTyped := argumentsTyped)
+    (represented := represented)
+    (heaps := heaps)
+    (sourceAt := sourceAt)
+    (supports := supports)
+    (reflectsBodies := reflectsBodies)
+    (descriptor := descriptor)
+    (completed := completed)
 
 variable {recipe : SourceCoreIndexedSession.Recipe} {nativeArtifact : SourceCoreIndexedSession.Artifact}
   {nativeSession : SourceCoreIndexedSession.Session nativeArtifact}
@@ -218,23 +204,31 @@ theorem public_run_succeeded_reflects
         (registry := completion.result.context.registry) (payloads := payloads)
         (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
         rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
-  cases sameCompiled
-  obtain ⟨actualCheckpoint, accepted, resumed⟩ := publicRun
-  have same : actualCheckpoint = publicCheckpoint := Except.ok.inj (accepted.symm.trans publicStart)
-  subst actualCheckpoint
-  obtain ⟨actual, generation, value, finalStore, completed, exported, valueEq, typeEq, budgetEq, sessionAt⟩ :=
-    resumed.indexed_succeeded atCheckpoint
-  obtain ⟨capture, sourceSize, outcome, after, finalMap, finalWorld, trace, result⟩ :=
-    reflects_root
-      (stagePrepared := stagePrepared) (functions := functions)
-      (packet := packet) (keyPhysical := keyPhysical) (physical := physical)
-      (wellFormed := wellFormed) (selected := selected)
-      (owner := owner) (caller := caller) (globalReference := globalReference) (stable := stable)
-      (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
-      (heaps := heaps) (sourceAt := sourceAt) (supports := supports) (reflectsBodies := reflectsBodies) descriptor
-      (started.initial.native_done_iff.mp completed)
-  exact ⟨actual, generation, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
-    exported, valueEq, typeEq, budgetEq, sessionAt, trace, result⟩
+  exact CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.public_run_succeeded_reflects
+    (stagePrepared := stagePrepared)
+    (functions := functions)
+    (packet := CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal packet)
+    (keyPhysical := keyPhysical)
+    (physical := physical)
+    (wellFormed := wellFormed)
+    (selected := selected)
+    (owner := owner)
+    (caller := caller)
+    (globalReference := globalReference)
+    (stable := stable)
+    (heapTyped := heapTyped)
+    (argumentsTyped := argumentsTyped)
+    (represented := represented)
+    (heaps := heaps)
+    (sourceAt := sourceAt)
+    (supports := supports)
+    (reflectsBodies := reflectsBodies)
+    (sameCompiled := sameCompiled)
+    (started := started)
+    (publicStart := publicStart)
+    (atCheckpoint := atCheckpoint)
+    (publicRun := publicRun)
+    (descriptor := descriptor)
 
 include packet keyPhysical physical wellFormed reflectsBodies
   selected owner caller globalReference stable heapTyped argumentsTyped represented heaps sourceAt supports
@@ -264,23 +258,31 @@ theorem public_run_failed_reflects
         (registry := completion.result.context.registry) (payloads := payloads)
         (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
         rootFunctions owner caller header capture context outcome after value finalStore finalMap finalWorld rootFaults := by
-  cases sameCompiled
-  obtain ⟨actualCheckpoint, accepted, resumed⟩ := publicRun
-  have same : actualCheckpoint = publicCheckpoint := Except.ok.inj (accepted.symm.trans publicStart)
-  subst actualCheckpoint
-  obtain ⟨actual, _generation, value, finalStore, completed, failed, sessionAt⟩ :=
-    resumed.indexed_failed atCheckpoint
-  obtain ⟨capture, sourceSize, outcome, after, finalMap, finalWorld, trace, result⟩ :=
-    reflects_root
-      (stagePrepared := stagePrepared) (functions := functions)
-      (packet := packet) (keyPhysical := keyPhysical) (physical := physical)
-      (wellFormed := wellFormed) (selected := selected)
-      (owner := owner) (caller := caller) (globalReference := globalReference) (stable := stable)
-      (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
-      (heaps := heaps) (sourceAt := sourceAt) (supports := supports) (reflectsBodies := reflectsBodies) descriptor
-      (started.initial.native_done_iff.mp completed)
-  exact ⟨actual, value, finalStore, capture, sourceSize, outcome, after, finalMap, finalWorld,
-    failed, sessionAt, trace, result⟩
+  exact CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.public_run_failed_reflects
+    (stagePrepared := stagePrepared)
+    (functions := functions)
+    (packet := CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal packet)
+    (keyPhysical := keyPhysical)
+    (physical := physical)
+    (wellFormed := wellFormed)
+    (selected := selected)
+    (owner := owner)
+    (caller := caller)
+    (globalReference := globalReference)
+    (stable := stable)
+    (heapTyped := heapTyped)
+    (argumentsTyped := argumentsTyped)
+    (represented := represented)
+    (heaps := heaps)
+    (sourceAt := sourceAt)
+    (supports := supports)
+    (reflectsBodies := reflectsBodies)
+    (sameCompiled := sameCompiled)
+    (started := started)
+    (publicStart := publicStart)
+    (atCheckpoint := atCheckpoint)
+    (publicRun := publicRun)
+    (descriptor := descriptor)
 
 include packet keyPhysical physical wellFormed preservesBodies observations
   selected owner caller globalReference stable heapTyped argumentsTyped represented heaps sourceAt supports
@@ -307,35 +309,33 @@ theorem public_word_preserved
         (scope := []) (canonical := SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed)
         rootFunctions owner caller header capture context (.value (.word word)) after
           (.inRight .word (.word word)) finalStore finalMap finalWorld rootFaults := by
-  cases sameCompiled
-  obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, completes, result⟩ :=
-    preserves_root
-      (stagePrepared := stagePrepared) (functions := functions)
-      (packet := packet) (keyPhysical := keyPhysical) (physical := physical)
-      (wellFormed := wellFormed) (selected := selected)
-      (owner := owner) (caller := caller) (globalReference := globalReference) (stable := stable)
-      (heapTyped := heapTyped) (argumentsTyped := argumentsTyped) (represented := represented)
-      (heaps := heaps) (sourceAt := sourceAt) (supports := supports) (preservesBodies := preservesBodies) trace
-  have represented := result.2.1
-  rw [outputWord] at represented
-  have nativeWord : value = .inRight .word (.word word) := by
-    cases represented with
-    | value payload =>
-        obtain ⟨actualWord, sourceEq, nativeEq⟩ := CompatiblePlaceModifier.word_fields observations payload
-        have same : word = actualWord := Dynamic.Value.word.inj sourceEq
-        cases same
-        exact congrArg (fun payload => Core.Value.inRight .word payload) nativeEq
-  rw [nativeWord] at completes result
-  have atRecipe : nativeArtifact.RecipeAt recipe := by
-    cases nativeArtifact
-    exact started.recipe_eq
-  have requested := started.original.result_type_at atRecipe started.selected
-  have rootWord := (RecursiveNamedPublicRootSourceSignature.inputs_and_result selected).2.trans resultWord
-  rw [rootWord] at requested
-  exact ⟨capture, finalStore, finalMap, finalWorld, required,
-    fun fuel enough outcome resumed => RecursiveNamedPublicExecutionMeaning.resume_word_succeeded
-      atCheckpoint resumed (started.initial.native_done_iff.mpr (completes fuel enough)) requested positive,
-    result⟩
-
+  exact CallableIndexedOwnedPreparedStagedPhysicalBodyPublicInvocationBounds.public_word_preserved
+    (stagePrepared := stagePrepared)
+    (functions := functions)
+    (packet := CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal packet)
+    (keyPhysical := keyPhysical)
+    (physical := physical)
+    (wellFormed := wellFormed)
+    (selected := selected)
+    (owner := owner)
+    (caller := caller)
+    (globalReference := globalReference)
+    (stable := stable)
+    (heapTyped := heapTyped)
+    (argumentsTyped := argumentsTyped)
+    (represented := represented)
+    (heaps := heaps)
+    (sourceAt := sourceAt)
+    (supports := supports)
+    (preservesBodies := preservesBodies)
+    (sameCompiled := sameCompiled)
+    (started := started)
+    (observations := observations)
+    (atCheckpoint := atCheckpoint)
+    (outputWord := outputWord)
+    (resultWord := resultWord)
+    (outputBudget := outputBudget)
+    (positive := positive)
+    (trace := trace)
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalFunctionPublicInvocationBounds

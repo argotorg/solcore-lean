@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedRootBounds
@@ -102,6 +103,11 @@ variable {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compile
       { _support : CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.Support
           (bodyRegistry := bodyRegistry) (stages := stages) (semanticFaults := semanticFaults)
           header (terminals header member) // header.globals = compiled.indexed.base.globals.length })
+  (bodies : ∀ header, header ∈ headers → CallableIndexedOwnedPreparedStagedNamedBodies.Body header)
+  (bodySupport : ∀ header (member : header ∈ headers),
+    CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.Support
+      (headers := headers) (bodyRegistry := bodyRegistry) (stages := stages)
+      (semanticFaults := semanticFaults) header (bodies header member))
   (closurePackets : ∀ {mapping world function native bindings parameter result}
     (association : CallableIndexedOwnedPhysicalClosureAssociation.Association headers keys bodyRegistry semanticFaults
       mapping world function native bindings parameter result),
@@ -117,9 +123,9 @@ local notation "functions" => CallableIndexedOwnedPhysicalCellOrigins.functions 
 local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked completion.result.context.registry functions
 local notation "callFaults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
 
-include closurePackets closureSupport owners stagePrepared receiver profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+include closurePackets closureSupport owners stagePrepared receiver profile wellFormed observations extension semantic bodies bodySupport methodSupport in
 /-- Every ordinary and method body uses only strictly smaller Source grades. -/
-theorem preserves (size : Nat) :
+theorem preserves_with_bodies (size : Nat) :
     PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   induction size using Nat.strongRecOn with
   | ind budget ih =>
@@ -131,13 +137,9 @@ theorem preserves (size : Nat) :
         CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.PreservesBelow
           (headers := headers) (keys := keys) header model stages child callFaults size := by
       intro size within header member child selected
-      cases namedSupport header member with
-      | inl static =>
-        exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.preserves
-          static selected wellFormed (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-      | inr static =>
-        exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.preserves
-          profile static.val selected wellFormed static.property
+      exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.preserves
+        (bodySupport header member) profile wellFormed extension selected
+        (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     have directHeads : PreservesDirect callerBridge.forgetSlots model stages callFaults budget root.support.certificate := by
       intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
       obtain ⟨port⟩ := root.support.directReady compiler path
@@ -191,7 +193,7 @@ theorem preserves (size : Nat) :
       exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.preserves
         callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
         wellFormed root.support.runtime root.support.covers root.support.unique root.support.actualFunctionType
-        observations closurePackets closureSupport (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+        observations closurePackets closureSupport bodies
         compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
     intro current id code point
     exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.preserves_reached_with_functions
@@ -200,9 +202,9 @@ theorem preserves (size : Nat) :
       budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
       budget (Nat.le_refl _) point
 
-include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic bodies bodySupport methodSupport in
 /-- Every ordinary and method body uses only strictly smaller native grades. -/
-theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+theorem reflects_with_bodies (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
     ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size := by
   subst stages
   induction size using Nat.strongRecOn with
@@ -215,13 +217,9 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
         CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts.ReflectsBelow
           (headers := headers) (keys := keys) header model (RecursiveNamedPreparedStageScopes.registry stagePrepared) child callFaults size := by
       intro size within header member child selected
-      cases namedSupport header member with
-      | inl static =>
-        exact CallableIndexedOwnedPreparedStagedPhysicalMixedNamedTerminalSupport.reflects
-          static selected wellFormed (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
-      | inr static =>
-        exact CallableIndexedOwnedPreparedStagedPhysicalNamedFormationSupport.reflects
-          profile static.val selected wellFormed static.property
+      exact CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.reflects
+        (bodySupport header member) profile wellFormed extension selected
+        (fun smaller strict => ih smaller (Nat.lt_of_lt_of_le strict within))
     have directHeads : ReflectsDirect callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget root.support.certificate := by
       intro fuel current id callee ids instantiation code types compiler path calleeTyped application sequence size within childMeaning
       obtain ⟨port⟩ := root.support.directReady compiler path
@@ -276,7 +274,7 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       exact CallableIndexedOwnedPreparedStagedPhysicalIndirectHeadBounds.reflects
         callerBridge.forgetSlots (fun state => state.physical) owners receiver stagePrepared rfl profile
         wellFormed root.support.runtime root.support.covers root.support.unique root.support.actualFunctionType
-        observations closurePackets closureSupport (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+        observations closurePackets closureSupport bodies
         rfl compiler port calleeCertified sequence size childMeaning budget ih (namedBodies size within) within ⟨rfl, rfl, rfl⟩
     intro current id code point
     exact CallableIndexedOwnedPreparedStagedSharedRecursiveCallerBounds.reflects_reached_with_functions
@@ -284,5 +282,25 @@ theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry 
       observations extension semantic root.support.sameLedger root.support.runtimeLedger root.support.uninitialized
       budget root.support.certificate (.root (by simp)) directHeads methodHeads root.support.indexReady indirectHeads
       budget (Nat.le_refl _) point
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+/-- Existing terminal families delegate to the same body-generic induction. -/
+theorem preserves (size : Nat) :
+    PreservesRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  preserves_with_bodies receiver stagePrepared profile wellFormed observations extension semantic
+    (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+    (fun header member => CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.of_terminal_support
+      (terminals header member) (namedSupport header member))
+    closurePackets closureSupport owners methodSupport size
+
+include closurePackets closureSupport owners receiver stagePrepared profile wellFormed observations extension semantic terminals namedSupport methodSupport in
+/-- Existing terminal reflection retains its original arguments and conclusion. -/
+theorem reflects (stageEq : stages = RecursiveNamedPreparedStageScopes.registry stagePrepared) (size : Nat) :
+    ReflectsRootsAt (headers := headers) (keys := keys) model stages semanticFaults callFaults size :=
+  reflects_with_bodies receiver stagePrepared profile wellFormed observations extension semantic
+    (fun header member => CallableIndexedOwnedPreparedStagedNamedBodies.of_terminal (terminals header member))
+    (fun header member => CallableIndexedOwnedPreparedStagedPhysicalNamedBodySupport.of_terminal_support
+      (terminals header member) (namedSupport header member))
+    closurePackets closureSupport owners methodSupport stageEq size
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalMixedCallerFamily
