@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Selected methods through scoped closure mutation (2026-10-13)
+
+`PhysicalBranchingClosureStaticSupport` retains the original branching compiler packet and a collected tree of physical mixed roots at every reached lexical context. `OrdinaryMethodScopedSupport` derives that support from the actual caller evidence and compiler action. `PhysicalClosureStaticSupport.PacketFor` and `SupportFor` distinguish terminal and scoped bodies while retaining their original association and stage.
+
+`PhysicalBranchingLambdaBodyBounds` and `PhysicalBranchingLambdaApplicationBounds` reuse existing parameter entry, imperative flow and restoration. `PhysicalClosureApplicationBounds` selects the matching body case. `PhysicalNamedFormationCollectors.of_branching` produces the formation support from the original Source body.
+
+Closed endpoints are `Tests.SourceCoreMethodScoped.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public runtime API is unchanged.
+
+The four scalar results are `11 / false / 33 / 55`; native store lengths are `9 / 27 / 45 / 61 / 79 / 95 / 108 / 121`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 47 affected modules pass coherent checks. The full build (6,893 jobs), all registered tests (13,656 build jobs and the final pass marker), kernel policy and 106 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped closure grammar with genuine method calls in local initialization, captured assignment and return. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Method-bearing scoped named bodies in the same physical family, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods inside retained closures (2026-10-13)
 
 `PhysicalClosureAssociation` and `PhysicalNamedAssociation` retain the original callable identity and actual captured physical slots. `PhysicalCellOrigins` carries these facts through recursive payloads and heaps. The shared indirect prefixes accept this receiving representation; conversion to the older contextual representation is used only to classify callees.

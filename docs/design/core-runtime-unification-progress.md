@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected methods through scoped closure mutation (2026-10-13)
+
+`20b48ab6` adds scoped closure packets and their actual compiler collector, then connects them through the existing body entry, imperative flow and restoration proofs. Terminal closures keep their existing adapter. The formation collector accepts the original scoped Source body without a supplied body execution law.
+
+`9639ca05` verifies three factory calls and four original Source indirect calls. The first closure captures `(11, 33, true)`, the second `(false, true, true)` and the third `(55, 66, false)`. Each invocation saves its captured value, updates the value and flag inside a finite loop, then returns the saved value through a selected method. Reinvoking the first closure observes the previous update.
+
+The four scalar results are `11 / false / 33 / 55`; native store lengths are `9 / 27 / 45 / 61 / 79 / 95 / 108 / 121`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 47 affected modules pass coherent checks. The full build (6,893 jobs), all registered tests (13,656 build jobs and the final pass marker), kernel policy and 106 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped closure grammar with genuine method calls in local initialization, captured assignment and return. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Method-bearing scoped named bodies in the same physical family, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods inside retained closures (2026-10-13)
 
 `81da9984` generalizes shared indirect prefixes while retaining their full receiving function representation. Positive named and closure receipts keep the actual captured physical slots. Legacy consumers select their existing representation explicitly.

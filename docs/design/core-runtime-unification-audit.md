@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected methods through scoped closure mutation (2026-10-13)
+
+Commits `20b48ab6` and `9639ca05` connect scoped closure mutation and selected methods through original Source indirect calls and seven successive public sessions. The artifact retains eight physical cache slots, six ordinary Headers and four public roots. The first closure is called both before and after an intervening factory call and another closure invocation. Its second result observes the retained value update and its loop flag remains false.
+
+The static packet retains real accepted compiler actions and the full caller dictionary at the reached contexts. The dynamic proof retains physical authority and all captured slots through parameter entry, local allocation, assignment and restoration. It uses the existing imperative flow proof and introduces no Core or operational Source rule. Public entry follows actual initialization and authenticated handle reimport. The closed fixture supplies no body execution law.
+
+The four scalar results are `11 / false / 33 / 55`; native store lengths are `9 / 27 / 45 / 61 / 79 / 95 / 108 / 121`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 47 affected modules pass coherent checks. The full build (6,893 jobs), all registered tests (13,656 build jobs and the final pass marker), kernel policy and 106 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped closure grammar with genuine method calls in local initialization, captured assignment and return. The closed fixture uses identity implementations of Word and Bool bit-not with no implementation parameters or method assumptions. Method-bearing scoped named bodies in the same physical family, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods inside retained closures (2026-10-13)
 
 Commits `81da9984`, `ef0cd998` and `8a082cea` connect selected methods inside retained closure bodies through actual Source indirect calls and seven successive public sessions. The artifact has eight physical cache slots and six ordinary Headers. Method cells remain covered by physical authority without being treated as ordinary declarations.
