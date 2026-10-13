@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Evidence-bearing retained closure calls (2026-10-13)
+
+Commits `fd39e383` and `a19eac55` close the retained ordinary closure dictionary connection. Full dictionary equality is retained at genuine formation; it is never inferred from dictionary coverage or capture typing alone. Both original Source well-formedness and actual selected compiler evidence are retained in the closed public regression.
+
+The regression has six actual selected named rows, three distinct exported closures and seven linked public calls. The three creation steps append actual handles; later calls preserve all older entries. Both Word and Bool outputs follow from Source/native result representation and the actual public encoder. Each of the seven original starts has an independent Source-derived sufficient-fuel theorem.
+
+Validation: all 1,007 affected modules pass coherent checks. The full build (6,741 jobs), all registered tests (13,352 build jobs and the final pass marker), kernel policy and 73 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers evidence-bearing direct declaration calls in ordinary retained closure bodies, using the existing supported scoped grammar and actual named formation. It preserves the full closed replacement range and captured environment. Trait method dispatch, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls in scoped named bodies (2026-10-13)
 
 Commits `8a433c18` and `55db5d43` extend genuine declaration evidence beyond terminal bodies. Every direct-call occurrence is reconstructed from the selected compiler policy. The independently produced Source dictionary agrees with the actual compiler dictionary through the original ledger, including after local allocation and inside the loop.

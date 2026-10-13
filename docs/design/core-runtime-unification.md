@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Evidence-bearing retained closure calls (2026-10-13)
+
+A constrained generic factory can return a closure whose body calls another constrained generic function. The formation receipt retains the actual caller preparation and complete dictionary alongside the captured Source context. Later invocations use that same provenance through parameter entry and lexical changes.
+
+The closed public regression retains three distinct Word/Bool closures across seven calls, including a new factory call between invocations of older handles. Original Source typing, exact successor heaps and reusable export histories are derived through the actual compiler and public execution receipts. All seven original checkpoints have Source-derived execution/output-fuel bounds.
+
+Validation: all 1,007 affected modules pass coherent checks. The full build (6,741 jobs), all registered tests (13,352 build jobs and the final pass marker), kernel policy and 73 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers evidence-bearing direct declaration calls in ordinary retained closure bodies, using the existing supported scoped grammar and actual named formation. It preserves the full closed replacement range and captured environment. Trait method dispatch, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls in scoped named bodies (2026-10-13)
 
 Evidence-bearing declaration calls now compose with the existing named scoped body proof. Local allocation and control flow preserve the caller signature catalog, requirement ledger and full dictionary. Actual compiler receipts construct the child certificates at each lexical context; the shared body and public execution proofs consume them unchanged.
@@ -308,11 +318,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `8a433c18` / `55db5d43`: evidence-bearing generic calls through named local allocation and finite loops. |
-| Latest completed verification | Full build (6716 jobs), all registered tests, kernel policy and 65 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `fd39e383` / `a19eac55`: evidence-bearing retained closure bodies and three distinct handles across seven public calls. |
+| Latest completed verification | Full build (6741 jobs), all registered tests, kernel policy and 73 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | All three generic call sites retain the actual dictionary through scoped execution; four public calls have Source meaning and execution/output fuel bounds. |
-| Current implementation priority | Remaining evidence and method paths, expression/control forms and all-pass composition. |
+| Latest proof scope | Actual formation retains complete caller evidence and captured context; all seven calls have Source meaning, reusable histories and execution/output-fuel bounds. |
+| Current implementation priority | Trait method dispatch, coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

@@ -6,6 +6,16 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Evidence-bearing retained closure calls (2026-10-13)
+
+`fd39e383` retains the actual prepared caller, reached context and complete trait dictionary when an ordinary closure is formed. Recapture and parameter entry preserve that record. Evidence-aware body transport compares the actual compiler hooks, callee validation and ordered child compilation, then feeds the existing Source/public body proof. Public callers supply no extra dictionary-equality or execution premise.
+
+`a19eac55` connects seven public calls across three distinct closures: create Word `11`, create Bool `false`, invoke the first closure, create Word `33`, invoke the Bool closure, invoke the first closure again, and invoke the third closure. The four invocations return `11 / false / 11 / 33`. Every call preserves its exact Source heap and returned session; all three exports extend reusable histories, and all seven original checkpoints have sufficient execution/output-fuel bounds.
+
+Validation: all 1,007 affected modules pass coherent checks. The full build (6,741 jobs), all registered tests (13,352 build jobs and the final pass marker), kernel policy and 73 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers evidence-bearing direct declaration calls in ordinary retained closure bodies, using the existing supported scoped grammar and actual named formation. It preserves the full closed replacement range and captured environment. Trait method dispatch, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls in scoped named bodies (2026-10-13)
 
 `8a433c18` derives complete caller evidence at every reached lexical context from the actual prepared Header and selected Source scope. Evidence-aware scoped roots retain the genuine compiler action and feed the existing imperative body collector. Public callers supply no additional body execution or dictionary-equality premise.

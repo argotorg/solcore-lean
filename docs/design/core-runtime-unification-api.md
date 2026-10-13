@@ -4,6 +4,16 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Evidence-bearing retained closure calls (2026-10-13)
+
+`OrdinaryCallerReceipts.CallerAt` retains actual `Prepared`, `HeaderAt`, runtime context fields and the complete evidence dictionary. Ordinary formation and `OrdinaryAt` carry it through recapture. The existing named and nested formation producers derive it internally from their accepted compiler receipts.
+
+`OrdinaryEvidencePolicy`, `EvidenceBodyViewTransport` and `OrdinaryEvidenceScopedRoots` recover the actual evidence-aware compiler policy and preserve reached Source/view nodes. `OrdinaryEvidenceCallsReady` and `OrdinaryEvidenceScopedSupport.of_actual` feed the existing canonical body and public history machinery. The original general body-view transport wrappers retain their signatures.
+
+Validation: all 1,007 affected modules pass coherent checks. The full build (6,741 jobs), all registered tests (13,352 build jobs and the final pass marker), kernel policy and 73 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers evidence-bearing direct declaration calls in ordinary retained closure bodies, using the existing supported scoped grammar and actual named formation. It preserves the full closed replacement range and captured environment. Trait method dispatch, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls in scoped named bodies (2026-10-13)
 
 `NamedEvidenceScopedCallerFrames.of_selected` derives the full caller frame from Prepared, HeaderAt, selected Source scope and RuntimeContextFields. It has no terminal-body restriction. `NamedEvidenceScopedRoots.of_policy_sites` authenticates every direct-call action using that actual frame and inventory; `of_accepted_sites` extracts the same root from real child acceptance.
