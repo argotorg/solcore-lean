@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-14.
 
+## Factory closure bodies come from actual compilation (2026-10-14)
+
+`956ced51` derives ordinary closure admission from the actual lambda body action. `dde742cb` completes both factory closure source rows in the original evidence program.
+
+The accepted factory receipt supplies the inner returning-body compiler and its exact expression trace. Source ownership and parameter order come from the original checked function and prepared origin. The closure certificate retains the captured scope and original lambda metadata. Finite source-node coverage accounts for every lambda in each selected cache row.
+
+The shared program certificate now consumes compiler receipts for all ten ordinary roots and both factory closure source rows. Its twelve cache rows, ten direct-table rows and seven Source/public operations are unchanged: results remain `33 / true / 33 / 55`, with three retained closures, the same reached heaps and all public fuel conclusions. Selected closure checks are completed by exact indexed certificates. Unselected closures, method selection, metadata and table coverage still run through the existing checks.
+
+Validation: 10 affected modules checked together, full build (7,237 jobs), registered tests (14,308 build jobs), kernel policy and 693 endpoint audits pass. Earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This completes closure-body admission for the two original factories. Independent Source well-formedness, finite metadata and catalog checks, method certification, broader compiler syntax and preservation across all actual passes remain explicit work.
+
+The next connections remove the extra method-check budget restriction and build a common certified public session from actual initialization and later calls.
+
 ## All ordinary roots in the evidence program use compiler receipts (2026-10-14)
 
 `646f46e7` derives factory admission from actual outer-return and lambda compilation. `c2817faf` connects both original factory functions, completing all ten ordinary roots in the existing evidence program.
@@ -654,11 +668,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `646f46e7` / `c2817faf`: actual lambda compilation supplies both factory roots; all ten ordinary roots in the original evidence program use compiler receipts. |
-| Latest completed verification | Full build (7234 jobs), registered tests, kernel policy and 674 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `956ced51` / `dde742cb`: actual inner lambda compilation supplies both factory closure certificates, alongside all ten ordinary root receipts. |
+| Latest completed verification | Full build (7237 jobs), registered tests, kernel policy and 693 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | All ten original ordinary roots derive admission from accepted compilation, preserving the full seven-operation Source/public sequence and captures. |
-| Current implementation priority | Connect arbitrary successful checker budgets and remaining closure/method support, then complete compiler and pass coverage. |
+| Latest proof scope | All ten original ordinary roots and both factory closure source rows derive admission from accepted compilation, preserving the seven-operation Source/public sequence and captures. |
+| Current implementation priority | Connect arbitrary successful checker budgets and a common certified public session, then complete compiler and pass coverage. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

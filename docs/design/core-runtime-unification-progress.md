@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Factory closure bodies come from actual compilation (2026-10-14)
+
+`956ced51` derives ordinary closure admission from the actual lambda body action. `dde742cb` completes both factory closure source rows in the original evidence program.
+
+The accepted factory receipt supplies the inner returning-body compiler and its exact expression trace. Source ownership and parameter order come from the original checked function and prepared origin. The closure certificate retains the captured scope and original lambda metadata. Finite source-node coverage accounts for every lambda in each selected cache row.
+
+The shared program certificate now consumes compiler receipts for all ten ordinary roots and both factory closure source rows. Its twelve cache rows, ten direct-table rows and seven Source/public operations are unchanged: results remain `33 / true / 33 / 55`, with three retained closures, the same reached heaps and all public fuel conclusions. Selected closure checks are completed by exact indexed certificates. Unselected closures, method selection, metadata and table coverage still run through the existing checks.
+
+Validation: 10 affected modules checked together, full build (7,237 jobs), registered tests (14,308 build jobs), kernel policy and 693 endpoint audits pass. Earlier public sequences remain connected. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This completes closure-body admission for the two original factories. Independent Source well-formedness, finite metadata and catalog checks, method certification, broader compiler syntax and preservation across all actual passes remain explicit work.
+
+Both factory bodies now join their outer roots in the accepted compiler path. The twelve unrelated workspace changes remain excluded.
+
 ## All ordinary roots in the evidence program use compiler receipts (2026-10-14)
 
 `646f46e7` derives factory admission from actual outer-return and lambda compilation. `c2817faf` connects both original factory functions, completing all ten ordinary roots in the existing evidence program.
