@@ -147,6 +147,11 @@ def expression?
                   let ⟨container⟩ ← expression? inputs source fuel base
                   let ⟨lookup⟩ ← expression? inputs source fuel key
                   pure ⟨.index found form keyFound scalar container lookup⟩
+          | .constructor instantiation ids => do
+              let ⟨ranges⟩ ← closedRange? instantiation.parameterSubstitution
+              let ⟨children⟩ ← allProof? (fun child => GeneralSyntax source child (DirectSite inputs))
+                (expression? inputs source fuel) ids
+              pure ⟨.constructor found form ranges children⟩
           | .call _callee ids (.declaration instantiation) => do
               let ⟨site⟩ ← directSite? inputs instantiation
               let ⟨children⟩ ← allProof? (fun child => GeneralSyntax source child (DirectSite inputs))
