@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Scoped named calls through retained closures (2026-10-13)
+
+`NamedPhysicalMixedScopedRoots` and `NamedPhysicalMixedScopedCollectors` derive child support from actual named compiler receipts, full caller evidence and per-site Header coverage. `PhysicalMixedNamedScopedStaticSupport` retains the collected statement tree and catalog sites.
+
+`PhysicalMixedNamedScopedBounds` uses actual parameter entry and the existing imperative engine. `PhysicalNamedBodySupport.Support` is indexed by `NamedBodies.Body`; its terminal, formation and scoped cases feed `PhysicalMixedCallerFamily.preserves_with_bodies` and `reflects_with_bodies`. The corresponding named family ports and `PhysicalBodyPublicInvocationBounds` expose the same result and heap relations. The old terminal adapters delegate through `NamedBodies.of_terminal`.
+
+Closed endpoints are `Tests.SourceCoreMethodNamedScoped.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public runtime API is unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 72 / 90 / 115 / 140 / 162`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 54 affected modules pass coherent checks. The full build (6,924 jobs), all registered tests (13,718 build jobs and the final pass marker), kernel policy and 121 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped named-body grammar inside the same physical callable family as direct calls, selected methods and retained closures. The selected implementation methods in the closed fixture still have terminal bodies. Scoped implementation method bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods through scoped closure mutation (2026-10-13)
 
 `PhysicalBranchingClosureStaticSupport` retains the original branching compiler packet and a collected tree of physical mixed roots at every reached lexical context. `OrdinaryMethodScopedSupport` derives that support from the actual caller evidence and compiler action. `PhysicalClosureStaticSupport.PacketFor` and `SupportFor` distinguish terminal and scoped bodies while retaining their original association and stage.

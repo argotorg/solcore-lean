@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Scoped named calls through retained closures (2026-10-13)
+
+Commits `71c40c0c` and `f24bbeb7` connect scoped named relays through retained closure captures and seven successive public sessions. The artifact contains ten physical cache slots, eight ordinary Headers and four public roots. Each closure retains its own value, next value and loop flag; the actual input registry authenticates the handle used by the Source indirect caller.
+
+The named entry derives its native prefix from the actual frame packet and captured physical slots. The scoped proof retains the same positive callable representation, Source heap, full pool and physical authority. Static support stores actual compiler and Source typing receipts; no called-body execution law is supplied by the closed fixture. Both directions use the same strong induction and strict child grades.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 72 / 90 / 115 / 140 / 162`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 54 affected modules pass coherent checks. The full build (6,924 jobs), all registered tests (13,718 build jobs and the final pass marker), kernel policy and 121 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped named-body grammar inside the same physical callable family as direct calls, selected methods and retained closures. The selected implementation methods in the closed fixture still have terminal bodies. Scoped implementation method bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods through scoped closure mutation (2026-10-13)
 
 Commits `20b48ab6` and `9639ca05` connect scoped closure mutation and selected methods through original Source indirect calls and seven successive public sessions. The artifact retains eight physical cache slots, six ordinary Headers and four public roots. The first closure is called both before and after an intervening factory call and another closure invocation. Its second result observes the retained value update and its loop flag remains false.

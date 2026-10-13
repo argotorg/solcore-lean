@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Scoped named calls through retained closures (2026-10-13)
+
+`71c40c0c` retains actual prepared named bodies with terminal, formation and scoped support. Accepted compiler actions issue mixed expression roots at the reached lexical contexts. Actual parameter entry supplies the physical slots and authority used by the existing imperative flow proof. The same numeric induction closes all call kinds, and public adapters accept the resulting body carrier. Existing terminal callers keep their API.
+
+`f24bbeb7` connects three closure creations and four original Source indirect calls. Each closure captures three inputs and directly invokes a generic relay. The relay initializes a local through a selected method, conditionally assigns inside a finite loop, and returns through another selected method. The first closure is invoked again after creating and invoking other closures.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `11 / 29 / 47 / 72 / 90 / 115 / 140 / 162`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 54 affected modules pass coherent checks. The full build (6,924 jobs), all registered tests (13,718 build jobs and the final pass marker), kernel policy and 121 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+This connection covers the existing scoped named-body grammar inside the same physical callable family as direct calls, selected methods and retained closures. The selected implementation methods in the closed fixture still have terminal bodies. Scoped implementation method bodies, broader method selection, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Selected methods through scoped closure mutation (2026-10-13)
 
 `20b48ab6` adds scoped closure packets and their actual compiler collector, then connects them through the existing body entry, imperative flow and restoration proofs. Terminal closures keep their existing adapter. The formation collector accepts the original scoped Source body without a supplied body execution law.
