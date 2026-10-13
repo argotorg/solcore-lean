@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreConstructorCallsCompilerProfile
 import Solcore.Test.SourceCoreCanonicalScopedCompilerProfile
 import Solcore.Test.SourceCorePublicSourceOutcomes
 import Solcore.Test.SourceCoreRecursiveIndexCompilerProfile
@@ -3195,6 +3196,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreCanonicalScoped.CompilerProfile.runForward
   SourceCorePublicSourceOutcomes.run
   SourceCoreRecursiveIndex.CompilerProfile.runForward
+  SourceCoreConstructorCalls.CompilerProfile.runForward
   SourceCoreCoercionPublic.runForward
   SourceCoreAcceptedBodyBindings.run
   SourceCoreFinalCatalogLateRows.runLateRows
