@@ -59,15 +59,13 @@ theorem RetainedState.factory_meaning {fixture : CompiledFixture} {observed : Ob
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (value : Bool)
     (call : ObservedFunctionCall session observed.makeRow.row.key [.bool value])
     (stages : ObservedStages fixture observed.makeRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (FactoryMeaning state support.makeHeader.header call .word [.bool value] invocation) := by
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support
   obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
     support.toOrdinaryInventory.rows state.atRecipe
@@ -95,8 +93,6 @@ theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : Observ
     {artifact : SourceCoreExecution.Artifact} {session : SourceCoreExecution.Session artifact}
     {entries : List Entry}
     (support : StaticSupportPackage fixture observed receiver.completion)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
     (state : RetainedState support.toOrdinaryInventory receiver session entries)
     (entry : Entry) (member : entry ∈ entries) (entryType : entry.sourceType = closureType .word)
     {handle : SourceCorePublicValues.Handle} (handleEq : entry.handle = handle)
@@ -105,7 +101,7 @@ theorem RetainedState.use_meaning {fixture : CompiledFixture} {observed : Observ
     (stages : ObservedStages fixture observed.useRow.toObservedRow)
     (invocation : Staging.Recursive.Scope) :
     Nonempty (CallMeaning state support.useHeader.header (.word value) call [entry.source] invocation) := by
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support
   obtain ⟨request⟩ := RecursiveNamedPublicPhysicalFrontdoor.recover_start_at
     fixture.recipePrepared [support.makeInput, support.useInput, support.keepInput]
     support.toOrdinaryInventory.rows state.atRecipe
@@ -169,31 +165,29 @@ theorem SequenceWitness.handles_distinct {fixture : CompiledFixture} {observed :
 theorem sequence_meaning {fixture : CompiledFixture} {observed : ObservedProgram fixture}
     (makeStages : ObservedStages fixture observed.makeRow.toObservedRow)
     (useStages : ObservedStages fixture observed.useRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) (receiver : ObservedReceiver fixture observed) :
     Nonempty (SequenceWitness makeStages useStages sequence receiver) := by
-  obtain ⟨support⟩ := static_supports fixture observed factories methods receiver.issued
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
+  obtain ⟨support⟩ := static_supports fixture observed admission receiver
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support
   obtain ⟨firstEntry, firstType, firstHandle, initial, firstTrace⟩ := first_meaning_typed_handle
     support.toOrdinaryInventory support.distinct
     program makeStages sequence.first
-  obtain ⟨second⟩ := RetainedState.factory_meaning support sources bodies methods initial false sequence.second makeStages
+  obtain ⟨second⟩ := RetainedState.factory_meaning support initial false sequence.second makeStages
     (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
-  obtain ⟨firstRead⟩ := RetainedState.use_meaning support sources bodies methods second.after firstEntry
+  obtain ⟨firstRead⟩ := RetainedState.use_meaning support second.after firstEntry
     (by simp) firstType firstHandle (Core.Word.ofNatModulo 41) sequence.firstRead sequence.firstValue useStages
     (RecursiveStageRegistry.scope useStages.sidecar [] support.useHeader.header.function)
-  obtain ⟨third⟩ := RetainedState.factory_meaning support sources bodies methods firstRead.after
+  obtain ⟨third⟩ := RetainedState.factory_meaning support firstRead.after
     false sequence.third makeStages
     (RecursiveStageRegistry.scope makeStages.sidecar [] support.makeHeader.header.function)
-  obtain ⟨secondRead⟩ := RetainedState.use_meaning support sources bodies methods third.after second.entry
+  obtain ⟨secondRead⟩ := RetainedState.use_meaning support third.after second.entry
     (by simp) second.entryType second.handleEq (Core.Word.ofNatModulo 7) sequence.secondRead sequence.secondValue useStages
     (RecursiveStageRegistry.scope useStages.sidecar [] support.useHeader.header.function)
-  obtain ⟨repeatedRead⟩ := RetainedState.use_meaning support sources bodies methods secondRead.after firstEntry
+  obtain ⟨repeatedRead⟩ := RetainedState.use_meaning support secondRead.after firstEntry
     (by simp) firstType firstHandle (Core.Word.ofNatModulo 41) sequence.repeatedRead sequence.repeatedValue useStages
     (RecursiveStageRegistry.scope useStages.sidecar [] support.useHeader.header.function)
-  obtain ⟨thirdRead⟩ := RetainedState.use_meaning support sources bodies methods repeatedRead.after third.entry
+  obtain ⟨thirdRead⟩ := RetainedState.use_meaning support repeatedRead.after third.entry
     (by simp) third.entryType third.handleEq (Core.Word.ofNatModulo 7) sequence.thirdRead sequence.thirdValue useStages
     (RecursiveStageRegistry.scope useStages.sidecar [] support.useHeader.header.function)
   exact ⟨⟨support, firstEntry, firstType, firstHandle, initial, firstTrace,
@@ -202,13 +196,11 @@ theorem sequence_meaning {fixture : CompiledFixture} {observed : ObservedProgram
 theorem closed_sequence_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (makeStages : ObservedStages fixture observed.makeRow.toObservedRow)
     (useStages : ObservedStages fixture observed.useRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) :
     ∃ receiver : ObservedReceiver fixture observed,
       Nonempty (SequenceWitness makeStages useStages sequence receiver) := by
   obtain ⟨receiver⟩ := initial_receiver fixture observed
-  exact ⟨receiver, sequence_meaning makeStages useStages factories sources bodies methods sequence receiver⟩
+  exact ⟨receiver, sequence_meaning makeStages useStages admission sequence receiver⟩
 
 end Tests.SourceCoreCoercionPublic

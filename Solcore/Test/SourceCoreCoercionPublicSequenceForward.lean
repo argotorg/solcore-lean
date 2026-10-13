@@ -20,11 +20,9 @@ theorem CallMeaning.forward {fixture : CompiledFixture} {observed : ObservedProg
     {scalar : ScalarOutput} {call : ObservedCall session key publicArguments}
     {arguments : List Dynamic.Value} {invocation : Staging.Recursive.Scope}
     (meaning : CallMeaning before header scalar call arguments invocation)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
     (ready : session.ExportsReady) :
     ForwardAt (entries := entries) support.toOrdinaryInventory receiver scalar call meaning.after.heap := by
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support
   apply forward_call before scalar call meaning.request meaning.inputs meaning.registry meaning.rawType meaning.nativeType ready
     program
   rw [meaning.headerEq]
@@ -41,12 +39,10 @@ theorem FactoryMeaning.forward {fixture : CompiledFixture} {observed : ObservedP
     {call : ObservedFunctionCall session key publicArguments} {resultType : TypeSystem.Ty}
     {arguments : List Dynamic.Value} {invocation : Staging.Recursive.Scope}
     (meaning : FactoryMeaning before header call resultType arguments invocation)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
     (simple : ∀ value ∈ publicArguments, SourceCoreIndexedSession.SimplePublic value)
     (ready : session.ExportsReady) :
     FactoryForwardAt (entries := entries) support.toOrdinaryInventory receiver call resultType meaning.entry.source meaning.after.heap := by
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support sources bodies methods
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver support
   apply forward_factory before call meaning.request meaning.inputs simple meaning.rawType ready
     program
   rw [meaning.headerEq]
@@ -76,9 +72,8 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
     {useStages : ObservedStages fixture observed.useRow.toObservedRow}
     {sequence : ObservedSequence fixture observed} {receiver : ObservedReceiver fixture observed}
     (meaning : SequenceWitness makeStages useStages sequence receiver)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled) : ForwardMeaning meaning := by
-  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver meaning.support sources bodies methods
+    : ForwardMeaning meaning := by
+  obtain ⟨program⟩ := StaticSupportPackage.program_support receiver meaning.support
   have initialReady : sequence.first.session.ExportsReady :=
     (show sequence.first.bootstrap.ReadyAt 102400 sequence.first.session from .single sequence.first.ready).exportsReady
       sequence.first.authority
@@ -91,38 +86,34 @@ theorem SequenceWitness.forward {fixture : CompiledFixture} {observed : Observed
   exact ⟨forward_initial meaning.support.toOrdinaryInventory meaning.support.distinct sequence.first
       program
       meaning.firstTrace,
-    meaning.secondMeaning.forward sources bodies methods (bool_simple false) firstReady,
-    meaning.firstReadMeaning.forward sources bodies methods secondReady,
-    meaning.thirdMeaning.forward sources bodies methods (bool_simple false) firstReadReady,
-    meaning.secondReadMeaning.forward sources bodies methods thirdReady,
-    meaning.repeatedReadMeaning.forward sources bodies methods secondReadReady,
-    meaning.thirdReadMeaning.forward sources bodies methods repeatedReady⟩
+    meaning.secondMeaning.forward (bool_simple false) firstReady,
+    meaning.firstReadMeaning.forward secondReady,
+    meaning.thirdMeaning.forward (bool_simple false) firstReadReady,
+    meaning.secondReadMeaning.forward thirdReady,
+    meaning.repeatedReadMeaning.forward secondReadReady,
+    meaning.thirdReadMeaning.forward repeatedReady⟩
 
 theorem closed_sequence_forward_meaning (fixture : CompiledFixture) (observed : ObservedProgram fixture)
     (makeStages : ObservedStages fixture observed.makeRow.toObservedRow)
     (useStages : ObservedStages fixture observed.useRow.toObservedRow)
-    (factories : ObservedFactories fixture observed)
-    (sources : ObservedClosureSources fixture observed) (bodies : MethodBodies fixture)
-    (methods : CallableIndexedOwnedPreparedStagedClosedCoercionSelection.Catalog fixture.recipe.compiled)
+    (admission : ObservedProgramCertificate fixture observed)
     (sequence : ObservedSequence fixture observed) :
     ∃ (receiver : ObservedReceiver fixture observed)
       (meaning : SequenceWitness makeStages useStages sequence receiver), ForwardMeaning meaning := by
   obtain ⟨receiver, ⟨meaning⟩⟩ := closed_sequence_meaning fixture observed makeStages useStages
-    factories sources bodies methods sequence
-  exact ⟨receiver, meaning, meaning.forward sources bodies methods⟩
+    admission sequence
+  exact ⟨receiver, meaning, meaning.forward⟩
 
 def runForward : IO Unit := do
   let fixture ← compiledFixture
   let observed ← observeProgram fixture
-  let factories ← observeFactories fixture observed
+  let admission ← observeProgramCertificate fixture observed
   let makeStages ← observeStages fixture observed.makeRow.toObservedRow
   let useStages ← observeStages fixture observed.useRow.toObservedRow
-  let ⟨sources⟩ ← observeClosureSources fixture observed
-  let ⟨bodies⟩ ← observeMethodBodies fixture
-  let ⟨methods⟩ ← observeMethodCatalog fixture
   let sequence ← observeSequence fixture observed
+  have _automatic := admission.automatic_catalog_initial
   have _meaning := closed_sequence_forward_meaning fixture observed makeStages useStages
-    factories sources bodies methods sequence
+    admission sequence
   let stores := [sequence.first.session.heapSize, sequence.first.completion.session.heapSize,
     sequence.second.completion.session.heapSize, sequence.firstRead.completion.session.heapSize,
     sequence.third.completion.session.heapSize, sequence.secondRead.completion.session.heapSize,
