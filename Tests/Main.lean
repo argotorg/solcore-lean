@@ -1539,6 +1539,7 @@ import Solcore.Test.SourceCoreClosureDirectForward
 import Solcore.Test.SourceCoreRecursiveIndexForward
 import Solcore.Test.SourceCoreCanonicalScopedForward
 import Solcore.Test.SourceCoreCanonicalFormationForward
+import Solcore.Test.SourceCoreRecursiveFormationForward
 import Solcore.Test.SourceCoreHeapSnapshot
 import Solcore.Test.SourceCoreExecutionSnapshots
 import Solcore.Test.SourceCoreActiveHeapPrefix
@@ -3150,6 +3151,7 @@ def capturedClosureSessionTests : IO Unit := do
   SourceCoreRecursiveIndex.runForward
   SourceCoreCanonicalScoped.runForward
   SourceCoreCanonicalFormation.runForward
+  SourceCoreRecursiveFormation.runForward
 
 def run : IO Unit := do
   SourceCoreChosenOrdinaryAcceptedFixture.run
