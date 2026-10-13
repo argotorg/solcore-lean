@@ -4,6 +4,21 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Executable named Source admission in public proofs (2026-10-13)
+
+Commits `c76aef63` and `edab7dac` add static certification without changing the public runtime API.
+
+- `NamedSyntaxAdmission.expression?` and `metadata?` return proofs from original finite Source data. Full direct instantiation metadata is retained.
+- `NamedScopedAdmission.admitSource` checks the original body and returns `SourceAdmission`. `of_actual` uses real Header typing and accepted compilation to produce body support.
+- `OrdinarySyntaxTable.collect` computes an ordinary raw-row table from the actual cache. `type?` and `range?` retain original Source nominal membership, arity and all raw replacements. `Table.aligned` connects these data to any authentic semantic catalog.
+- `NamedCatalogAdmission.certifySource` builds the table and source certificate together. `of_actual` closes table alignment internally; `of_empty_actual` handles the empty direct-call table for any retained inventory. Neither executable scanner takes classically chosen Inputs or Headers.
+
+Both ordinary `keep` and `use` in the existing retained-closure coercion sequence now obtain body support from the actual Source checker. All seven original Source and sufficient-fuel public endpoints still pass, with results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+Validation: all 30 affected modules pass coherent checks. The full build (7,140 jobs), registered tests (14,150 build jobs and the final pass marker), kernel policy and 289 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The checker currently supports initialized monomorphic lets and value returns, with read, literal, group, direct-call and indirect-call expressions under the existing ordinary metadata conditions. Its fuel bounds static traversal. Successful certification is an additional condition; completeness from compiler acceptance is not proved. Factory formation, retained coerced closure bodies and method support still use their existing authentic producers. Wider syntax and preservation across all actual passes remain unfinished.
+
 ## Final ordinary catalogs and selected public starts (2026-10-13)
 
 The public runtime API is unchanged. `760f1a28` adds the following proof entry points; `7a8a2de8` connects them to the existing public sequence.

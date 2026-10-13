@@ -4,6 +4,20 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Executable named Source admission in public proofs (2026-10-13)
+
+`c76aef63` adds executable certification of original named Source and actual cached direct callees. `edab7dac` connects the generated body support to the existing seven-call public proof.
+
+The scanner reads concrete Source nodes, metadata, statement roots and cached specialization rows. It never evaluates the classically chosen semantic catalog. A separate proof connects the computed table to authentic catalog Inputs. Real Header typing supplies lexical contexts, and accepted compiler actions supply the body receipt used by the existing recursive meaning proof.
+
+Both ordinary `keep` and `use` in the existing retained-closure coercion sequence now obtain body support from the actual Source checker. All seven original Source and sufficient-fuel public endpoints still pass, with results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+Validation: all 30 affected modules pass coherent checks. The full build (7,140 jobs), registered tests (14,150 build jobs and the final pass marker), kernel policy and 289 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The checker currently supports initialized monomorphic lets and value returns, with read, literal, group, direct-call and indirect-call expressions under the existing ordinary metadata conditions. Its fuel bounds static traversal. Successful certification is an additional condition; completeness from compiler acceptance is not proved. Factory formation, retained coerced closure bodies and method support still use their existing authentic producers. Wider syntax and preservation across all actual passes remain unfinished.
+
+The next connection should carry a nonempty computed direct-call table through an existing let/direct/return public sequence. This should reuse the actual input initialization and body family while removing the remaining per-fixture syntax and metadata assembly.
+
 ## Final ordinary catalogs and selected public starts (2026-10-13)
 
 `760f1a28` constructs ordinary function inventories from actual final compilation. `7a8a2de8` connects the common construction to the existing public coercion and retained-closure proofs. This removes per-fixture assembly of prepared Inputs and whole-root coverage from those public calls.

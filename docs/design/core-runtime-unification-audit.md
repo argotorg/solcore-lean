@@ -8,6 +8,25 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Executable named Source admission in public proofs (2026-10-13)
+
+Commits `c76aef63` and `edab7dac` remove manually assembled Source syntax/metadata support for the ordinary keep/use bodies in the public coercion sequence. The audit checked these boundaries:
+
+- Executable checks read actual compiler and original Source data. Classical inventory witnesses are used only by proof transfer.
+- Direct calls compare complete retained instantiations; replacement checking includes nominal catalog membership and arity, not only native type erasure.
+- Metadata checking covers every lookupable form in the consumer's global grammar. Unsupported forms are skipped only through a proof excluding them from that grammar.
+- Context-free body scanning becomes a lexical statement certificate through independent Source typing. It does not derive typing from metadata alone.
+- Real accepted body compilation, Header identity, dictionaries and stage receipts feed the existing semantic family. No child execution law is supplied.
+- The actual public observers retain exact checker success; later Header transport preserves full cached row identity and the original body/result.
+
+Both ordinary `keep` and `use` in the existing retained-closure coercion sequence now obtain body support from the actual Source checker. All seven original Source and sufficient-fuel public endpoints still pass, with results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+The regression also checks actual direct-source admission, nominal/compound positives, full-range and open-type negatives, and method-discovered ordinary rows.
+
+Validation: all 30 affected modules pass coherent checks. The full build (7,140 jobs), registered tests (14,150 build jobs and the final pass marker), kernel policy and 289 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The checker currently supports initialized monomorphic lets and value returns, with read, literal, group, direct-call and indirect-call expressions under the existing ordinary metadata conditions. Its fuel bounds static traversal. Successful certification is an additional condition; completeness from compiler acceptance is not proved. Factory formation, retained coerced closure bodies and method support still use their existing authentic producers. Wider syntax and preservation across all actual passes remain unfinished.
+
 ## Final ordinary catalogs and selected public starts (2026-10-13)
 
 Commits `760f1a28` and `7a8a2de8` connect actual final preparation to the ordinary inventory and selected public start. The review checked these boundaries:

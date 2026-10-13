@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Executable named Source admission in public proofs (2026-10-13)
+
+`c76aef63` adds four production proof modules. `NamedSyntaxAdmission` scans original expression syntax and all relevant lookupable metadata nodes, including unused nodes. `NamedScopedAdmission` derives the lexical statement certificate from genuine Header typing and issues support from accepted body compilation. `OrdinarySyntaxTable` checks actual cached ordinary rows, including complete raw replacement formation. `NamedCatalogAdmission` combines the table and source scanners and closes the proof transfer into the catalog.
+
+`edab7dac` replaces hand-written keep/use metadata and syntax support with exact successful checker receipts stored at the actual observed cached Source. Header transport retains the actual cached function, compiled statement roots and result type. No new body execution or public input premise is added.
+
+Both ordinary `keep` and `use` in the existing retained-closure coercion sequence now obtain body support from the actual Source checker. All seven original Source and sufficient-fuel public endpoints still pass, with results `41 / 7 / 41 / 7` and store lengths `5 / 8 / 11 / 20 / 23 / 32 / 41 / 50`.
+
+The registered table regression accepts an actual original direct-call relay and concrete nominal/compound types. It rejects wrong nominal arity, function declarations used as nominal types, open types, exhausted traversal fuel and an invalid later replacement in a duplicate-domain substitution. The computed final table includes both method-discovered identity rows.
+
+Validation: all 30 affected modules pass coherent checks. The full build (7,140 jobs), registered tests (14,150 build jobs and the final pass marker), kernel policy and 289 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The checker currently supports initialized monomorphic lets and value returns, with read, literal, group, direct-call and indirect-call expressions under the existing ordinary metadata conditions. Its fuel bounds static traversal. Successful certification is an additional condition; completeness from compiler acceptance is not proved. Factory formation, retained coerced closure bodies and method support still use their existing authentic producers. Wider syntax and preservation across all actual passes remain unfinished.
+
 ## Final ordinary catalogs and selected public starts (2026-10-13)
 
 `760f1a28` adds final-cache Input construction, a finite admitted ordinary catalog and public entry recovery. `7a8a2de8` switches the existing coercion sequence to that catalog and local root selection.
