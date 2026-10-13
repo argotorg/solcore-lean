@@ -323,17 +323,17 @@ theorem Certificate.issue_without_methods {raw : Workspace.RawWorkspace} {checki
     (CallableMethodBodyCoherence.of_empty_checked accepted empty) accepted
 
 include certificate wellFormed ready issued registry entryMember rows aligned in
-/-- The existing fixed-budget entry derives its method receipt internally. -/
-theorem Certificate.issue_for_checked {raw : Workspace.RawWorkspace}
-    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+/-- Original checker success supplies the method receipt at its actual budget. -/
+theorem Certificate.issue_for_checked {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram) :
     Nonempty (Support compiled (headers rows) (keys compiled) initial) :=
   certificate.issue_for_checked_with_methods wellFormed ready issued registry entryMember rows aligned
     (CallableMethodBodyCoherence.of_checked accepted) accepted
 
 include certificate wellFormed ready issued registry entryMember in
-/-- The existing automatic catalog entry keeps its original public interface. -/
-theorem Certificate.issue {raw : Workspace.RawWorkspace}
-    (accepted : checkProgram raw 1024 = .ok compiled.sourceProgram) :
+/-- Automatic catalog construction also accepts the actual original checking budget. -/
+theorem Certificate.issue {raw : Workspace.RawWorkspace} {checkingFuel : Nat}
+    (accepted : checkProgram raw checkingFuel = .ok compiled.sourceProgram) :
     ∃ catalog : Catalog compiled, Nonempty (Support compiled (headers catalog.rows) (keys compiled) initial) :=
   certificate.issue_with_methods wellFormed ready issued registry entryMember
     (CallableMethodBodyCoherence.of_checked accepted) accepted

@@ -1,3 +1,4 @@
+import Solcore.Frontend.SourceInference.FunctionFuelAgreement
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodCertificates
 import Solcore.SourceSemantics.CoreLowering.CallableCoercionPlanProvenance
@@ -185,12 +186,13 @@ theorem Selection.retained {program : CheckedProgram}
       implementationMethodCheckTargets program.signatures := by
     apply List.mem_flatMap.mpr
     exact ⟨_, selected.implementationMember, List.mem_map.mpr ⟨_, selected.methodMember, rfl⟩⟩
-  obtain ⟨retained, member, provenance⟩ := retained_of_target loadedAccepted member
+  obtain ⟨checkingFuel, checkedBodies⟩ := loadedAccepted
+  obtain ⟨retained, member, provenance⟩ := retained_of_target checkedBodies member
   cases provenance with
   | intro idEq traitLookup checked =>
     have sameTrait := Option.some.inj (traitLookup.symm.trans selected.traitLookup)
     subst_vars
-    have same := Except.ok.inj (selected.bodyChecked.symm.trans checked)
+    have same := checkFunctionBody_success_unique_fuel selected.bodyChecked checked
     exact ⟨retained, member, idEq.trans selected.methodId.symm, same⟩
 
 private theorem reject_ok {α ε : Type} {condition : Prop} [Decidable condition]
