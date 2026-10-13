@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Generic implementation substitutions through public execution (2026-10-13)
+
+`e31d23c5` derives generic implementation selection from actual Source typing and the successful specialization. Existing closed-method APIs keep their signatures. `191f8355` connects one generic implementation method specialized to Word and Bool through retained closures, scoped named relays and seven successive public executions.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 87 affected modules pass coherent checks. The full build (7,015 jobs), all registered tests (13,900 build jobs and the final pass marker), kernel policy and 161 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Method selection now retains arbitrary actual implementation substitutions. Its complete replacement range follows from the original well-formed implementation head, actual typed selection goal and accepted concrete specialization. The connected method catalog still requires empty method assumptions. Methods with their own dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls inside implementation methods (2026-10-13)
 
 `8401d7ee` derives evidence for actual direct calls inside implementation methods and prepares ordinary callees added by the final method preparation pass. `358575d6` connects these calls through retained closures, scoped named relays and seven successive public executions.
@@ -378,11 +388,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `8401d7ee` / `358575d6`: evidence-bearing method calls and final-plan helpers through seven public executions. |
-| Latest completed verification | Full build (6985 jobs), all registered tests, kernel policy and 128 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `e31d23c5` / `191f8355`: generic implementation substitutions through seven public executions. |
+| Latest completed verification | Full build (7015 jobs), all registered tests, kernel policy and 161 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Original implementation methods call constrained generic functions inside scoped bodies, sharing the named/closure proof family and all seven public execution/output-fuel bounds. |
-| Current implementation priority | Generalize method selection and substitutions, then broader dictionaries, coercions, remaining grammar and all-pass composition. |
+| Latest proof scope | Actual generic method substitutions retain their complete raw range and original Source body through the named/closure family and all seven public execution/output-fuel bounds. |
+| Current implementation priority | Connect methods with their own dictionaries, then coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

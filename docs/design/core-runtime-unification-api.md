@@ -4,6 +4,20 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Generic implementation substitutions through public execution (2026-10-13)
+
+`MethodPathTyping.parent_typed` recovers original parent typing along actual method-call certificate paths. `MethodSelectionGoal.admissible` identifies the primary typed requirement with the actual selected goal. `MethodSelectionRanges.of_selected` derives the complete raw replacement range from original implementation formation, head matching and accepted specialization.
+
+`GenericMethodSelection.Catalog` retains formation and empty method assumptions while allowing implementation parameters. `selection_support` constructs the method authority from the genuine caller ledger and parent typing. Existing closed catalogs embed through `Catalog.of_closed`; the named, ordinary-closure and method support producers expose additive `_generic` entry points. The seventeen existing producer types are unchanged.
+
+Closed endpoints are `Tests.SourceCoreMethodGenericSubstitution.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The physical recursive family and public runtime API are unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 87 affected modules pass coherent checks. The full build (7,015 jobs), all registered tests (13,900 build jobs and the final pass marker), kernel policy and 161 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Method selection now retains arbitrary actual implementation substitutions. Its complete replacement range follows from the original well-formed implementation head, actual typed selection goal and accepted concrete specialization. The connected method catalog still requires empty method assumptions. Methods with their own dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls inside implementation methods (2026-10-13)
 
 `DirectCallAuthority.ResolvedCaller` retains the exact resolver output and complete semantic dictionary. `authenticated_evidence_of_resolved` serves both ordinary and method callers; the existing ordinary API delegates to it. `MethodCallerEvidence.of_selected` retains the selected method and reached lexical ledger. `MethodEvidenceScopedRoots.of_actual` derives direct-call roots from original Source metadata, accepted method compilation and the actual ordinary callee inventory.

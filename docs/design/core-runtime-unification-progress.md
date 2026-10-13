@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Generic implementation substitutions through public execution (2026-10-13)
+
+`e31d23c5` recovers the original operator-parent typing along each real method-call path. Its primary requirement identifies the admitted selection goal. Every implementation parameter occurs in the checked head, so the genuine head equation recovers each replacement, including nominal arguments. Successful specialization supplies concrete replacement checks. No replacement-range or closed-caller assumption is added to the public support producers.
+
+The named, retained-closure and scoped-method adapters keep their existing APIs as closed-catalog wrappers. Their generic variants retain the original ledger, selected Source body and full dictionary.
+
+`191f8355` uses one generic BitNot implementation and a generic Mark implementation. Its Word and Bool methods each retain one actual replacement. The complete cached specialization and actual synthetic method signature supply the scoped syntax receipt; independent SourceAt supplies body typing. The three identity calls inside each method retain their nonempty callee dictionaries.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 87 affected modules pass coherent checks. The full build (7,015 jobs), all registered tests (13,900 build jobs and the final pass marker), kernel policy and 161 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Method selection now retains arbitrary actual implementation substitutions. Its complete replacement range follows from the original well-formed implementation head, actual typed selection goal and accepted concrete specialization. The connected method catalog still requires empty method assumptions. Methods with their own dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls inside implementation methods (2026-10-13)
 
 `8401d7ee` factors direct-call evidence around the actual complete caller resolver result. Method callers derive that receipt from the selected Source method and reached lexical context. Their original call nodes, requirement ledgers and accepted compiler actions supply the callee dictionaries.

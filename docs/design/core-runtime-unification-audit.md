@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Generic implementation substitutions through public execution (2026-10-13)
+
+Commits `e31d23c5` and `191f8355` connect actual generic implementation substitutions through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. A single original generic implementation method produces the actual Word and Bool method rows, each with one retained type replacement. Its eighteen-node source has three direct calls with real Mark requirements.
+
+The range proof follows actual parameter occurrences in the checked implementation head and preserves nominal catalog membership and arity. Concrete checks come from successful specialization, not from a scalar-only observation. The method body receipt compares complete cached specializations and uses the actual selected synthetic signature; it does not replace the method with an ordinary declaration Header or erase its substitution. Independent Source typing and actual accepted method compilation remain the semantic authority.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 87 affected modules pass coherent checks. The full build (7,015 jobs), all registered tests (13,900 build jobs and the final pass marker), kernel policy and 161 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+Method selection now retains arbitrary actual implementation substitutions. Its complete replacement range follows from the original well-formed implementation head, actual typed selection goal and accepted concrete specialization. The connected method catalog still requires empty method assumptions. Methods with their own dictionaries, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Evidence-bearing calls inside implementation methods (2026-10-13)
 
 Commits `8401d7ee` and `358575d6` connect actual method-to-function evidence calls through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. Each original implementation body has eighteen nodes and three direct calls with genuine solved Mark requirements. Independent Source typing covers the entire original body and its lexical changes.
