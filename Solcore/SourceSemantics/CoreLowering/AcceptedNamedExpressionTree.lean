@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualDirectReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionPolicy
 import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectExpressionReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedContextualOperatorReceipt
 
 /-! Original expression trees follow accepted child actions. Unexpanded compiler
 branches retain the actual selected action and its original source occurrence. -/
@@ -28,6 +29,8 @@ theorem LeafForm.view {form : ExpressionForm} (leaf : LeafForm form) :
 def DirectForm (form : ExpressionForm) : Prop :=
   ∃ callee arguments instantiation, form = .call callee arguments (.declaration instantiation)
 
+abbrev MethodForm := AcceptedContextualOperatorReceipt.Form
+
 def IndirectForm (form : ExpressionForm) : Prop :=
   ∃ callee arguments metadata, form = .call callee arguments (.indirect metadata)
 
@@ -48,11 +51,16 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
     {id : ExpressionId} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr}
     (head : Head policy body fuel current source scope id reasonAt lowered) where
   | special (selected : head.special = some lowered) (outside : ¬ DirectForm head.node.form)
+      (outsideMethod : ¬ MethodForm head.node.form)
   | initializer (selected : head.special = some lowered)
       (actual : AcceptedContextualDirectReceipt.InitializerAt compiled.indexed current id)
   | form (selected : head.special = none)
       (notLeaf : ¬ LeafForm head.node.form) (notDirect : ¬ DirectForm head.node.form)
-      (notIndirect : ¬ IndirectForm head.node.form)
+      (notIndirect : ¬ IndirectForm head.node.form) (notMethod : ¬ MethodForm head.node.form)
+  | operatorOrdinary (selected : head.special = none) (form : MethodForm head.node.form)
+      (requirements : head.node.requirements = [])
+  | operatorCoercions (selected : head.special = some lowered) (form : MethodForm head.node.form)
+      (coercions : head.node.coercions ≠ [])
 
 inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
     (reasonAt : ExpressionId → Word) (fuel : Nat) (id : ExpressionId)
@@ -76,6 +84,10 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
       {metadata : IndirectCallResolution}
       (receipt : CallableIndirectCallCertificates.Receipt policy body fuel current source scope
         id callee arguments metadata reasonAt lowered)
+  | method (head : Head policy body fuel current source scope id reasonAt lowered)
+      (selected : head.special = some lowered)
+      (receipt : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt
+        policy body fuel current valueContext source scope id reasonAt lowered)
   | boundary (head : Head policy body fuel current source scope id reasonAt lowered)
       (cause : Cause root head)
 
@@ -102,6 +114,7 @@ def Step.children : Step root source scope reasonAt fuel id lowered →
   | .ordinary _ _ receipt => ordinaryChildren receipt
   | .evidence _ _ receipt => evidenceChildren receipt
   | .indirect _ _ receipt => receipt.entries
+  | .method _ _ receipt => receipt.arguments.zip receipt.codes
 
 inductive Trace (root : RootPolicyReceipt (compiled := compiled) named diagnostics namedCode compilation
     rootFuel rootSource rootScope rootId rootReasonAt rootLowered)
@@ -174,6 +187,7 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
     simpa only [Child, Nat.min_eq_right (Nat.le_succ fuel)] using accepted
 
   | indirect head plain receipt => exact receipt.ordered_children.2 entry.1 entry.2 member
+  | method head selected receipt => exact (mapM_receipt receipt.generated).2.1 entry member
 
 variable {directSites : DeclarationInstantiation → Prop}
 
@@ -216,17 +230,34 @@ theorem Step.of_head
         | inr initializers =>
           obtain ⟨initializer⟩ := initializers
           exact ⟨.boundary head (.initializer selected' initializer)⟩
-    · cases selected : head.special with
-      | none =>
-        by_cases indirect : IndirectForm head.node.form
-        · obtain ⟨callee, arguments, metadata, form⟩ := indirect
-          obtain ⟨receipt⟩ := AcceptedIndirectExpressionReceipt.of_head root head selected form
-          exact ⟨.indirect head selected receipt⟩
-        · exact ⟨.boundary head (.form selected leaf direct indirect)⟩
-      | some output =>
-        have same := head.result output selected
-        have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)
-        exact ⟨.boundary head (.special selected' direct)⟩
+    · by_cases method : MethodForm head.node.form
+      · cases selected : head.special with
+        | none =>
+          exact ⟨.boundary head (.operatorOrdinary selected method
+            (AcceptedContextualOperatorReceipt.plain_requirements root head selected method))⟩
+        | some output =>
+          have same := head.result output selected
+          have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)
+          by_cases coercions : head.node.coercions = []
+          · cases AcceptedContextualOperatorReceipt.of_head root head selected' method coercions with
+            | inl methods =>
+              obtain ⟨receipt⟩ := methods
+              exact ⟨.method head selected' receipt⟩
+            | inr initializers =>
+              obtain ⟨initializer⟩ := initializers
+              exact ⟨.boundary head (.initializer selected' initializer)⟩
+          · exact ⟨.boundary head (.operatorCoercions selected' method coercions)⟩
+      · cases selected : head.special with
+        | none =>
+          by_cases indirect : IndirectForm head.node.form
+          · obtain ⟨callee, arguments, metadata, form⟩ := indirect
+            obtain ⟨receipt⟩ := AcceptedIndirectExpressionReceipt.of_head root head selected form
+            exact ⟨.indirect head selected receipt⟩
+          · exact ⟨.boundary head (.form selected leaf direct indirect method)⟩
+        | some output =>
+          have same := head.result output selected
+          have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)
+          exact ⟨.boundary head (.special selected' direct method)⟩
 
 /-- Recursion follows successful child actions and their strictly smaller fuel. -/
 theorem Trace.of_accepted

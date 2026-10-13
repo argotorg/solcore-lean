@@ -74,8 +74,11 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
     (typed : StatementsHaveType source control context statements final facts) :
     ScopedSourceBodyAdmission.Scan source approved control.returnType mode statements := by
   induction tree generalizing control context final facts with
-  | nil => cases closed
-  | boundary => cases closed
+  | @nil actualMode _ _ _ =>
+      cases actualMode with
+      | false => exact .nil (.inl rfl)
+      | true => cases closed
+  | boundary | assigning => cases closed
   | returning read form statementType child generated childType =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, _⟩ := head_tail typed
@@ -122,6 +125,40 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
             (ih closed (fun child member => children child (by simpa [Tree.children] using member))
               (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
 
+  | assigned read form statementType remaining receipt targetType ih =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | assignValue assignment =>
+        cases assignment with
+        | wordCompound operator _ _ _ => cases operator
+        | equal place value _ =>
+          obtain ⟨node, contains, same⟩ := value.stored_type
+          exact .assign found form receipt.declaration targetType receipt.bare
+            (lookupExpression?_complete unique contains) (same.trans (by cases place with | intro _ _ target => exact target.symm))
+            (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
+            (ih closed (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
+  | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have both : inner.closed = true ∧ remaining.closed = true := by simpa only [Tree.closed, Bool.and_eq_true_iff] using closed
+      obtain ⟨innerClosed, tailClosed⟩ := both
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | whileLoop condition body =>
+        obtain ⟨node, contains, same⟩ := condition.stored_type
+        exact .whileLoop found form (lookupExpression?_complete unique contains) same
+          (children ⟨_, _, _, child, generated⟩ (by simp [Tree.children]))
+          (innerIH (control := control.enterLoop) innerClosed
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) body)
+          (tailIH tailClosed
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
 
 /-- A returned compiler branch has exactly its original expression child and
 no executed suffix, even if the source root list retains dead statements. -/
@@ -148,6 +185,10 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       cases same
       simp_all
   | absent read original statementType projected tail allocated =>
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      cases same
+      simp_all
+  | assigning read original _ _ _ | assigned read original _ _ _ _ | whileLoop read original _ _ _ _ _ _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all

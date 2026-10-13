@@ -186,6 +186,23 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact receipt
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
+  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih =>
+      obtain ⟨_, _, _, _, tail⟩ := head_tail typed
+      exact ih tail monomorphic
+  | whileLoop read form _ _ _ _ inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | whileLoop _ body =>
+        intro binding member
+        rcases List.mem_append.mp member with member | member
+        · exact innerIH (control := control.enterLoop) body
+            (fun next present => monomorphic next (List.mem_append_left _ present)) binding member
+        · exact tailIH tail
+            (fun next present => monomorphic next (List.mem_append_right _ present)) binding member
+
 /-- The only unresolved binding condition is exposed on an actual accepted
 binding, retaining its original scope, payload and contextual projection. -/
 theorem of_tree {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}

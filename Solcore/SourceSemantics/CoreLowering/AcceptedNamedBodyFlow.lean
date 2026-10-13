@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts
 
@@ -13,15 +14,15 @@ open CompatibleEncoding (bind_ok)
 
 /-- These are compiler branches expanded by this receipt, not a source checker. -/
 def expanded : StatementForm → Bool
-  | .returnStmt _ | .letDecl _ _ => true
+  | .returnStmt _ | .letDecl _ _ | .assignValue _ _ _ | .whileLoop _ _ => true
   | _ => false
 
 inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
-    (result : Ty) (reasonAt : ExpressionId → Word) (mode : Bool) (escaped : Word) :
-    Nat → SourceCoreLocalCell.Scope → List StatementId → Expr → Type where
-  | nil {fuel scope} : Tree policy source result reasonAt mode escaped fuel scope []
+    (result : Ty) (reasonAt : ExpressionId → Word) :
+    Bool → Word → Nat → SourceCoreLocalCell.Scope → List StatementId → Expr → Type where
+  | nil {mode escaped fuel scope} : Tree policy source result reasonAt mode escaped fuel scope []
       (LocalLoop.fallthrough result)
-  | returning {fuel scope id rest node stored expression}
+  | returning {mode escaped fuel scope id rest node stored expression}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .returnStmt (some expression))
       (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) result stored = .ok ())
@@ -30,14 +31,14 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (childType : SourceCoreBasic.ensureType (.occurrence id.occurrence) result child.type = .ok ()) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
         (LocalLoop.returnValue result child.expression)
-  | returnUnit {fuel scope id rest node stored}
+  | returnUnit {mode escaped fuel scope id rest node stored}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .returnStmt none)
       (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) result stored = .ok ())
       (unitType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ()) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
         (LocalLoop.returned .unit)
-  | initialized {fuel scope id rest node stored binder expression payload tail code}
+  | initialized {mode escaped fuel scope id rest node stored binder expression payload tail code}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .letDecl binder (some expression))
       (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
@@ -49,7 +50,7 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (allocated : SourceCoreSourceCells.letInitialized policy.sourceCells source scope Renaming.id binder
         (LocalLoop.controlType result) payload child.expression tail = .ok code) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
-  | absent {fuel scope id rest node stored binder payload tail code}
+  | absent {mode escaped fuel scope id rest node stored binder payload tail code}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .letDecl binder none)
       (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
@@ -58,7 +59,35 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (allocated : SourceCoreSourceCells.letUninitialized policy.sourceCells source scope Renaming.id binder
         payload tail = .ok code) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
-  | boundary {fuel scope id rest node stored code}
+  | assigning {mode escaped fuel scope id rest node stored assignment operator expression tail code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .assignValue assignment operator expression)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
+      (assigned : SourceCoreLoops.assignValue policy fuel source scope (.occurrence id.occurrence)
+        assignment operator expression (LocalLoop.controlType result) tail reasonAt = .ok code) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | assigned {mode escaped fuel scope id rest node stored assignment expression tail code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .assignValue assignment .equal expression)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail)
+      (receipt : AcceptedBareAssignmentReceipt.Receipt policy fuel source scope (.occurrence id.occurrence)
+        assignment expression (LocalLoop.controlType result) tail reasonAt code)
+      (targetType : receipt.binder.scheme.body = assignment.target.type) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | whileLoop {mode escaped fuel scope id rest node stored condition body loopCode tail}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .whileLoop condition body)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (child : SourceCoreBasic.LoweredExpr)
+      (generated : policy.lowerExpression fuel source scope condition reasonAt = .ok child)
+      (conditionType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .bool child.type = .ok ())
+      (inner : Tree policy source result reasonAt false escaped fuel scope body loopCode)
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
+        (LocalLoop.sequence result (LocalLoop.whileLoop result child.expression loopCode escaped) tail)
+  | boundary {mode escaped fuel scope id rest node stored code}
       (read : policy.readStatement source id = .ok (node, stored))
       (outside : expanded node.form = false)
       (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
@@ -73,7 +102,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
     (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope
       statements result reasonAt mode escaped = .ok code) :
     Nonempty (Tree policy source result reasonAt mode escaped fuel scope statements code) := by
-  induction fuel generalizing scope statements code with
+  induction fuel generalizing mode scope statements code with
   | zero =>
       cases statements with
       | nil => cases accepted; exact ⟨.nil⟩
@@ -121,7 +150,27 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
                 obtain ⟨tail, tailGenerated, allocated⟩ := bind_ok accepted
                 obtain ⟨remaining⟩ := ih tailGenerated
                 exact ⟨.initialized read form statementType projected child generated childType remaining allocated⟩
-        | expression | assignValue | assignBitNot | block | ifThen | whileLoop | forLoop | matchWith | breakStmt | continueStmt =>
+        | assignValue assignment operator expression =>
+            simp only [form] at accepted
+            obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+            cases checked
+            obtain ⟨tail, tailGenerated, assigned⟩ := bind_ok accepted
+            obtain ⟨remaining⟩ := ih tailGenerated
+            exact ⟨.assigning read form statementType remaining assigned⟩
+        | whileLoop condition body =>
+            simp only [form] at accepted
+            obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+            cases checked
+            obtain ⟨child, generated, accepted⟩ := bind_ok accepted
+            obtain ⟨checked, conditionType, accepted⟩ := bind_ok accepted
+            cases checked
+            obtain ⟨loopCode, loopGenerated, accepted⟩ := bind_ok accepted
+            obtain ⟨tail, tailGenerated, accepted⟩ := bind_ok accepted
+            cases accepted
+            obtain ⟨inner⟩ := ih loopGenerated
+            obtain ⟨remaining⟩ := ih tailGenerated
+            exact ⟨.whileLoop read form statementType child generated conditionType inner remaining⟩
+        | expression | assignBitNot | block | ifThen | forLoop | matchWith | breakStmt | continueStmt =>
             exact ⟨.boundary read (by simp only [form, expanded]) whole⟩
 
 /-- The footer is retained once, around the exact recursively issued flow. -/
@@ -164,14 +213,17 @@ variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {result : Ty}
 
 -- Empty fallthrough remains a separate boundary: accepted native code alone
 -- does not prove the original source body's return obligation.
-def Tree.closed {escaped : Word} {fuel scope statements code}
+def Tree.closed {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Bool :=
   match tree with
-  | .nil | .boundary .. => false
+  | .nil => !mode
+  | .boundary .. | .assigning .. => false
   | .returning .. | .returnUnit .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.closed
+  | .assigned _ _ _ tail _ _ => tail.closed
+  | .whileLoop _ _ _ _ _ _ inner tail => inner.closed && tail.closed
 
-def Tree.children {escaped : Word} {fuel scope statements code}
+def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
     List (Child policy source reasonAt) :=
   match tree with
@@ -180,9 +232,13 @@ def Tree.children {escaped : Word} {fuel scope statements code}
       [⟨fuel, scope, expression, child, generated⟩]
   | @Tree.initialized _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ _ _ child generated _ tail _ =>
       ⟨fuel, scope, expression, child, generated⟩ :: tail.children
-  | .absent _ _ _ _ tail _ => tail.children
+  | .absent _ _ _ _ tail _ | .assigning _ _ _ tail _ => tail.children
+  | @Tree.assigned _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ tail receipt _ =>
+      ⟨fuel, scope, expression, receipt.child, receipt.generated⟩ :: tail.children
+  | @Tree.whileLoop _ _ _ _ _ _ fuel scope _ _ _ _ condition _ _ _ _ _ _ child generated _ inner tail =>
+      ⟨fuel, scope, condition, child, generated⟩ :: (inner.children ++ tail.children)
 
-def Tree.bindings {escaped : Word} {fuel scope statements code}
+def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
     List (Binding policy source) :=
   match tree with
@@ -191,6 +247,65 @@ def Tree.bindings {escaped : Word} {fuel scope statements code}
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
   | @Tree.absent _ _ _ _ _ _ _ scope _ _ _ _ binder payload _ _ _ _ _ projected tail _ =>
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
+  | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ => tail.bindings
+  | .whileLoop _ _ _ _ _ _ inner tail => inner.bindings ++ tail.bindings
+
+/-- Bare equal writes retain the original declaration type as well as native layout. -/
+def Assignable (source : TypedSource) (assignment : AssignmentResolution)
+    (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
+  operator = .equal ∧ assignment.target.projections = [] ∧
+    ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+      binder.scheme.body = assignment.target.type
+
+/-- A refined tree exposes every supported assignment RHS from its actual callback. -/
+def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
+    (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Prop :=
+  match tree with
+  | .nil | .returning .. | .returnUnit .. | .boundary .. => True
+  | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ => tail.Ready
+  | @Tree.assigning _ _ _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ _ _ tail _ =>
+      ¬ Assignable source assignment operator ∧ tail.Ready
+  | .whileLoop _ _ _ _ _ _ inner tail => inner.Ready ∧ tail.Ready
+
+/-- The profile identifies the actual callback. Unsupported original writes
+keep their complete action and suffix in the returned tree. -/
+theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
+    {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
+    {missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
+    (matched : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missing)
+    {mode : Bool} {escaped : Word} {fuel scope statements code}
+    (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
+    ∃ refined : Tree policy source result reasonAt mode escaped fuel scope statements code, refined.Ready := by
+  classical
+  induction tree with
+  | nil => exact ⟨.nil, True.intro⟩
+  | returning read form statementType child generated childType =>
+      exact ⟨.returning read form statementType child generated childType, True.intro⟩
+  | returnUnit read form statementType unitType =>
+      exact ⟨.returnUnit read form statementType unitType, True.intro⟩
+  | initialized read form statementType projected child generated childType remaining allocated ih =>
+      obtain ⟨tail, ready⟩ := ih
+      exact ⟨.initialized read form statementType projected child generated childType tail allocated, ready⟩
+  | absent read form statementType projected remaining allocated ih =>
+      obtain ⟨tail, ready⟩ := ih
+      exact ⟨.absent read form statementType projected tail allocated, ready⟩
+  | @assigning mode escaped fuel scope id rest node stored assignment operator expression tail code
+      read form statementType remaining assigned ih =>
+      obtain ⟨tail, ready⟩ := ih
+      by_cases supported : Assignable source assignment operator
+      · obtain ⟨rfl, bare, target⟩ := supported
+        obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched bare assigned
+        exact ⟨.assigned read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
+      · exact ⟨.assigning read form statementType tail assigned, supported, ready⟩
+  | assigned read form statementType remaining receipt targetType ih =>
+      obtain ⟨tail, ready⟩ := ih
+      exact ⟨.assigned read form statementType tail receipt targetType, ready⟩
+  | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
+      obtain ⟨inner, innerReady⟩ := innerIH
+      obtain ⟨tail, tailReady⟩ := tailIH
+      exact ⟨.whileLoop read form statementType child generated conditionType inner tail, innerReady, tailReady⟩
+  | boundary read outside accepted => exact ⟨.boundary read outside accepted, True.intro⟩
 
 theorem Tree.accepted {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
@@ -210,16 +325,25 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
   | absent read form statementType projected _ allocated ih =>
       simpa [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         projected, ih, bind, Except.bind, pure, Except.pure] using allocated
+  | assigning read form statementType _ assigned ih =>
+      simpa [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        ih, bind, Except.bind, pure, Except.pure] using assigned
+  | assigned read form statementType _ receipt _ ih =>
+      simpa [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        ih, bind, Except.bind, pure, Except.pure] using receipt.accepted
+  | whileLoop read form statementType child generated conditionType _ _ innerIH tailIH =>
+      simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        generated, conditionType, innerIH, tailIH, bind, Except.bind, pure, Except.pure]
   | boundary _ _ accepted => exact accepted
 
 /-- A remaining compiler branch, retaining its exact action and local scope. -/
 inductive Boundary (policy : SourceCoreLoops.Policy) (source : TypedSource)
-    (result : Ty) (reasonAt : ExpressionId → Word) (mode : Bool) (escaped : Word) : Type where
-  | fallthrough (fuel : Nat) (scope : SourceCoreLocalCell.Scope)
+    (result : Ty) (reasonAt : ExpressionId → Word) : Bool → Word → Type where
+  | fallthrough {mode escaped} (fuel : Nat) (scope : SourceCoreLocalCell.Scope)
       (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope []
         result reasonAt mode escaped = .ok (LocalLoop.fallthrough result)) :
       Boundary policy source result reasonAt mode escaped
-  | statement (fuel : Nat) (scope : SourceCoreLocalCell.Scope) (id : StatementId)
+  | statement {mode escaped} (fuel : Nat) (scope : SourceCoreLocalCell.Scope) (id : StatementId)
       (rest : List StatementId) (node : StatementNode) (stored : Ty) (code : Expr)
       (read : policy.readStatement source id = .ok (node, stored))
       (outside : expanded node.form = false)
@@ -227,13 +351,30 @@ inductive Boundary (policy : SourceCoreLoops.Policy) (source : TypedSource)
         (id :: rest) result reasonAt mode escaped = .ok code) :
       Boundary policy source result reasonAt mode escaped
 
+  | assignment {mode escaped} (fuel : Nat) (scope : SourceCoreLocalCell.Scope) (id : StatementId)
+      (rest : List StatementId) (code : Expr)
+      (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
+        (id :: rest) result reasonAt mode escaped = .ok code) :
+      Boundary policy source result reasonAt mode escaped
+  | nested {mode escaped} (boundary : Boundary policy source result reasonAt false escaped) :
+      Boundary policy source result reasonAt mode escaped
+
 theorem Tree.frontier {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code)
     (openBranch : tree.closed = false) : Nonempty (Boundary policy source result reasonAt mode escaped) := by
   induction tree with
-  | @nil actualFuel actualScope => exact ⟨.fallthrough actualFuel actualScope (by simp [SourceCoreLoops.lowerFlowStatementsWithPolicy])⟩
+  | @nil _ _ actualFuel actualScope => exact ⟨.fallthrough actualFuel actualScope (by simp [SourceCoreLoops.lowerFlowStatementsWithPolicy])⟩
   | returning | returnUnit => cases openBranch
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih => exact ih openBranch
+  | assigning read form statementType remaining assigned ih =>
+      exact ⟨.assignment _ _ _ _ _ (Tree.assigning read form statementType remaining assigned).accepted⟩
+  | assigned _ _ _ _ _ _ ih => exact ih openBranch
+  | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
+      simp only [Tree.closed, Bool.and_eq_false_iff] at openBranch
+      rcases openBranch with innerOpen | tailOpen
+      · obtain ⟨boundary⟩ := innerIH innerOpen
+        exact ⟨.nested boundary⟩
+      · exact tailIH tailOpen
   | boundary read outside accepted => exact ⟨.statement _ _ _ _ _ _ _ read outside accepted⟩
 
 theorem Body.accepted {escaped fellThrough : Word} {fuel scope statements code}

@@ -59,6 +59,19 @@ theorem Trace.syntax_or_boundary
         · intro argument member
           obtain ⟨code, present⟩ := (mapM_receipt receipt.argumentsAccepted).2.2 argument member
           exact all (argument, code) (List.mem_cons_of_mem _ present)
+      | method head selected receipt =>
+        have childrenSyntax : ∀ child ∈ receipt.arguments, GeneralSyntax source child directSites := by
+          intro child member
+          obtain ⟨code, present⟩ := (mapM_receipt receipt.generated).2.2 child member
+          exact all (child, code) present
+        rcases receipt.operator.form with ⟨operator, operand, form, arguments⟩ |
+          ⟨operator, left, right, form, arguments⟩
+        · refine .inl (.unary receipt.metadata.found form (childrenSyntax operand ?_))
+          simp only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+            arguments, List.mem_singleton]
+        · refine .inl (.binary receipt.metadata.found form (childrenSyntax left ?_) (childrenSyntax right ?_))
+          all_goals simp only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+            arguments, List.mem_cons, true_or, or_true]
     · obtain ⟨entry, absent⟩ := Classical.not_forall.mp all
       have member : entry ∈ actual.children := Classical.byContradiction fun missing =>
         absent (fun present => False.elim (missing present))
