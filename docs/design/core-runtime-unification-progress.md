@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Methods with their own evidence through public execution (2026-10-13)
+
+`92b3848c` validates actual final-plan operator selections and their complete materialized dictionaries. The original parent typing and requirement ledger still derive method selection and the full replacement range. A method port now retains the real caller resolver receipt, allowing its constrained direct calls to use the same original Source context and full method evidence.
+
+Independent Source dictionary assembly can select caller entries or subtrees of requirement evidence. Equality therefore uses a separate coherence proof for every ordered entry. The closed fixture derives this property from its original Mark implementation, which has no premises. The comparison preserves full trees, order and repeated entries.
+
+`890ebedc` adds `where T: Mark` to the generic BitNot implementation. The selected Word and Bool methods retain that nonempty assumption and dictionary. Their local initializer, finite loop and return each call the constrained identity function. Actual Source method formation supplies the complete ledger without erasing its predicates.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 160 affected modules pass coherent checks. The full build (7,050 jobs), all registered tests (13,970 build jobs and the final pass marker), kernel policy and 196 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected method catalog now supports nonempty method assumptions. It validates the complete ordered materialized dictionary against the actual caller resolver, and derives Source dictionary equality from the original leaf Mark rule. This finite static check can reject compiler-accepted selections outside its supported conditions. Coherence for evidence with premises, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Generic implementation substitutions through public execution (2026-10-13)
 
 `e31d23c5` recovers the original operator-parent typing along each real method-call path. Its primary requirement identifies the admitted selection goal. Every implementation parameter occurs in the checked head, so the genuine head equation recovers each replacement, including nominal arguments. Successful specialization supplies concrete replacement checks. No replacement-range or closed-caller assumption is added to the public support producers.

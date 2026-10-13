@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Methods with their own evidence through public execution (2026-10-13)
+
+Commits `92b3848c` and `890ebedc` connect a selected method with its own nonempty dictionary through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. The actual Word and Bool method rows each retain one type replacement and one Mark dictionary entry. Their original eighteen-node bodies retain all three constrained direct calls.
+
+The executable static validator compares complete ordered raw evidence trees and checks actual caller coverage. Source identity follows original body selection and coherence of each reached assumption. The method port retains the real complete resolver receipt, which is reused by direct calls at the reached lexical scopes. No method execution law or dictionary equality is added to the public caller assumptions.
+
+An investigation found distinct default and ordinary evidence origins in a checker-accepted program; existing compilation validation rejects that case. It is not a counterexample for the compile-success theorem. No Source selection rule was changed. The general connection between accepted compilation and evidence-origin coherence remains work to do.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 160 affected modules pass coherent checks. The full build (7,050 jobs), all registered tests (13,970 build jobs and the final pass marker), kernel policy and 196 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected method catalog now supports nonempty method assumptions. It validates the complete ordered materialized dictionary against the actual caller resolver, and derives Source dictionary equality from the original leaf Mark rule. This finite static check can reject compiler-accepted selections outside its supported conditions. Coherence for evidence with premises, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Generic implementation substitutions through public execution (2026-10-13)
 
 Commits `e31d23c5` and `191f8355` connect actual generic implementation substitutions through seven public executions. The fixture retains twelve physical cache slots, ten ordinary Headers and four public roots. A single original generic implementation method produces the actual Word and Bool method rows, each with one retained type replacement. Its eighteen-node source has three direct calls with real Mark requirements.

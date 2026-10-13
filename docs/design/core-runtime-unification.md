@@ -4,6 +4,16 @@ Status: The first goal (runtime unification on Core) is complete. Implementation
 
 Created: 2026-09-30. Updated: 2026-10-13.
 
+## Methods with their own evidence through public execution (2026-10-13)
+
+`92b3848c` connects selected methods with their own dictionaries to independent Source meaning and the shared callable family. Existing generic and closed method APIs keep their signatures. `890ebedc` verifies the connection through retained closures, scoped named relays and seven successive public executions.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 160 affected modules pass coherent checks. The full build (7,050 jobs), all registered tests (13,970 build jobs and the final pass marker), kernel policy and 196 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected method catalog now supports nonempty method assumptions. It validates the complete ordered materialized dictionary against the actual caller resolver, and derives Source dictionary equality from the original leaf Mark rule. This finite static check can reject compiler-accepted selections outside its supported conditions. Coherence for evidence with premises, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Generic implementation substitutions through public execution (2026-10-13)
 
 `e31d23c5` derives generic implementation selection from actual Source typing and the successful specialization. Existing closed-method APIs keep their signatures. `191f8355` connects one generic implementation method specialized to Word and Bool through retained closures, scoped named relays and seven successive public executions.
@@ -388,11 +398,11 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 | --- | --- |
 | Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
 | Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `e31d23c5` / `191f8355`: generic implementation substitutions through seven public executions. |
-| Latest completed verification | Full build (7015 jobs), all registered tests, kernel policy and 161 endpoint audits pass with only the standard three axioms. |
+| Latest verified implementation | `92b3848c` / `890ebedc`: methods with their own dictionaries through seven public executions. |
+| Latest completed verification | Full build (7050 jobs), all registered tests, kernel policy and 196 endpoint audits pass with only the standard three axioms. |
 | Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual generic method substitutions retain their complete raw range and original Source body through the named/closure family and all seven public execution/output-fuel bounds. |
-| Current implementation priority | Connect methods with their own dictionaries, then coercions, remaining grammar and all-pass composition. |
+| Latest proof scope | Actual generic methods retain their own ordered dictionaries and original Source bodies through all seven public execution/output-fuel bounds. The connected static catalog validates resolver equality and leaf evidence coherence. |
+| Current implementation priority | Derive dictionary coherence from actual caller and selected requirement origins, then connect coercions, remaining grammar and all-pass composition. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)

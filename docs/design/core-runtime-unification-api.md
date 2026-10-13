@@ -4,6 +4,22 @@ Last updated: 2026-10-13.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Methods with their own evidence through public execution (2026-10-13)
+
+`CallableMethodResolverEvidence.Materialized` relates the complete ordered materialized method dictionary to the actual fresh resolver result. `CallableMethodResolverTable.validate` checks the finite final plan and produces `Ready`; its operator receipt includes actual caller coverage.
+
+`RecursiveMethodDictionaryIdentity.same_coherent` derives complete Source dictionary equality. `LeafTraitEvidenceCoherence` derives coherence from an original premise-free implementation rule, while `CachedMethodEvidenceCoherence` transfers it through authentic cached method identity.
+
+`EvidenceMethodSelection.Catalog` combines method formation, the validated actual table and cached coherence. `MethodSelectionIssuer` dispatches the generic and evidence catalogs through common support producers. `OperatorMethodAuthority.Port.resolved` retains the selected method resolver receipt; `MethodCallerResolvedEvidence` carries it through real parameter and lexical contexts. Existing generic and closed producer types remain unchanged.
+
+Closed endpoints are `Tests.SourceCoreMethodOwnEvidence.closed_sequence_meaning` and `closed_sequence_forward_meaning`. The public runtime API and Source evaluation rules are unchanged.
+
+The four scalar results are `33 / true / 33 / 55`; native store lengths are `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. All seven original checkpoints have independent Source meaning and sufficient execution/output-fuel bounds. Every sufficient factory completion appends its actual exported handle to the reusable history.
+
+Validation: all 160 affected modules pass coherent checks. The full build (7,050 jobs), all registered tests (13,970 build jobs and the final pass marker), kernel policy and 196 endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The connected method catalog now supports nonempty method assumptions. It validates the complete ordered materialized dictionary against the actual caller resolver, and derives Source dictionary equality from the original leaf Mark rule. This finite static check can reject compiler-accepted selections outside its supported conditions. Coherence for evidence with premises, coercions, remaining expression and control forms, generalized local functions and composition across every compiler pass remain incomplete.
+
 ## Generic implementation substitutions through public execution (2026-10-13)
 
 `MethodPathTyping.parent_typed` recovers original parent typing along actual method-call certificate paths. `MethodSelectionGoal.admissible` identifies the primary typed requirement with the actual selected goal. `MethodSelectionRanges.of_selected` derives the complete raw replacement range from original implementation formation, head matching and accepted specialization.
