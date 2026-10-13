@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualDirectReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionPolicy
 import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectExpressionReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedIndexExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualOperatorReceipt
 
 /-! Original expression trees follow accepted child actions. Unexpanded compiler
@@ -28,6 +29,8 @@ theorem LeafForm.view {form : ExpressionForm} (leaf : LeafForm form) :
 
 def DirectForm (form : ExpressionForm) : Prop :=
   ∃ callee arguments instantiation, form = .call callee arguments (.declaration instantiation)
+
+def IndexForm (form : ExpressionForm) : Prop := ∃ base key, form = .index base key
 
 abbrev MethodForm := AcceptedContextualOperatorReceipt.Form
 
@@ -57,6 +60,10 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
   | form (selected : head.special = none)
       (notLeaf : ¬ LeafForm head.node.form) (notDirect : ¬ DirectForm head.node.form)
       (notIndirect : ¬ IndirectForm head.node.form) (notMethod : ¬ MethodForm head.node.form)
+      (notIndex : ¬ IndexForm head.node.form)
+  | indexOperands (selected : head.special = none) {base key : ExpressionId}
+      (form : head.node.form = .index base key)
+      (missing : ¬ AcceptedIndexExpressionReceipt.Operands source base key)
   | operatorOrdinary (selected : head.special = none) (form : MethodForm head.node.form)
       (requirements : head.node.requirements = [])
   | operatorCoercions (selected : head.special = some lowered) (form : MethodForm head.node.form)
@@ -88,6 +95,9 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
       (selected : head.special = some lowered)
       (receipt : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt
         policy body fuel current valueContext source scope id reasonAt lowered)
+  | index (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none) {base key : ExpressionId}
+      (receipt : AcceptedIndexExpressionReceipt.Receipt root source scope reasonAt fuel id base key lowered)
   | boundary (head : Head policy body fuel current source scope id reasonAt lowered)
       (cause : Cause root head)
 
@@ -115,6 +125,7 @@ def Step.children : Step root source scope reasonAt fuel id lowered →
   | .evidence _ _ receipt => evidenceChildren receipt
   | .indirect _ _ receipt => receipt.entries
   | .method _ _ receipt => receipt.arguments.zip receipt.codes
+  | .index (base := base) (key := key) _ _ receipt => [(base, receipt.first), (key, receipt.second)]
 
 inductive Trace (root : RootPolicyReceipt (compiled := compiled) named diagnostics namedCode compilation
     rootFuel rootSource rootScope rootId rootReasonAt rootLowered)
@@ -188,6 +199,11 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
 
   | indirect head plain receipt => exact receipt.ordered_children.2 entry.1 entry.2 member
   | method head selected receipt => exact (mapM_receipt receipt.generated).2.1 entry member
+  | index head plain receipt =>
+    rcases List.mem_cons.mp member with same | member
+    · exact same ▸ receipt.firstAccepted
+    · have same := List.mem_singleton.mp member
+      exact same ▸ receipt.secondAccepted
 
 variable {directSites : DeclarationInstantiation → Prop}
 
@@ -253,7 +269,14 @@ theorem Step.of_head
           · obtain ⟨callee, arguments, metadata, form⟩ := indirect
             obtain ⟨receipt⟩ := AcceptedIndirectExpressionReceipt.of_head root head selected form
             exact ⟨.indirect head selected receipt⟩
-          · exact ⟨.boundary head (.form selected leaf direct indirect method)⟩
+          · by_cases index : IndexForm head.node.form
+            · obtain ⟨base, key, form⟩ := index
+              by_cases operands : AcceptedIndexExpressionReceipt.Operands source base key
+              · obtain ⟨baseNode, keyNode, baseFound, keyFound, scalar⟩ := operands
+                obtain ⟨receipt⟩ := AcceptedIndexExpressionReceipt.of_head root head selected form baseFound keyFound scalar
+                exact ⟨.index head selected receipt⟩
+              · exact ⟨.boundary head (.indexOperands selected form operands)⟩
+            · exact ⟨.boundary head (.form selected leaf direct indirect method index)⟩
         | some output =>
           have same := head.result output selected
           have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)

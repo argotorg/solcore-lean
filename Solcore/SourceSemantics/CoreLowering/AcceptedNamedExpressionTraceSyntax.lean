@@ -59,6 +59,10 @@ theorem Trace.syntax_or_boundary
         · intro argument member
           obtain ⟨code, present⟩ := (mapM_receipt receipt.argumentsAccepted).2.2 argument member
           exact all (argument, code) (List.mem_cons_of_mem _ present)
+      | index head plain receipt =>
+        exact .inl (.index receipt.found receipt.form receipt.keyFound receipt.scalar
+          (all (_, receipt.first) (by simp only [Step.children, List.mem_cons_self]))
+          (all (_, receipt.second) (by simp [Step.children])))
       | method head selected receipt =>
         have childrenSyntax : ∀ child ∈ receipt.arguments, GeneralSyntax source child directSites := by
           intro child member

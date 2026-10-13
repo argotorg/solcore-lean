@@ -16,11 +16,12 @@ open CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles (MetadataFor)
 
 /-- The restricted lane is used by existing direct/read method and closure
 producers. The general lane additionally accepts indirect and method calls. -/
-def supportedForm (directOnly : Bool) : ExpressionForm → Bool
+def supportedForm (directOnly : Bool) (allowIndices : Bool := false) : ExpressionForm → Bool
   | .reference _ (.local _) | .reference _ (.builtinBoolean _)
     | .literal _ | .integerLiteral _ _ | .tuple []
     | .call _ _ (.declaration _) => true
   | .call _ _ (.indirect _) | .unary _ _ | .binary _ _ _ => !directOnly
+  | .index _ _ => allowIndices && !directOnly
   | _ => false
 
 /-- These are operand positions in their actual evaluation order. A direct
@@ -30,25 +31,26 @@ def operands : ExpressionForm → List ExpressionId
   | .call callee arguments (.indirect _) => callee :: arguments
   | .unary _ operand => [operand]
   | .binary left _ right => [left, right]
+  | .index base key => [base, key]
   | _ => []
 
-def supportedIds (source : TypedSource) (directOnly : Bool) : List ExpressionId :=
+def supportedIds (source : TypedSource) (directOnly : Bool) (allowIndices : Bool := false) : List ExpressionId :=
   source.nodes.filterMap fun node => match node with
-    | .expression expression => if supportedForm directOnly expression.form then some expression.id else none
+    | .expression expression => if supportedForm directOnly allowIndices expression.form then some expression.id else none
     | .statement _ => none
 
-private theorem supported_mem {source : TypedSource} {directOnly : Bool}
+private theorem supported_mem {source : TypedSource} {directOnly allowIndices : Bool}
     {id : ExpressionId} {node : ExpressionNode}
     (found : source.lookupExpression? id = some node)
-    (supported : supportedForm directOnly node.form = true) : id ∈ supportedIds source directOnly := by
+    (supported : supportedForm directOnly allowIndices node.form = true) : id ∈ supportedIds source directOnly allowIndices := by
   obtain ⟨member, same⟩ := lookupExpression?_sound found
   apply List.mem_filterMap.mpr
   refine ⟨.expression node, member, ?_⟩
   simp only [supported, ↓reduceIte]
   exact congrArg some same
 
-private theorem form_of_supported {directOnly : Bool} {form : ExpressionForm}
-    (supported : supportedForm directOnly form = true) :
+private theorem old_form_of_supported {directOnly : Bool} {form : ExpressionForm}
+    (supported : supportedForm directOnly false form = true) :
     LeafForm form ∨ DirectForm form ∨
       (directOnly = false ∧ (IndirectForm form ∨ MethodForm form)) := by
   match form with
@@ -72,10 +74,24 @@ private theorem form_of_supported {directOnly : Bool} {form : ExpressionForm}
   | .tuple (_ :: _) | .group _ | .index _ _ | .conditional _ _ _
     | .constructor _ _ | .call _ _ (.builtinFunction _) | .lambda _ _ _ => cases supported
 
-private theorem policy_supported {directOnly : Bool} {form : ExpressionForm}
-    (supported : supportedForm directOnly form = true) :
+private theorem form_of_supported {directOnly allowIndices : Bool} {form : ExpressionForm}
+    (supported : supportedForm directOnly allowIndices form = true) :
+    (LeafForm form ∨ DirectForm form ∨
+      (directOnly = false ∧ (IndirectForm form ∨ MethodForm form))) ∨
+      (allowIndices = true ∧ directOnly = false ∧ IndexForm form) := by
+  by_cases old : supportedForm directOnly false form = true
+  · exact .inl (old_form_of_supported old)
+  · cases form <;> try simp_all [supportedForm]
+    case reference name resolution => cases resolution <;> simp_all
+    case tuple elements => cases elements <;> simp_all
+    case call callee arguments resolution => cases resolution <;> simp_all
+    case index base key =>
+      cases directOnly <;> cases allowIndices <;> simp_all [IndexForm]
+
+private theorem policy_supported {directOnly allowIndices : Bool} {form : ExpressionForm}
+    (supported : supportedForm directOnly allowIndices form = true) :
     CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.SupportedForm form := by
-  rcases form_of_supported supported with leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩
+  rcases form_of_supported supported with (leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩
   · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
     · exact .literal atomic
     · exact .read name binder
@@ -85,6 +101,8 @@ private theorem policy_supported {directOnly : Bool} {form : ExpressionForm}
     · rcases method with ⟨operator, operand, rfl⟩ | ⟨operator, left, right, rfl⟩
       · exact .unary operator operand
       · exact .binary left operator right
+
+  · exact .index base key
 
 def SiteReady (rows : List SourceSpecialization.SpecializedFunction) (node : ExpressionNode) : Prop :=
   match node.form with
@@ -112,25 +130,52 @@ private def requirements? (node : ExpressionNode) : Option (PLift (RequirementsR
       exact if present : node.requirements ≠ [] then some ⟨by simpa only [RequirementsReady, form] using present⟩ else none
   | _ => exact some ⟨by simp [RequirementsReady, form]⟩
 
+def IndexReady (source : TypedSource) (node : ExpressionNode) : Prop :=
+  match node.form with
+  | .index base key => AcceptedIndexExpressionReceipt.Operands source base key
+  | _ => True
+
+private def index? (source : TypedSource) (node : ExpressionNode) : Option (PLift (IndexReady source node)) := by
+  cases form : node.form
+  case index base key =>
+    exact do
+      match baseFound : source.lookupExpression? base with
+      | none => none
+      | some baseNode =>
+        match keyFound : source.lookupExpression? key with
+        | none => none
+        | some keyNode =>
+          if scalar : keyNode.type = .bool ∨ keyNode.type = .word ∨ keyNode.type = .integer then
+            pure ⟨by
+              simp only [IndexReady, form]
+              refine ⟨baseNode, keyNode, baseFound, keyFound, ?_⟩
+              rcases scalar with same | same | same
+              · exact same ▸ CompatibleExpressionIndices.SourceScalar.bool
+              · exact same ▸ CompatibleExpressionIndices.SourceScalar.word
+              · exact same ▸ CompatibleExpressionIndices.SourceScalar.integer⟩
+          else none
+  all_goals exact some ⟨by simp only [IndexReady, form]⟩
+
 /-- All facts refer to the node selected by the actual source lookup. -/
 def NodeReady (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction)
-    (directOnly : Bool) (id : ExpressionId) : Prop :=
-  ∃ node, source.lookupExpression? id = some node ∧ supportedForm directOnly node.form = true ∧
-    (∀ child ∈ operands node.form, child ∈ supportedIds source directOnly) ∧
-    SiteReady rows node ∧ RequirementsReady node
+    (directOnly allowIndices : Bool) (id : ExpressionId) : Prop :=
+  ∃ node, source.lookupExpression? id = some node ∧ supportedForm directOnly allowIndices node.form = true ∧
+    (∀ child ∈ operands node.form, child ∈ supportedIds source directOnly allowIndices) ∧
+    SiteReady rows node ∧ RequirementsReady node ∧ IndexReady source node
 
 private def node? (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction)
-    (directOnly : Bool) (id : ExpressionId) : Option (PLift (NodeReady source rows directOnly id)) := do
+    (directOnly allowIndices : Bool) (id : ExpressionId) : Option (PLift (NodeReady source rows directOnly allowIndices id)) := do
   match found : source.lookupExpression? id with
   | none => none
   | some node =>
-    if supported : supportedForm directOnly node.form = true then do
-      if edges : (operands node.form).all (fun child => decide (child ∈ supportedIds source directOnly)) = true then do
+    if supported : supportedForm directOnly allowIndices node.form = true then do
+      if edges : (operands node.form).all (fun child => decide (child ∈ supportedIds source directOnly allowIndices)) = true then do
         let ⟨site⟩ ← site? rows node
         let ⟨requirements⟩ ← requirements? node
+        let ⟨index⟩ ← index? source node
         pure ⟨⟨node, found, supported, by
           intro child member
-          exact of_decide_eq_true (List.all_eq_true.mp edges child member), site, requirements⟩⟩
+          exact of_decide_eq_true (List.all_eq_true.mp edges child member), site, requirements, index⟩⟩
       else none
     else none
 
@@ -150,47 +195,55 @@ private def allProof? {α : Type} (predicate : α → Prop)
 structure Profile {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named)
     (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction)
-    (directOnly : Bool := false) : Type where
-  nodes : ∀ id ∈ supportedIds source directOnly, NodeReady source rows directOnly id
+    (directOnly : Bool := false) (allowIndices : Bool := false) : Type where
+  nodes : ∀ id ∈ supportedIds source directOnly allowIndices, NodeReady source rows directOnly allowIndices id
   metadataAccepted : ∃ receipt : PLift (MetadataFor prepared named source (DirectSite rows)),
     metadata? prepared named source (DirectSite rows) = some receipt
 
 namespace Profile
 variable {checked : SourceCoreCompatibleCatalog.Checked}
   {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : Named}
-  {source : TypedSource} {rows : List SourceSpecialization.SpecializedFunction} {directOnly : Bool}
+  {source : TypedSource} {rows : List SourceSpecialization.SpecializedFunction} {directOnly allowIndices : Bool}
 
-abbrev ids (_profile : Profile prepared named source rows directOnly) : List ExpressionId := supportedIds source directOnly
-abbrev Reached (profile : Profile prepared named source rows directOnly) (id : ExpressionId) : Prop := id ∈ profile.ids
+abbrev ids (_profile : Profile prepared named source rows directOnly allowIndices) : List ExpressionId := supportedIds source directOnly allowIndices
+abbrev Reached (profile : Profile prepared named source rows directOnly allowIndices) (id : ExpressionId) : Prop := id ∈ profile.ids
 
-private theorem at_node (profile : Profile prepared named source rows directOnly) {id : ExpressionId} {node : ExpressionNode}
+private theorem at_node (profile : Profile prepared named source rows directOnly allowIndices) {id : ExpressionId} {node : ExpressionNode}
     (reached : profile.Reached id) (found : source.lookupExpression? id = some node) :
-    supportedForm directOnly node.form = true ∧
-    (∀ child ∈ operands node.form, profile.Reached child) ∧ SiteReady rows node ∧ RequirementsReady node := by
+    supportedForm directOnly allowIndices node.form = true ∧
+    (∀ child ∈ operands node.form, profile.Reached child) ∧ SiteReady rows node ∧ RequirementsReady node ∧ IndexReady source node := by
   obtain ⟨actual, selected, rest⟩ := profile.nodes id reached
   cases Option.some.inj (selected.symm.trans found)
   exact rest
 
-theorem metadata (profile : Profile prepared named source rows directOnly) : MetadataFor prepared named source (DirectSite rows) := by
+theorem metadata (profile : Profile prepared named source rows directOnly allowIndices) : MetadataFor prepared named source (DirectSite rows) := by
   obtain ⟨receipt, _accepted⟩ := profile.metadataAccepted
   exact receipt.down
 
-theorem covered (profile : Profile prepared named source rows directOnly) (id : ExpressionId) (node : ExpressionNode)
+theorem covered (profile : Profile prepared named source rows directOnly allowIndices) (id : ExpressionId) (node : ExpressionNode)
     (found : source.lookupExpression? id = some node)
     (callee : ExpressionId) (arguments : List ExpressionId) (instantiation : DeclarationInstantiation)
     (form : node.form = .call callee arguments (.declaration instantiation)) : DirectSite rows instantiation := by
-  have member := supported_mem found (show supportedForm directOnly node.form = true by simp only [form, supportedForm])
+  have member := supported_mem found (show supportedForm directOnly allowIndices node.form = true by simp only [form, supportedForm])
   have facts := profile.at_node member found
   simpa only [SiteReady, form] using facts.2.2.1
 
-theorem forms (profile : Profile prepared named source rows directOnly) : ReachedMethodForms source profile.Reached := by
+theorem forms (profile : Profile prepared named source rows directOnly false) : ReachedMethodForms source profile.Reached := by
   intro id node reached found
-  rcases form_of_supported (profile.at_node reached found).1 with leaf | direct | ⟨_, rest⟩
+  rcases old_form_of_supported (profile.at_node reached found).1 with leaf | direct | ⟨_, rest⟩
   · exact .inl leaf
   · exact .inr (.inl direct)
   · exact .inr (.inr rest)
 
-theorem arguments (profile : Profile prepared named source rows directOnly) : ReachedMethodArguments source profile.Reached := by
+theorem indexForms (profile : Profile prepared named source rows directOnly allowIndices) : ReachedIndexForms source profile.Reached := by
+  intro id node reached found
+  rcases form_of_supported (profile.at_node reached found).1 with (leaf | direct | ⟨_, rest⟩) | ⟨_, _, index⟩
+  · exact .inl (.inl leaf)
+  · exact .inl (.inr (.inl direct))
+  · exact .inl (.inr (.inr rest))
+  · exact .inr index
+
+theorem arguments (profile : Profile prepared named source rows directOnly allowIndices) : ReachedMethodArguments source profile.Reached := by
   refine ⟨⟨?_, ?_⟩, ?_, ?_⟩
   · intro id node reached found callee arguments instantiation form child member
     exact (profile.at_node reached found).2.1 child (by simpa only [operands, form] using member)
@@ -206,18 +259,18 @@ theorem arguments (profile : Profile prepared named source rows directOnly) : Re
     have edges := (profile.at_node reached found).2.1
     exact ⟨edges left (by simp [form, operands]), edges right (by simp [form, operands])⟩
 
-theorem requirements (profile : Profile prepared named source rows directOnly) : ReachedMethodRequirements source profile.Reached := by
+theorem requirements (profile : Profile prepared named source rows directOnly allowIndices) : ReachedMethodRequirements source profile.Reached := by
   intro id node reached found method
-  have facts := (profile.at_node reached found).2.2.2
+  have facts := (profile.at_node reached found).2.2.2.1
   rcases method with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
   · simpa only [RequirementsReady, form] using facts
   · simpa only [RequirementsReady, form] using facts
 
-theorem rawMetadata (profile : Profile prepared named source rows directOnly) : ReachedMethodMetadata prepared named source profile.Reached := by
+theorem rawMetadata (profile : Profile prepared named source rows directOnly allowIndices) : ReachedMethodMetadata prepared named source profile.Reached := by
   obtain ⟨receipt, accepted⟩ := profile.metadataAccepted
   exact ReachedMethodMetadata.of_accepted accepted
 
-theorem noInitializer (profile : Profile prepared named source rows directOnly) (id : ExpressionId) (reached : profile.Reached id) :
+theorem noInitializer (profile : Profile prepared named source rows directOnly allowIndices) (id : ExpressionId) (reached : profile.Reached id) :
     ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt prepared (context prepared named) id) := by
   obtain ⟨node, found, supported, _rest⟩ := profile.nodes id reached
   obtain ⟨receipt, accepted⟩ := profile.metadataAccepted
@@ -229,15 +282,31 @@ theorem noInitializer (profile : Profile prepared named source rows directOnly) 
   rw [empty] at impossible
   cases impossible
 
-theorem directForms (profile : Profile prepared named source rows true) : ReachedForms source profile.Reached := by
+theorem directForms (profile : Profile prepared named source rows true allowIndices) : ReachedForms source profile.Reached := by
   intro id node reached found
-  rcases form_of_supported (profile.at_node reached found).1 with leaf | direct | ⟨impossible, _⟩
+  rcases form_of_supported (profile.at_node reached found).1 with (leaf | direct | ⟨impossible, _⟩) | ⟨_, impossible, _⟩
   · exact .inl leaf
   · exact .inr direct
   · cases impossible
 
-theorem directArguments (profile : Profile prepared named source rows true) : ReachedArguments source profile.Reached :=
+  · cases impossible
+
+theorem directArguments (profile : Profile prepared named source rows true allowIndices) : ReachedArguments source profile.Reached :=
   profile.arguments.1.1
+
+theorem indexArguments (profile : Profile prepared named source rows directOnly allowIndices) : ReachedIndexArguments source profile.Reached := by
+  refine ⟨profile.arguments, ?_⟩
+  intro id node reached found base key form
+  have edges := (profile.at_node reached found).2.1
+  exact ⟨edges base (by simp [form, operands]), edges key (by simp [form, operands])⟩
+
+theorem indexOperands (profile : Profile prepared named source rows directOnly allowIndices) : ReachedIndexOperands source profile.Reached := by
+  intro id node reached found base key form
+  simpa only [IndexReady, form] using (profile.at_node reached found).2.2.2.2
+
+theorem indexMetadata (profile : Profile prepared named source rows directOnly allowIndices) : ReachedIndexMetadata prepared named source profile.Reached := by
+  obtain ⟨receipt, accepted⟩ := profile.metadataAccepted
+  exact ReachedIndexMetadata.of_accepted accepted
 
 end Profile
 
@@ -246,9 +315,9 @@ flat set, and all original metadata checks run on the unchanged source. -/
 def certify {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named)
     (source : TypedSource) (rows : List SourceSpecialization.SpecializedFunction)
-    (directOnly : Bool := false) : Option (Profile prepared named source rows directOnly) := do
-  let ⟨nodes⟩ ← allProof? (NodeReady source rows directOnly) (node? source rows directOnly)
-    (supportedIds source directOnly)
+    (directOnly : Bool := false) (allowIndices : Bool := false) : Option (Profile prepared named source rows directOnly allowIndices) := do
+  let ⟨nodes⟩ ← allProof? (NodeReady source rows directOnly allowIndices) (node? source rows directOnly allowIndices)
+    (supportedIds source directOnly allowIndices)
   match accepted : metadata? prepared named source (DirectSite rows) with
   | none => none
   | some receipt => pure ⟨nodes, ⟨receipt, accepted⟩⟩

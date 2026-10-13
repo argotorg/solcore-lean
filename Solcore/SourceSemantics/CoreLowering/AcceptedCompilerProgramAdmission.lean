@@ -56,12 +56,12 @@ private theorem scoped_of_header
     CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned
   rw [namedEq] at source body
   let expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source rows false := by
+      header.function.source rows false true := by
     rw [source, namedEq]
     exact profile.expressions
   have flatBody : AcceptedCompilerBodyProfile.Profile header.function.source expressions.Reached := by
     change AcceptedCompilerBodyProfile.Profile header.function.source
-      (fun id => id ∈ AcceptedCompilerExpressionProfile.supportedIds header.function.source false)
+      (fun id => id ∈ AcceptedCompilerExpressionProfile.supportedIds header.function.source false true)
     rw [source]
     exact profile.body
   have returns : AcceptedCompilerBodyProfile.HasReturn header.function.source header.function.body := by
@@ -75,8 +75,8 @@ private theorem scoped_of_header
     (by
       intro child member residual
       obtain ⟨residual⟩ := residual
-      exact residual.impossible_methods expressions.metadata expressions.forms expressions.noInitializer
-        expressions.arguments expressions.rawMetadata expressions.requirements (children child member)) wellFormed
+      exact residual.impossible_indices expressions.metadata expressions.indexForms expressions.noInitializer
+        expressions.indexArguments expressions.indexMetadata expressions.requirements expressions.indexOperands (children child member)) wellFormed
   exact ⟨⟨.scoped (AcceptedNamedBodyAdmission.source_of_header prepared aligned selected same admission),
     no_lambdas profile.lambdas⟩⟩
 
@@ -156,7 +156,7 @@ private theorem scoped_factory_of_header
     CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned
   rw [namedEq] at source body
   let expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source rows false := by
+      header.function.source rows false true := by
     rw [source, namedEq]
     exact profile.expressions
   have ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
@@ -166,7 +166,7 @@ private theorem scoped_factory_of_header
     exact profile.ordinary
   have bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids profile.statements := by
     change AcceptedCompilerBodySubsetProfile.Profile header.function.source
-      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false) profile.statements
+      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false true) profile.statements
     rw [source]
     exact profile.body
   obtain ⟨⟨factory⟩, ⟨closure⟩⟩ := AcceptedNamedScopedFactoryAdmission.of_returning prepared aligned

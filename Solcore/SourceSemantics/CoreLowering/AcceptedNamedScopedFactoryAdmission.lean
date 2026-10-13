@@ -28,13 +28,13 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {header : Header compiled (Program.ofChecked compiled.sourceProgram)}
   (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
   {parameters : List TypedBinder} {result : TypeSystem.Ty} {statements : List StatementId}
-  {directRows : List SourceSpecialization.SpecializedFunction} {directOnly : Bool}
+  {directRows : List SourceSpecialization.SpecializedFunction} {directOnly allowIndices : Bool}
 
 /-- Every expression proof comes from an actual child compiler action at its
 minimum root budget and original lexical scope. -/
 theorem Produced.scan (produced : Produced prepared header parameters result statements)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source directRows directOnly)
+      header.function.source directRows directOnly allowIndices)
     (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
@@ -52,8 +52,8 @@ theorem Produced.scan (produced : Produced prepared header parameters result sta
     | inl grammar => exact grammar
     | inr residual =>
       obtain ⟨boundary⟩ := residual
-      exact False.elim (boundary.impossible_methods expressions.metadata expressions.forms expressions.noInitializer
-        expressions.arguments expressions.rawMetadata expressions.requirements (members child member))
+      exact False.elim (boundary.impossible_indices expressions.metadata expressions.indexForms expressions.noInitializer
+        expressions.indexArguments expressions.indexMetadata expressions.requirements expressions.indexOperands (members child member))
   obtain ⟨inner, final, facts, typed⟩ := AcceptedScopedLambdaBodyReceipts.inner_typing
     produced.actual.roots produced.actual.found produced.actual.form produced.action.head.found produced.form wellFormed
   obtain ⟨_facts, certified⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
@@ -77,7 +77,7 @@ include aligned in
 /-- Formation and later body admission share the same derived original scan. -/
 theorem of_produced (produced : Produced prepared header parameters result statements)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source directRows directOnly)
+      header.function.source directRows directOnly allowIndices)
     (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
@@ -122,7 +122,7 @@ theorem of_returning {outer : StatementId} {rest : List StatementId} {outerNode 
     (ordinary : compiled.indexed.base.locals.bindings.find? (fun binding =>
       decide (binding.caller = (context compiled.indexed prepared.named).owner ∧ binding.initializer = id)) = none)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
-      header.function.source directRows directOnly)
+      header.function.source directRows directOnly allowIndices)
     (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
