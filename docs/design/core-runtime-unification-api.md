@@ -4,6 +4,14 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Unary assignment and original diagnostic provenance (2026-10-14)
+
+`GenericAssignmentUnaryDiagnostics.UnaryOccurs` identifies the actual statement or for-item unary occurrence. `UnaryRep` and `prepared_unary_included` connect the original raw Word target to its authentic prepared unary token. `CallableIndexedOwnedPublicUnaryAssignmentDiagnostics` transports that token through the actual named, cached or contextual compilation receiver. These additive unary relations reuse the existing `IssuedAt` and retained body recipes; the binary operand relation is unchanged.
+
+The accepted body producer supplies the real unary compiler policy between its assignment and match policies. Collected sites retain the unary fault law derived from that policy and same-compilation token identity. Physical heads preserve the actual target write, map/world extension and caller state, or the unchanged Source heap on fault. No RHS or new Core instruction is introduced.
+
+`SourceCoreSelectedBitNotSourceFirst` exposes `initial_from_source`, `later_from_source`, `missing_from_source` and `missing_then_reuse`. The last theorem obtains the next state of the same issued session at the genuine failure heap before constructing an independent complement trace. Closed public forwarding retains an authentic earlier-stage-stop alternative. `SourceCoreSelectedBitNotProfile` registers the complete original eight-function profile and runtime corpus. Public checked-session and closed-forward inputs are unchanged.
+
 ## Compound assignment and actual diagnostic provenance (2026-10-14)
 
 The assignment profile records `operator = .equal` or an original raw Word target, together with the existing bare-target and RHS conditions. The same profile is retained by statement and for-item receipts. `CompatibleBareWordModifier` supplies the physical Word operation. The protected assignment proof records the pre-RHS snapshot and commits against the current heap; its operand-failure branch retains the RHS effects.

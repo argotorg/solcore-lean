@@ -8,6 +8,22 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Bare unary assignment audit (2026-10-14)
+
+This extension covers bare original raw Word targets only. The unary statement and for-item rules have no RHS evaluation. Successful traces retain the original bare target, `BitNotSnapshot`, exact write and genuine suffix grade. Failure traces retain the actual unary fault and unchanged Source heap. The native proof keeps the seven administrative slots, strict continuation bound, map/world extension and reached caller state. Original source typing supplies deep heap admission after the write.
+
+The compiler profile records the actual unary assignment and binder. Preparation and the existing same-compilation issued diagnostic receipt supply its public token; final public constructors gain no independent inclusion or semantic callback. The unit preserves existing runtime instructions and selected compilation scope.
+
+Independent ordinary Source traces establish complement and uninitialized-target failure before the corresponding public completion. Initial forwarding is instantiated in the runtime consumer; later failure and same-issued reuse are separately proved for genuine histories. The unchanged eight-function runtime corpus additionally checks for initializer/post order, continue/break behavior, all three absent-target positions and repeated captured-cell mutation. Those header and captured-handle cases are reported as runtime coverage.
+
+Validation: 173 changed or new modules checked in a coherent graph of 7,812 modules. Every one of the 2,830 transitively affected modules was freshly elaborated from source. All 15 focused runtime markers and 2,256 endpoint audits pass. Full build (7,852 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Cache reuse must match the complete imported environment, including transitive changes. Equal hashes for immediate imported objects alone did not detect a stale `MutualMeaning` caller. The final dependency receipt records recursive environment fingerprints, and the affected closure is checked afresh.
+
+The profile does not claim projected targets or general raw bit-not types. Complete compiler-form coverage and actual-pass composition remain open; compiler acceptance alone is not yet the complete meaning-preservation premise.
+
+The nine nonfinal bare surface-expression probes all fail at `expressionRequiresSemicolon`; semicolon and final-tail controls succeed. Any remaining obligation for that internal form must first identify an actual checker/compiler-reachable typed input. Widening the parser or only the finite shape check is not justified by those rejected probes.
+
 ## Compound assignment and issued diagnostic audit (2026-10-14)
 
 The extension is limited to bare original Word compound targets while retaining all previous plain-assignment payloads. It does not add Core instructions. The proofs distinguish the target snapshot before RHS evaluation from the actual root and heap used after the RHS. An absent compound target causes `invalidAssignmentOperands` for the actual operator after evaluating the RHS. Division by zero retains Word's zero-result behavior.

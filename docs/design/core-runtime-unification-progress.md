@@ -6,6 +6,22 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Bare Word bit-not reaches the public proof (2026-10-14)
+
+The automatic profile admits `~=` on bare original raw Word targets in statements and for-loop initializer/post items. Actual compiler receipts retain the original assignment, binder, allocation policy and emitted code. The operation has no right-hand expression: it reads the current target, complements its Word value and writes through the same heap. An uninitialized target produces the genuine `invalidUnaryOperand .bitNot` fault without a write.
+
+The staged statement and header rules retain the exact successful write or unchanged fault heap. Ordinary Source lifting and physical preservation/reflection use those same traces. Diagnostic correspondence comes from actual preparation and the receiving public table; named, method and closure producers retain the existing same-compilation issued provenance. No independent diagnostic or execution callback is added to public constructors.
+
+`SourceCoreSelectedBitNotSource` constructs independent original Source traces for complement and an uninitialized target. The initial complement theorem is instantiated before public completion. Separate universal theorems connect later calls, unary failure and reuse of the returned issued state, preserving the authentic earlier-stage-stop alternative.
+
+The complete unchanged eight-function program is checked and compiled with fuel 1000 and specialization budget 128, then accepted by the same automatic profile with eight cache rows and eight table rows. Runtime companions check initializer execution, continue executing the post, break skipping the post, statement/header failures, named reuse after failure and two calls through the same captured-cell handle. The handle first complements seven and then restores seven. Zero execution fuel suspends and later resumes. Native heap sizes are `9 / 12 / 16 / 23 / 30 / 33 / 40 / 43 / 46 / 49 / 52 / 55`. Header and captured-handle cases are runtime companions, not separate independent Source derivations.
+
+Validation: 173 changed or new modules checked in a coherent graph of 7,812 modules. Every one of the 2,830 transitively affected modules was freshly elaborated from source. All 15 focused runtime markers and 2,256 endpoint audits pass. Full build (7,852 jobs), registered tests, kernel policy and canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Projected assignment, other raw bit-not target types, generalized local declarations, broader function-value/coercion forms and composition across every actual compiler pass remain outside this completed unit. A successful supported profile is still required. Runtime unification is complete; full compiler meaning preservation is not. Core instructions and public runtime behavior are unchanged.
+
+All nine tested nonfinal bare surface-expression forms fail loading with `expressionRequiresSemicolon`, before checking or compilation. The semicolon and final-tail controls succeed through the automatic profile and execution. The remaining question is which corresponding typed forms are actually reachable through the checker and compiler; these parser-rejected examples do not establish an accepted-program proof gap or require a parser extension.
+
 ## Bare Word compound assignment reaches the public proof (2026-10-14)
 
 The automatic profile now admits bare compound Word assignment in statements and for-loop initializer/post items. The existing plain-assignment cases retain their full payload coverage. Actual accepted compiler receipts determine the operator, original source occurrence, allocation policy and emitted code. The staged relation, ordinary Source lifting, physical preservation/reflection and selected public family all use the same operation and reached heap.

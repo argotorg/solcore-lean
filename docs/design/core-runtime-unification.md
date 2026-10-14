@@ -34,7 +34,9 @@ The body profile now accepts final expressions, Unit fallthrough and guaranteed 
 
 Bare compound assignments on original Word targets now use the same automatic profile in statements and for-loop headers. Plain assignment retains its previous payload coverage. The proof preserves the target snapshot taken before the RHS, evaluates the RHS once, and writes through the actual post-RHS heap. An absent compound target produces the genuine operand diagnostic after RHS evaluation; Word division by zero remains a successful zero result. Actual named, method and closure compilation records supply the diagnostic correspondence internally. Independent original Source traces connect addition, division and operand failure to the checked public session, including a failure continuation that starts the next call from the exact returned heap.
 
-Projected and bit-not assignments, generalized locals and broader factory/coercion shapes remain unfinished. The coercion factory profile still requires leaf direct-call arguments and closed implementation parameters and assumptions. A nonfinal bare expression in function mode remains outside the proof profile; admitting it requires the corresponding staged-discard connection.
+Bare bit-not assignment on an original raw Word target now uses the same automatic profile in statements and for-loop headers. The operation has no RHS: successful execution complements the selected Word and writes to the exact reached heap; an uninitialized target reports the authentic unary diagnostic without a write. Independent original Source traces reach initial and later closed public forwarding, including failure followed by reuse of the same issued state. The unchanged eight-function runtime corpus also exercises header control and repeated captured-cell invocation.
+
+Projected assignments, other raw bit-not target types, generalized locals and broader factory/coercion shapes remain unfinished. The coercion factory profile still requires leaf direct-call arguments and closed implementation parameters and assumptions. All nine tested nonfinal bare surface-expression forms are rejected with `expressionRequiresSemicolon` before checking or compilation. The remaining question is which corresponding typed forms are actually reachable through the checker and compiler; parser-rejected syntax is not an established accepted-program proof obligation.
 
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
@@ -828,13 +830,14 @@ The six-call captured-closure proof uses this general connection. Its obsolete o
 
 | Item | Status |
 | --- | --- |
-| Removal of direct runtime evaluation | Completed in `a3168382` (2026-10-01). The public SourceCompiler uses a shared Core artifact, Value, Session, and Checkpoint. |
-| Preservation of meaning across the full compilation pipeline | Ongoing. The earlier estimate of about 70% is historical; the final theorem covering every compiler pass and public input is incomplete. |
-| Latest verified implementation | `2d82255c` / `fc157381`: constructor payloads use the common compiler certificate and preserve six executions plus three handle issuances. |
-| Latest completed verification | Full build (7299 jobs), registered tests, kernel policy and 968 endpoint audits pass with only the standard three axioms. |
-| Working implementation | Actual initialization, input registries, output collection, resumptions and retained closures connect to public execution. Recursive calls and mapping indices compose with named and ordinary scoped allocation, assignments and finite loops. |
-| Latest proof scope | Actual constructor child actions preserve ordered callable payloads, closure captures and handle reuse in one certified public session. |
-| Current implementation priority | Derive body validity for the actual selected compilation from checker success, finish compiler-derived static support, and connect both to public sessions; continue full syntax and actual-pass coverage. |
+| Removal of direct runtime evaluation | Complete: 100%. Public execution uses the common Core artifact, Value, Session and Checkpoint. |
+| Preservation of meaning across the full compilation pipeline | In progress: roughly 80% by amount of work. The older 70% estimate is historical. Supported-profile restrictions and the complete actual-pass theorem remain substantial work. |
+| Overall estimate | Roughly 90% if the two goals have equal weight. These estimates are not feature counts or estimates of remaining time. |
+| Latest verified implementation | Bare original Word bit-not in statements and for initializer/post items, through actual compilation, Source lifting, preservation/reflection and the checked public session. |
+| Latest completed verification | Full build (7,852 jobs), registered tests and kernel policy pass; 173 changed/new modules in the 7,812-module coherent graph, all 2,830 transitively affected modules freshly elaborated from source, and 2,256 endpoint audits. |
+| Connected public path | Actual checking supplies selected body validity; the supported compiler profile supplies static support. Ordinary Source calls reach closed public forwarding or authentic earlier stage rejection. Completed public execution has corresponding Source meaning. Retained handles, structured output and failure continuations preserve their actual histories and heaps. |
+| Latest concrete coverage | The complete unchanged eight-function bit-not program passes the profile with cache8/table8. Independent Source proofs cover complement and unary failure/reuse; header controls and repeated captured-handle calls are runtime companions. |
+| Current implementation priority | Projected assignments, generalized locals, broader function-value/coercion forms and complete compiler-form/actual-pass composition. Preserve the existing selected compilation boundary while closing those gaps. |
 | Next phase | Unify the comptime evaluator on Core and connect new source contract/storage/external-call support to ContractRuntime. |
 
 ### Returned captures reused through six public calls (2026-10-13)
