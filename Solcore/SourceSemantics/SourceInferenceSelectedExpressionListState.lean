@@ -49,7 +49,7 @@ theorem ActualStateInvariant.ofExpressions
     ActualStateInvariant final source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   refine ⟨⟨pending, (actualLedgerFamily fuel).expressions success ledger⟩,
-    invariant.origins.inferExprsFuel success, ?_⟩
+    invariant.origins.inferExprsFuel success, ?_, invariant.sourceMonomorphic⟩
   exact activeQuantifiersBelowNext_transport invariant.quantifiersBelow
     (congrArg LexicalScope.binders (Detail.inferExprsFuel_success_lexicalScope_eq success)) nextLe
 

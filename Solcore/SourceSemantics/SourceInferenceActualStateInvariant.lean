@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.SourceExecutableBinderInterfaces
 import Solcore.SourceSemantics.SourceInferenceStatementLedgerInvariant
 import Solcore.SourceSemantics.SourceInferenceCaptureOrigins
 import Solcore.SourceSemantics.SourceInferenceUnannotatedLetCertificate
@@ -13,16 +14,18 @@ structure ActualStateInvariant (state : State) (evidenceSource : TypedSource) : 
   ledger : ∃ pending, RecursiveLedgerInvariant state pending
   origins : ActiveBinderCaptureOrigins state evidenceSource
   quantifiersBelow : ActiveQuantifiersBelowNext state
+  sourceMonomorphic : ExecutableBinderInterfaces.SourceMonomorphic evidenceSource
 
 namespace ActualStateInvariant
 
 theorem initial (owner : Resolved.DeclarationId) (locals : Environment)
     (comptime : List Bool) (evidenceSource : TypedSource)
-    (monomorphic : ∀ entry ∈ locals, entry.2.quantified = []) :
+    (monomorphic : ∀ entry ∈ locals, entry.2.quantified = [])
+    (sourceMonomorphic : ExecutableBinderInterfaces.SourceMonomorphic evidenceSource) :
     ActualStateInvariant (State.initial owner locals comptime) evidenceSource :=
   ⟨⟨[], RecursiveLedgerInvariant.initial owner locals comptime⟩,
     activeBinderCaptureOrigins_initial_mono owner locals comptime evidenceSource monomorphic,
-    activeQuantifiersBelowNext_initial_mono owner locals comptime monomorphic⟩
+    activeQuantifiersBelowNext_initial_mono owner locals comptime monomorphic, sourceMonomorphic⟩
 
 end ActualStateInvariant
 end Solcore.SourceSemantics.SourceInferenceSoundness

@@ -53,6 +53,6 @@ theorem ActualStateInvariant.ofForItemPreservingBinders
   obtain ⟨pending, ledger⟩ := invariant.ledger
   exact ⟨⟨pending ++ inferred.localSchemeTemplateIds, (actualLedgerFamily fuel).statements.forItem success ledger⟩,
     invariant.origins.congr_localBinders bindersEq,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe, invariant.sourceMonomorphic⟩
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

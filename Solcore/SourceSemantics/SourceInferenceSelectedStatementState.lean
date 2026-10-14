@@ -11,7 +11,7 @@ theorem ActualStateInvariant.allocateStatementId
     (allocation : initial.allocateStatementId = (id, final)) : ActualStateInvariant final source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   have stateEq : initial.allocateStatementId.2 = final := congrArg Prod.snd allocation
-  refine ⟨⟨pending, ?_⟩, ?_, ?_⟩
+  refine ⟨⟨pending, ?_⟩, ?_, ?_, invariant.sourceMonomorphic⟩
   · rw [← stateEq]
     exact ledger.allocateStatementId
   · apply invariant.origins.congr_localBinders
@@ -33,6 +33,6 @@ theorem ActualStateInvariant.ofStatementPreservingBinders
   obtain ⟨pending, ledger⟩ := invariant.ledger
   exact ⟨⟨pending, (actualLedgerFamily fuel).statements.statement success ledger⟩,
     invariant.origins.congr_localBinders bindersEq,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe, invariant.sourceMonomorphic⟩
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

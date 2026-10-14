@@ -856,7 +856,7 @@ theorem actualInferStatementFuel_success_ifWithElse_of_scoped_bodies
       (thenResult.state.restoreLexicalScope conditionState.lexicalScope) (evidenceState.toTypedSource roots) := by
     obtain ⟨pending, ledger⟩ := conditionOperational.ledger
     refine ⟨⟨pending, ((actualLedgerFamily fuel).statements.statements thenSuccess ledger).restoreLexicalScope _⟩,
-      conditionOperational.origins.congr_localBinders rfl, ?_⟩
+      conditionOperational.origins.congr_localBinders rfl, ?_, conditionOperational.sourceMonomorphic⟩
     exact activeQuantifiersBelowNext_transport conditionOperational.quantifiersBelow rfl thenProperties.1.next_le
   obtain ⟨elseFinal, elseFacts, elseInvariant, _elseActual, _elseOperational, elseTyping,
       elseAgreement⟩ :=

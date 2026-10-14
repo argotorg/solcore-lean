@@ -12,7 +12,7 @@ theorem ActualStateInvariant.withLocals
   obtain ⟨pending, ledger⟩ := invariant.ledger
   exact ⟨⟨pending, ⟨ledger.requirements,
     ⟨ledger.templates.classified, ledger.templates.unique, ledger.templates.covered⟩⟩⟩, invariant.origins.congr_localBinders rfl,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow rfl (Nat.le_refl _)⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow rfl (Nat.le_refl _), invariant.sourceMonomorphic⟩
 
 theorem ActualStateInvariant.ofStatementWithScope
     {fuel : Nat} {context : Frontend.SourceInference.Context}
@@ -23,6 +23,6 @@ theorem ActualStateInvariant.ofStatementWithScope
     (origins : ActiveBinderCaptureOrigins result.state source)
     (bound : ActiveQuantifiersBelowNext result.state) : ActualStateInvariant result.state source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
-  exact ⟨⟨pending, (actualLedgerFamily fuel).statements.statement success ledger⟩, origins, bound⟩
+  exact ⟨⟨pending, (actualLedgerFamily fuel).statements.statement success ledger⟩, origins, bound, invariant.sourceMonomorphic⟩
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

@@ -33,7 +33,7 @@ theorem ActualStateInvariant.ofPlace
   have bindersEq := congrArg LexicalScope.binders (Detail.inferPlaceFuel_success_lexicalScope_eq success)
   exact ⟨⟨pending, (actualLedgerFamily fuel).place success ledger⟩,
     invariant.origins.congr_localBinders bindersEq,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq nextLe, invariant.sourceMonomorphic⟩
 
 def ActualInferPlaceFuelRootedSoundness (fuel : Nat) : Prop :=
   ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}

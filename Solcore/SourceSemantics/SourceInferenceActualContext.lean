@@ -34,6 +34,8 @@ structure ActualContext (wholeContext : Frontend.SourceInference.Context)
   assumptions_eq : context.assumptions =
     (finalizedRequirementContext wholeContext finalized).assumptions ++ ActualContext.predicates frames
 
+  sourceOwner : finalized.typedSource.owner = wholeContext.scope.genericOwner
+
 namespace ActualContext
 variable {wholeContext : Frontend.SourceInference.Context}
   {finalized : Frontend.SourceInference.Result}
@@ -41,9 +43,10 @@ variable {wholeContext : Frontend.SourceInference.Context}
 
 /-- The canonical checked body starts outside every generalized initializer. -/
 theorem empty (variables : context.typeVariables = [])
-    (assumptions : context.assumptions = (finalizedRequirementContext wholeContext finalized).assumptions) :
+    (assumptions : context.assumptions = (finalizedRequirementContext wholeContext finalized).assumptions)
+    (sourceOwner : finalized.typedSource.owner = wholeContext.scope.genericOwner) :
     ActualContext wholeContext finalized [] context := by
-  exact ⟨by simp, by simp, variables, by simpa [predicates] using assumptions⟩
+  exact ⟨by simp, by simp, variables, by simpa [predicates] using assumptions, sourceOwner⟩
 
 theorem covers_empty (occurrence : NodeId) : Covers finalized [] occurrence := by
   intro frame member
@@ -55,7 +58,7 @@ theorem congr (actual : ActualContext wholeContext finalized frames context)
     (assumptions : final.assumptions = context.assumptions) :
     ActualContext wholeContext finalized frames final :=
   ⟨actual.retained, actual.nested, variables.trans actual.variables_eq,
-    assumptions.trans actual.assumptions_eq⟩
+    assumptions.trans actual.assumptions_eq, actual.sourceOwner⟩
 
 theorem withLocal (actual : ActualContext wholeContext finalized frames context)
     (id : Resolved.LocalId) (scheme : Scheme) (requirements : List LocalSchemeRequirement := []) :
@@ -107,7 +110,7 @@ theorem initializer (actual : ActualContext wholeContext finalized frames contex
     (nested : ∀ outer ∈ frames, Descends finalized.typedSource outer.initializer binding.initializer) :
     ActualContext wholeContext finalized (frames ++ [binding])
       (localSchemeInitializerContext context binding.binder) := by
-  refine ⟨?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, actual.sourceOwner⟩
   · intro frame member
     rcases List.mem_append.mp member with member | member
     · exact actual.retained frame member

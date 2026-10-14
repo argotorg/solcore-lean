@@ -284,7 +284,7 @@ theorem actualInferStatementFuel_success_forLoop_rooted
   have postOperational : ActualStateInvariant
       (bodyResult.state.restoreLexicalScope initializerResult.state.lexicalScope) (evidenceState.toTypedSource roots) := by
     obtain ⟨pending, ledger⟩ := bodyOperational.ledger
-    refine ⟨⟨pending, ledger.restoreLexicalScope _⟩, initializerOperational.origins.congr_localBinders rfl, ?_⟩
+    refine ⟨⟨pending, ledger.restoreLexicalScope _⟩, initializerOperational.origins.congr_localBinders rfl, ?_, initializerOperational.sourceMonomorphic⟩
     exact activeQuantifiersBelowNext_transport initializerOperational.quantifiersBelow rfl
       (Nat.le_trans conditionProperties.1.next_le bodyProperties.1.next_le)
   have postCovered : ForItemsReferencesCovered finalized.typedSource

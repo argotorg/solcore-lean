@@ -48,7 +48,7 @@ theorem ActualStateInvariant.allocateExpressionId
     (allocation : initial.allocateExpressionId = (id, final)) : ActualStateInvariant final source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   have stateEq : initial.allocateExpressionId.2 = final := congrArg Prod.snd allocation
-  refine ⟨⟨pending, ?_⟩, ?_, ?_⟩
+  refine ⟨⟨pending, ?_⟩, ?_, ?_, invariant.sourceMonomorphic⟩
   · rw [← stateEq]
     exact ledger.allocateExpressionId
   · apply invariant.origins.congr_localBinders
@@ -68,7 +68,7 @@ theorem ActualStateInvariant.ofExpression
     ActualStateInvariant final source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   refine ⟨⟨pending, (actualLedgerFamily fuel).expression success ledger⟩,
-    invariant.origins.inferExprFuel success, ?_⟩
+    invariant.origins.inferExprFuel success, ?_, invariant.sourceMonomorphic⟩
   exact activeQuantifiersBelowNext_transport invariant.quantifiersBelow
     (congrArg LexicalScope.binders (Detail.inferExprFuel_success_lexicalScope_eq success)) nextLe
 
@@ -77,7 +77,7 @@ theorem ActualStateInvariant.fresh
     (invariant : ActualStateInvariant state source) : ActualStateInvariant state.fresh.2 source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   exact ⟨⟨pending, ledger.fresh⟩, invariant.origins.congr_localBinders rfl,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow rfl (Nat.le_succ _)⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow rfl (Nat.le_succ _), invariant.sourceMonomorphic⟩
 
 theorem ActualStateInvariant.unify
     {initial final : State} {source : TypedSource} {left right : Ty}
@@ -86,7 +86,7 @@ theorem ActualStateInvariant.unify
   obtain ⟨pending, ledger⟩ := invariant.ledger
   have bindersEq := congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope success)
   refine ⟨⟨pending, ledger.unify success⟩, invariant.origins.congr_localBinders bindersEq,
-    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq ?_⟩
+    activeQuantifiersBelowNext_transport invariant.quantifiersBelow bindersEq ?_, invariant.sourceMonomorphic⟩
   unfold Detail.unify at success
   cases unification : initial.inference.unify left right with
   | error error => simp [Detail.liftUnification, unification, bind, Except.bind] at success
@@ -103,7 +103,7 @@ theorem ActualStateInvariant.allocateMonoBinder
     ActualStateInvariant (state.allocateBinder name (.mono type) span comptime []).2 source := by
   obtain ⟨pending, ledger⟩ := invariant.ledger
   refine ⟨⟨pending, ledger.allocateBinderWithoutRequirements name (.mono type) span comptime⟩,
-    invariant.origins.allocateBinder rfl (.inl rfl), ?_⟩
+    invariant.origins.allocateBinder rfl (.inl rfl), ?_, invariant.sourceMonomorphic⟩
   exact activeQuantifiersBelowNext_allocateBinder state name (.mono type) span comptime []
     invariant.quantifiersBelow (by simp [Scheme.mono])
 

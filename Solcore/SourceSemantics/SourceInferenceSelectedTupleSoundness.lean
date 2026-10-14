@@ -81,7 +81,7 @@ theorem actualInferExprFuelRetainedSoundness_tuple {fuel : Nat}
   have allocatedOperational : ActualStateInvariant allocated (evidenceState.toTypedSource roots) := by
     obtain ⟨pending, ledger⟩ := operational.ledger
     have stateEq : initial.allocateExpressionId.2 = allocated := congrArg Prod.snd allocationEq
-    refine ⟨⟨pending, ?_⟩, ?_, ?_⟩
+    refine ⟨⟨pending, ?_⟩, ?_, ?_, operational.sourceMonomorphic⟩
     · rw [← stateEq]
       exact ledger.allocateExpressionId
     · apply operational.origins.congr_localBinders
