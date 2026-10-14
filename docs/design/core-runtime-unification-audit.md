@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Compound assignment and issued diagnostic audit (2026-10-14)
+
+The extension is limited to bare original Word compound targets while retaining all previous plain-assignment payloads. It does not add Core instructions. The proofs distinguish the target snapshot before RHS evaluation from the actual root and heap used after the RHS. An absent compound target causes `invalidAssignmentOperands` for the actual operator after evaluating the RHS. Division by zero retains Word's zero-result behavior.
+
+Assignment preparation, original source occurrence, exact compiler-token identity and actual public receiver jointly establish diagnostic correspondence. A generic body collector no longer claims that its sites work for arbitrary fault relations. Actual named/method factories derive the law from prepared or cached receipts. Ordinary and native-aware lambda producers retain the same compilation's issued base table, full root policy and body recipe through recapture. Final public adapters derive the receiver inclusion internally; no new semantic hypothesis is added to the public session.
+
+Independent Source traces precede public completion for the arithmetic and absent-target fixture. The later-call and failure/reuse theorems retain the complete original program, actual inputs and exact reached heap, with a genuine earlier-stage-stop alternative. Separate runtime programs verify for-header control and captured RHS mutation surviving an operand failure. They are not reported as independent Source proofs.
+
+Validation: 258 changed or new modules checked in a coherent graph of 7,792 modules, including 2,124 affected modules. All 14 focused runtime markers and 1,882 endpoint audits pass. Full build (7,832 jobs), registered tests, kernel policy and the same canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+The current scope remains selected compilation and its dependencies/handles. Complete compiler-form coverage and actual-pass composition are still open; compilation success alone is not yet the complete meaning-preservation premise.
+
 ## Raw body completion and public-session audit (2026-10-14)
 
 Completion retains the original raw result type instead of searching only for an explicit outer return. Tail expressions require their genuine original annotation. Function-mode fallthrough requires Unit. A terminal block or conditional and a present-default match retain original stopping evidence; every ordered match arm must stop. Original Source typing proves the exact result equality. The actual closure parameter context supplies the same fact for captured lambdas.

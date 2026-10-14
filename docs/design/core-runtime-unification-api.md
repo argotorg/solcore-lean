@@ -4,6 +4,16 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Compound assignment and actual diagnostic provenance (2026-10-14)
+
+The assignment profile records `operator = .equal` or an original raw Word target, together with the existing bare-target and RHS conditions. The same profile is retained by statement and for-item receipts. `CompatibleBareWordModifier` supplies the physical Word operation. The protected assignment proof records the pre-RHS snapshot and commits against the current heap; its operand-failure branch retains the RHS effects.
+
+`CallableIndexedOwnedPublicAssignmentDiagnostics` derives operand diagnostics from actual preparation and the receiving issuer. `CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt` retains the real diagnostic base table for the same contextual compilation. Its `Retained` receipt combines that identity with the original body and full expression-policy recipes. Closure formation and recapture preserve the receipt. The generic branching compiler choice exposes the matching token identity; actual factories derive its operand law internally.
+
+Collected body sites now keep their authentic fault relation. At the public lifting boundary, the existing receiving semantic extension embeds it into staged faults. Selected checked-session and closed-forward constructors keep their previous public inputs.
+
+`SourceCoreSelectedCompoundSourceFirst` exposes initial/later scalar forwarding, genuine missing-target failure and `missing_then_reuse`. The latter derives the next issued state at the exact failure heap before connecting an independent subsequent addition. `SourceCoreSelectedCompoundProfile` registers actual compiler/profile/public-runtime checks, including for headers and captured RHS mutation.
+
 ## Original completion in automatic body profiles (2026-10-14)
 
 `AcceptedCompilerBodyCompletion.Finish` checks completion at an original raw result type, with separate function and nested-body modes. `AcceptedNamedBodyFinish` derives `Tree.complete` from that finite check and the authentic formed compiler tree. `AcceptedNamedBodyFlow.Tree.scan_complete` (defined in `AcceptedNamedBodySyntax`) then constructs Source admission while retaining original typing, binder ownership and every compiled child.

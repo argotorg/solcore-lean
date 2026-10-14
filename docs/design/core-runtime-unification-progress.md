@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Bare Word compound assignment reaches the public proof (2026-10-14)
+
+The automatic profile now admits bare compound Word assignment in statements and for-loop initializer/post items. The existing plain-assignment cases retain their full payload coverage. Actual accepted compiler receipts determine the operator, original source occurrence, allocation policy and emitted code. The staged relation, ordinary Source lifting, physical preservation/reflection and selected public family all use the same operation and reached heap.
+
+Target resolution records the pre-RHS value. The RHS executes once; a successful commit uses the actual post-RHS root and heap. An absent compound target faults after the RHS, retaining its effects. Word division by zero is successful and returns zero. The diagnostic proof uses the operator's actual prepared token and receiving public table. Named and method producers derive it from their real cached compilation. Closure recipes retain the same compilation's issued diagnostic table through formation and recapture. Public constructors gain no semantic callback or unrelated-body-validity premise.
+
+`SourceCoreSelectedCompoundSource` constructs independent original Source traces for addition, division and an absent target. The initial addition theorem is instantiated before public completion. Separate universal theorems connect later calls, genuine operand failure and reuse of the returned issued state, retaining the authentic earlier-stage-stop alternative. The runtime sequence returns 42, then zero for division by zero, reports the absent-target divide fault and reuses the session for another addition. Native heap sizes are `4 / 10 / 16 / 22 / 28`.
+
+Two additional runtime programs use the same automatic profile and public issuance. The for-header program checks compound initialization, continue executing the post, break skipping an invalid post, and reuse after a post failure; native heap sizes are `5 / 15 / 22 / 29 / 39 / 43`. The capture program invokes the same mutating closure repeatedly, calls it in the RHS of an assignment whose absent target then fails, and reuses the same handle to observe 46. Its native heap sizes are `3 / 6 / 9 / 12 / 21 / 24`. These header and capture cases are runtime companions, not additional independent Source derivations.
+
+Validation: 258 changed or new modules checked in a coherent graph of 7,792 modules, including 2,124 affected modules. All 14 focused runtime markers and 1,882 endpoint audits pass. Full build (7,832 jobs), registered tests, kernel policy and the same canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Projected and bit-not assignment, generalized local declarations, broader function-value/coercion forms and composition across every actual compiler pass remain unfinished. A successful supported profile is still required. Runtime unification is complete; full compiler meaning preservation is not. Core instructions and public runtime behavior are unchanged.
+
 ## Original body completion reaches the public proof (2026-10-14)
 
 The automatic compiler profile now derives body completion at the original result type. It accepts final expressions, empty or ordinary Unit fallthrough, and guaranteed returns through a block, both conditional branches or every ordered match arm with a present default. Genuine accepted compiler actions retain tail and discard order, nested non-function mode, child fuel and emitted code. The raw completion check also retains the forms of emitted suffix statements after a stopping head.
