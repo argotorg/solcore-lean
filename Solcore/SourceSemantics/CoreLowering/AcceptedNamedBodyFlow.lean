@@ -14,7 +14,8 @@ open CompatibleEncoding (bind_ok)
 
 /-- These are compiler branches expanded by this receipt, not a source checker. -/
 def expanded : StatementForm → Bool
-  | .returnStmt _ | .letDecl _ _ | .assignValue _ _ _ | .whileLoop _ _ => true
+  | .returnStmt _ | .letDecl _ _ | .assignValue _ _ _ | .whileLoop _ _
+    | .expression _ true | .block _ | .ifThen _ _ _ => true
   | _ => false
 
 inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
@@ -76,6 +77,33 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
         assignment expression (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
+  | discard {mode escaped fuel scope id rest node stored expression tail}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .expression expression true)
+      (child : SourceCoreBasic.LoweredExpr)
+      (generated : policy.lowerExpression fuel source scope expression reasonAt = .ok child)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
+        (LocalSequence.discard (LocalLoop.controlType result) child.expression tail)
+  | block {mode escaped fuel scope id rest node stored statements innerCode tail}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .block statements)
+      (inner : Tree policy source result reasonAt false escaped fuel scope statements innerCode)
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
+        (LocalLoop.sequence result innerCode tail)
+  | conditional {mode escaped fuel scope id rest node stored condition thenBody elseBody thenCode elseCode tail}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .ifThen condition thenBody elseBody)
+      (child : SourceCoreBasic.LoweredExpr)
+      (generated : policy.lowerExpression fuel source scope condition reasonAt = .ok child)
+      (conditionType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .bool child.type = .ok ())
+      (left : Tree policy source result reasonAt false escaped fuel scope thenBody thenCode)
+      (right : Tree policy source result reasonAt false escaped fuel scope (elseBody.getD []) elseCode)
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
+        (LocalLoop.sequence result (LocalLoop.conditional result child.expression thenCode elseCode) tail)
   | whileLoop {mode escaped fuel scope id rest node stored condition body loopCode tail}
       (read : policy.readStatement source id = .ok (node, stored))
       (form : node.form = .whileLoop condition body)
@@ -157,6 +185,47 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
             obtain ⟨tail, tailGenerated, assigned⟩ := bind_ok accepted
             obtain ⟨remaining⟩ := ih tailGenerated
             exact ⟨.assigning read form statementType remaining assigned⟩
+        | expression value semicolon =>
+            cases semicolon with
+            | false => exact ⟨.boundary read (by simp only [form, expanded]) whole⟩
+            | true =>
+                simp only [form, Bool.not_true, Bool.false_and, Bool.false_eq_true, ↓reduceIte] at accepted
+                obtain ⟨child, generated, accepted⟩ := bind_ok accepted
+                obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+                cases checked
+                obtain ⟨tail, tailGenerated, accepted⟩ := bind_ok accepted
+                cases accepted
+                obtain ⟨remaining⟩ := ih tailGenerated
+                exact ⟨.discard read form child generated statementType remaining⟩
+        | block statements =>
+            simp only [form] at accepted
+            obtain ⟨innerCode, innerGenerated, accepted⟩ := bind_ok accepted
+            obtain ⟨tail, tailGenerated, accepted⟩ := bind_ok accepted
+            cases accepted
+            obtain ⟨inner⟩ := ih innerGenerated
+            obtain ⟨remaining⟩ := ih tailGenerated
+            exact ⟨.block read form inner remaining⟩
+        | ifThen condition thenBody elseBody =>
+            simp only [form] at accepted
+            obtain ⟨child, generated, accepted⟩ := bind_ok accepted
+            obtain ⟨checked, conditionType, accepted⟩ := bind_ok accepted
+            cases checked
+            obtain ⟨thenCode, thenGenerated, accepted⟩ := bind_ok accepted
+            obtain ⟨left⟩ := ih thenGenerated
+            cases elseBody with
+            | none =>
+                simp only [pure, Except.pure, bind, Except.bind] at accepted
+                obtain ⟨tail, tailGenerated, accepted⟩ := bind_ok accepted
+                cases accepted
+                obtain ⟨remaining⟩ := ih tailGenerated
+                exact ⟨.conditional read form child generated conditionType left .nil remaining⟩
+            | some statements =>
+                obtain ⟨elseCode, elseGenerated, accepted⟩ := bind_ok accepted
+                obtain ⟨tail, tailGenerated, accepted⟩ := bind_ok accepted
+                cases accepted
+                obtain ⟨right⟩ := ih elseGenerated
+                obtain ⟨remaining⟩ := ih tailGenerated
+                exact ⟨.conditional read form child generated conditionType left right remaining⟩
         | whileLoop condition body =>
             simp only [form] at accepted
             obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
@@ -170,7 +239,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
             obtain ⟨inner⟩ := ih loopGenerated
             obtain ⟨remaining⟩ := ih tailGenerated
             exact ⟨.whileLoop read form statementType child generated conditionType inner remaining⟩
-        | expression | assignBitNot | block | ifThen | forLoop | matchWith | breakStmt | continueStmt =>
+        | assignBitNot | forLoop | matchWith | breakStmt | continueStmt =>
             exact ⟨.boundary read (by simp only [form, expanded]) whole⟩
 
 /-- The footer is retained once, around the exact recursively issued flow. -/
@@ -220,7 +289,10 @@ def Tree.closed {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .boundary .. | .assigning .. => false
   | .returning .. | .returnUnit .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.closed
-  | .assigned _ _ _ tail _ _ => tail.closed
+  | .assigned _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.closed
+  | .block _ _ inner tail => inner.closed && tail.closed
+  | @Tree.conditional _ _ _ _ _ _ _ _ _ _ node _ _ _ _ _ _ _ _ _ _ _ _ left right tail =>
+      decide (node.type = .unit) && left.closed && right.closed && tail.closed
   | .whileLoop _ _ _ _ _ _ inner tail => inner.closed && tail.closed
 
 def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
@@ -235,6 +307,11 @@ def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .absent _ _ _ _ tail _ | .assigning _ _ _ tail _ => tail.children
   | @Tree.assigned _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ tail receipt _ =>
       ⟨fuel, scope, expression, receipt.child, receipt.generated⟩ :: tail.children
+  | @Tree.discard _ _ _ _ _ _ fuel scope _ _ _ _ expression _ _ _ child generated _ tail =>
+      ⟨fuel, scope, expression, child, generated⟩ :: tail.children
+  | .block _ _ inner tail => inner.children ++ tail.children
+  | @Tree.conditional _ _ _ _ _ _ fuel scope _ _ _ _ condition _ _ _ _ _ _ _ child generated _ left right tail =>
+      ⟨fuel, scope, condition, child, generated⟩ :: (left.children ++ right.children ++ tail.children)
   | @Tree.whileLoop _ _ _ _ _ _ fuel scope _ _ _ _ condition _ _ _ _ _ _ child generated _ inner tail =>
       ⟨fuel, scope, condition, child, generated⟩ :: (inner.children ++ tail.children)
 
@@ -247,7 +324,9 @@ def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
   | @Tree.absent _ _ _ _ _ _ _ scope _ _ _ _ binder payload _ _ _ _ _ projected tail _ =>
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
-  | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ => tail.bindings
+  | .assigning _ _ _ tail _ | .assigned _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.bindings
+  | .block _ _ inner tail => inner.bindings ++ tail.bindings
+  | .conditional _ _ _ _ _ left right tail => left.bindings ++ right.bindings ++ tail.bindings
   | .whileLoop _ _ _ _ _ _ inner tail => inner.bindings ++ tail.bindings
 
 /-- Bare equal writes retain the original declaration type as well as native layout. -/
@@ -265,6 +344,9 @@ def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ => tail.Ready
   | @Tree.assigning _ _ _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ _ _ tail _ =>
       ¬ Assignable source assignment operator ∧ tail.Ready
+  | .discard _ _ _ _ _ tail => tail.Ready
+  | .block _ _ inner tail => inner.Ready ∧ tail.Ready
+  | .conditional _ _ _ _ _ left right tail => left.Ready ∧ right.Ready ∧ tail.Ready
   | .whileLoop _ _ _ _ _ _ inner tail => inner.Ready ∧ tail.Ready
 
 /-- The profile identifies the actual callback. Unsupported original writes
@@ -301,6 +383,18 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
   | assigned read form statementType remaining receipt targetType ih =>
       obtain ⟨tail, ready⟩ := ih
       exact ⟨.assigned read form statementType tail receipt targetType, ready⟩
+  | discard read form child generated statementType remaining ih =>
+      obtain ⟨tail, ready⟩ := ih
+      exact ⟨.discard read form child generated statementType tail, ready⟩
+  | block read form inner remaining innerIH tailIH =>
+      obtain ⟨inner, innerReady⟩ := innerIH
+      obtain ⟨tail, tailReady⟩ := tailIH
+      exact ⟨.block read form inner tail, innerReady, tailReady⟩
+  | conditional read form child generated conditionType left right remaining leftIH rightIH tailIH =>
+      obtain ⟨left, leftReady⟩ := leftIH
+      obtain ⟨right, rightReady⟩ := rightIH
+      obtain ⟨tail, tailReady⟩ := tailIH
+      exact ⟨.conditional read form child generated conditionType left right tail, leftReady, rightReady, tailReady⟩
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       obtain ⟨inner, innerReady⟩ := innerIH
       obtain ⟨tail, tailReady⟩ := tailIH
@@ -331,6 +425,23 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
   | assigned read form statementType _ receipt _ ih =>
       simpa [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         ih, bind, Except.bind, pure, Except.pure] using receipt.accepted
+  | discard read form child generated statementType _ ih =>
+      simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, generated, statementType,
+        ih, bind, Except.bind, pure, Except.pure]
+  | block read form _ _ innerIH tailIH =>
+      simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, innerIH, tailIH,
+        bind, Except.bind, pure, Except.pure]
+  | @conditional _ _ _ _ _ _ _ _ _ _ elseBody _ _ _ read form child generated conditionType _ _ _ leftIH rightIH tailIH =>
+      cases elseBody with
+      | none =>
+          simp only [Option.getD_none, SourceCoreLoops.lowerFlowStatementsWithPolicy, Except.ok.injEq] at rightIH
+          cases rightIH
+          simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, generated, conditionType,
+            leftIH, tailIH, bind, Except.bind, pure, Except.pure]
+      | some statements =>
+          simp only [Option.getD_some] at rightIH
+          simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, generated, conditionType,
+            leftIH, rightIH, tailIH, bind, Except.bind, pure, Except.pure]
   | whileLoop read form statementType child generated conditionType _ _ innerIH tailIH =>
       simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         generated, conditionType, innerIH, tailIH, bind, Except.bind, pure, Except.pure]
@@ -356,6 +467,13 @@ inductive Boundary (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
         (id :: rest) result reasonAt mode escaped = .ok code) :
       Boundary policy source result reasonAt mode escaped
+  | conditionalType {mode escaped} (fuel : Nat) (scope : SourceCoreLocalCell.Scope) (id : StatementId)
+      (rest : List StatementId) (node : StatementNode) (stored : Ty) (code : Expr)
+      (read : policy.readStatement source id = .ok (node, stored))
+      (notUnit : node.type ≠ .unit)
+      (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
+        (id :: rest) result reasonAt mode escaped = .ok code) :
+      Boundary policy source result reasonAt mode escaped
   | nested {mode escaped} (boundary : Boundary policy source result reasonAt false escaped) :
       Boundary policy source result reasonAt mode escaped
 
@@ -369,6 +487,23 @@ theorem Tree.frontier {escaped : Word} {fuel scope statements code}
   | assigning read form statementType remaining assigned ih =>
       exact ⟨.assignment _ _ _ _ _ (Tree.assigning read form statementType remaining assigned).accepted⟩
   | assigned _ _ _ _ _ _ ih => exact ih openBranch
+  | discard _ _ _ _ _ _ ih => exact ih openBranch
+  | block read form inner remaining innerIH tailIH =>
+      simp only [Tree.closed, Bool.and_eq_false_iff] at openBranch
+      rcases openBranch with innerOpen | tailOpen
+      · obtain ⟨boundary⟩ := innerIH innerOpen
+        exact ⟨.nested boundary⟩
+      · exact tailIH tailOpen
+  | conditional read form child generated conditionType left right remaining leftIH rightIH tailIH =>
+      simp only [Tree.closed, Bool.and_eq_false_iff] at openBranch
+      rcases openBranch with ((notUnit | leftOpen) | rightOpen) | tailOpen
+      · exact ⟨.conditionalType _ _ _ _ _ _ _ read (of_decide_eq_false notUnit)
+          (Tree.conditional read form child generated conditionType left right remaining).accepted⟩
+      · obtain ⟨boundary⟩ := leftIH leftOpen
+        exact ⟨.nested boundary⟩
+      · obtain ⟨boundary⟩ := rightIH rightOpen
+        exact ⟨.nested boundary⟩
+      · exact tailIH tailOpen
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       simp only [Tree.closed, Bool.and_eq_false_iff] at openBranch
       rcases openBranch with innerOpen | tailOpen

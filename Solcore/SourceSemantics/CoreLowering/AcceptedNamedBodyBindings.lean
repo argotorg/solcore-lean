@@ -186,9 +186,54 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact receipt
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
-  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih =>
+  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih =>
       obtain ⟨_, _, _, _, tail⟩ := head_tail typed
       exact ih tail monomorphic
+  | block read form inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | block body =>
+        intro binding member
+        rcases List.mem_append.mp member with member | member
+        · exact innerIH body
+            (fun next present => monomorphic next (List.mem_append_left _ present)) binding member
+        · exact tailIH tail
+            (fun next present => monomorphic next (List.mem_append_right _ present)) binding member
+  | conditional read form _ _ _ left right remaining leftIH rightIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | ifWithoutElse condition body =>
+        have first := leftIH body
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have second := rightIH (.nil control context)
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have next := tailIH tail
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with (member | member) | member
+        · exact first binding member
+        · exact second binding member
+        · exact next binding member
+      | ifWithElse condition firstBody secondBody =>
+        have first := leftIH firstBody
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have second := rightIH secondBody
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have next := tailIH tail
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with (member | member) | member
+        · exact first binding member
+        · exact second binding member
+        · exact next binding member
   | whileLoop read form _ _ _ _ inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, tail⟩ := head_tail typed

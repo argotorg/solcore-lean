@@ -24,6 +24,9 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .letDecl binder initializer =>
       binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
   | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
+  | .expression expression semicolon => semicolon = true ∧ reached expression
+  | .block _ => True
+  | .ifThen condition _ _ => node.type = .unit ∧ reached condition
   | .whileLoop condition _ => reached condition
   | _ => False
 
@@ -79,6 +82,16 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
       if present : reached expression then
         pure ⟨by simpa only [StatementReady, form] using And.intro target present⟩
       else none
+  case expression expression semicolon =>
+    exact if discarded : semicolon = true then
+      if present : reached expression then some ⟨by simpa only [StatementReady, form] using And.intro discarded present⟩ else none
+    else none
+  case block body => exact some ⟨by simp only [StatementReady, form]⟩
+  case ifThen condition left right =>
+    exact if ordinary : node.type = .unit then
+      if present : reached condition then
+        some ⟨by simpa only [StatementReady, form] using And.intro ordinary present⟩ else none
+    else none
   case whileLoop condition body =>
     exact if present : reached condition then some ⟨by simpa only [StatementReady, form] using present⟩ else none
   all_goals exact none
@@ -195,6 +208,51 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       rcases List.mem_cons.mp member with rfl | member
       · exact original.2
       · exact next.2.2 actual member
+  | discard read form child generated statementType remaining tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have next := tailIH ready (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact original.2
+      · exact next.2.2 actual member
+  | block read form inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have inside := innerIH ready.1 (Or.inl rfl)
+      have next := tailIH ready.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      · intro binding member
+        rcases List.mem_append.mp member with member | member
+        · exact inside.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_append.mp member with member | member
+        · exact inside.2.2 actual member
+        · exact next.2.2 actual member
+  | conditional read form child generated conditionType left right remaining leftIH rightIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have first := leftIH ready.1 (Or.inl rfl)
+      have second := rightIH ready.2.1 (Or.inl rfl)
+      have next := tailIH ready.2.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp [Tree.closed, original.1, first.1, second.1, next.1], ?_, ?_⟩
+      · intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with (member | member) | member
+        · exact first.2.1 binding member
+        · exact second.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact original.2
+        · simp only [List.mem_append] at member
+          rcases member with (member | member) | member
+          · exact first.2.2 actual member
+          · exact second.2.2 actual member
+          · exact next.2.2 actual member
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found

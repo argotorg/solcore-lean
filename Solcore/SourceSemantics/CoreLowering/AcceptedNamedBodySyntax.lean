@@ -59,6 +59,18 @@ private theorem returned_annotation {source : TypedSource} {control : ControlCon
     cases same
     simp_all
 
+private theorem discard_annotation {source : TypedSource} {control : ControlContext}
+    {context final : SourceSemantics.Context} {id : StatementId} {facts : StatementFacts}
+    {node : StatementNode} {expression : ExpressionId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .expression expression true)
+    (typed : StatementHasType source control context id final facts) : node.type = .unit := by
+  cases typed
+  all_goals
+    have same := Option.some.inj ((lookupStatement?_complete unique (by assumption)).symm.trans found)
+    cases same
+    simp_all
+
 /-- The support boundary is tested on the issued compiler tree. No separate
 statement recognizer result or preconstructed body shape occurs here. -/
 theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
@@ -141,6 +153,71 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
             (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
             (ih closed (fun child member => children child (by simp [Tree.children, member]))
               (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
+  | discard read form child generated statementType remaining ih =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have annotation := discard_annotation unique found form head
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | expressionDiscard value =>
+          obtain ⟨node, contains, same⟩ := value.stored_type
+          exact .discard found form (.inl rfl) (by simpa only [Bool.true_eq, ↓reduceIte] using annotation)
+            (lookupExpression?_complete unique contains)
+            (children ⟨_, _, _, child, generated⟩ (by simp [Tree.children]))
+            (ih closed (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
+  | block read form inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have both : inner.closed = true ∧ remaining.closed = true := by
+        simpa only [Tree.closed, Bool.and_eq_true_iff] using closed
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | block body =>
+          exact .block found form
+            (innerIH both.1
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) body)
+            (tailIH both.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
+  | conditional read form child generated conditionType left right remaining leftIH rightIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have allClosed := closed
+      simp only [Tree.closed, Bool.and_eq_true_iff] at allClosed
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have annotation := of_decide_eq_true allClosed.1.1.1
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | ifWithoutElse condition body =>
+          obtain ⟨node, contains, same⟩ := condition.stored_type
+          exact .conditional found form annotation (lookupExpression?_complete unique contains) same
+            (children ⟨_, _, _, child, generated⟩ (by simp [Tree.children]))
+            (leftIH allClosed.1.1.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) body)
+            (rightIH allClosed.1.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) (.nil control context))
+            (tailIH allClosed.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
+      | ifWithElse condition first second =>
+          obtain ⟨node, contains, same⟩ := condition.stored_type
+          exact .conditional found form annotation (lookupExpression?_complete unique contains) same
+            (children ⟨_, _, _, child, generated⟩ (by simp [Tree.children]))
+            (leftIH allClosed.1.1.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) first)
+            (rightIH allClosed.1.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) second)
+            (tailIH allClosed.2
+              (fun child member => children child (by simp [Tree.children, member]))
+              (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       have both : inner.closed = true ∧ remaining.closed = true := by simpa only [Tree.closed, Bool.and_eq_true_iff] using closed
@@ -188,7 +265,8 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all
-  | assigning read original _ _ _ | assigned read original _ _ _ _ | whileLoop read original _ _ _ _ _ _ =>
+  | assigning read original _ _ _ | assigned read original _ _ _ _ | whileLoop read original _ _ _ _ _ _
+      | discard read original _ _ _ _ | block read original _ _ | conditional read original _ _ _ _ _ _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all

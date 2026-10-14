@@ -19,7 +19,10 @@ def ids (source : TypedSource) (expressions : List ExpressionId) : List Statemen
 
 def LoopEdges (source : TypedSource) (expressions : List ExpressionId) (node : StatementNode) : Prop :=
   match node.form with
-  | .whileLoop _ body => ∀ id ∈ body, id ∈ ids source expressions
+  | .block body | .whileLoop _ body => ∀ id ∈ body, id ∈ ids source expressions
+  | .ifThen _ left right =>
+      (∀ id ∈ left, id ∈ ids source expressions) ∧
+      (∀ id ∈ right.getD [], id ∈ ids source expressions)
   | _ => True
 
 def NodeReady (source : TypedSource) (expressions : List ExpressionId) (id : StatementId) : Prop :=
@@ -47,6 +50,19 @@ private def allProof? {α : Type} (predicate : α → Prop)
 private def edges? (source : TypedSource) (expressions : List ExpressionId) (node : StatementNode) :
     Option (PLift (LoopEdges source expressions node)) := by
   cases form : node.form
+  case block body =>
+    exact if closed : body.all (fun id => decide (id ∈ ids source expressions)) = true then
+      some ⟨by
+        simp only [LoopEdges, form]
+        exact fun id member => of_decide_eq_true (List.all_eq_true.mp closed id member)⟩ else none
+  case ifThen condition left right =>
+    exact if first : left.all (fun id => decide (id ∈ ids source expressions)) = true then
+      if second : (right.getD []).all (fun id => decide (id ∈ ids source expressions)) = true then
+        some ⟨by
+          simp only [LoopEdges, form]
+          exact ⟨fun id member => of_decide_eq_true (List.all_eq_true.mp first id member),
+            fun id member => of_decide_eq_true (List.all_eq_true.mp second id member)⟩⟩ else none
+    else none
   case whileLoop condition body =>
     exact if closed : body.all (fun id => decide (id ∈ ids source expressions)) = true then
       some ⟨by
@@ -148,6 +164,55 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       rcases List.mem_cons.mp member with rfl | member
       · exact original.2
       · exact next.2.2 actual member
+  | discard read form child generated statementType remaining tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      simp only [StatementReady, form] at original
+      have next := tailIH ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact original.2
+      · exact next.2.2 actual member
+  | block read form inner remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have edges := (profile.at (present _ List.mem_cons_self) found).2
+      simp only [LoopEdges, form] at edges
+      have inside := innerIH ready.1 edges (Or.inl rfl)
+      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      · intro binding member
+        rcases List.mem_append.mp member with member | member
+        · exact inside.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_append.mp member with member | member
+        · exact inside.2.2 actual member
+        · exact next.2.2 actual member
+  | conditional read form child generated conditionType left right remaining leftIH rightIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      simp only [StatementReady, form] at original
+      have edges := (profile.at (present _ List.mem_cons_self) found).2
+      simp only [LoopEdges, form] at edges
+      have first := leftIH ready.1 edges.1 (Or.inl rfl)
+      have second := rightIH ready.2.1 edges.2 (Or.inl rfl)
+      have next := tailIH ready.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp [Tree.closed, original.1, first.1, second.1, next.1], ?_, ?_⟩
+      · intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with (member | member) | member
+        · exact first.2.1 binding member
+        · exact second.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact original.2
+        · simp only [List.mem_append] at member
+          rcases member with (member | member) | member
+          · exact first.2.2 actual member
+          · exact second.2.2 actual member
+          · exact next.2.2 actual member
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1

@@ -71,7 +71,8 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
       obtain ⟨closed, bindings, children⟩ := tail remaining ready
       exact ⟨closed, bindings, by simpa only [Tree.children, List.map_cons] using congrArg (List.cons expression) children⟩
   | initialized read original | absent read original | returning read original
-  | returnUnit read original | whileLoop read original =>
+  | returnUnit read original | whileLoop read original
+  | discard read original | block read original | conditional read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
       simp_all
@@ -101,7 +102,8 @@ private theorem returning_children {policy : SourceCoreLoops.Policy}
       cases original
       rfl
   | initialized read original | absent read original | returnUnit read original
-  | whileLoop read original | assigning read original | assigned read original =>
+  | whileLoop read original | assigning read original | assigned read original
+  | discard read original | block read original | conditional read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
       rw [form] at original
@@ -140,7 +142,8 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
         inside.2.1, tail.2.1, List.nil_append, Tree.children, List.map_cons, List.map_append,
         inside.2.2, tailChildren, List.cons_append, List.nil_append, and_self]
   | initialized read form | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form =>
+  | assigning read form | assigned read form
+  | discard read form | block read form | conditional read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.loopFound)
       cases same
       rw [shape.loopForm] at form
@@ -177,7 +180,8 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
           simp only [Tree.closed, Tree.bindings, List.map_cons, tail.1, tail.2.1,
             List.map_nil, Tree.children, tail.2.2, MethodShape.childIds, and_self]
       | absent read form | returning read form | returnUnit read form
-      | assigning read form | assigned read form | whileLoop read form =>
+      | assigning read form | assigned read form | whileLoop read form
+      | discard read form | block read form | conditional read form =>
           have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.flagInitializedFound)
           cases same
           rw [shape.flagInitializedForm] at form
@@ -188,7 +192,8 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
           simp only [shape.flagInitializedForm, expanded] at outside
           cases outside
   | absent read form | returning read form | returnUnit read form
-  | assigning read form | assigned read form | whileLoop read form =>
+  | assigning read form | assigned read form | whileLoop read form
+  | discard read form | block read form | conditional read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.initializedFound)
       cases same
       rw [shape.initializedForm] at form
