@@ -1,3 +1,7 @@
+import Solcore.Test.SourceCoreSelectedBoxOutputRuntime
+import Solcore.Test.SourceCoreSelectedCompositeProfile
+import Solcore.Test.SourceCoreSelectedCapturedDirectRuntime
+import Solcore.Test.SourceCoreSelectedNamedBuiltinDirectRuntime
 import Solcore.Test.SourceCoreSelectedOrdinaryStageLift
 import Solcore.Test.SourceCoreSelectedLexicalSourceFirstRuntime
 import Solcore.Test.SourceCoreSelectedFailurePublicExecution
@@ -3729,6 +3733,10 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreSelectedOrdinaryStageLift.run
   Tests.SourceCoreSelectedLexicalSourceFirst.run
+  Tests.SourceCoreSelectedNamedBuiltinDirect.run
+  Tests.SourceCoreSelectedBoxOutput.run
+  Tests.SourceCoreSelectedCompositeProfile.run
+  Tests.SourceCoreSelectedCapturedDirect.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run
   Tests.SourceCoreSelectedCompilationProfile.run
