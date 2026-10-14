@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreSelectedCoercedDirectRuntime
 import Solcore.Test.SourceCoreSelectedPrimitiveProfile
 import Solcore.Test.SourceCoreSelectedBodyControlRuntime
 import Solcore.Test.SourceCoreSelectedBoxOutputRuntime
@@ -3740,6 +3741,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreSelectedCompositeProfile.run
   Tests.SourceCoreSelectedPrimitiveProfile.run
   Tests.SourceCoreSelectedBodyControl.run
+  Tests.SourceCoreSelectedCoercedDirect.run
   Tests.SourceCoreSelectedCapturedDirect.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run
