@@ -1,3 +1,5 @@
+import Solcore.Test.SourceCoreSelectedOrdinaryStageLift
+import Solcore.Test.SourceCoreSelectedLexicalSourceFirstRuntime
 import Solcore.Test.SourceCoreSelectedFailurePublicExecution
 import Solcore.Test.SourceCoreSelectedCompilationProfile
 import Solcore.Test.SourceCoreSelectedOperatorAlias
@@ -3725,6 +3727,8 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.SourceCoreSelectedLexicalFailure.run
+  Tests.SourceCoreSelectedOrdinaryStageLift.run
+  Tests.SourceCoreSelectedLexicalSourceFirst.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run
   Tests.SourceCoreSelectedCompilationProfile.run
