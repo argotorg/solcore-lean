@@ -42,6 +42,9 @@ def MethodSupports : Prop :=
   ∀ {policy body fuel compilation source scope id reasonAt lowered context caller}
     (receipt : Receipt policy body fuel compilation (.initial compiled.compatible.checked) source scope id reasonAt lowered)
     (port : Port (compiled := compiled) receipt context caller stages),
+    Dynamic.TypedOperatorMethodSelected (Program.ofChecked compiled.sourceProgram) context caller
+      port.principal.traitName port.principal.methodName receipt.node.requirements
+      port.principal.sourceBody port.principal.dictionary →
     ∃ packet : Packet port.principal, packet.sourceAt = port.sourceAt ∧
       Support port.principal packet headers stages semanticFaults
 
@@ -50,6 +53,9 @@ def MixedMethodSupports : Prop :=
   ∀ {policy body fuel compilation source scope id reasonAt lowered context caller}
     (receipt : Receipt policy body fuel compilation (.initial compiled.compatible.checked) source scope id reasonAt lowered)
     (port : Port (compiled := compiled) receipt context caller stages),
+    Dynamic.TypedOperatorMethodSelected (Program.ofChecked compiled.sourceProgram) context caller
+      port.principal.traitName port.principal.methodName receipt.node.requirements
+      port.principal.sourceBody port.principal.dictionary →
     ∃ packet : SelectedCompilationMethodBodies.Packet port.principal,
       packet.sourceAt = port.sourceAt ∧
       SelectedCompilationMethodBodies.Support port.principal packet headers stages semanticFaults
@@ -60,8 +66,8 @@ theorem MethodSupports.toMixed
       (stages := stages) (semanticFaults := semanticFaults)) :
     MixedMethodSupports (compiled := compiled) (headers := headers)
       (stages := stages) (semanticFaults := semanticFaults) := by
-  intro policy body fuel compilation source scope id reasonAt lowered context caller receipt port
-  obtain ⟨packet, sourceAt, supported⟩ := support receipt port
+  intro policy body fuel compilation source scope id reasonAt lowered context caller receipt port selection
+  obtain ⟨packet, sourceAt, supported⟩ := support receipt port selection
   exact ⟨.terminal packet, sourceAt, supported⟩
 
 private theorem tree_types {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate}
@@ -182,7 +188,7 @@ theorem preserves_with_methods (size : Nat) :
       have methodHeads : PreservesMethod callerBridge.forgetSlots model stages callFaults budget support.certificate := by
         intro fuel current id code types compiler path sequence size within childMeaning
         obtain ⟨⟨port, selection⟩⟩ := support.methodReady compiler path
-        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
+        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port selection
         have certified := SelectedCompilationMethodBodySupport.Certified.of_typed port.principal packet.sourceAt selection
         have bodies : SelectedCompilationMethodHeadBounds.SourceBodies
             (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
@@ -279,7 +285,7 @@ theorem reflects_with_methods (stageEq : stages = RecursiveNamedPreparedStageSco
       have methodHeads : ReflectsMethod callerBridge.forgetSlots model (RecursiveNamedPreparedStageScopes.registry stagePrepared) callFaults budget support.certificate := by
         intro fuel current id code types compiler path sequence size within childMeaning
         obtain ⟨⟨port, selection⟩⟩ := support.methodReady compiler path
-        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port
+        obtain ⟨packet, sourceAtEq, static⟩ := mixedMethodSupport compiler port selection
         have certified := SelectedCompilationMethodBodySupport.Certified.of_typed port.principal packet.sourceAt selection
         have bodies : SelectedCompilationMethodHeadBounds.NativeBodies
             (headers := headers) (receiving := completion.result.context.registry) owner compiler port functions callFaults size := by
