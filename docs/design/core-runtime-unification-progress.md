@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Selected compiler support reaches successful public sessions (2026-10-14)
+
+The accepted compiler certificate now issues the selected named, closure and method support internally. Authentic cached headers supply their instance certificates, including headers used as anchors outside a finite inventory. Operator and coercion methods retain the exact typed selection, original body and invocation dictionary.
+
+The selected session path connects actual initialization and repeated successful calls, named and builtin handle issuance, direct callable invocation and output collection. The existing session and history carriers remain in use. A new named-issuance constructor carries the exact retained Source instance certificate, so issuance no longer stores a whole-program body-validity premise.
+
+The executable compiler profile now uses signatures obtained from actual checker success. Its regression accepts the selected identity cache while preserving the unrelated conversion that lacks an executable `coerce` method. A second regression retains an imported trait's original identity and checks that an incompatible operator alias is rejected only when that operator is compiled.
+
+The original seven-call evidence sequence uses the selected public session at checker budgets `1024` and `1000`. All seven calls retain ordinary Dynamic meanings and sufficient public fuel bounds. Three distinct closures survive intervening calls; results remain `33 / true / 33 / 55`, and public store sizes remain `13 / 31 / 49 / 122 / 140 / 213 / 286 / 340`. The fixture supplies selected body typing through `Bodies.of_program`; it does not establish the pending general checker producer.
+
+Validation: 697 affected modules checked as one coherent graph; the complete registered runtime suite and 1,475 endpoint audits pass. Canonical build (7,497 jobs), registered tests (14,820 build jobs), kernel policy and the same endpoint audits also pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Remaining work includes the actual checker-to-selected-body proof, heap typing and continuation after failed calls under selected assumptions, complete syntax coverage and lifting arbitrary ordinary Source executions through stage guards. Existing failure proofs with their earlier whole-program premise remain checked.
+
 ## Selected compilation replaces whole-program body validity (2026-10-14)
 
 The proof target now follows the actual compilation scope, as approved: the selected entry, dependencies and admitted handles. The full original checked program remains the semantic carrier. Global signature and identity facts remain; ordinary and method body validity is requested only for authentic selected cache rows.

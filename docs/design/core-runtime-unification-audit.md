@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected static issuance and public-session audit (2026-10-14)
+
+Static support is reconstructed from actual named, closure and method compiler receipts. The method interface consumes the genuine typed selector; coercion chains retain a certificate for each selected step. The executable profile uses checker-derived signatures and preserves the original cache order.
+
+The public connection retains real bootstrap and resume histories, exact initial and reached heaps, complete callable captures, input metadata and handle identities. The additive named-issuance history case stores the certificate for the actual retained instantiation. Compatibility checks rebuild all affected older history consumers.
+
+The seven-call companion proves both ordinary Source outcomes and sufficient-fuel public execution using one selected session. Its selected body premise comes from the existing fixture's program proof. Failure continuation under selected assumptions and the general checker producer are still open; the successful companion does not imply either result.
+
+Validation: 697 affected modules checked as one coherent graph; the complete registered runtime suite and 1,475 endpoint audits pass. Canonical build (7,497 jobs), registered tests (14,820 build jobs), kernel policy and the same endpoint audits also pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
 ## Selected compilation audit boundary (2026-10-14)
 
 The current proof scope is the selected compilation, including its dependencies and admitted callable handles. A checker-accepted marker `Coerce` trait can lack the executable method needed by one function. The registered `SourceCoreCompilationScope` regression verifies that this function fails compilation while an unrelated entry in the same original program executes successfully.

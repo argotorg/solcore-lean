@@ -10,7 +10,11 @@ Public runtime APIs are unchanged. The new proof entry points use `SelectedCompi
 
 `SelectedCompilationCatalog` and `SelectedCompilationSourceSignatureFacts` recover header certificates and ordered parameter rows. `SelectedCompilationPhysicalProgramSupport.Support` carries those certificates with the actual static named, closure and method support. Its shared body family supplies preservation and reflection. The `SelectedCompilationPublicDirectNamedBounds`, `SelectedCompilationPublicDirectClosureBounds`, `SelectedCompilationPublicDirectBuiltinBounds` and `SelectedCompilationPublicDirectCallableBounds` modules expose the corresponding packed-input public bounds.
 
-Selected body typing and complete static support are still premises of this path. The actual checker producer and remaining static issuers are being connected. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
+`SelectedCompilationProgramSupportIssuer` builds static named, closure and method support internally from the original compiler certificate and selected body typing. `SelectedCompilationCompilerStaticProfile.validateCheckedProfile` scans the actual cache using signatures derived from the supplied successful checker result. `SelectedCompilationCompilerCertifiedPublicSession.from_profile_initial_row` connects that profile to the real initial public call.
+
+The selected public-session modules cover successful initialization and later calls, direct callable invocation, named and builtin handle issuance, output collection and ordinary Source outcomes. They retain the existing session and history types. The additive `IssuedEntry.physicalNamedSelected` constructor records the exact named Source instance certificate used at issuance.
+
+Selected body typing remains a premise until its actual checker producer is complete. The selected failure-continuation proof and complete compiler coverage remain unfinished. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
