@@ -23,6 +23,9 @@ def LoopEdges (source : TypedSource) (expressions : List ExpressionId) (node : S
   | .ifThen _ left right =>
       (∀ id ∈ left, id ∈ ids source expressions) ∧
       (∀ id ∈ right.getD [], id ∈ ids source expressions)
+  | .matchWith resolution =>
+      (∀ arm ∈ resolution.cases, ∀ id ∈ arm.body, id ∈ ids source expressions) ∧
+      (∀ id ∈ resolution.defaultBody.getD [], id ∈ ids source expressions)
   | _ => True
 
 def NodeReady (source : TypedSource) (expressions : List ExpressionId) (id : StatementId) : Prop :=
@@ -62,6 +65,16 @@ private def edges? (source : TypedSource) (expressions : List ExpressionId) (nod
           simp only [LoopEdges, form]
           exact ⟨fun id member => of_decide_eq_true (List.all_eq_true.mp first id member),
             fun id member => of_decide_eq_true (List.all_eq_true.mp second id member)⟩⟩ else none
+    else none
+  case matchWith resolution =>
+    exact if arms : resolution.cases.all (fun arm => arm.body.all (fun id => decide (id ∈ ids source expressions))) = true then
+      if fallback : (resolution.defaultBody.getD []).all (fun id => decide (id ∈ ids source expressions)) = true then
+        some ⟨by
+          simp only [LoopEdges, form]
+          exact ⟨fun arm member id present => of_decide_eq_true
+            (List.all_eq_true.mp (List.all_eq_true.mp arms arm member) id present),
+            fun id member => of_decide_eq_true (List.all_eq_true.mp fallback id member)⟩⟩
+      else none
     else none
   case whileLoop condition body =>
     exact if closed : body.all (fun id => decide (id ∈ ids source expressions)) = true then
@@ -217,6 +230,40 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
           rcases member with (member | member) | member
           · exact first.2.2 actual member
           · exact second.2.2 actual member
+          · exact next.2.2 actual member
+  | matching => exact False.elim ready
+  | matched read form receipt branches remaining branchIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      simp only [StatementReady, form] at original
+      have allBranches : ∀ request member,
+          (branches request member).closed = true ∧
+          (∀ binding ∈ (branches request member).bindings, binding.binder.scheme.quantified = []) ∧
+          (∀ child ∈ (branches request member).children, child.expression ∈ expressionIds) := by
+        intro request member
+        have edges := (profile.at (present _ List.mem_cons_self) found).2
+        simp only [LoopEdges, form] at edges
+        have requestPresent : ∀ id ∈ request.statements, id ∈ ids source expressionIds := by
+          rcases receipt.original request member with ⟨arm, armMember, same⟩ | same
+          · rw [same]; exact edges.1 arm armMember
+          · intro id member
+            exact edges.2 id (by simpa only [same, Option.getD_some] using member)
+        exact branchIH request member (ready.1 request member) requestPresent (Or.inl rfl)
+      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨?_, ?_, ?_⟩
+      · simp only [Tree.closed, Bool.and_eq_true]
+        exact ⟨List.all_eq_true.mpr (fun request _ => (allBranches request.val request.property).1), next.1⟩
+      · intro binding member
+        rcases List.mem_append.mp member with member | member
+        · obtain ⟨request, _, member⟩ := List.mem_flatMap.mp member
+          exact (allBranches request.val request.property).2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact original
+        · rcases List.mem_append.mp member with member | member
+          · obtain ⟨request, _, member⟩ := List.mem_flatMap.mp member
+            exact (allBranches request.val request.property).2.2 actual member
           · exact next.2.2 actual member
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)

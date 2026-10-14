@@ -110,7 +110,7 @@ theorem of_certificate
     intro child member
     exact child_syntax cached table bodies metadata covered reachedForms arguments initializers
       child.accepted (children child member)
-  have body := receipt.tree.scan (read cached) closed unique grammar binders typed
+  have body := receipt.tree.scan (read cached) closed unique ownership grammar binders typed
   rw [← AcceptedMethodBodyAdmission.roots cached] at body
   exact ⟨⟨forms, ⟨metadata, body⟩⟩⟩
 

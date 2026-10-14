@@ -40,6 +40,7 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .expression expression semicolon => semicolon = true ∧ reached expression
   | .block _ => True
   | .ifThen condition _ _ => node.type = .unit ∧ reached condition
+  | .matchWith resolution => reached resolution.scrutinee
   | .whileLoop condition _ => reached condition
   | .forLoop initializer condition post _ =>
       (∀ item ∈ initializer, HeaderReady source reached item) ∧ reached condition ∧
@@ -126,6 +127,9 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
       if present : reached condition then
         some ⟨by simpa only [StatementReady, form] using And.intro ordinary present⟩ else none
     else none
+  case matchWith resolution =>
+    exact if present : reached resolution.scrutinee then
+      some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case whileLoop condition body =>
     exact if present : reached condition then some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case forLoop initializer condition post body =>
@@ -342,6 +346,33 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
           rcases member with (member | member) | member
           · exact first.2.2 actual member
           · exact second.2.2 actual member
+          · exact next.2.2 actual member
+  | matching => exact False.elim ready
+  | matched read form receipt branches remaining branchIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have allBranches : ∀ request member,
+          (branches request member).closed = true ∧
+          (∀ binding ∈ (branches request member).bindings, binding.binder.scheme.quantified = []) ∧
+          (∀ child ∈ (branches request member).children, reached child.expression) := by
+        intro request member
+        exact branchIH request member (ready.1 request member) (Or.inl rfl)
+      have next := tailIH ready.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨?_, ?_, ?_⟩
+      · simp only [Tree.closed, Bool.and_eq_true]
+        exact ⟨List.all_eq_true.mpr (fun request _ => (allBranches request.val request.property).1), next.1⟩
+      · intro binding member
+        rcases List.mem_append.mp member with member | member
+        · obtain ⟨request, _, member⟩ := List.mem_flatMap.mp member
+          exact (allBranches request.val request.property).2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        rcases List.mem_cons.mp member with rfl | member
+        · exact original
+        · rcases List.mem_append.mp member with member | member
+          · obtain ⟨request, _, member⟩ := List.mem_flatMap.mp member
+            exact (allBranches request.val request.property).2.2 actual member
           · exact next.2.2 actual member
   | whileLoop read form statementType child generated conditionType inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)

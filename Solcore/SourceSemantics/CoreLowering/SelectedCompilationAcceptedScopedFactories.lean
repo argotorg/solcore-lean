@@ -62,7 +62,7 @@ theorem Produced.scan (produced : Produced prepared header parameters result sta
     exact certificate.local_identity_ownership
   have binders := AcceptedNamedBodyBindings.of_monomorphic produced.inner.tree readPolicy
     header.unique ownership typed monomorphic
-  exact produced.inner.tree.scan readPolicy closed header.unique children binders typed
+  exact produced.inner.tree.scan readPolicy closed header.unique ownership children binders typed
 
 private theorem origin_owner : ∃ signature ∈ compiled.sourceProgram.signatures.functions,
     prepared.named.specialized.function.typedBody.owner = signature.id := by

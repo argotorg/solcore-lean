@@ -26,6 +26,7 @@ theorem of_header {compiled : SourceCoreUnifiedCompilation.Compiled}
     rw [aligned.policy]
     exact RecursiveNamedPreparedHeaderPolicies.Prepared.assignments prepared
   obtain ⟨tree, ready⟩ := actual.tree.refine matched
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned)
   exact ⟨⟨actual.flow, tree, actual.emitted⟩, ready⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyRefinement

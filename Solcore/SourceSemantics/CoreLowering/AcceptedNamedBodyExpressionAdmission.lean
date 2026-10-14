@@ -64,7 +64,10 @@ theorem of_receipt {directRows : List SourceSpecialization.SpecializedFunction}
       · obtain ⟨final, facts, typed, _complete⟩ := RecursiveNamedHeaderSourceTyping.statements header wellFormed
         exact .inl ⟨metadata, receipt.tree.scan
           (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-          closed header.unique children binders typed⟩
+          closed header.unique (by
+        obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
+        rw [header.frame.source]
+        exact certificate.local_identity_ownership) children binders typed⟩
       · obtain ⟨child, absent⟩ := Classical.not_forall.mp children
         have member : child ∈ receipt.tree.children := Classical.byContradiction fun missing =>
           absent (fun present => False.elim (missing present))

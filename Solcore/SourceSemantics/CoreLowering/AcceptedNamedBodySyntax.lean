@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchRequests
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsSyntax
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
@@ -92,6 +93,7 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
     (closed : tree.closed = true) (unique : NodeOccurrencesUnique source)
+    (ownership : LocalIdentityOwnership source)
     {approved : ExpressionId → Prop}
     (children : ∀ child ∈ tree.children, approved child.expression)
     (bindings : ∀ binding ∈ tree.bindings, RecursiveNamedStatementSyntaxFacts.BinderReceipt source binding.binder)
@@ -105,7 +107,7 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
       | true => cases closed
   | breaking read form _ => exact .breaking _ (read_found (readPolicy ▸ read)) form
   | continuing read form _ => exact .continuing _ (read_found (readPolicy ▸ read)) form
-  | boundary | assigning | forBoundary => cases closed
+  | boundary | assigning | forBoundary | matching => cases closed
   | returning read form statementType child generated childType =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, _⟩ := head_tail typed
@@ -252,6 +254,31 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
             (fun child member => children child (by simp [Tree.children, member]))
             (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
 
+  | matched read form receipt branches remaining branchIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have allClosed := closed
+      simp only [Tree.closed, Bool.and_eq_true_iff, List.all_eq_true] at allClosed
+      obtain ⟨scrutinee, scrutineeFound⟩ := ScopedSourceMatchAdmission.scrutinee_found receipt.certificate
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      obtain ⟨same, caseFacts, _, caseTyped, defaultTyped⟩ :=
+        ScopedSourceMatchAdmission.statement_sites unique found form scrutineeFound head
+      subst_vars
+      apply ScopedSourceMatchAdmission.matching_scan receipt.certificate ownership found form scrutineeFound
+        (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
+      · intro request member
+        obtain ⟨child, last, bodyFacts, _, body⟩ := ScopedSourceMatchAdmission.original_context
+          caseTyped defaultTyped (receipt.original request member)
+        exact branchIH request member (allClosed.1 ⟨request, member⟩ (List.mem_attach _ _))
+          (fun entry present => children entry (by
+            simp only [Tree.children, List.mem_cons, List.mem_append]
+            exact .inr (.inl (List.mem_flatMap.mpr ⟨⟨request, member⟩, List.mem_attach _ _, present⟩))))
+          (fun entry present => bindings entry (by
+            simp only [Tree.bindings, List.mem_append]
+            exact .inl (List.mem_flatMap.mpr ⟨⟨request, member⟩, List.mem_attach _ _, present⟩))) body
+      · exact tailIH allClosed.2
+          (fun entry present => children entry (by simp [Tree.children, present]))
+          (fun entry present => bindings entry (by simp [Tree.bindings, present])) tail
+
   | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       have allClosed := closed
@@ -312,7 +339,8 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all
-  | forLoop read original _ _ _ _ _ _ _ _ | forBoundary read original _ _ =>
+  | forLoop read original _ _ _ _ _ _ _ _ | forBoundary read original _ _
+      | matching read original _ _ _ | matched read original _ _ _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all

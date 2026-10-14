@@ -65,7 +65,10 @@ theorem of_actual {compiled : SourceCoreUnifiedCompilation.Compiled}
       obtain ⟨final, facts, typed, _complete⟩ := RecursiveNamedHeaderSourceTyping.statements header wellFormed
       have scan := receipt.tree.scan
         (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-        closed header.unique (children receipt) (bindings receipt) typed
+        closed header.unique (by
+          obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
+          rw [header.frame.source]
+          exact certificate.local_identity_ownership) (children receipt) (bindings receipt) typed
       exact .inl (CallableIndexedOwnedPreparedNamedScopedAdmission.of_actual
         prepared aligned rows table ⟨metadata, scan⟩ ready diagnostic receiver wellFormed
         checked catalog methods member actual)
@@ -114,7 +117,10 @@ theorem of_returning {compiled : SourceCoreUnifiedCompilation.Compiled}
   obtain ⟨final, facts, typed, _complete⟩ := RecursiveNamedHeaderSourceTyping.statements header wellFormed
   have scan := receipt.tree.scan
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-    details.1 header.unique
+    details.1 header.unique (by
+      obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
+      rw [header.frame.source]
+      exact certificate.local_identity_ownership)
     (fun actual member => (details.2.2 actual member).symm ▸ child)
     (fun binding member => False.elim (by simp only [details.2.1, List.not_mem_nil] at member)) typed
   exact CallableIndexedOwnedPreparedNamedScopedAdmission.of_actual

@@ -33,6 +33,7 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
   | returning read form | returnUnit read form | absent read form
   | assigning read form | assigned read form | whileLoop read form
   | discard read form | block read form | conditional read form
+  | matching read form | matched read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans initialFound)
       cases same

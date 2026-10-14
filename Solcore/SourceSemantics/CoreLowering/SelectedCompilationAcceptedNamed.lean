@@ -53,6 +53,6 @@ theorem of_receipt {compiled : SourceCoreUnifiedCompilation.Compiled}
     header.unique ownership typed monomorphic
   exact ⟨metadata, receipt.tree.scan
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-    closed header.unique children bindings typed⟩
+    closed header.unique ownership children bindings typed⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationAcceptedNamed

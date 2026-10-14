@@ -56,11 +56,23 @@ theorem assignments : CompatibleAssignmentStatements.AssignmentPolicy
 theorem read : (policy cached).readStatement =
     SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked := rfl
 
+/-- The selected method keeps its actual matcher and final native table. -/
+def matchContext : SourceCoreCompatibleDataMatches.Context :=
+  CompatibleMatchAmbientLowering.withDefinitions
+    ⟨.initial compiled.compatible.checked, cached.named.specialized.function.solvedRequirements,
+      some (CallableIndexedNamedGeneration.allocator compiled.indexed cached.named), none⟩
+    compiled.indexed.layouts.definitions
+
+theorem match_policy : CompatibleMatchAmbientLowering.PolicySuccess
+    (policy cached) (matchContext cached) := by
+  apply CompatibleMatchAmbientLowering.PolicySuccess.extend (by rfl)
+  exact ⟨_, CallableIndexedAmbient.definitions_exact compiled.indexed⟩
+
 /-- The exact accepted body is refined only through its actual assignment
 callbacks. The result preserves code, source, roots, scopes and child budgets. -/
 theorem of_cached : ∃ receipt : BodyAt cached, receipt.tree.Ready := by
   obtain ⟨body⟩ := body_of_accepted cached.compilation.bodyCompiled
-  obtain ⟨tree, ready⟩ := body.tree.refine (assignments cached)
+  obtain ⟨tree, ready⟩ := body.tree.refine (assignments cached) (match_policy cached)
   exact ⟨⟨body.flow, tree, body.emitted⟩, ready⟩
 
 /-- Full cached specialization authenticates the method policy at this child. -/

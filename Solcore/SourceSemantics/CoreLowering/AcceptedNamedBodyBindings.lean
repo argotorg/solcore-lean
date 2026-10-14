@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchRequests
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodySyntax
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedPreparedHeaderPolicies
@@ -237,7 +238,8 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact receipt
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
-  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih =>
+  | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih
+      | matching _ _ _ _ _ ih =>
       obtain ⟨_, _, _, _, tail⟩ := head_tail typed
       exact ih tail monomorphic
   | block read form inner remaining innerIH tailIH =>
@@ -298,6 +300,24 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
             (fun next present => monomorphic next (List.mem_append_left _ present)) binding member
         · exact tailIH tail
             (fun next present => monomorphic next (List.mem_append_right _ present)) binding member
+
+  | matched read form receipt branches remaining branchIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨scrutinee, scrutineeFound⟩ := ScopedSourceMatchAdmission.scrutinee_found receipt.certificate
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      obtain ⟨same, caseFacts, _, caseTyped, defaultTyped⟩ :=
+        ScopedSourceMatchAdmission.statement_sites unique found form scrutineeFound head
+      subst_vars
+      intro binding member
+      rcases List.mem_append.mp member with member | member
+      · obtain ⟨request, _, present⟩ := List.mem_flatMap.mp member
+        obtain ⟨child, last, bodyFacts, _, body⟩ := ScopedSourceMatchAdmission.original_context
+          caseTyped defaultTyped (receipt.original request.val request.property)
+        exact branchIH request.val request.property body
+          (fun entry member => monomorphic entry (List.mem_append_left _
+            (List.mem_flatMap.mpr ⟨request, List.mem_attach _ _, member⟩))) binding present
+      · exact tailIH tail
+          (fun entry present => monomorphic entry (List.mem_append_right _ present)) binding member
 
   | forLoop read form _ _ _ _ initial inner after remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)

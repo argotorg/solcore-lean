@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchAdmission
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
 
 /-! Finite original statement admission separates syntax from lexical typing.
@@ -72,6 +73,16 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (conditionType : conditionNode.type = .bool) (value : approved condition)
       (inner : Scan source approved expected false body)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+  | matching {mode id node resolution scrutineeNode rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (value : approved resolution.scrutinee)
+      (hiddenOrdinary : source.inputs.any (fun input => decide (input.id = resolution.hiddenScrutinee)) = false)
+      (armsOrdinary : ∀ arm ∈ resolution.cases, ∀ binder ∈ arm.pattern.binderIds,
+        source.inputs.any (fun input => decide (input.id = binder)) = false)
+      (arms : ∀ arm ∈ resolution.cases, Scan source approved expected false arm.body)
+      (fallback : ∀ statements, resolution.defaultBody = some statements → Scan source approved expected false statements)
+      (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
   | forLoop {mode id node initializer condition conditionNode post body rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post body)
       (sourceType : node.type = .unit)
@@ -133,6 +144,8 @@ theorem Scan.shape {source approved expected mode statements}
   | conditional found form _ _ _ _ _ _ _ left right remaining => exact .conditional found form left right remaining
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
   | assign found form _ _ bare _ _ _ _ ih => exact .assign found form bare ih
+  | matching found form _ _ _ _ _ _ _ arms fallback remaining =>
+      exact .matchWith found form arms fallback remaining
   | forLoop found form _ initial _ _ _ _ after _ inner remaining =>
       exact .forLoop found form initial.shape after.shape inner remaining
 
@@ -243,6 +256,25 @@ theorem Scan.syntax {source approved expected mode statements}
               subst child
               exact ⟨value, _, rhsFound, expression_at unique rhsFound rhs⟩
             · exact ih result tail
+
+  | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
+      obtain ⟨middle, headFacts, tailFacts, head, tail⟩ := head_tail typed
+      obtain ⟨sameContext, caseFacts, scrutineeTyped, casesTyped, defaultTyped⟩ :=
+        ScopedSourceMatchAdmission.statement_sites unique found form scrutineeFound head
+      subst middle
+      have sourceType := ScopedSourceMatchAdmission.statement_type unique found form head
+      rw [result] at sourceType
+      apply GenericImperativeMatch.Syntax.matchWith found form sourceType scrutineeFound scrutineeTyped
+        value casesTyped defaultTyped hiddenOrdinary armsOrdinary
+      · intro request childContext selected
+        obtain ⟨last, childFacts, childTyped⟩ :=
+          ScopedSourceMatchAdmission.request_typing casesTyped defaultTyped selected
+        cases selected with
+        | arm member same _ _ =>
+          rw [same] at childTyped ⊢
+          exact arms _ member result childTyped
+        | default same => exact fallback _ same result childTyped
+      · exact remaining result tail
 
   | forLoop found form sourceType initial conditionFound conditionType value _ after _ inner remaining =>
       obtain ⟨_, _, _, head, tail⟩ := head_tail typed

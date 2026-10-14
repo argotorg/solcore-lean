@@ -47,7 +47,10 @@ theorem of_receipt {compiled : SourceCoreUnifiedCompilation.Compiled}
     obtain ⟨final, facts, typed, _⟩ := RecursiveNamedHeaderSourceTyping.statements header wellFormed
     exact ⟨metadata, receipt.tree.scan
       (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-      closed header.unique children bindings typed⟩
+      closed header.unique (by
+        obtain ⟨_, certificate⟩ := RecursiveNamedHeaderSourceTyping.certificate header wellFormed
+        rw [header.frame.source]
+        exact certificate.local_identity_ownership) children bindings typed⟩
   | inr generalized =>
     obtain ⟨binding, member, different⟩ := generalized
     exact False.elim (different (monomorphic binding member))

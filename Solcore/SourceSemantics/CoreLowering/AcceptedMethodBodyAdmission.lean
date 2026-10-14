@@ -155,7 +155,7 @@ theorem of_instantiated
     intro child member
     exact child_syntax cached table wellFormed metadata covered reachedForms arguments initializers
       child.accepted (children child member)
-  have body := receipt.tree.scan (read cached) closed unique grammar binders typed
+  have body := receipt.tree.scan (read cached) closed unique ownership grammar binders typed
   rw [← roots cached] at body
   exact ⟨⟨forms, ⟨metadata, body⟩⟩⟩
 

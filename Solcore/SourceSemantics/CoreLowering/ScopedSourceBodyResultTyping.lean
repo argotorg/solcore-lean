@@ -33,6 +33,8 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
     exact .conditional found form sourceType conditionFound conditionType (mapped _ value) left right remaining
   | whileLoop found form conditionFound conditionType value _ _ inner remaining =>
     exact .whileLoop found form conditionFound conditionType (mapped _ value) inner remaining
+  | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
+    exact .matching found form scrutineeFound (mapped _ value) hiddenOrdinary armsOrdinary arms fallback remaining
   | forLoop found form sourceType initial conditionFound conditionType value _ after _ inner remaining =>
     exact .forLoop found form sourceType (initial.map mapped) conditionFound conditionType (mapped _ value)
       inner (after.map mapped) remaining
@@ -125,6 +127,9 @@ theorem Scan.result_eq_of_return {source : TypedSource} {approved : ExpressionId
     obtain ⟨_, _, _, _, tail⟩ := head_tail typed
     exact remaining (return_in_tail found (by simp [form, returns]) present) tail noLoop
   | whileLoop found form _ _ _ _ _ _ remaining =>
+    obtain ⟨_, _, _, _, tail⟩ := head_tail typed
+    exact remaining (return_in_tail found (by simp [form, returns]) present) tail noLoop
+  | matching found form _ _ _ _ _ _ _ _ _ remaining =>
     obtain ⟨_, _, _, _, tail⟩ := head_tail typed
     exact remaining (return_in_tail found (by simp [form, returns]) present) tail noLoop
   | forLoop found form _ _ _ _ _ _ _ _ _ remaining =>

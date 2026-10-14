@@ -73,6 +73,7 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
   | initialized read original | absent read original | returning read original
   | returnUnit read original | whileLoop read original
   | discard read original | block read original | conditional read original
+  | matching read original | matched read original
   | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -105,6 +106,7 @@ private theorem returning_children {policy : SourceCoreLoops.Policy}
   | initialized read original | absent read original | returnUnit read original
   | whileLoop read original | assigning read original | assigned read original
   | discard read original | block read original | conditional read original
+  | matching read original | matched read original
   | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
@@ -146,6 +148,7 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
   | initialized read form | absent read form | returning read form | returnUnit read form
   | assigning read form | assigned read form
   | discard read form | block read form | conditional read form
+  | matching read form | matched read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.loopFound)
       cases same
@@ -185,6 +188,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
       | absent read form | returning read form | returnUnit read form
       | assigning read form | assigned read form | whileLoop read form
       | discard read form | block read form | conditional read form
+  | matching read form | matched read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
           have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.flagInitializedFound)
           cases same
@@ -198,6 +202,7 @@ theorem MethodShape.compiler_details {policy : SourceCoreLoops.Policy}
   | absent read form | returning read form | returnUnit read form
   | assigning read form | assigned read form | whileLoop read form
   | discard read form | block read form | conditional read form
+  | matching read form | matched read form
   | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.initializedFound)
       cases same
