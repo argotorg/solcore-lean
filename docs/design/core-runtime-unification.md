@@ -24,7 +24,9 @@ The selected public connection now also covers retained named, closure and built
 
 The selected compiler profile derives group, nonempty tuple, conditional, primitive operator and builtin-call expression support from actual compiler receipts, preserving operand order, original metadata and native descriptors. It also derives discarded-expression, lexical-block and unit-annotated conditional statement support. These forms use the same checked public-session producer; independent discard and complement Source traces reach the closed public forward theorems.
 
-The body profile still requires an explicit outer return and rejects non-unit conditional annotations, including some compiler-accepted cases where both branches return. For-loop admission, staged break/continue and broader local/factory and coercion profiles remain unfinished.
+The same profile now derives returned closures containing a direct call with its original output coercion and selected closed implementation methods. Genuine compiler actions supply primitive method certificates. One automatic public issuance connects independent Source factory capture, generic `keep` evidence and selected `Coerce` execution to complete factory output and direct scalar forwarding. The original program, dictionaries and reached heaps remain intact; the first direct call has an independent Source proof and later reuse is covered by runtime regression.
+
+The body profile still requires an explicit outer return and rejects non-unit conditional annotations, including some compiler-accepted cases where both branches return. For-loop admission, staged break/continue and broader local, factory and coercion profiles remain unfinished. The coercion factory profile currently requires leaf direct-call arguments and closed implementation parameters and assumptions.
 
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 

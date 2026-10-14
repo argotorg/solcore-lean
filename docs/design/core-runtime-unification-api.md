@@ -51,6 +51,14 @@ Complete compiler-form and actual-pass preservation remain unfinished. The accep
 
 Callers use the same checked `Profiled` constructors and closed public forward/reflection APIs. The new registered discard and complement companions demonstrate independent Source traces entering whole-output and scalar forwarding respectively. Successful compilation alone still does not imply acceptance of the complete proof profile.
 
+### Closed coercion factories and selected methods
+
+`CompilerCoercedExpressionProfile`, `CompilerCoercedMethodProfile` and `SelectedCompilationAcceptedCoercedFactories` add `coercedFactory` and `closedMethod` alternatives to the existing static profile. They derive support for the original returned lambda, leaf direct-call arguments and complete output-coercion suffix. Closed implementation parameters and assumptions, actual method selection and original metadata remain checked. Ordinary rows continue through their existing routes.
+
+`SelectedCompilationAcceptedPrimitiveMethods` derives method certificates from real cached compilation; `SelectedCompilationPrimitiveMethodNodeFacts` supplies facts for every original raw node. `SelectedCompilationClosedCoercionSourceSelection.selects` turns successful original method resolution and dictionary materialization into independent Source selection, deriving formation, substitution and caller coverage internally.
+
+Public callers keep the same checked `Profiled` constructors and closed forward APIs. `SourceCoreSelectedCoercedDirectPublic.from_source` demonstrates one automatic issuance covering factory output and the first direct call of its returned closure. Its independent Source derivation retains captured cells and the generic-call dictionary before applying the selected conversion. `AcceptedCompilerProgramAdmission.of_profile` preserves its existing full-program compatibility signature and delegates to the selected producer.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.

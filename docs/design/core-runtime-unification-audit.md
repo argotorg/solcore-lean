@@ -8,6 +8,16 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Coercion profile and Source-first public audit (2026-10-14)
+
+The new `coercedFactory` and `closedMethod` profile alternatives authenticate the original selected cache rows. Coercion factories retain the whole original suffix and call requirements. Selected implementation methods use genuine cached body typing and primitive compiler receipts; closed parameters and assumptions remain explicit profile checks. Original occurrence uniqueness rules out an accidental local-initializer use of the returned lambda. No separate evaluator, compiler restriction or runtime flag is introduced.
+
+The public consumer constructs ordinary factory, captured-read, generic-call and coercion-method traces independently of target execution. Actual checking, compilation, profile, bootstrap and start receipts supply one certified session. Its selected body support supplies the real method typing; runtime reflection supplies no ordinary execution premise. The original method selection and dictionary materialization determine the Source method invocation. Both Boolean branches retain the original program, budgets and Source heap growth from one to three cells.
+
+Independent review covers the producer, the six consumer modules and the legacy compatibility wrapper. The wrapper keeps its public full-program signature while delegating to the selected producer. Whole factory output and direct scalar forwarding use the same issued session and actual returned handle. The extra retained-handle invocation is tested at runtime without claiming a second independently constructed Source trace.
+
+Validation: 21 changed or new modules, 86 affected modules, a coherent graph of 7,729 modules and 930 standard-three endpoint audits pass. Full build (7,790 jobs), registered runtime tests, kernel policy and the same 930 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Complete compiler-form and actual-pass preservation remain unfinished.
+
 ## Body control and primitive receipt audit (2026-10-14)
 
 New body constructors retain authentic accepted child actions for expression discard, blocks and unit-annotated conditional statements. Nested bodies use the compiler's actual non-function mode; the suffix resumes the original scope. Conditional receipts retain condition, then-branch, else-branch and suffix in compiler order. Binder checks visit both branches and restore lexical bindings at the boundary.

@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Coercion factories reach the same certified public session (2026-10-14)
+
+The automatic compiler profile now covers a returned closure whose direct call has an original output coercion, together with the selected closed implementation methods. The producer retains the complete coercion suffix, method identity, dictionary, cached body and original raw metadata. Primitive method certificates come from actual accepted compilation. Existing full-program clients use the same selected producer through their existing compatibility interface.
+
+The new consumer uses the unchanged `SourceCoreCoercionPublic` program with checker fuel `1024`, compiler fuel `1000`, four cached functions and three direct targets. One automatic `Profiled` issuance supports factory export and direct invocation of the returned closure. Independent Source derivations allocate and capture a Boolean, read it, call generic `keep` with its `Mark` dictionary, then execute the selected `Coerce` method. These derivations precede public completion and retain the exact Source heap growth from one cell to three.
+
+The factory reaches both closed function forwarding and whole-output forwarding. A successful packed start of its returned handle reaches closed direct scalar forwarding, or a genuine earlier stage stop. Neither the fixture nor the public theorem asks for validity of unrelated bodies or a recursive body-meaning callback. Runtime tests cover both results (`41` and `7`), zero-fuel suspension and resumption, and reuse of the original handle, with native heap sizes `5 / 8 / 14 / 20`. The second reuse is a runtime regression; the independent Source proof covers the first direct invocation.
+
+Validation: 21 changed or new modules checked in a coherent graph of 7,729 modules; 86 affected modules and 930 endpoint audits pass. Full build (7,790 jobs), registered runtime tests, kernel policy and the same 930 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`.
+
+The added factory grammar still requires leaf direct-call arguments and closed selected implementation parameters and assumptions. Broader coercion, local and factory forms, for-loop and staged transfer admission, general staged transformations and remaining actual-pass obligations are unfinished. Core execution and its instruction set are unchanged. The second goal remains incomplete.
+
 ## Body control and primitive compiler actions (2026-10-14)
 
 The common compiler profile now accepts discarded expressions, lexical blocks and unit-annotated conditional statements. The body proof follows the actual accepted compiler actions, retains child fuel and both compiled branches, and restores the caller scope before the following statements. The subset profile also checks every nested body edge. These receipts feed the existing checked public-session constructors and selected meaning-preservation family.
