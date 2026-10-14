@@ -118,7 +118,7 @@ def originalWorkspace : Workspace.RawWorkspace := {
   ] }]
 }
 
-private def rejectBoundary (name : String) : IO Unit := do
+private def checkBoundary (name : String) (acceptedProfile : Bool) : IO Unit := do
   match checked : checkProgram originalWorkspace options.checkingFuel with
   | .error errors => throw (IO.userError (reprStr errors))
   | .ok program =>
@@ -133,8 +133,8 @@ private def rejectBoundary (name : String) : IO Unit := do
           (source.artifact_fields present).1.trans (SourceCoreCompiler.compileChecked_program generated)
         have original : checkProgram originalWorkspace options.checkingFuel = .ok cached.sourceProgram := by
           rw [sameProgram]; exact checked
-        require (SelectedCompilationCompilerStaticProfile.validateCheckedProfile cached original).isNone
-          s!"loop unsupported profile changed: {name}"
+        require ((SelectedCompilationCompilerStaticProfile.validateCheckedProfile cached original).isSome == acceptedProfile)
+          s!"loop profile boundary changed: {name}"
         if name == "compound" then
           let some named := cached.indexed.base.functions.head?
             | throw (IO.userError "compound loop cached row missing")
@@ -155,8 +155,8 @@ private def checkMissingInitializer (fixture : Fixture) : IO Unit := do
   require (AcceptedCompilerBodyProfile.validate dirty (fun _ => True)).isNone "loop polymorphic header was accepted"
 
 def run : IO Unit := do
-  rejectBoundary "spin"
-  rejectBoundary "compound"
+  checkBoundary "spin" true
+  checkBoundary "compound" false
   let fixture ← fixture
   checkMissingInitializer fixture
   let started ← observeStarted fixture

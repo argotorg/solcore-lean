@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodySyntax
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFinish
 
 /-! Flat facts about original statement nodes close the refined compiler tree.
 The tree supplies recursion, actual child actions and lexical scopes. -/
@@ -6,7 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
-open Core Frontend SourceInference AcceptedNamedBodyFlow
+open Core Frontend SourceInference AcceptedNamedBodyFlow AcceptedCompilerBodyCompletion
 
 def returns : StatementForm → Bool
   | .returnStmt _ => true
@@ -37,9 +37,9 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .letDecl binder initializer =>
       binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
   | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
-  | .expression expression semicolon => semicolon = true ∧ reached expression
+  | .expression expression _ => reached expression
   | .block _ => True
-  | .ifThen condition _ _ => node.type = .unit ∧ reached condition
+  | .ifThen condition _ _ => reached condition
   | .matchWith resolution => reached resolution.scrutinee
   | .whileLoop condition _ => reached condition
   | .forLoop initializer condition post _ =>
@@ -118,15 +118,11 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
         pure ⟨by simpa only [StatementReady, form] using And.intro target present⟩
       else none
   case expression expression semicolon =>
-    exact if discarded : semicolon = true then
-      if present : reached expression then some ⟨by simpa only [StatementReady, form] using And.intro discarded present⟩ else none
-    else none
+    exact if present : reached expression then some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case block body => exact some ⟨by simp only [StatementReady, form]⟩
   case ifThen condition left right =>
-    exact if ordinary : node.type = .unit then
-      if present : reached condition then
-        some ⟨by simpa only [StatementReady, form] using And.intro ordinary present⟩ else none
-    else none
+    exact if present : reached condition then
+      some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case matchWith resolution =>
     exact if present : reached resolution.scrutinee then
       some ⟨by simpa only [StatementReady, form] using present⟩ else none
@@ -239,36 +235,47 @@ theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
     · exact head.2
     · exact tail.2.2 actual member
 
-/-- The outer sequence retains a return occurrence; loop bodies use their
-actual false mode and can end normally. No source-body shape is supplied. -/
-theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
+/-- The actual compiler tree and finite original forms retain every visited
+operand and binder, including the emitted suffix of a stopped branch. -/
+private theorem read_found {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}
+    {id : StatementId} {node : StatementNode} {type : Ty}
+    (accepted : SourceCoreCompatibleDataExpressions.readStatement checked source id = .ok (node, type)) :
+    source.lookupStatement? id = some node := by
+  unfold SourceCoreCompatibleDataExpressions.readStatement at accepted
+  by_cases owner : id.occurrence.owner ≠ source.owner
+  · simp [owner, throw, bind, Except.bind] at accepted
+  · simp only [owner, ↓reduceIte, bind, Except.bind, pure, Except.pure] at accepted
+    cases found : source.lookupStatement? id with
+    | none => simp [found] at accepted
+    | some actual =>
+      simp only [found] at accepted
+      obtain ⟨projected, _, same⟩ := CompatibleEncoding.bind_ok accepted
+      cases same
+      rfl
+
+theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
     {source : TypedSource} {result : Ty} {reasonAt : ExpressionId → Word}
     {mode : Bool} {escaped : Word} {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     {statements : List StatementId} {code : Expr} {reached : ExpressionId → Prop}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
     (profile : Profile source reached) (ready : tree.Ready)
-    (finish : mode = false ∨ HasReturn source statements) :
-    tree.closed = true ∧
+    (finish : TailForms source mode statements) :
+    tree.formed = true ∧
       (∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) ∧
       (∀ child ∈ tree.children, reached child.expression) := by
   induction tree with
-  | @nil actualMode _ _ _ =>
-      have modeFalse : actualMode = false := by
-        rcases finish with same | ⟨id, member, _⟩
-        · exact same
-        · cases member
-      simp [Tree.closed, Tree.bindings, Tree.children, modeFalse]
+  | nil => simp [Tree.formed, Tree.bindings, Tree.children]
   | returning read form statementType child generated childType =>
       have original := profile.at (read_found (readPolicy ▸ read))
       simp only [StatementReady, form] at original
       exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
-  | returnUnit | breaking | continuing => simp [Tree.closed, Tree.bindings, Tree.children]
+  | returnUnit | breaking | continuing => simp [Tree.formed, Tree.bindings, Tree.children]
   | initialized read form statementType projected child generated childType remaining allocated ih =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form, Option.toList_some, List.mem_singleton] at original
-      have next := ih ready (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, ?_, ?_⟩
       · intro binding member
         rcases List.mem_cons.mp member with rfl | member
@@ -282,7 +289,7 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form] at original
-      have next := ih ready (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, ?_, next.2.2⟩
       intro binding member
       rcases List.mem_cons.mp member with rfl | member
@@ -296,7 +303,7 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form] at original
-      have next := ih ready (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, next.2.1, ?_⟩
       intro actual member
       rcases List.mem_cons.mp member with rfl | member
@@ -306,17 +313,32 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form] at original
-      have next := tailIH ready (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := tailIH ready (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, next.2.1, ?_⟩
       intro actual member
       rcases List.mem_cons.mp member with rfl | member
-      · exact original.2
+      · exact original
+      · exact next.2.2 actual member
+  | tailValue read form child generated statementType childType =>
+      have original := profile.at (read_found (readPolicy ▸ read))
+      simp only [StatementReady, form] at original
+      exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
+  | valueDiscard read form notFinal child generated statementType remaining ih =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have modeFalse := finish.discard_mode found form notFinal
+      have next := ih ready (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, modeFalse, Bool.not_false, Bool.true_and]; exact next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact original
       · exact next.2.2 actual member
   | block read form inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
-      have inside := innerIH ready.1 (Or.inl rfl)
-      have next := tailIH ready.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      have inside := innerIH ready.1 (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
         · exact inside.2.1 binding member
@@ -329,10 +351,10 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form] at original
-      have first := leftIH ready.1 (Or.inl rfl)
-      have second := rightIH ready.2.1 (Or.inl rfl)
-      have next := tailIH ready.2.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp [Tree.closed, original.1, first.1, second.1, next.1], ?_, ?_⟩
+      have first := leftIH ready.1 (by simp [TailForms, tailForms?])
+      have second := rightIH ready.2.1 (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2.2 (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp [Tree.formed, first.1, second.1, next.1], ?_, ?_⟩
       · intro binding member
         simp only [Tree.bindings, List.mem_append] at member
         rcases member with (member | member) | member
@@ -341,7 +363,7 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
         · exact next.2.1 binding member
       · intro actual member
         rcases List.mem_cons.mp member with rfl | member
-        · exact original.2
+        · exact original
         · simp only [List.mem_append] at member
           rcases member with (member | member) | member
           · exact first.2.2 actual member
@@ -353,14 +375,14 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have original := profile.at found
       simp only [StatementReady, form] at original
       have allBranches : ∀ request member,
-          (branches request member).closed = true ∧
+          (branches request member).formed = true ∧
           (∀ binding ∈ (branches request member).bindings, binding.binder.scheme.quantified = []) ∧
           (∀ child ∈ (branches request member).children, reached child.expression) := by
         intro request member
-        exact branchIH request member (ready.1 request member) (Or.inl rfl)
-      have next := tailIH ready.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+        exact branchIH request member (ready.1 request member) (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (finish.tail found (by simp [form, stopsHere]))
       refine ⟨?_, ?_, ?_⟩
-      · simp only [Tree.closed, Bool.and_eq_true]
+      · simp only [Tree.formed, Bool.and_eq_true]
         exact ⟨List.all_eq_true.mpr (fun request _ => (allBranches request.val request.property).1), next.1⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
@@ -378,9 +400,9 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
       simp only [StatementReady, form] at original
-      have inside := innerIH ready.1 (Or.inl rfl)
-      have next := tailIH ready.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      have inside := innerIH ready.1 (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
         · exact inside.2.1 binding member
@@ -396,10 +418,10 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have original := profile.at found
       simp only [StatementReady, form] at original
       have before := header_facts initial original.1 ready.1
-      have inside := innerIH ready.2.1 (Or.inl rfl)
+      have inside := innerIH ready.2.1 (by simp [TailForms, tailForms?])
       have post := header_facts after original.2.2 ready.2.2.1
-      have next := tailIH ready.2.2.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
+      have next := tailIH ready.2.2.2 (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         simp only [Tree.bindings, List.mem_append] at member
         rcases member with ((member | member) | member) | member
@@ -423,5 +445,22 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have original := (profile.at (read_found (readPolicy ▸ read))).expanded
       rw [outside] at original
       cases original
+
+/-- Original completion and the actual compiler action give the full body
+certificate while retaining every original operand and binding receipt. -/
+theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
+    {source : TypedSource} {result : Ty} {reasonAt : ExpressionId → Word}
+    {mode : Bool} {escaped : Word} {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
+    {statements : List StatementId} {code : Expr} {reached : ExpressionId → Prop}
+    {expected : TypeSystem.Ty}
+    (tree : Tree policy source result reasonAt mode escaped fuel scope statements code)
+    (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
+    (profile : Profile source reached) (ready : tree.Ready)
+    (finish : Finish source expected mode statements) :
+    tree.complete expected = true ∧
+      (∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) ∧
+      (∀ child ∈ tree.children, reached child.expression) := by
+  obtain ⟨formed, bindings, children⟩ := facts_forms tree readPolicy profile ready finish.forms
+  exact ⟨tree.complete_of_formed readPolicy formed finish, bindings, children⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile

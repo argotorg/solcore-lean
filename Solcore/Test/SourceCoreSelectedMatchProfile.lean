@@ -102,14 +102,15 @@ def factoryWorkspace : Workspace.RawWorkspace := {
 
 private def boundaries (fixture : Fixture) : IO Unit := do
   let source := fixture.named.specialized.function.typedBody
+  let expected := fixture.named.specialized.function.inferredBodyType
   require (AcceptedCompilerBodyProfile.validate source (fun _ => True)).isSome "match original body profile"
   require (AcceptedCompilerBodyProfile.validate source (fun id => id ≠ fixture.shape.initialRead.node.id)).isNone
     "match scrutinee coverage omitted"
   let expressions := source.nodes.filterMap fun | .expression node => some node.id | _ => none
   let roots := [fixture.shape.matchNode.id, fixture.shape.statement.id]
-  require (AcceptedCompilerBodySubsetProfile.validate source expressions roots).isSome "match original subset profile"
+  require (AcceptedCompilerBodySubsetProfile.validate source expressions roots expected).isSome "match original subset profile"
   require (AcceptedCompilerBodySubsetProfile.validate source
-      (expressions.filter (fun id => id != fixture.shape.localRead.node.id)) roots).isNone
+      (expressions.filter (fun id => id != fixture.shape.localRead.node.id)) roots expected).isNone
     "match actual arm coverage omitted"
   let missing := {fixture.shape.assignment.id with occurrence := {fixture.shape.assignment.id.occurrence with index := 1000000}}
   let missingArm := {source with nodes := source.nodes.map fun
@@ -117,14 +118,14 @@ private def boundaries (fixture : Fixture) : IO Unit := do
         form := .matchWith {fixture.shape.matching with cases := [{fixture.shape.arm with body := [missing]}]}}
       else .statement node
     | node => node}
-  require (AcceptedCompilerBodySubsetProfile.validate missingArm expressions roots).isNone
+  require (AcceptedCompilerBodySubsetProfile.validate missingArm expressions roots expected).isNone
     "match nonexistent arm statement accepted"
   let missingDefault := {source with nodes := source.nodes.map fun
     | .statement node => if node.id == fixture.shape.matchNode.id then .statement {node with
         form := .matchWith {fixture.shape.matching with defaultBody := some [missing]}}
       else .statement node
     | node => node}
-  require (AcceptedCompilerBodySubsetProfile.validate missingDefault expressions roots).isNone
+  require (AcceptedCompilerBodySubsetProfile.validate missingDefault expressions roots expected).isNone
     "match nonexistent default statement accepted"
 
 def run : IO Unit := do

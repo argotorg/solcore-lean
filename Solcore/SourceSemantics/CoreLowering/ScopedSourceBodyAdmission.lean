@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchAdmission
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyStopping
 
 /-! Finite original statement admission separates syntax from lexical typing.
 The same scan yields the accepted body shape and recovers changing contexts
@@ -61,7 +62,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
   | conditional {mode id node condition conditionNode thenBody elseBody rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
-      (sourceType : node.type = .unit)
+      (sourceType : node.type = .unit ∨ node.type = expected)
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool) (value : approved condition)
       (left : Scan source approved expected false thenBody)
@@ -100,6 +101,40 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+
+  | terminalBlock {mode id node body rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .block body)
+      (sourceType : node.type = expected)
+      (inner : Scan source approved expected false body)
+      (stops : ScopedSourceBodyStopping.ReturnStopped source body)
+      (remaining : CallableIndexedOwnedPreparedStagedBranchingTree.Shape source mode rest) :
+      Scan source approved expected mode (id :: rest)
+  | terminalConditional {mode id node condition conditionNode leftBody rightBody rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition leftBody (some rightBody))
+      (sourceType : node.type = expected)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool) (value : approved condition)
+      (left : Scan source approved expected false leftBody)
+      (right : Scan source approved expected false rightBody)
+      (first : ScopedSourceBodyStopping.ReturnStopped source leftBody)
+      (second : ScopedSourceBodyStopping.ReturnStopped source rightBody)
+      (remaining : CallableIndexedOwnedPreparedStagedBranchingTree.Shape source mode rest) :
+      Scan source approved expected mode (id :: rest)
+  | terminalMatch {mode id node resolution scrutineeNode defaultBody rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
+      (sourceType : node.type = expected)
+      (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
+      (value : approved resolution.scrutinee)
+      (hiddenOrdinary : source.inputs.any (fun input => decide (input.id = resolution.hiddenScrutinee)) = false)
+      (armsOrdinary : ∀ arm ∈ resolution.cases, ∀ binder ∈ arm.pattern.binderIds,
+        source.inputs.any (fun input => decide (input.id = binder)) = false)
+      (arms : ∀ arm ∈ resolution.cases, Scan source approved expected false arm.body)
+      (fallback : ∀ statements, resolution.defaultBody = some statements → Scan source approved expected false statements)
+      (present : resolution.defaultBody = some defaultBody)
+      (stoppedArms : ∀ arm ∈ resolution.cases, ScopedSourceBodyStopping.ReturnStopped source arm.body)
+      (stoppedDefault : ScopedSourceBodyStopping.ReturnStopped source defaultBody)
+      (remaining : CallableIndexedOwnedPreparedStagedBranchingTree.Shape source mode rest) :
+      Scan source approved expected mode (id :: rest)
 
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
@@ -148,6 +183,11 @@ theorem Scan.shape {source approved expected mode statements}
       exact .matchWith found form arms fallback remaining
   | forLoop found form _ initial _ _ _ _ after _ inner remaining =>
       exact .forLoop found form initial.shape after.shape inner remaining
+  | terminalBlock found form _ _ _ remaining inner => exact .block found form inner remaining
+  | terminalConditional found form _ _ _ _ _ _ _ _ remaining left right =>
+      exact .conditional found form left right remaining
+  | terminalMatch found form _ _ _ _ _ _ _ _ _ _ remaining arms fallback =>
+      exact .matchWith found form arms fallback remaining
 
 /-- Changing loop depth is harmless because each recursive body retains the
 same actual return type. All writes come from the original assignment typing. -/
@@ -288,6 +328,42 @@ theorem Scan.syntax {source approved expected mode statements}
               (inner (control := control.enterLoop) result body) (after.syntax unique postTyped)))
           (remaining result tail)
 
+
+  | terminalBlock found form sourceType _ stops _ inner =>
+      obtain ⟨_, _, _, head, _⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | block body =>
+          exact .terminalBlock unique found form sourceType
+            (inner result body) (stops.stopped unique body)
+  | terminalConditional found form sourceType conditionFound conditionType value _ _ first second _ left right =>
+      obtain ⟨_, _, _, head, _⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | ifWithElse condition firstTyped secondTyped =>
+          exact .terminalIf unique found form sourceType conditionFound conditionType
+            (by simpa only [conditionType] using condition) value
+            (left result firstTyped) (right result secondTyped)
+            (first.stopped unique firstTyped) (second.stopped unique secondTyped)
+  | terminalMatch found form sourceType scrutineeFound value hiddenOrdinary armsOrdinary _ _ present stoppedArms stoppedDefault _ arms fallback =>
+      obtain ⟨_, _, _, head, _⟩ := head_tail typed
+      obtain ⟨_, caseFacts, scrutineeTyped, casesTyped, defaultTyped⟩ :=
+        ScopedSourceMatchAdmission.statement_sites unique found form scrutineeFound head
+      apply GenericImperativeMatch.Syntax.terminalMatch unique found form (.inr sourceType)
+        scrutineeFound scrutineeTyped value casesTyped defaultTyped hiddenOrdinary armsOrdinary
+      · intro request childContext selected
+        obtain ⟨last, childFacts, childTyped⟩ :=
+          ScopedSourceMatchAdmission.request_typing casesTyped defaultTyped selected
+        cases selected with
+        | arm member same _ _ =>
+          rw [same] at childTyped ⊢
+          exact arms _ member result childTyped
+        | default same => exact fallback _ same result childTyped
+      · exact ScopedSourceBodyStopping.ReturnStopped.match_default stoppedArms stoppedDefault
+          unique found form present head
+
 /-- The expression checker is a data-only parameter; the finite traversal uses
 its proof receipts without evaluating any selected semantic inventory. -/
 def scan? (source : TypedSource) {approved : ExpressionId → Prop}
@@ -365,7 +441,7 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
         let ⟨remaining⟩ ← scan? source expression expected fuel mode rest
         pure ⟨.block found form inner remaining⟩
       | .ifThen condition thenBody elseBody =>
-        if sourceType : node.type = .unit then
+        if sourceType : node.type = .unit ∨ node.type = expected then
           match conditionFound : source.lookupExpression? condition with
           | none => none
           | some conditionNode =>

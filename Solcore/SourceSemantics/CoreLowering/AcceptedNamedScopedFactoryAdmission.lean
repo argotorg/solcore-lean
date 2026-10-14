@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyResultTyping
 import Solcore.SourceSemantics.CoreLowering.AcceptedScopedLambdaBodyReceipts
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerExpressionProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
@@ -35,7 +36,7 @@ minimum root budget and original lexical scope. -/
 theorem Produced.scan (produced : Produced prepared header parameters result statements)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
       header.function.source directRows directOnly allowIndices allowConstructors)
-    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
+    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements result)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
     ScopedSourceBodyAdmission.Scan header.function.source
@@ -62,7 +63,7 @@ theorem Produced.scan (produced : Produced prepared header parameters result sta
     exact certified.local_identity_ownership
   have binders := AcceptedNamedBodyBindings.of_monomorphic produced.inner.tree readPolicy
     header.unique ownership typed monomorphic
-  exact produced.inner.tree.scan readPolicy closed header.unique ownership children binders typed
+  exact produced.inner.tree.scan_complete readPolicy closed header.unique ownership children binders typed
 
 private theorem origin_owner : ∃ signature ∈ compiled.sourceProgram.signatures.functions,
     prepared.named.specialized.function.typedBody.owner = signature.id := by
@@ -78,7 +79,7 @@ include aligned in
 theorem of_produced (produced : Produced prepared header parameters result statements)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
       header.function.source directRows directOnly allowIndices allowConstructors)
-    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
+    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements result)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
     Nonempty (SourceCertificate compiled prepared.named header.function.source header.function.body) ∧
@@ -103,10 +104,9 @@ theorem of_produced (produced : Produced prepared header parameters result state
   obtain ⟨signature, member, owner⟩ := origin_owner prepared
   have source := (CallableIndexedOwnedPreparedNamedSourceAdmissionTransport.header_data prepared aligned).1
   have typedScan := scan
-  have returns := bodyProfile.returns
   have metadata := expressions.metadata
-  rw [source] at typedScan returns metadata
-  exact ⟨⟨factory⟩, ⟨⟨result, typedScan, returns, metadata, signature, member, owner⟩⟩⟩
+  rw [source] at typedScan metadata
+  exact ⟨⟨factory⟩, ⟨⟨result, typedScan, metadata, signature, member, owner⟩⟩⟩
 
 include aligned in
 /-- The accepted outer return identifies the literal lambda. Its actual scoped
@@ -123,7 +123,7 @@ theorem of_returning {outer : StatementId} {rest : List StatementId} {outerNode 
       decide (binding.caller = (context compiled.indexed prepared.named).owner ∧ binding.initializer = id)) = none)
     (expressions : AcceptedCompilerExpressionProfile.Profile compiled.indexed prepared.named
       header.function.source directRows directOnly allowIndices allowConstructors)
-    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements)
+    (bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids statements result)
     (supported : ∀ instantiation, DirectSite directRows instantiation → Supported compiled.indexed.base.plan instantiation)
     (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram)) :
     Nonempty (SourceCertificate compiled prepared.named header.function.source header.function.body) ∧

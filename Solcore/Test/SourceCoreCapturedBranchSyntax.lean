@@ -137,7 +137,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
   cases firstForm with
   | ifWithElse conditionTyped thenTyped elseTyped =>
     apply GenericImperativeMatch.Syntax.ifThen observed.shape.branchFound observed.shape.branchForm
-      observed.shape.branchType observed.shape.conditionRead.found observed.shape.conditionRead.type
+      (Or.inl observed.shape.branchType) observed.shape.conditionRead.found observed.shape.conditionRead.type
       (by simpa only [observed.shape.conditionRead.type] using conditionTyped) (leaf _ (by simp [readIds]))
     · obtain ⟨_, _, _, assignedHead, _⟩ := head_tail thenTyped
       have assignment := form_at unique observed.shape.assignmentFound assignedHead
@@ -176,7 +176,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
       cases earlyForm with
       | ifWithoutElse conditionTyped thenTyped =>
         apply GenericImperativeMatch.Syntax.ifThen observed.shape.earlyBranchFound observed.shape.earlyBranchForm
-          observed.shape.earlyBranchType observed.shape.earlyConditionRead.found observed.shape.earlyConditionRead.type
+          (Or.inl observed.shape.earlyBranchType) observed.shape.earlyConditionRead.found observed.shape.earlyConditionRead.type
           (by simpa only [observed.shape.earlyConditionRead.type] using conditionTyped) (leaf _ (by simp [readIds]))
         · obtain ⟨_, _, _, returningHead, _⟩ := head_tail thenTyped
           exact returning unique observed.shape.earlyRead observed.shape.earlyReturnFound observed.shape.earlyReturnForm

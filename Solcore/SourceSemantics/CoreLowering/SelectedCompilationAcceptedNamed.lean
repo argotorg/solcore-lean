@@ -29,7 +29,7 @@ theorem of_receipt {compiled : SourceCoreUnifiedCompilation.Compiled}
     (covered : ∀ id node, header.function.source.lookupExpression? id = some node →
       ∀ callee arguments instantiation, node.form = .call callee arguments (.declaration instantiation) →
         DirectSite directRows instantiation)
-    (closed : receipt.tree.closed = true)
+    (complete : receipt.tree.complete header.function.resultType = true)
     (monomorphic : ∀ binding ∈ receipt.tree.bindings, binding.binder.scheme.quantified = [])
     (excluded : ∀ child ∈ receipt.tree.children,
       ¬ Nonempty (AcceptedNamedExpressionFlow.Residual prepared header (DirectSite directRows)
@@ -51,8 +51,8 @@ theorem of_receipt {compiled : SourceCoreUnifiedCompilation.Compiled}
   have bindings := AcceptedNamedBodyBindings.of_monomorphic receipt.tree
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
     header.unique ownership typed monomorphic
-  exact ⟨metadata, receipt.tree.scan
+  exact ⟨metadata, receipt.tree.scan_complete
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
-    closed header.unique ownership children bindings typed⟩
+    complete header.unique ownership children bindings typed⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationAcceptedNamed

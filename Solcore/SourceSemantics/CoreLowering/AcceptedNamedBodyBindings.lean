@@ -205,7 +205,7 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
     (monomorphic : ∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) :
     ∀ binding ∈ tree.bindings, RecursiveNamedStatementSyntaxFacts.BinderReceipt source binding.binder := by
   induction tree generalizing control context final facts with
-  | nil | returning | returnUnit | boundary | forBoundary | breaking | continuing =>
+  | nil | returning | returnUnit | boundary | forBoundary | breaking | continuing | tailValue =>
       intro binding member
       simp only [Tree.bindings, List.not_mem_nil] at member
   | initialized read form statementType projected child generated childType remaining allocated ih =>
@@ -239,7 +239,7 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
         · exact ih tail (fun next present => monomorphic next (List.mem_cons_of_mem _ present)) binding member
 
   | assigning _ _ _ _ _ ih | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih
-      | matching _ _ _ _ _ ih =>
+      | matching _ _ _ _ _ ih | valueDiscard _ _ _ _ _ _ _ ih =>
       obtain ⟨_, _, _, _, tail⟩ := head_tail typed
       exact ih tail monomorphic
   | block read form inner remaining innerIH tailIH =>

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyCompletionTyping
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
 
 /-! Original return annotations identify a scoped body's result independently
@@ -40,6 +40,15 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
       inner (after.map mapped) remaining
   | assign found form declaration targetType bare rhsFound rhsType value _ ih =>
     exact .assign found form declaration targetType bare rhsFound rhsType (mapped _ value) ih
+
+  | terminalBlock found form sourceType _ stops remaining inner =>
+    exact .terminalBlock found form sourceType inner stops remaining
+  | terminalConditional found form sourceType conditionFound conditionType value _ _ first second remaining left right =>
+    exact .terminalConditional found form sourceType conditionFound conditionType (mapped _ value)
+      left right first second remaining
+  | terminalMatch found form sourceType scrutineeFound value hiddenOrdinary armsOrdinary _ _ present stoppedArms stoppedDefault remaining arms fallback =>
+    exact .terminalMatch found form sourceType scrutineeFound (mapped _ value) hiddenOrdinary armsOrdinary
+      arms fallback present stoppedArms stoppedDefault remaining
 
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
@@ -138,5 +147,15 @@ theorem Scan.result_eq_of_return {source : TypedSource} {approved : ExpressionId
   | assign found form _ _ _ _ _ _ _ ih =>
     obtain ⟨_, _, _, _, tail⟩ := head_tail typed
     exact ih (return_in_tail found (by simp [form, returns]) present) tail noLoop
+
+  | terminalBlock found form sourceType _ stops _ _ =>
+    obtain ⟨_, _, _, head, _⟩ := head_tail typed
+    exact (stopped_statement_result unique found (.block found form stops) head).symm.trans sourceType
+  | terminalConditional found form sourceType _ _ _ _ _ first second _ _ _ =>
+    obtain ⟨_, _, _, head, _⟩ := head_tail typed
+    exact (stopped_statement_result unique found (.conditional found form first second) head).symm.trans sourceType
+  | terminalMatch found form sourceType _ _ _ _ _ _ defaultEq arms fallback _ _ _ =>
+    obtain ⟨_, _, _, head, _⟩ := head_tail typed
+    exact (stopped_statement_result unique found (.matching found form defaultEq arms fallback) head).symm.trans sourceType
 
 end Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission

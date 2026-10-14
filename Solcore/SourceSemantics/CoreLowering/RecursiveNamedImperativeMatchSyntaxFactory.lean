@@ -203,7 +203,7 @@ theorem syntax_of_typed {source : TypedSource} {expressionSyntax : ExpressionId 
       obtain ⟨node, found, bool, typed⟩ := expression_node unique (by assumption)
       refine ⟨?_, ?_, ?_⟩
       · intro mode rest _ tail
-        exact .ifThen (lookupStatement?_complete unique (by assumption)) (by assumption) (by assumption)
+        exact .ifThen (lookupStatement?_complete unique (by assumption)) (by assumption) (Or.inl (by assumption))
           found bool typed conditionSyntax (bodyIH.tree false (.inl rfl)) (.body (.nil (.inl rfl))) tail
       · intros; contradiction
       · intros; contradiction
@@ -223,7 +223,7 @@ theorem syntax_of_typed {source : TypedSource} {expressionSyntax : ExpressionId 
       refine ⟨?_, terminal, ?_⟩
       · intro mode rest _ tail
         by_cases unit : actualControl.returnType = .unit
-        · exact .ifThen (lookupStatement?_complete unique contains) form (by simpa [unit] using annotation)
+        · exact .ifThen (lookupStatement?_complete unique contains) form (Or.inl (by simpa [unit] using annotation))
             found bool typed conditionSyntax (leftIH.tree false (.inl rfl)) (rightIH.tree false (.inl rfl)) tail
         · by_cases returned : (leftFacts.sawReturn && rightFacts.sawReturn) = true
           · rcases admitted with same | noReturn | ⟨leftAvailable, rightAvailable⟩
@@ -231,7 +231,7 @@ theorem syntax_of_typed {source : TypedSource} {expressionSyntax : ExpressionId 
             · simp [returned] at noReturn
             · exact terminal returned (Bool.and_eq_true_iff.mpr ⟨leftAvailable, rightAvailable⟩) mode rest
           · have noReturn : (leftFacts.sawReturn && rightFacts.sawReturn) = false := by cases flag : (leftFacts.sawReturn && rightFacts.sawReturn) <;> simp_all
-            exact .ifThen (lookupStatement?_complete unique contains) form (by simpa [noReturn] using annotation)
+            exact .ifThen (lookupStatement?_complete unique contains) form (Or.inl (by simpa [noReturn] using annotation))
               found bool typed conditionSyntax (leftIH.tree false (.inl rfl)) (rightIH.tree false (.inl rfl)) tail
       · intro noReturn value _
         simp_all

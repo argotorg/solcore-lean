@@ -60,8 +60,8 @@ structure Scoped (compiled : SourceCoreUnifiedCompilation.Compiled)
     (directOnly : Bool) where
   expressions : ExpressionProfile compiled named rows directOnly
   body : AcceptedCompilerBodyProfile.Profile named.specialized.function.typedBody expressions.Reached
-  returns : AcceptedCompilerBodyProfile.HasReturn named.specialized.function.typedBody
-    (statements named.specialized.function.typedBody)
+  finish : AcceptedCompilerBodyCompletion.Finish named.specialized.function.typedBody
+    named.specialized.function.inferredBodyType true (statements named.specialized.function.typedBody)
   lambdas : ∀ node ∈ named.specialized.function.typedBody.nodes, LambdaAllowed none node
 
 def scoped? (compiled : SourceCoreUnifiedCompilation.Compiled)
@@ -70,10 +70,10 @@ def scoped? (compiled : SourceCoreUnifiedCompilation.Compiled)
   let expressions ← AcceptedCompilerExpressionProfile.certify compiled.indexed named
     named.specialized.function.typedBody rows directOnly (!directOnly) (!directOnly)
   let ⟨body⟩ ← AcceptedCompilerBodyProfile.validate named.specialized.function.typedBody expressions.Reached
-  let ⟨returns⟩ ← AcceptedCompilerBodyProfile.hasReturn? named.specialized.function.typedBody
-    (statements named.specialized.function.typedBody)
+  let ⟨finish⟩ ← AcceptedCompilerBodyCompletion.finish? named.specialized.function.typedBody
+    named.specialized.function.inferredBodyType true (statements named.specialized.function.typedBody)
   let ⟨lambdas⟩ ← lambdas? named.specialized.function.typedBody none
-  pure ⟨expressions, body, returns, lambdas⟩
+  pure ⟨expressions, body, finish, lambdas⟩
 
 /-- The factory lane records the original outer return and singleton inner
 return. Every lambda in the complete original node table is accounted for. -/
@@ -236,7 +236,7 @@ structure ScopedFactory (compiled : SourceCoreUnifiedCompilation.Compiled)
   ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
     (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
       binding.initializer = expression)) = none
-  body : AcceptedCompilerBodySubsetProfile.Profile named.specialized.function.typedBody expressions.ids statements
+  body : AcceptedCompilerBodySubsetProfile.Profile named.specialized.function.typedBody expressions.ids statements result
   lambdas : ∀ actual ∈ named.specialized.function.typedBody.nodes, LambdaAllowed (some node) actual
 
 def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
@@ -262,7 +262,7 @@ def scopedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
                 if ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
                     (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
                       binding.initializer = expression)) = none then do
-                  let ⟨body⟩ ← AcceptedCompilerBodySubsetProfile.validate named.specialized.function.typedBody expressions.ids bodyRoots
+                  let ⟨body⟩ ← AcceptedCompilerBodySubsetProfile.validate named.specialized.function.typedBody expressions.ids bodyRoots result
                   let ⟨lambdas⟩ ← lambdas? named.specialized.function.typedBody (some node)
                   pure ⟨expressions, outer, rest, outerNode, expression, node, parameters, result, bodyRoots,
                     roots, outerFound, outerForm, found, form, requirements, coercions, ordinary, body, lambdas⟩

@@ -1,3 +1,8 @@
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFinish
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyShape
+import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyCompletion
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyCompletion
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyCompletionTyping
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedMatchFlow
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchAdmission
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceMatchRequests

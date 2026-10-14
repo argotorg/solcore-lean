@@ -99,7 +99,7 @@ theorem of_certificate
     (initializers : ∀ id, reached id → ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt
       compiled.indexed (CallableIndexedNamedGeneration.context compiled.indexed cached.named) id))
     (children : ∀ child ∈ receipt.tree.children, reached child.expression)
-    (closed : receipt.tree.closed = true)
+    (complete : receipt.tree.complete cached.named.specialized.function.inferredBodyType = true)
     (monomorphic : ∀ binding ∈ receipt.tree.bindings, binding.binder.scheme.quantified = []) :
     Nonempty (SourceCertificate compiled cached.named table.rows) := by
   obtain ⟨context, final, facts, typed, unique, ownership⟩ := source_typing cached certified
@@ -110,7 +110,7 @@ theorem of_certificate
     intro child member
     exact child_syntax cached table bodies metadata covered reachedForms arguments initializers
       child.accepted (children child member)
-  have body := receipt.tree.scan (read cached) closed unique ownership grammar binders typed
+  have body := receipt.tree.scan_complete (read cached) complete unique ownership grammar binders typed
   rw [← AcceptedMethodBodyAdmission.roots cached] at body
   exact ⟨⟨forms, ⟨metadata, body⟩⟩⟩
 
@@ -135,7 +135,7 @@ theorem of_selection
     (initializers : ∀ id, reached id → ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt
       compiled.indexed (CallableIndexedNamedGeneration.context compiled.indexed cached.named) id))
     (children : ∀ child ∈ receipt.tree.children, reached child.expression)
-    (closed : receipt.tree.closed = true)
+    (complete : receipt.tree.complete cached.named.specialized.function.inferredBodyType = true)
     (monomorphic : ∀ binding ∈ receipt.tree.bindings, binding.binder.scheme.quantified = []) :
     Nonempty (SourceCertificate compiled cached.named table.rows) := by
   obtain ⟨definition, member, identity, instantiated⟩ :=
@@ -152,6 +152,6 @@ theorem of_selection
     sameDefinition ▸ retainedValid
   obtain ⟨types, context, facts, certificate⟩ := instantiated.certificate_of_valid bodies.signatures valid
   exact of_certificate cached ⟨types, context, facts, certificate.toBodyInstanceTypingCertificate⟩
-    bodies table receipt forms metadata covered reachedForms arguments initializers children closed monomorphic
+    bodies table receipt forms metadata covered reachedForms arguments initializers children complete monomorphic
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationAcceptedMethods

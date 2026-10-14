@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyResultTyping
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyCompletionTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNamedSyntaxAdmission
 
@@ -19,7 +19,6 @@ structure SourceBodyCertificate (compiled : SourceCoreUnifiedCompilation.Compile
   result : TypeSystem.Ty
   scan : ScopedSourceBodyAdmission.Scan named.specialized.function.typedBody
     (fun id => GeneralSyntax named.specialized.function.typedBody id (DirectSite directRows)) result true body
-  hasReturn : AcceptedCompilerBodyProfile.HasReturn named.specialized.function.typedBody body
   metadata : CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles.MetadataFor
     compiled.indexed named named.specialized.function.typedBody (DirectSite directRows)
   signature : ProgramFunctionSignature
@@ -66,14 +65,13 @@ theorem of_actual
     exact site.covered rows aligned target global
   obtain ⟨sidecar, _issued, selected⟩ :=
     CallableIndexedOwnedPreparedDirectStageScopeReceipts.code_scope code support.source_receipt support.body.unique
-  obtain ⟨finalContext, facts, typed, _⟩ :=
+  obtain ⟨finalContext, facts, typed, completed⟩ :=
     CallableIndexedOwnedLambdaSourceAdmission.body_typed_at_parameters support.body.frame support.body.extended
   have scan : ScopedSourceBodyAdmission.Scan function.source
       (fun id => GeneralSyntax function.source id (DirectSite directRows)) certificate.result true function.body := by
     simpa only [support.source, CallableIndexedNamedGeneration.source] using certificate.scan
-  have returned : AcceptedCompilerBodyProfile.HasReturn function.source function.body := by
-    simpa only [support.source, CallableIndexedNamedGeneration.source] using certificate.hasReturn
-  have result : function.resultType = certificate.result := scan.result_eq_of_return support.body.unique returned typed rfl
+  have result : function.resultType = certificate.result :=
+    scan.result_eq_of_completes support.body.unique typed completed
   have syntaxTree := scan.syntax support.body.unique result typed
   rw [← result] at syntaxTree
   exact CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedSupport.of_actual_with_catalog

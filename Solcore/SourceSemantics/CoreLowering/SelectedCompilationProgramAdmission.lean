@@ -67,12 +67,13 @@ private theorem scoped_of_header
       (fun id => id ∈ AcceptedCompilerExpressionProfile.supportedIds header.function.source false true true)
     rw [source]
     exact profile.body
-  have returns : AcceptedCompilerBodyProfile.HasReturn header.function.source header.function.body := by
-    rw [source, body]
-    exact profile.returns
+  have finish : AcceptedCompilerBodyCompletion.Finish header.function.source
+      header.function.resultType true header.function.body := by
+    rw [source, body, _result, namedEq]
+    exact profile.finish
   obtain ⟨receipt, ready⟩ := AcceptedNamedBodyRefinement.of_header prepared aligned
   obtain ⟨closed, monomorphic, children⟩ := AcceptedCompilerBodyProfile.facts receipt.tree
-    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned) flatBody ready (.inr returns)
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned) flatBody ready finish
   have admission := SelectedCompilationAcceptedNamed.of_receipt prepared aligned receipt
     expressions.metadata supported expressions.covered closed monomorphic
     (by
@@ -223,9 +224,9 @@ private theorem scoped_factory_of_header
         binding.initializer = profile.expression)) = none := by
     rw [namedEq]
     exact profile.ordinary
-  have bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids profile.statements := by
+  have bodyProfile : AcceptedCompilerBodySubsetProfile.Profile header.function.source expressions.ids profile.statements profile.result := by
     change AcceptedCompilerBodySubsetProfile.Profile header.function.source
-      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false true true) profile.statements
+      (AcceptedCompilerExpressionProfile.supportedIds header.function.source false true true) profile.statements profile.result
     rw [source]
     exact profile.body
   obtain ⟨⟨factory⟩, ⟨closure⟩⟩ := SelectedCompilationAcceptedScopedFactories.of_returning prepared aligned
@@ -371,12 +372,12 @@ private theorem method_row {index : Nat} {named : SourceCoreGeneralFunctions.Fun
   let cached : CallablePreparedMethodSelection.Cached compiled method.specialized :=
     ⟨index, named, diagnostics, code, selected, same, generated, compilation⟩
   obtain ⟨receipt, ready⟩ := AcceptedMethodBodyReceipts.of_cached cached
-  have returns : AcceptedCompilerBodyProfile.HasReturn (AcceptedMethodBodyReceipts.source cached)
-      cached.compilation.statements := by
+  have finish : AcceptedCompilerBodyCompletion.Finish (AcceptedMethodBodyReceipts.source cached)
+      cached.named.specialized.function.inferredBodyType true cached.compilation.statements := by
     rw [← AcceptedMethodBodyAdmission.roots cached]
-    exact profile.returns
+    exact profile.finish
   obtain ⟨closed, monomorphic, children⟩ := AcceptedCompilerBodyProfile.facts receipt.tree
-    (AcceptedMethodBodyReceipts.read cached) profile.body ready (.inr returns)
+    (AcceptedMethodBodyReceipts.read cached) profile.body ready finish
   have formation := catalog.formed.formed selection.implementation selection.implementationMember
     selection.declaration selection.methodMember
   exact SelectedCompilationAcceptedMethods.of_selection cached checked selection formation.parameters

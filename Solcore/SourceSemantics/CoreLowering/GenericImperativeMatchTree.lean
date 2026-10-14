@@ -63,7 +63,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) : Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
   | ifThen {context mode id node condition conditionNode thenBody elseBody rest expected}
       (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
-      (sourceType : node.type = .unit)
+      (sourceType : node.type = .unit ∨ node.type = expected)
       (conditionFound : source.lookupExpression? condition = some conditionNode)
       (conditionType : conditionNode.type = .bool)
       (typed : ExpressionHasType source context condition conditionNode.type)

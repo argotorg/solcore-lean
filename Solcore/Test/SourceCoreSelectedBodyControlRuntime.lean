@@ -114,8 +114,8 @@ private def checkConditionalBoundary : IO Unit := do
               | _ => false
             | _ => false))) "body control boundary lost its original non-unit annotation"
         match SelectedCompilationCompilerStaticProfile.validateCheckedProfile cached original with
-        | none => pure ()
-        | some _ => throw (IO.userError "non-unit conditional profile boundary changed")
+        | none => throw (IO.userError "non-unit conditional profile rejected")
+        | some _ => pure ()
 
 def run : IO Unit := do
   checkConditionalBoundary

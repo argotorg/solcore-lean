@@ -6,7 +6,7 @@ set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
-open Core Frontend SourceInference AcceptedNamedBodyFlow
+open Core Frontend SourceInference AcceptedNamedBodyFlow AcceptedCompilerBodyCompletion
 open AcceptedCompilerBodyProfile (StatementReady HasReturn returns)
 
 /-- Membership is computed from original forms and expression operands. -/
@@ -32,10 +32,10 @@ def NodeReady (source : TypedSource) (expressions : List ExpressionId) (id : Sta
   ∃ node, source.lookupStatement? id = some node ∧
     StatementReady source (fun expression => expression ∈ expressions) node ∧ LoopEdges source expressions node
 
-structure Profile (source : TypedSource) (expressions : List ExpressionId) (roots : List StatementId) : Prop where
+structure Profile (source : TypedSource) (expressions : List ExpressionId) (roots : List StatementId) (expected : TypeSystem.Ty) : Prop where
   nodes : ∀ id ∈ ids source expressions, NodeReady source expressions id
   rootMembers : ∀ id ∈ roots, id ∈ ids source expressions
-  returns : HasReturn source roots
+  finish : Finish source expected true roots
 
 private def allProof? {α : Type} (predicate : α → Prop)
     (check : (item : α) → Option (PLift (predicate item))) :
@@ -99,16 +99,16 @@ private def node? (source : TypedSource) (expressions : List ExpressionId) (id :
 
 /-- Every chosen original node, loop body and initial body root is checked.
 No recursive body grammar is an input or a result of this finite check. -/
-def validate (source : TypedSource) (expressions : List ExpressionId) (roots : List StatementId) :
-    Option (PLift (Profile source expressions roots)) := do
+def validate (source : TypedSource) (expressions : List ExpressionId) (roots : List StatementId) (expected : TypeSystem.Ty) :
+    Option (PLift (Profile source expressions roots expected)) := do
   let ⟨nodes⟩ ← allProof? (NodeReady source expressions) (node? source expressions) (ids source expressions)
   if present : roots.all (fun id => decide (id ∈ ids source expressions)) = true then
-    let ⟨returns⟩ ← AcceptedCompilerBodyProfile.hasReturn? source roots
-    pure ⟨⟨nodes, fun id member => of_decide_eq_true (List.all_eq_true.mp present id member), returns⟩⟩
+    let ⟨finish⟩ ← finish? source expected true roots
+    pure ⟨⟨nodes, fun id member => of_decide_eq_true (List.all_eq_true.mp present id member), finish⟩⟩
   else none
 
-theorem Profile.at {source : TypedSource} {expressions : List ExpressionId} {roots : List StatementId}
-    (profile : Profile source expressions roots) {id : StatementId} {node : StatementNode}
+theorem Profile.at {source : TypedSource} {expressions : List ExpressionId} {roots : List StatementId} {expected : TypeSystem.Ty}
+    (profile : Profile source expressions roots expected) {id : StatementId} {node : StatementNode}
     (present : id ∈ ids source expressions) (found : source.lookupStatement? id = some node) :
     StatementReady source (fun expression => expression ∈ expressions) node ∧ LoopEdges source expressions node := by
   obtain ⟨actual, lookup, ready⟩ := profile.nodes id present
@@ -120,35 +120,46 @@ private theorem expanded_of_ready {source : TypedSource} {expressions : List Exp
     expanded node.form = true := by
   cases form : node.form <;> simp_all [StatementReady, AcceptedNamedBodyFlow.expanded]
 
+private theorem read_found {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}
+    {id : StatementId} {node : StatementNode} {type : Ty}
+    (accepted : SourceCoreCompatibleDataExpressions.readStatement checked source id = .ok (node, type)) :
+    source.lookupStatement? id = some node := by
+  unfold SourceCoreCompatibleDataExpressions.readStatement at accepted
+  by_cases owner : id.occurrence.owner ≠ source.owner
+  · simp [owner, throw, bind, Except.bind] at accepted
+  · simp only [owner, ↓reduceIte, bind, Except.bind, pure, Except.pure] at accepted
+    cases found : source.lookupStatement? id with
+    | none => simp [found] at accepted
+    | some actual =>
+      simp only [found] at accepted
+      obtain ⟨projected, _, same⟩ := CompatibleEncoding.bind_ok accepted
+      cases same
+      rfl
+
 private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
     {source : TypedSource} {result : Ty} {reasonAt : ExpressionId → Word}
     {mode : Bool} {escaped : Word} {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
-    {statements originalRoots : List StatementId} {code : Expr} {expressionIds : List ExpressionId}
+    {statements originalRoots : List StatementId} {code : Expr} {expressionIds : List ExpressionId} {expected : TypeSystem.Ty}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
-    (profile : Profile source expressionIds originalRoots) (ready : tree.Ready)
+    (profile : Profile source expressionIds originalRoots expected) (ready : tree.Ready)
     (present : ∀ id ∈ statements, id ∈ ids source expressionIds)
-    (finish : mode = false ∨ HasReturn source statements) :
-    tree.closed = true ∧
+    (finish : TailForms source mode statements) :
+    tree.formed = true ∧
       (∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) ∧
       (∀ child ∈ tree.children, child.expression ∈ expressionIds) := by
   induction tree with
-  | @nil actualMode _ _ _ =>
-      have modeFalse : actualMode = false := by
-        rcases finish with same | ⟨id, member, _⟩
-        · exact same
-        · cases member
-      simp [Tree.closed, Tree.bindings, Tree.children, modeFalse]
+  | nil => simp [Tree.formed, Tree.bindings, Tree.children]
   | returning read form statementType child generated childType =>
       have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
       simp only [StatementReady, form] at original
       exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
-  | returnUnit | breaking | continuing => simp [Tree.closed, Tree.bindings, Tree.children]
+  | returnUnit | breaking | continuing => simp [Tree.formed, Tree.bindings, Tree.children]
   | initialized read form statementType projected child generated childType remaining allocated ih =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
       simp only [StatementReady, form, Option.toList_some, List.mem_singleton] at original
-      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, ?_, ?_⟩
       · intro binding member
         rcases List.mem_cons.mp member with rfl | member
@@ -162,7 +173,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
       simp only [StatementReady, form] at original
-      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, ?_, next.2.2⟩
       intro binding member
       rcases List.mem_cons.mp member with rfl | member
@@ -176,7 +187,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
       simp only [StatementReady, form] at original
-      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, next.2.1, ?_⟩
       intro actual member
       rcases List.mem_cons.mp member with rfl | member
@@ -186,19 +197,34 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
       simp only [StatementReady, form] at original
-      have next := tailIH ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      have next := tailIH ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
       refine ⟨next.1, next.2.1, ?_⟩
       intro actual member
       rcases List.mem_cons.mp member with rfl | member
-      · exact original.2
+      · exact original
+      · exact next.2.2 actual member
+  | tailValue read form child generated statementType childType =>
+      have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
+      simp only [StatementReady, form] at original
+      exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
+  | valueDiscard read form notFinal child generated statementType remaining ih =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      simp only [StatementReady, form] at original
+      have modeFalse := finish.discard_mode found form notFinal
+      have next := ih ready (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, modeFalse, Bool.not_false, Bool.true_and]; exact next.1, next.2.1, ?_⟩
+      intro actual member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact original
       · exact next.2.2 actual member
   | block read form inner remaining innerIH tailIH =>
       have found := read_found (readPolicy ▸ read)
       have edges := (profile.at (present _ List.mem_cons_self) found).2
       simp only [LoopEdges, form] at edges
-      have inside := innerIH ready.1 edges (Or.inl rfl)
-      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      have inside := innerIH ready.1 edges (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
         · exact inside.2.1 binding member
@@ -213,10 +239,10 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       simp only [StatementReady, form] at original
       have edges := (profile.at (present _ List.mem_cons_self) found).2
       simp only [LoopEdges, form] at edges
-      have first := leftIH ready.1 edges.1 (Or.inl rfl)
-      have second := rightIH ready.2.1 edges.2 (Or.inl rfl)
-      have next := tailIH ready.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp [Tree.closed, original.1, first.1, second.1, next.1], ?_, ?_⟩
+      have first := leftIH ready.1 edges.1 (by simp [TailForms, tailForms?])
+      have second := rightIH ready.2.1 edges.2 (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp [Tree.formed, first.1, second.1, next.1], ?_, ?_⟩
       · intro binding member
         simp only [Tree.bindings, List.mem_append] at member
         rcases member with (member | member) | member
@@ -225,7 +251,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
         · exact next.2.1 binding member
       · intro actual member
         rcases List.mem_cons.mp member with rfl | member
-        · exact original.2
+        · exact original
         · simp only [List.mem_append] at member
           rcases member with (member | member) | member
           · exact first.2.2 actual member
@@ -237,7 +263,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have original := (profile.at (present _ List.mem_cons_self) found).1
       simp only [StatementReady, form] at original
       have allBranches : ∀ request member,
-          (branches request member).closed = true ∧
+          (branches request member).formed = true ∧
           (∀ binding ∈ (branches request member).bindings, binding.binder.scheme.quantified = []) ∧
           (∀ child ∈ (branches request member).children, child.expression ∈ expressionIds) := by
         intro request member
@@ -248,10 +274,10 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
           · rw [same]; exact edges.1 arm armMember
           · intro id member
             exact edges.2 id (by simpa only [same, Option.getD_some] using member)
-        exact branchIH request member (ready.1 request member) requestPresent (Or.inl rfl)
-      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+        exact branchIH request member (ready.1 request member) requestPresent (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
       refine ⟨?_, ?_, ?_⟩
-      · simp only [Tree.closed, Bool.and_eq_true]
+      · simp only [Tree.formed, Bool.and_eq_true]
         exact ⟨List.all_eq_true.mpr (fun request _ => (allBranches request.val request.property).1), next.1⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
@@ -271,9 +297,9 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       simp only [StatementReady, form] at original
       have edges := (profile.at (present _ List.mem_cons_self) found).2
       simp only [LoopEdges, form] at edges
-      have inside := innerIH ready.1 edges (Or.inl rfl)
-      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
+      have inside := innerIH ready.1 edges (by simp [TailForms, tailForms?])
+      have next := tailIH ready.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, inside.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         rcases List.mem_append.mp member with member | member
         · exact inside.2.1 binding member
@@ -291,10 +317,10 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       simp only [LoopEdges, form] at edges
       simp only [StatementReady, form] at original
       have before := AcceptedCompilerBodyProfile.header_facts initial original.1 ready.1
-      have inside := innerIH ready.2.1 edges (Or.inl rfl)
+      have inside := innerIH ready.2.1 edges (by simp [TailForms, tailForms?])
       have post := AcceptedCompilerBodyProfile.header_facts after original.2.2 ready.2.2.1
-      have next := tailIH ready.2.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
-      refine ⟨by simp only [Tree.closed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
+      have next := tailIH ready.2.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.tail found (by simp [form, stopsHere]))
+      refine ⟨by simp only [Tree.formed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
       · intro binding member
         simp only [Tree.bindings, List.mem_append] at member
         rcases member with ((member | member) | member) | member
@@ -320,19 +346,22 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       rw [outside] at original
       cases original
 
-/-- Actual compiler recursion supplies the body shape and lexical bindings.
-The finite subset check identifies only original nodes and operand membership. -/
-theorem Profile.facts {source : TypedSource} {expressions : List ExpressionId} {statements : List StatementId}
-    (profile : Profile source expressions statements)
+/-- Original branch membership and raw completion are discharged by the finite
+profile; the authentic compiler tree supplies all recursive body receipts. -/
+theorem Profile.facts {source : TypedSource} {expressions : List ExpressionId}
+    {statements : List StatementId} {expected : TypeSystem.Ty}
+    (profile : Profile source expressions statements expected)
     {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
     {result : Ty} {reasonAt : ExpressionId → Word} {escaped : Word} {fuel : Nat}
     {scope : SourceCoreLocalCell.Scope} {code : Expr}
     (tree : Tree policy source result reasonAt true escaped fuel scope statements code)
     (readPolicy : policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement checked)
     (ready : tree.Ready) :
-    tree.closed = true ∧
+    tree.complete expected = true ∧
       (∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) ∧
-      (∀ child ∈ tree.children, child.expression ∈ expressions) :=
-  facts_general tree readPolicy profile ready profile.rootMembers (.inr profile.returns)
+      (∀ child ∈ tree.children, child.expression ∈ expressions) := by
+  obtain ⟨formed, bindings, children⟩ :=
+    facts_general tree readPolicy profile ready profile.rootMembers profile.finish.forms
+  exact ⟨tree.complete_of_formed readPolicy formed profile.finish, bindings, children⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
