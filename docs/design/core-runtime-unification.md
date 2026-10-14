@@ -18,7 +18,9 @@ The additive `Profiled` session retains the genuine static profile and checker r
 
 `SelectedCompilationCheckedBodyTyping.of_checked` now derives selected body typing from actual checker success and the existing compiler profile. The mutually recursive inference proof is closed, including unannotated declarations, match cases and for-loop headers. `SelectedCompilationCheckedPublicSession` uses this producer for automatic and profiled public initialization; callers no longer supply a body-typing certificate. The original checker budget and complete program remain unchanged.
 
-Covering every compiler form and lifting ordinary Source executions through authentic stage guards remain work in progress. A lift must preserve an earlier stage rejection and its reached prefix heap when a compiled guard rejects. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
+`SelectedCompilationStageActualLifting.lifts_roots` now closes ordinary-to-staged lifting for the accepted selected profile. It preserves the original value or semantic fault and exact final heap, or produces an authentic earlier stage rejection at its exact prefix heap. The closed initial and later named-call forward APIs consume independent ordinary Source outcomes. Actual bootstrap and input processing supply their physical state conditions; callers do not provide a staged trace or recursive body theorem.
+
+Direct retained-handle calls and whole structured outputs still need the same ordinary-to-public connection. Complete compiler-form and actual-pass coverage also remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 

@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Ordinary-to-staged and public forward connection audit (2026-10-14)
+
+The closed selected lifting family recurses on the original ordinary Source trace. A smaller ordinary trace supplies each recursive call; the independently closed staged-preservation family supplies physical facts at intermediate states. The proof retains actual method selection, complete invocation dictionaries, closure code and captured environments, and the ordering of operand and coercion effects.
+
+The public initial and later named-call endpoints derive their body lifting internally. Initial physical conditions come from actual bootstrap and input validation before completion. Later calls use the receiving registry and current handle history. The success and semantic-fault branches preserve the literal original result and final heap. The stage branch contains an actual staged failure, the rejected guard and its reached prefix heap, then connects that failure to public continuation.
+
+The concrete lexical proofs construct ordinary traces independently and use startup-only receipts. Their older fixture type still contains an unused manually constructed whole-program validity field. An additional transitive proof-value dependency check confirms that the new scalar/fault theorem paths do not use that field or a completed public run; the production closed APIs have no such field. The ordinary-stage runtime companion checks effect ordering and continuation but does not itself construct an independent Source execution proof.
+
+Validation: 103 changed or new modules checked in a coherent graph of 7,684 modules; both new runtime companions, the full build, registered runtime suite, kernel policy and 730 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Independent reviews check the closed root producer, coercion and body adapters, initial and later public boundaries, and the concrete Source-first consumers. Private integration pins every source and object dependency and excludes obsolete experimental wrappers. Remaining obligations are direct retained-handle and whole structured-output ordinary forward connections, wider compiler-form coverage and actual-pass preservation. No termination theorem for all checker-accepted programs is claimed.
+
 ## Actual checker and selected public initialization audit (2026-10-14)
 
 The selected body producer is now closed over the actual mutually recursive checker. Its public premises are the original successful checking receipt and accepted compiler profile. It retains every original declaration and method identity, complete raw substitutions and the original checking budget. It does not infer validity of unrelated bodies.

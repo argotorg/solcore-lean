@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Ordinary Source executions reach public named calls (2026-10-14)
+
+`SelectedCompilationStageActualLifting.lifts_roots` lifts finite ordinary Dynamic executions through the actual selected staging rules. Strong induction over the original Source trace closes named, closure, builtin, operator-method and coercion-method calls. Lexical declarations, assignment, branches, matching and loops use the actual intermediate states. Earlier stage rejection stops the remaining expressions and preserves the exact prefix heap.
+
+`SelectedCompilationStagePublicProgramLifting.named_bodies` closes the body premise used by the public adapters. `SelectedCompilationStageClosedInitialForward` and `SelectedCompilationStageClosedPublicForward` expose scalar, semantic-fault and function-return endpoints for initial and later named calls. They consume independent ordinary Source outcomes, actual startup/input receipts and the accepted compiler profile. Callers supply no staged execution or recursive body-meaning callback. The conclusion is either the same result or semantic fault at the same final Source heap, with sufficient-fuel public bounds, or a genuine earlier stage rejection with its own reached heap and public failure bounds.
+
+Initial input facts come from real bootstrap, including resumed initialization, and public data validation. Later calls derive their physical arguments and heap facts from the current certified session and retained handle history. The original checked program, dictionaries, argument order and closure captures remain intact.
+
+The new lexical companion constructs its ordinary identity and uninitialized-read traces directly from original Source body shapes before consuming either public forward theorem. Its startup receipt contains no completed-run field. Runtime checks preserve zero-fuel suspension, the semantic fault, fresh `identity(37)` and `identity(37)` in the returned session, with public heap sizes `3 / 6 / 3 / 6 / 9`. A second companion checks an indirect comptime-parameter rejection before argument effects, later ordinary closure calls and retained handles; its heap sizes are `5 / 5 / 11 / 11 / 26 / 32 / 47`.
+
+Validation: 103 changed or new modules checked in a coherent graph of 7,684 modules; both new runtime companions, the full build, registered runtime suite, kernel policy and 730 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Remaining work includes ordinary-to-public direct calls through retained handles, whole structured-output meaning, complete compiler-form coverage and the remaining actual-pass preservation obligations. The supported compiler profile remains explicit. The general lifting result intentionally permits a genuine earlier stage rejection; it does not prove that every ordinary successful execution succeeds publicly. Runtime unification is complete; semantic preservation for the full compiler remains incomplete.
+
 ## Actual checking supplies selected body typing (2026-10-14)
 
 `SelectedCompilationCheckedBodyTyping.of_checked` derives `SelectedCompilationBodyTyping.Bodies` from the original successful checker receipt and the accepted compiler profile. It retains the complete original checked program. Callers supply no recursive inference theorem, body certificate or whole-program body-validity proof.

@@ -23,7 +23,17 @@ Use `SelectedCompilationCheckedBodyTyping.of_checked checked profile` to obtain 
 - `of_checked_profile`, `from_checked_profile_initial_start` and `from_checked_profile_initial_row` return `Issued` sessions.
 - `profiled_of_checked_profile`, `from_checked_profiled_initial_start` and `from_checked_profiled_initial_row` retain the checker receipt and profile in `Profiled` sessions.
 
-These constructors preserve the existing preparation, compilation, bootstrap and startup premises; later outcome APIs retain their execution and resume receipts. They require no supplied body certificate or recursive soundness premise. The earlier constructors and `Bodies.of_program` remain available. Full compiler coverage and ordinary-to-staged execution lifting are still unfinished; the accepted compiler profile and stage-aware Source trace remain conditions of the forward execution theorem.
+These constructors preserve the existing preparation, compilation, bootstrap and startup premises; later outcome APIs retain their execution and resume receipts. They require no supplied body certificate or recursive soundness premise. The earlier constructors and `Bodies.of_program` remain available.
+
+### Forward calls from ordinary Source outcomes
+
+`SelectedCompilationStageClosedInitialForward.{scalar,fault,function}` takes a profiled session, actual startup/initialization receipts, supported initial data inputs and an independent `PlainValue` or `PlainFault`. `SelectedCompilationStageClosedPublicForward.{scalar,fault,function}` provides the same connection for later named calls from the current certified state and history-backed inputs. Both derive the internal staged execution and body support.
+
+Each endpoint returns either the original outcome and exact final Source heap with public forward bounds, or `StageStopped`: an actual rejected stage guard, its reached prefix heap and sufficient-fuel public failure bounds. The failure branch permits every output budget. Function export retains earlier handles and supplies reimport at the matching output budget. The stage alternative cannot be discarded merely because the ordinary Source execution succeeds.
+
+`SelectedCompilationStageActualLifting.lifts_roots` closes recursive expression/body lifting by the size of the ordinary Source trace. `SelectedCompilationStagePublicProgramLifting.named_bodies` connects it to actual selected named packets. These internal producers leave no body-meaning or root-lifting callback at the closed public APIs.
+
+Direct retained-handle invocation and whole structured-output meaning still need equivalent ordinary-to-public wrappers. Existing staged direct/output interfaces remain available. Complete compiler-form and actual-pass preservation also remain unfinished; the accepted compiler profile and typed public input conditions remain explicit.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
