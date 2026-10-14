@@ -27,6 +27,10 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
     exact StatementsPlain.terminal contains (by intro expression; simp [form]) (.returnUnit contains form)
+  case continuing contains form =>
+    exact StatementsPlain.terminal_continuing contains (by intro expression; simp [form]) (.continueStmt contains form)
+  case breaking contains form =>
+    exact StatementsPlain.terminal_breaking contains (by intro expression; simp [form]) (.breakStmt contains form)
   case returnValue contains form child _ih =>
     exact StatementsPlain.terminal contains (by intro expression; simp [form])
       (.returnValue contains form child.value_plain)
@@ -49,6 +53,12 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | semantic => exact StatementsPlain.head_fault (.ifCondition contains form test.semanticFault_plain)
   case ifReturned contains form test _branch _testIH branchIH =>
     exact StatementsPlain.terminal contains (by intro e; simp [form])
+      (StatementsPlain.if_execute contains form test.value_plain branchIH)
+  case ifContinuing contains form test _branch _testIH branchIH =>
+    exact StatementsPlain.terminal_continuing contains (by intro e; simp [form])
+      (StatementsPlain.if_execute contains form test.value_plain branchIH)
+  case ifBreaking contains form test _branch _testIH branchIH =>
+    exact StatementsPlain.terminal_breaking contains (by intro e; simp [form])
       (StatementsPlain.if_execute contains form test.value_plain branchIH)
   case ifFault contains form test _branch _testIH branchIH =>
     rename_i failure
@@ -90,6 +100,10 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
 
   case blockReturned contains form inner ih =>
     exact StatementsPlain.terminal contains (by intro e; simp [form]) (.block contains form ih)
+  case blockContinuing contains form inner ih =>
+    exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (.block contains form ih)
+  case blockBreaking contains form inner ih =>
+    exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (.block contains form ih)
   case blockFault contains form inner ih =>
     rename_i failure
     cases failure with
@@ -113,6 +127,7 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | stage => trivial
     | semantic => exact .condition test.semanticFault_plain
   case returned test body _testIH bodyIH => exact .returns test.value_plain bodyIH
+  case breakFromBody test body _testIH bodyIH => exact .breaks test.value_plain bodyIH
   case bodyFault test body _testIH bodyIH =>
     rename_i failure
     cases failure with
@@ -120,8 +135,14 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | semantic => exact .body test.value_plain bodyIH
   case next test body next _testIH bodyIH nextIH => exact WhilePlain.next test.value_plain bodyIH nextIH
 
+  case continueNext test body next _testIH bodyIH nextIH => exact WhilePlain.continued test.value_plain bodyIH nextIH
+
   case matchReturned contains form matched ih =>
     exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
+  case matchContinuing contains form matched ih =>
+    exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (ih _ _ contains form)
+  case matchBreaking contains form matched ih =>
+    exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (ih _ _ contains form)
   case matchFault contains form matched ih =>
     rename_i failure
     cases failure with
@@ -197,13 +218,22 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | stage => trivial
     | semantic => exact .body test.value_plain branchIH
   case returnedFromBody test branch _testIH branchIH => exact .returns test.value_plain branchIH
+  case forBreakFromBody test branch _testIH branchIH => exact .breaks test.value_plain branchIH
   case postFailure test branch postTrace _testIH branchIH postIH =>
     rename_i failure
     cases failure with
     | stage => trivial
     | semantic => exact .postFallthrough test.value_plain branchIH postIH
+  case continuePostFailure test branch postTrace _testIH branchIH postIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .postContinue test.value_plain branchIH postIH
   case iterate test branch postTrace next _testIH branchIH postIH nextIH =>
     exact ForLoopPlain.next test.value_plain branchIH postIH nextIH
+
+  case continueIterate test branch postTrace next _testIH branchIH postIH nextIH =>
+    exact ForLoopPlain.continued test.value_plain branchIH postIH nextIH
 
 /-- Loops retain their actual finite ordinary iterations, including nested calls. -/
 theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
@@ -230,12 +260,15 @@ theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     | stage => trivial
     | semantic => exact .condition test.semanticFault_plain
   case returned test body _testIH _bodyIH => exact .returns test.value_plain body.body_plain
+  case breakFromBody test body _testIH _bodyIH => exact .breaks test.value_plain body.body_plain
   case bodyFault test body _testIH _bodyIH =>
     rename_i failure
     cases failure with
     | stage => trivial
     | semantic => exact .body test.value_plain body.body_plain
   case next test body next _testIH _bodyIH nextIH => exact WhilePlain.next test.value_plain body.body_plain nextIH
+
+  case continueNext test body next _testIH _bodyIH nextIH => exact WhilePlain.continued test.value_plain body.body_plain nextIH
 
 /-- Match erasure retains its actual selected arm and allocation prefix. -/
 theorem Match.plain {program : Program} {registry : Registry} {scope : Scope}
@@ -335,13 +368,22 @@ theorem ForLoop.plain {program : Program} {registry : Registry} {scope : Scope}
     | stage => trivial
     | semantic => exact .body test.value_plain branch.body_plain
   case returnedFromBody test branch _testIH _branchIH => exact .returns test.value_plain branch.body_plain
+  case forBreakFromBody test branch _testIH _branchIH => exact .breaks test.value_plain branch.body_plain
   case postFailure test branch postTrace _testIH _branchIH _postIH =>
     rename_i failure
     cases failure with
     | stage => trivial
     | semantic => exact .postFallthrough test.value_plain branch.body_plain postTrace.plain
+  case continuePostFailure test branch postTrace _testIH _branchIH _postIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .postContinue test.value_plain branch.body_plain postTrace.plain
   case iterate test branch postTrace next _testIH _branchIH _postIH nextIH =>
     exact ForLoopPlain.next test.value_plain branch.body_plain postTrace.plain nextIH
+
+  case continueIterate test branch postTrace next _testIH _branchIH _postIH nextIH =>
+    exact ForLoopPlain.continued test.value_plain branch.body_plain postTrace.plain nextIH
 
 /-- A scoped arm retains the independent ordinary sequence and its actual heap. -/
 theorem StatementsIn.returned_scoped {program : Program} {registry : Registry} {scope : Scope}
@@ -367,6 +409,22 @@ theorem StatementsIn.semanticFault_scoped {program : Program} {registry : Regist
     StatementsFault program context scope.evidence scope.source environment before ids
       finalContext reason after := trace.body_plain
 
+theorem StatementsIn.breaking_scoped {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment finalEnvironment : Environment} {before after : Heap}
+    {ids : List StatementId}
+    (trace : StatementsIn program registry false scope context environment before ids finalContext
+      (.breaking finalEnvironment) after) :
+    StatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.breaking finalEnvironment) after := trace.body_plain
+
+theorem StatementsIn.continuing_scoped {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment finalEnvironment : Environment} {before after : Heap}
+    {ids : List StatementId}
+    (trace : StatementsIn program registry false scope context environment before ids finalContext
+      (.continuing finalEnvironment) after) :
+    StatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.continuing finalEnvironment) after := trace.body_plain
+
 /-- Returned staged bodies retain their complete ordinary function trace. -/
 theorem Statements.returned_plain {program : Program} {registry : Registry} {scope : Scope}
     {context finalContext : Context} {environment : Environment} {before after : Heap}
@@ -383,6 +441,23 @@ theorem Statements.fallthrough_plain {program : Program} {registry : Registry} {
       (.fallthrough finalEnvironment) after) :
     FunctionStatementsExecute program context scope.evidence scope.source environment before ids
       finalContext (.fallthrough finalEnvironment) after := trace.body_plain
+
+theorem Statements.breaking_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment finalEnvironment : Environment} {before after : Heap}
+    {ids : List StatementId}
+    (trace : Statements program registry scope context environment before ids finalContext
+      (.breaking finalEnvironment) after) :
+    FunctionStatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.breaking finalEnvironment) after := trace.body_plain
+
+theorem Statements.continuing_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context finalContext : Context} {environment finalEnvironment : Environment} {before after : Heap}
+    {ids : List StatementId}
+    (trace : Statements program registry scope context environment before ids finalContext
+      (.continuing finalEnvironment) after) :
+    FunctionStatementsExecute program context scope.evidence scope.source environment before ids
+      finalContext (.continuing finalEnvironment) after := trace.body_plain
+
 
 /-- A semantic fault keeps its actual reason, stopping context and prefix heap. -/
 theorem Statements.semanticFault_plain {program : Program} {registry : Registry} {scope : Scope}

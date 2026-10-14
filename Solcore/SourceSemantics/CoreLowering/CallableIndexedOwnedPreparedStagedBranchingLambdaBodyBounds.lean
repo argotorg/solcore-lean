@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicFaultReceivers
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativePreservation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativeFlow
@@ -110,7 +111,9 @@ theorem source_body_at
       entry.entry.locals entry.entry.lookups entry.entry.actualTyped entry.entry.reference entry.entry.read
       entry.entry.unmapped reached conditioned admitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function support.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    unique sourceTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function support.projection represented controlClosed
   obtain ⟨value, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented evaluated
       packet.fellThrough packet.escaped entry.entry.embedding
@@ -192,7 +195,9 @@ theorem native_body_at
       entry.locals entry.lookups entry.actualTyped entry.reference entry.read entry.unmapped reached
       conditioned admitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function support.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    graph.nodeOccurrencesUnique sourceTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function support.projection represented controlClosed
   obtain ⟨bodyValue, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented flowTrace.sound
       packet.fellThrough packet.escaped entry.embedding

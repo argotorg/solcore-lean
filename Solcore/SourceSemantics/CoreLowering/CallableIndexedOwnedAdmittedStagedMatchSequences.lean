@@ -112,6 +112,32 @@ private theorem fallthrough_environment {program registry size invocation contex
       cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
   | noBranch => exact Staging.Recursive.BodyOutcome.fallthrough.inj outcomeEq
 
+private theorem breaking_environment {program registry size invocation context before after resolution outer inner}
+    (trace : Staging.Recursive.Size.Match program registry size invocation context outer before
+      resolution (.breaking inner) after) : inner = outer := by
+  generalize outcomeEq : (Staging.Recursive.BodyOutcome.breaking inner) = outcome at trace
+  cases trace with
+  | scrutineeFault => cases outcomeEq
+  | patternFault => cases outcomeEq
+  | @arm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | @default _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | noBranch => cases outcomeEq
+
+private theorem continuing_environment {program registry size invocation context before after resolution outer inner}
+    (trace : Staging.Recursive.Size.Match program registry size invocation context outer before
+      resolution (.continuing inner) after) : inner = outer := by
+  generalize outcomeEq : (Staging.Recursive.BodyOutcome.continuing inner) = outcome at trace
+  cases trace with
+  | scrutineeFault => cases outcomeEq
+  | patternFault => cases outcomeEq
+  | @arm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | @default _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | noBranch => cases outcomeEq
+
 private theorem stopped_not_fallthrough {program registry size invocation context before after resolution environment inner id statement}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some statement)
@@ -174,6 +200,22 @@ theorem reflects {budget : Nat}
       exact ⟨_, context, _, middle, middleMap, middleWorld,
         .matchReturned (lookupStatement?_sound statementFound) form headTrace,
         .returned payload, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+        middleState, headRelated, headPost⟩
+  | breaking innerEnvironment =>
+      have environmentEq := breaking_environment headTrace
+      subst innerEnvironment
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      exact ⟨_, context, _, middle, middleMap, middleWorld,
+        .matchBreaking (lookupStatement?_sound statementFound) form headTrace,
+        .breaking environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+        middleState, headRelated, headPost⟩
+  | continuing innerEnvironment =>
+      have environmentEq := continuing_environment headTrace
+      subst innerEnvironment
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      exact ⟨_, context, _, middle, middleMap, middleWorld,
+        .matchContinuing (lookupStatement?_sound statementFound) form headTrace,
+        .continuing environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
         middleState, headRelated, headPost⟩
   | fault matched =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_failure _ headEval.sound)
@@ -266,6 +308,16 @@ theorem preserves {budget : Nat}
           maps, worlds, preservation, metadata, reached, related, post⟩
         rw [LoopRenaming.sequence]
         exact LocalLoop.sequence_returned _ evaluated
+    | breaking innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .breaking innerEnvironment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
+    | continuing innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .continuing innerEnvironment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
     | fault matched =>
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps,
           maps, worlds, preservation, metadata, reached, related, post⟩
@@ -275,7 +327,15 @@ theorem preserves {budget : Nat}
   rcases CallableIndexedOwnedPreparedStagedScopedMatchSourceInversion.match_and_tail unique statementFound form trace with
     ⟨innerSize, sourceValue, sameSize, contextEq, outcomeEq, innerTrace⟩ |
     ⟨innerSize, failure, sameSize, contextEq, outcomeEq, innerTrace⟩ |
+    ⟨innerSize, sameSize, contextEq, outcomeEq, innerTrace⟩ |
+    ⟨innerSize, sameSize, contextEq, outcomeEq, innerTrace⟩ |
     ⟨innerSize, tailSize, middle, sameSize, innerTrace, tailTrace⟩
+  · subst outcome
+    exact finish innerTrace (by intros; intro impossible; cases impossible)
+      (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)
+  · subst outcome
+    exact finish innerTrace (by intros; intro impossible; cases impossible)
+      (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)
   · subst outcome
     exact finish innerTrace (by intros; intro impossible; cases impossible)
       (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)

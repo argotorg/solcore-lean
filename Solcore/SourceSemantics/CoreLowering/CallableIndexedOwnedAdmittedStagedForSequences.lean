@@ -83,6 +83,8 @@ theorem reflects {budget : Nat}
     correct (Nat.le_trans (Nat.le_of_lt headSmaller) within)
       environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted headEval
   cases represented with
+  | breaking innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed headTrace).1 innerEnvironment rfl).elim
+  | continuing innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed headTrace).2 innerEnvironment rfl).elim
   | returned payload =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_returned _ headEval.sound)
       exact ⟨_, context, _, middle, middleMap, middleWorld,
@@ -172,6 +174,8 @@ theorem preserves {budget : Nat}
       correct bounded environments heaps locals agrees actualTyped
         reference read unmapped initial conditioned admitted headTrace
     cases represented with
+    | breaking innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed headTrace).1 innerEnvironment rfl).elim
+    | continuing innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed headTrace).2 innerEnvironment rfl).elim
     | returned payload =>
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, .returned payload, finalHeaps,
           maps, worlds, preservation, metadata, reached, related, post⟩

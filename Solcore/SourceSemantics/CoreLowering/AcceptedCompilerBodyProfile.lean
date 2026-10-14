@@ -15,11 +15,24 @@ def returns : StatementForm → Bool
 def HasReturn (source : TypedSource) (statements : List StatementId) : Prop :=
   ∃ id ∈ statements, ∃ node, source.lookupStatement? id = some node ∧ returns node.form = true
 
+/-- Header facts describe one original item and its immediate expression. -/
+def HeaderReady (source : TypedSource) (reached : ExpressionId → Prop) : ForItemForm → Prop
+  | .letDecl binder initializer => binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
+  | .expression expression => reached expression
+  | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
+  | .assignBitNot _ => False
+
+theorem header_forms {source reached items}
+    (ready : ∀ item ∈ items, HeaderReady source reached item) : HeaderForms items := by
+  intro item member assignment same
+  have found := ready item member
+  simp only [same, HeaderReady] at found
+
 /-- These conditions inspect one original node and its immediate operands. -/
 def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
     (node : StatementNode) : Prop :=
   match node.form with
-  | .returnStmt none => True
+  | .returnStmt none | .breakStmt | .continueStmt => True
   | .returnStmt (some expression) => reached expression
   | .letDecl binder initializer =>
       binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
@@ -28,6 +41,9 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .block _ => True
   | .ifThen condition _ _ => node.type = .unit ∧ reached condition
   | .whileLoop condition _ => reached condition
+  | .forLoop initializer condition post _ =>
+      (∀ item ∈ initializer, HeaderReady source reached item) ∧ reached condition ∧
+      (∀ item ∈ post, HeaderReady source reached item)
   | _ => False
 
 structure Profile (source : TypedSource) (reached : ExpressionId → Prop) : Prop where
@@ -62,9 +78,27 @@ def assignment? (source : TypedSource) (assignment : AssignmentResolution)
     else none
   else none
 
+def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
+    (item : ForItemForm) : Option (PLift (HeaderReady source reached item)) := by
+  cases item with
+  | letDecl binder initializer =>
+    exact if mono : binder.scheme.quantified = [] then do
+      let ⟨children⟩ ← allProof? reached (fun expression =>
+        if present : reached expression then some ⟨present⟩ else none) initializer.toList
+      pure ⟨⟨mono, children⟩⟩
+    else none
+  | expression expression => exact if present : reached expression then some ⟨present⟩ else none
+  | assignValue assignment operator expression =>
+    exact do
+      let ⟨target⟩ ← assignment? source assignment operator
+      if present : reached expression then pure ⟨⟨target, present⟩⟩ else none
+  | assignBitNot _ => exact none
+
 def statement? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
     (node : StatementNode) : Option (PLift (StatementReady source reached node)) := by
   cases form : node.form
+  case breakStmt => exact some ⟨by simp only [StatementReady, form]⟩
+  case continueStmt => exact some ⟨by simp only [StatementReady, form]⟩
   case returnStmt value =>
     cases value with
     | none => exact some ⟨by simp only [StatementReady, form]⟩
@@ -94,6 +128,13 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
     else none
   case whileLoop condition body =>
     exact if present : reached condition then some ⟨by simpa only [StatementReady, form] using present⟩ else none
+  case forLoop initializer condition post body =>
+    exact do
+      let ⟨initial⟩ ← allProof? (HeaderReady source reached) (header? source reached) initializer
+      if present : reached condition then
+        let ⟨after⟩ ← allProof? (HeaderReady source reached) (header? source reached) post
+        pure ⟨by simpa only [StatementReady, form] using And.intro initial (And.intro present after)⟩
+      else none
   all_goals exact none
 
 /-- Every original statement node is inspected once. Expression membership
@@ -145,6 +186,55 @@ private theorem StatementReady.expanded {source : TypedSource} {reached : Expres
     {node : StatementNode} (ready : StatementReady source reached node) : expanded node.form = true := by
   cases form : node.form <;> simp_all [StatementReady, AcceptedNamedBodyFlow.expanded]
 
+theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
+    {site : SourceCoreElaboration.ErrorSite} {result : Ty} {reasonAt : ExpressionId → Word}
+    {next : SourceCoreLocalCell.Scope → Except SourceCoreBasic.Error Expr} {finalScope : SourceCoreLocalCell.Scope}
+    {finish : Expr} {fuel scope items code} {reached : ExpressionId → Prop}
+    (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code)
+    (profile : ∀ item ∈ items, HeaderReady source reached item) (ready : tree.Ready) :
+    tree.closed = true ∧ (∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) ∧
+      (∀ child ∈ tree.children, reached child.expression) := by
+  induction tree with
+  | nil => simp [Items.closed, Items.bindings, Items.children]
+  | absent projected remaining allocated ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, ?_, tail.2.2⟩
+    intro binding member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact head.1
+    · exact tail.2.1 binding member
+  | initialized projected child generated childType remaining allocated ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, ?_, ?_⟩
+    · intro binding member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact head.1
+      · exact tail.2.1 binding member
+    · intro actual member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact head.2 _ (by simp)
+      · exact tail.2.2 actual member
+  | discard child generated remaining ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, tail.2.1, ?_⟩
+    intro actual member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact head
+    · exact tail.2.2 actual member
+  | assigning remaining accepted ih =>
+    exact False.elim (ready.1 (profile _ List.mem_cons_self).1)
+  | assigned remaining receipt targetType ih =>
+    have head := profile _ List.mem_cons_self
+    have tail := ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
+    refine ⟨tail.1, tail.2.1, ?_⟩
+    intro actual member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact head.2
+    · exact tail.2.2 actual member
+
 /-- The outer sequence retains a return occurrence; loop bodies use their
 actual false mode and can end normally. No source-body shape is supplied. -/
 theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
@@ -169,7 +259,7 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
       have original := profile.at (read_found (readPolicy ▸ read))
       simp only [StatementReady, form] at original
       exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
-  | returnUnit => simp [Tree.closed, Tree.bindings, Tree.children]
+  | returnUnit | breaking | continuing => simp [Tree.closed, Tree.bindings, Tree.children]
   | initialized read form statementType projected child generated childType remaining allocated ih =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
@@ -270,6 +360,34 @@ theorem facts {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleC
         · rcases List.mem_append.mp member with member | member
           · exact inside.2.2 actual member
           · exact next.2.2 actual member
+  | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := profile.at found
+      simp only [StatementReady, form] at original
+      have before := header_facts initial original.1 ready.1
+      have inside := innerIH ready.2.1 (Or.inl rfl)
+      have post := header_facts after original.2.2 ready.2.2.1
+      have next := tailIH ready.2.2.2 (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp only [Tree.closed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
+      · intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with ((member | member) | member) | member
+        · exact before.2.1 binding member
+        · exact inside.2.1 binding member
+        · exact post.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        simp only [Tree.children, List.mem_append, List.mem_cons] at member
+        rcases member with member | rfl | ((member | member) | member)
+        · exact before.2.2 actual member
+        · exact original.2.1
+        · exact inside.2.2 actual member
+        · exact post.2.2 actual member
+        · exact next.2.2 actual member
+  | forBoundary read form outside accepted =>
+      have original := profile.at (read_found (readPolicy ▸ read))
+      simp only [StatementReady, form] at original
+      exact False.elim (outside ⟨header_forms original.1, header_forms original.2.2⟩)
   | boundary read outside accepted =>
       have original := (profile.at (read_found (readPolicy ▸ read))).expanded
       rw [outside] at original

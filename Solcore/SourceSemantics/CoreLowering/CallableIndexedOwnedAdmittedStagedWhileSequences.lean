@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLoopOutcomes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedWhileSourceInversion
 
@@ -50,12 +51,7 @@ private theorem fallthrough_environment {program : Program} {stages : Staging.Re
     {size : Nat} {before after : Dynamic.Heap}
     (trace : Staging.Recursive.Size.While program stages size invocation context environment before condition statements
       (.fallthrough innerEnvironment) after) : innerEnvironment = environment := by
-  induction size using Nat.strongRecOn generalizing before after with
-  | ind size ih =>
-    cases trace with
-    | done => rfl
-    | next test body next =>
-      exact ih _ (Staging.Recursive.Size.child_lt_stepSize (by simp)) next
+  exact SelectedCompilationStageLoopOutcomes.while_environment trace
 
 include bridge functions condition transport in
 theorem reflects {budget : Nat}
@@ -106,6 +102,8 @@ theorem reflects {budget : Nat}
       found nodeType typed generated nativeTyped correct (Nat.le_trans (Nat.le_of_lt headSmaller) within)
       environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted headEval
   cases represented with
+  | breaking innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed headTrace).1 innerEnvironment rfl).elim
+  | continuing innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed headTrace).2 innerEnvironment rfl).elim
   | returned payload =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_returned _ headEval.sound)
       exact ⟨_, context, _, middle, middleMap, middleWorld,
@@ -202,6 +200,8 @@ theorem preserves {budget : Nat}
         found nodeType typed generated nativeTyped correct bounded environments heaps locals agrees actualTyped
         reference read unmapped initial conditioned admitted headTrace
     cases represented with
+    | breaking innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed headTrace).1 innerEnvironment rfl).elim
+    | continuing innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed headTrace).2 innerEnvironment rfl).elim
     | returned payload =>
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, .returned payload, finalHeaps,
           maps, worlds, preservation, metadata, reached, related, post⟩

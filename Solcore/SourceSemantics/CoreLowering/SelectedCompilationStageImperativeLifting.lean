@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalTreeLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageWhileSequenceLifting
@@ -302,7 +303,24 @@ theorem lifts_position {budget : Nat}
       obtain ⟨_armShapes, _defaultShape, restShape⟩ := shape.match_children found form
       exact SelectedCompilationStageMatchSequences.lifts bridge functions condition unique found form selectedMeaning selectedPreservation
         (.inr stops) within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | @breaking _ _ _ _ _ _ _ _ found form | @continuing _ _ _ _ _ _ _ _ found form
+  | @breaking context scope mode id node rest expected type found form =>
+    intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
+      contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
+      finalContext outcome after trace
+    have ordinary : TypedScopedStatements.Executes mode program context invocation.evidence invocation.source
+        environment before (id :: rest) finalContext outcome after := by
+      cases mode <;> exact trace.sound
+    obtain ⟨rfl, rfl, rfl⟩ := ProtectedLoopStatements.breaking_view unique found form ordinary
+    exact ⟨_, _, _, .breaking (lookupStatement?_sound found) form, .completed (.breaking environment)⟩
+  | @continuing context scope mode id node rest expected type found form =>
+    intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
+      contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
+      finalContext outcome after trace
+    have ordinary : TypedScopedStatements.Executes mode program context invocation.evidence invocation.source
+        environment before (id :: rest) finalContext outcome after := by
+      cases mode <;> exact trace.sound
+    obtain ⟨rfl, rfl, rfl⟩ := ProtectedLoopStatements.continuing_view unique found form ordinary
+    exact ⟨_, _, _, .continuing (lookupStatement?_sound found) form, .completed (.continuing environment)⟩
   | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _ =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted

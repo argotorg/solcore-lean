@@ -102,6 +102,22 @@ theorem reflects {budget : Nat}
             .ifReturned (lookupStatement?_sound statementFound) form testTrace branchTrace,
             .returned payload, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
             middleState, headRelated, headPost⟩
+  | breaking innerEnvironment =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      cases headTrace with
+      | branch testTrace branchTrace =>
+          exact ⟨_, context, _, middle, middleMap, middleWorld,
+            .ifBreaking (lookupStatement?_sound statementFound) form testTrace branchTrace,
+            .breaking environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+            middleState, headRelated, headPost⟩
+  | continuing innerEnvironment =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      cases headTrace with
+      | branch testTrace branchTrace =>
+          exact ⟨_, context, _, middle, middleMap, middleWorld,
+            .ifContinuing (lookupStatement?_sound statementFound) form testTrace branchTrace,
+            .continuing environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+            middleState, headRelated, headPost⟩
   | fault matched =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_failure _ headEval.sound)
       cases headTrace with
@@ -192,12 +208,12 @@ theorem preserves {budget : Nat}
       (bounded : headSize ≤ budget) :
       ∃ value finalStore finalMap finalWorld,
         Evaluates actual store ((LocalLoop.sequence type (LocalLoop.conditional type testCode leftCode rightCode) body).rename ξ) value finalStore ∧
-        Represents model finalMap finalWorld mode expected type faults headOutcome value ∧
+        Represents model finalMap finalWorld mode expected type faults (headOutcome.restore environment) value ∧
         CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions finalMap finalWorld after finalStore ∧
         LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
         AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
         ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
-          callerProtocol.Relates initial reached ∧ Post bridge context expected headOutcome reached := by
+          callerProtocol.Relates initial reached ∧ Post bridge context expected (headOutcome.restore environment) reached := by
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
         maps, worlds, preservation, metadata, reached, related, post⟩ :=
       CallableIndexedOwnedAdmittedStagedConditionalHeads.preserves bridge functions condition children
@@ -209,6 +225,16 @@ theorem preserves {budget : Nat}
           maps, worlds, preservation, metadata, reached, related, post⟩
         rw [LoopRenaming.sequence]
         exact LocalLoop.sequence_returned _ evaluated
+    | breaking innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .breaking environment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
+    | continuing innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .continuing environment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
     | fault matched =>
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps,
           maps, worlds, preservation, metadata, reached, related, post⟩
@@ -219,9 +245,15 @@ theorem preserves {budget : Nat}
     ⟨testSize, failure, sameSize, contextEq, outcomeEq, testTrace⟩ |
     ⟨testSize, branchSize, truth, sourceValue, middle, innerContext, sameSize, contextEq, outcomeEq, testTrace, branchTrace⟩ |
     ⟨testSize, branchSize, truth, failure, middle, innerContext, sameSize, contextEq, outcomeEq, testTrace, branchTrace⟩ |
+    ⟨testSize, branchSize, truth, innerEnvironment, middle, innerContext, sameSize, contextEq, outcomeEq, testTrace, branchTrace⟩ |
+    ⟨testSize, branchSize, truth, innerEnvironment, middle, innerContext, sameSize, contextEq, outcomeEq, testTrace, branchTrace⟩ |
     ⟨testSize, branchSize, tailSize, truth, middle, branchHeap, innerContext, innerEnvironment, sameSize, testTrace, branchTrace, tailTrace⟩
   · subst outcome
     exact finish (.fault testTrace) (by intros; intro impossible; cases impossible) (sameSize ▸ within)
+  · subst outcome
+    exact finish (.branch testTrace branchTrace) (by intros; intro impossible; cases impossible) (sameSize ▸ within)
+  · subst outcome
+    exact finish (.branch testTrace branchTrace) (by intros; intro impossible; cases impossible) (sameSize ▸ within)
   · subst outcome
     exact finish (.branch testTrace branchTrace) (by intros; intro impossible; cases impossible) (sameSize ▸ within)
   · subst outcome

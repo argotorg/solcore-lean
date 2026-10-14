@@ -123,7 +123,7 @@ theorem reflects {budget : Nat}
             RecursiveNamedForContracts.post_computation_size false branch bodyEval.sound
           obtain ⟨postSourceSize, postContext, postOutcome, postHeap, postMap, postWorld, postTrace,
               postRelated, postProgress, postState, postRetained, postPost⟩ :=
-            CallableIndexedOwnedAdmittedStagedForPostEdges.reflects_at bridge functions guard postCorrect
+            CallableIndexedOwnedAdmittedStagedForPostEdges.reflects_at (continuing := false) bridge functions guard postCorrect
               (Nat.le_trans (Nat.le_of_lt postSmaller) (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded))
               agrees reference bodyState
               (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
@@ -150,6 +150,47 @@ theorem reflects {budget : Nat}
                   (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead prefixProgress.2.2.2.1).2
                   guarded postPost nextEval
               exact ⟨_, _, after, finalMap, finalWorld, .iterate conditionTrace bodyTrace postTrace nextTrace, related,
+                prefixProgress.trans nextProgress, finalState,
+                callerProtocol.trans (callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained) finalRetained, finalPost⟩
+
+        | breaking innerEnvironment =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+            (Core.LoopExecution.body_breaking conditionEval.sound bodyEval.sound)
+          exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .forBreakFromBody conditionTrace bodyTrace,
+            .fallthrough environment (.inl rfl), progress, bodyState,
+            callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
+        | continuing innerEnvironment =>
+          obtain ⟨postSize, postStore, postValue, postSmaller, postEval⟩ :=
+            RecursiveNamedForContracts.post_computation_size true branch bodyEval.sound
+          obtain ⟨postSourceSize, postContext, postOutcome, postHeap, postMap, postWorld, postTrace,
+              postRelated, postProgress, postState, postRetained, postPost⟩ :=
+            CallableIndexedOwnedAdmittedStagedForPostEdges.reflects_at (continuing := true) bridge functions guard postCorrect
+              (Nat.le_trans (Nat.le_of_lt postSmaller) (Nat.le_trans (Nat.le_of_lt branchSmaller) bounded))
+              agrees reference bodyState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
+              guarded bodyPost postEval
+          cases postOutcome with
+          | fault failure =>
+            cases postRelated with
+            | fault matched =>
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+                (ForLoop.body_continuing_post_fault conditionEval.sound bodyEval.sound postEval.sound)
+              exact ⟨_, _, postHeap, postMap, postWorld, .continuePostFailure conditionTrace bodyTrace postTrace,
+                .fault matched, progress.trans postProgress, postState,
+                callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained, postPost⟩
+          | done postEnvironment =>
+            cases postRelated with
+            | fallthrough _ _ =>
+              have prefixProgress := progress.trans postProgress
+              obtain ⟨nextSize, smaller, nextEval⟩ :=
+                ForLoop.next_continuing branch bodyEval.sound postEval.sound postState.live.selfRead
+              obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress,
+                  finalState, finalRetained, finalPost⟩ :=
+                ih nextSize (Nat.lt_trans smaller branchSmaller)
+                  (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) postState
+                  (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead prefixProgress.2.2.2.1).2
+                  guarded postPost nextEval
+              exact ⟨_, _, after, finalMap, finalWorld, .continueIterate conditionTrace bodyTrace postTrace nextTrace, related,
                 prefixProgress.trans nextProgress, finalState,
                 callerProtocol.trans (callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained) finalRetained, finalPost⟩
 
@@ -236,6 +277,29 @@ theorem preserves {budget : Nat}
           | returned payload =>
             exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_returned conditionEval bodyEval, .returned payload,
               conditionProgress.trans bodyProgress, bodyState, callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
+    | forBreakFromBody testTrace bodyTrace =>
+        obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
+            conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at bridge functions
+            (children _ (Nat.lt_of_lt_of_le (Staging.Recursive.Size.child_lt_stepSize (by simp)) bounded))
+            tree found typed agrees state ready testTrace
+        cases conditionRelated with
+        | value payload =>
+          rw [nodeType] at payload
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress,
+              bodyState, bodyRetained, bodyPost⟩ :=
+            body_preserves_at bridge functions guard correct
+              (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+              agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2
+              guarded conditionPost.at_value.2 bodyTrace
+          cases bodyRelated with
+          | breaking innerEnvironment =>
+            exact ⟨_, bodyStore, bodyMap, bodyWorld, Core.LoopExecution.body_breaking conditionEval bodyEval, .fallthrough environment (.inl rfl),
+              conditionProgress.trans bodyProgress, bodyState, callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
     | bodyFailure testTrace bodyTrace =>
         obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
             conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
@@ -283,7 +347,7 @@ theorem preserves {budget : Nat}
             have progress := conditionProgress.trans bodyProgress
             obtain ⟨postValue, postStore, postMap, postWorld, postEval, postRelated, postProgress,
                 postState, postRetained, postPost⟩ :=
-              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at bridge functions guard postCorrect
+              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at (continuing := false) bridge functions guard postCorrect
                 (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
                 agrees reference bodyState
                 (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
@@ -318,7 +382,7 @@ theorem preserves {budget : Nat}
             have progress := conditionProgress.trans bodyProgress
             obtain ⟨postValue, postStore, postMap, postWorld, postEval, postRelated, postProgress,
                 postState, postRetained, postPost⟩ :=
-              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at bridge functions guard postCorrect
+              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at (continuing := false) bridge functions guard postCorrect
                 (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
                 agrees reference bodyState
                 (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
@@ -334,6 +398,84 @@ theorem preserves {budget : Nat}
                   guarded postPost next
               exact ⟨result, finalStore, finalMap, finalWorld,
                 ForLoop.body_fallthrough conditionEval bodyEval postEval postState.live.selfRead nativeTrace,
+                related, prefixProgress.trans finalProgress, finalState,
+                callerProtocol.trans (callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained) finalRetained, finalPost⟩
+
+    | continuePostFailure testTrace bodyTrace postTrace =>
+        obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
+            conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at bridge functions
+            (children _ (Nat.lt_of_lt_of_le (Staging.Recursive.Size.child_lt_stepSize (by simp)) bounded))
+            tree found typed agrees state ready testTrace
+        cases conditionRelated with
+        | value payload =>
+          rw [nodeType] at payload
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress,
+              bodyState, bodyRetained, bodyPost⟩ :=
+            body_preserves_at bridge functions guard correct
+              (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+              agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2
+              guarded conditionPost.at_value.2 bodyTrace
+          cases bodyRelated with
+          | continuing innerEnvironment =>
+            have progress := conditionProgress.trans bodyProgress
+            obtain ⟨postValue, postStore, postMap, postWorld, postEval, postRelated, postProgress,
+                postState, postRetained, postPost⟩ :=
+              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at (continuing := true) bridge functions guard postCorrect
+                (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+                agrees reference bodyState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
+                guarded bodyPost postTrace
+            cases postRelated with
+            | fault matched =>
+              exact ⟨_, postStore, postMap, postWorld,
+                ForLoop.body_continuing_post_fault conditionEval bodyEval postEval, .fault matched,
+                progress.trans postProgress, postState,
+                callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained, postPost⟩
+    | continueIterate testTrace bodyTrace postTrace next =>
+        obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
+            conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at bridge functions
+            (children _ (Nat.lt_of_lt_of_le (Staging.Recursive.Size.child_lt_stepSize (by simp)) bounded))
+            tree found typed agrees state ready testTrace
+        cases conditionRelated with
+        | value payload =>
+          rw [nodeType] at payload
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress,
+              bodyState, bodyRetained, bodyPost⟩ :=
+            body_preserves_at bridge functions guard correct
+              (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+              agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2
+              guarded conditionPost.at_value.2 bodyTrace
+          cases bodyRelated with
+          | continuing innerEnvironment =>
+            have progress := conditionProgress.trans bodyProgress
+            obtain ⟨postValue, postStore, postMap, postWorld, postEval, postRelated, postProgress,
+                postState, postRetained, postPost⟩ :=
+              CallableIndexedOwnedAdmittedStagedForPostEdges.preserves_at (continuing := true) bridge functions guard postCorrect
+                (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+                agrees reference bodyState
+                (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
+                guarded bodyPost postTrace
+            cases postRelated with
+            | fallthrough _ _ =>
+              have prefixProgress := progress.trans postProgress
+              obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress,
+                  finalState, finalRetained, finalPost⟩ :=
+                ih _ (Staging.Recursive.Size.child_lt_stepSize (by simp))
+                  (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+                  postState (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead prefixProgress.2.2.2.1).2
+                  guarded postPost next
+              exact ⟨result, finalStore, finalMap, finalWorld,
+                ForLoop.body_continuing conditionEval bodyEval postEval postState.live.selfRead nativeTrace,
                 related, prefixProgress.trans finalProgress, finalState,
                 callerProtocol.trans (callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) postRetained) finalRetained, finalPost⟩
 

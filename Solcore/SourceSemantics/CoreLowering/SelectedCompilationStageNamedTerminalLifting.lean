@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageBodyLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageTerminalInversion
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationNamedTerminalChildReceipts

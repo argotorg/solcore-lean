@@ -367,6 +367,18 @@ theorem while_step (wellFormed : ProgramWellFormed program) (size : Nat)
         runtime covers ((locals.mono testExtends).mono preserved.heap_extends) preserved.heap_typed
         conditionTyped bodyTyped next
       exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans nextExtends)⟩
+  | @continueNext testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after
+      condition statements outcome test body next =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap statements
+        (.continuing innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped body.sound.continuing_scoped
+      obtain ⟨afterTyped, nextExtends⟩ := whileIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers ((locals.mono testExtends).mono preserved.heap_extends) preserved.heap_typed
+        conditionTyped bodyTyped next
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans nextExtends)⟩
 
 /-- Only the selected arm runs; its real binder frame is restored after a fault. -/
 theorem match_step (wellFormed : ProgramWellFormed program) (size : Nat)
@@ -395,7 +407,7 @@ theorem match_step (wellFormed : ProgramWellFormed program) (size : Nat)
       contains scrutinee hiddenAllocated selected extended allocated body =>
       cases outcome with
       | fallthrough => cases failed
-      | returned => cases failed
+      | returned | breaking | continuing => cases failed
       | fault actualFailure =>
         cases BodyOutcome.fault.inj failed
         obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
@@ -434,7 +446,7 @@ theorem match_step (wellFormed : ProgramWellFormed program) (size : Nat)
       resolution node value location statements outcome contains scrutinee hiddenAllocated selected body =>
       cases outcome with
       | fallthrough => cases failed
-      | returned => cases failed
+      | returned | breaking | continuing => cases failed
       | fault actualFailure =>
         cases BodyOutcome.fault.inj failed
         obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value wellFormed
@@ -566,6 +578,17 @@ theorem for_loop_step (wellFormed : ProgramWellFormed program) (size : Nat)
       obtain ⟨afterTyped, postExtends⟩ := itemsIH postTraceSize (Size.child_lt_stepSize (by simp))
         runtime covers (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace
       exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans postExtends)⟩
+  | @continuePostFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
+      before middle bodyHeap after condition post body failure test branch postTrace =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap body
+        (.continuing innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped branch.sound.continuing_scoped
+      obtain ⟨afterTyped, postExtends⟩ := itemsIH postTraceSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans postExtends)⟩
   | @iterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
       before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
       obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
@@ -574,6 +597,21 @@ theorem for_loop_step (wellFormed : ProgramWellFormed program) (size : Nat)
         context scope.evidence scope.source environment middle bodyHeap body
         (.fallthrough innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
         (locals.mono testExtends) middleTyped bodyTyped branch.sound.fallthrough_scoped
+      obtain ⟨_postContext, postHeapTyped, postExtends, _postLocals⟩ :=
+        ForItemsExecute.preserved wellFormed runtime covers
+          (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace.sound.plain
+      obtain ⟨afterTyped, nextExtends⟩ := loopIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono (testExtends.trans (preserved.heap_extends.trans postExtends)))
+        postHeapTyped conditionTyped bodyTyped postTyped next
+      exact ⟨afterTyped, testExtends.trans (preserved.heap_extends.trans (postExtends.trans nextExtends))⟩
+  | @continueIterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
+      before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
+      obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value wellFormed
+        runtime covers locals heap conditionTyped test
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment middle bodyHeap body
+        (.continuing innerEnvironment) control.enterLoop bodyFinal innerContext _ runtime covers
+        (locals.mono testExtends) middleTyped bodyTyped branch.sound.continuing_scoped
       obtain ⟨_postContext, postHeapTyped, postExtends, _postLocals⟩ :=
         ForItemsExecute.preserved wellFormed runtime covers
           (locals.mono (testExtends.trans preserved.heap_extends)) preserved.heap_typed postTyped postTrace.sound.plain

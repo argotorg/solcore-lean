@@ -25,6 +25,9 @@ theorem statements_step (size : Nat)
       cases typed
       exact ⟨heap, .refl _, (by intro _ value equal; cases equal), by
         intro result equal; cases equal; exact ⟨rfl, locals, rfl⟩⟩
+  | breaking _ _ | continuing _ _ =>
+      exact ⟨heap, .refl _, (by intro _ value equal; cases equal),
+        by intro result equal; cases equal⟩
   | returnUnit contains form =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _, _⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -216,6 +219,18 @@ theorem statements_step (size : Nat)
       obtain ⟨first, firstFalls⟩ := if_branch expressionIH statementsIH
         (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
       exact terminal_statements first (by intro env equal; cases equal)
+  | @ifContinuing testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment contains form test branch =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      obtain ⟨first, firstFalls⟩ := if_branch expressionIH statementsIH
+        (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
+      exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+  | @ifBreaking testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment contains form test branch =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      obtain ⟨first, firstFalls⟩ := if_branch expressionIH statementsIH
+        (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
+      exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
   | @ifFault testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure contains form test branch =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -242,6 +257,20 @@ theorem statements_step (size : Nat)
       | block innerTyped =>
           have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
           exact terminal_statements ⟨first.heap_typed, first.heap_extends, first.returned (by simp)⟩ (by intro env equal; cases equal)
+  | @blockContinuing innerSize mode scope context innerContext environment before after id rest node statements innerEnvironment contains form inner =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases controlTyped with
+      | block innerTyped =>
+          have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
+          exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+  | @blockBreaking innerSize mode scope context innerContext environment before after id rest node statements innerEnvironment contains form inner =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases controlTyped with
+      | block innerTyped =>
+          have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
+          exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
   | @blockFault innerSize mode scope context innerContext environment before after id rest node statements failure contains form inner =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -292,6 +321,46 @@ theorem statements_step (size : Nat)
             (locals.mono first.heap_extends) first.heap_typed tailTyped next
           exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends
   | @matchReturned matchSize mode scope context environment before after id rest node resolution value contains form matched =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      have same : staticMiddle = context := by cases formTyped <;> rfl
+      subst staticMiddle
+      have common : ∃ type caseFacts,
+          ExpressionHasType scope.source context resolution.scrutinee type ∧
+          MatchCasesHaveType scope.source control context type resolution.cases caseFacts ∧
+          (∀ statements, resolution.defaultBody = some statements →
+            ∃ final facts, StatementsHaveType scope.source control context statements final facts) := by
+        cases formTyped with
+        | matchWithoutDefault absent scrutineeTyped casesTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by simp_all⟩
+        | matchWithDefault present scrutineeTyped casesTyped defaultTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by
+            cases Option.some.inj (present.symm.trans found)
+            exact ⟨_, _, defaultTyped⟩⟩
+      obtain ⟨type, caseFacts, scrutineeTyped, casesTyped, defaults⟩ := common
+      have first := matchIH matchSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap scrutineeTyped casesTyped defaults matched
+      exact terminal_statements first (by intro env equal; cases equal)
+  | @matchContinuing matchSize mode scope context environment before after id rest node resolution contains form matched =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      have same : staticMiddle = context := by cases formTyped <;> rfl
+      subst staticMiddle
+      have common : ∃ type caseFacts,
+          ExpressionHasType scope.source context resolution.scrutinee type ∧
+          MatchCasesHaveType scope.source control context type resolution.cases caseFacts ∧
+          (∀ statements, resolution.defaultBody = some statements →
+            ∃ final facts, StatementsHaveType scope.source control context statements final facts) := by
+        cases formTyped with
+        | matchWithoutDefault absent scrutineeTyped casesTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by simp_all⟩
+        | matchWithDefault present scrutineeTyped casesTyped defaultTyped =>
+          exact ⟨_, _, scrutineeTyped, casesTyped, fun statements found => by
+            cases Option.some.inj (present.symm.trans found)
+            exact ⟨_, _, defaultTyped⟩⟩
+      obtain ⟨type, caseFacts, scrutineeTyped, casesTyped, defaults⟩ := common
+      have first := matchIH matchSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap scrutineeTyped casesTyped defaults matched
+      exact terminal_statements first (by intro env equal; cases equal)
+  | @matchBreaking matchSize mode scope context environment before after id rest node resolution contains form matched =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       have same : staticMiddle = context := by cases formTyped <;> rfl

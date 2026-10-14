@@ -53,6 +53,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
     cases same
     exact form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | expressionFault actual same _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _

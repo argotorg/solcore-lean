@@ -93,23 +93,22 @@ private theorem filter_self {binders : List TypedBinder} {binder : TypedBinder}
         exact absent (List.mem_map.mpr ⟨binder, member, same.symm⟩)
       simp [different, ih restUnique member]
 
-private theorem let_receipt {source : TypedSource} {node : StatementNode}
-    {binder : TypedBinder} {initializer : Option ExpressionId}
+private theorem node_receipt {source : TypedSource} {node : StatementNode}
+    {binder : TypedBinder}
     (ownership : LocalIdentityOwnership source)
     (member : Node.statement node ∈ source.nodes)
-    (form : node.form = .letDecl binder initializer)
+    (defined : binder ∈ nodeBinders (.statement node))
     (mono : binder.scheme.quantified = []) (requirements : binder.schemeRequirements = []) :
     RecursiveNamedStatementSyntaxFacts.BinderReceipt source binder := by
   have declared : binder ∈ SourceCoreDataPlaces.declaredBinders source := by
     apply List.mem_append_right
-    exact List.mem_flatMap.mpr ⟨.statement node, member, by simp [form]⟩
+    exact List.mem_flatMap.mpr ⟨.statement node, member, defined⟩
   have idMem : binder.id ∈ definedLocalIds source :=
     (declared_ids source).subset (List.mem_map.mpr ⟨binder, declared, rfl⟩)
   have owned := ownership.owned binder.id idMem
   have filtered := filter_self ((declared_ids source).nodup ownership.unique) declared
   have inNodes : binder.id ∈ source.nodes.flatMap Node.definedLocalIds := by
-    exact List.mem_flatMap.mpr ⟨.statement node, member, by simp [Node.definedLocalIds,
-      StatementForm.definedLocalIds, form]⟩
+    exact List.mem_flatMap.mpr ⟨.statement node, member, (node_ids (.statement node)).subset (List.mem_map.mpr ⟨binder, defined, rfl⟩)⟩
   have disjoint := (List.nodup_append.mp (show
     (source.inputs.map (·.id) ++ source.nodes.flatMap Node.definedLocalIds).Nodup from
     by simpa only [definedLocalIds, ← flatMapNodeDefinedLocalIds_eq_carrier] using ownership.unique)).2.2
@@ -120,6 +119,58 @@ private theorem let_receipt {source : TypedSource} {node : StatementNode}
     obtain ⟨input, present, same⟩ := List.any_eq_true.mp found
     exact disjoint input.id (List.mem_map.mpr ⟨input, present, rfl⟩)
       binder.id inNodes (of_decide_eq_true same)
+
+private theorem let_receipt {source : TypedSource} {node : StatementNode}
+    {binder : TypedBinder} {initializer : Option ExpressionId}
+    (ownership : LocalIdentityOwnership source) (member : Node.statement node ∈ source.nodes)
+    (form : node.form = .letDecl binder initializer)
+    (mono : binder.scheme.quantified = []) (requirements : binder.schemeRequirements = []) :
+    RecursiveNamedStatementSyntaxFacts.BinderReceipt source binder :=
+  node_receipt ownership member (by simp [nodeBinders, form]) mono requirements
+
+private theorem items_receipts {policy : SourceCoreLoops.Policy} {source : TypedSource}
+    {site : SourceCoreElaboration.ErrorSite} {result : Ty} {reasonAt : ExpressionId → Word}
+    {next : SourceCoreLocalCell.Scope → Except SourceCoreBasic.Error Expr} {finalScope : SourceCoreLocalCell.Scope}
+    {finish : Expr} {fuel scope items code} {node : StatementNode}
+    (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code)
+    (ownership : LocalIdentityOwnership source) (member : Node.statement node ∈ source.nodes)
+    (defined : ∀ binder initializer, ForItemForm.letDecl binder initializer ∈ items → binder ∈ nodeBinders (.statement node))
+    {control : ControlContext} {context final : SourceSemantics.Context}
+    (typed : ForItemsHaveType source control context items final)
+    (monomorphic : ∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) :
+    ∀ binding ∈ tree.bindings, RecursiveNamedStatementSyntaxFacts.BinderReceipt source binding.binder := by
+  induction tree generalizing context final with
+  | nil => simp [Items.bindings]
+  | absent projected remaining allocated ih =>
+    cases typed with
+    | cons head tail =>
+      cases head with
+      | letUninitialized mono _ extension =>
+        have receipt := node_receipt ownership member (defined _ _ List.mem_cons_self) mono
+          (by cases extension with | intro wellFormed _ => exact wellFormed.monomorphic_requirements_empty mono)
+        intro binding present
+        rcases List.mem_cons.mp present with rfl | present
+        · exact receipt
+        · exact ih (fun b e p => defined b e (List.mem_cons_of_mem _ p)) tail
+            (fun b p => monomorphic b (List.mem_cons_of_mem _ p)) binding present
+  | initialized projected child generated childType remaining allocated ih =>
+    have mono := monomorphic ⟨_, _, _, projected⟩ (by simp [Items.bindings])
+    cases typed with
+    | cons head tail =>
+      cases head with
+      | letInitialized value _ _ extension =>
+        have receipt := node_receipt ownership member (defined _ _ List.mem_cons_self) mono
+          (by cases extension with | intro wellFormed _ => exact wellFormed.monomorphic_requirements_empty mono)
+        intro binding present
+        rcases List.mem_cons.mp present with rfl | present
+        · exact receipt
+        · exact ih (fun b e p => defined b e (List.mem_cons_of_mem _ p)) tail
+            (fun b p => monomorphic b (List.mem_cons_of_mem _ p)) binding present
+      | letInitializedGeneralized poly _ _ _ _ => exact False.elim (poly mono)
+  | discard _ _ remaining ih | assigning remaining _ ih | assigned remaining _ _ ih =>
+    cases typed with
+    | cons head tail =>
+      exact ih (fun b e p => defined b e (List.mem_cons_of_mem _ p)) tail monomorphic
 
 private theorem head_tail {source : TypedSource} {control : ControlContext}
     {context final : SourceSemantics.Context} {id : StatementId} {rest : List StatementId} {facts : BodyFacts}
@@ -153,7 +204,7 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
     (monomorphic : ∀ binding ∈ tree.bindings, binding.binder.scheme.quantified = []) :
     ∀ binding ∈ tree.bindings, RecursiveNamedStatementSyntaxFacts.BinderReceipt source binding.binder := by
   induction tree generalizing control context final facts with
-  | nil | returning | returnUnit | boundary =>
+  | nil | returning | returnUnit | boundary | forBoundary | breaking | continuing =>
       intro binding member
       simp only [Tree.bindings, List.not_mem_nil] at member
   | initialized read form statementType projected child generated childType remaining allocated ih =>
@@ -247,6 +298,35 @@ theorem of_monomorphic {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
             (fun next present => monomorphic next (List.mem_append_left _ present)) binding member
         · exact tailIH tail
             (fun next present => monomorphic next (List.mem_append_right _ present)) binding member
+
+  | forLoop read form _ _ _ _ initial inner after remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | forLoop initTyped condition body postTyped =>
+        have initialBindings := items_receipts initial ownership (lookupStatement?_sound found).1
+          (fun binder expression present => by
+            simp only [nodeBinders, form, List.filterMap_append, List.mem_append]
+            exact .inl (List.mem_filterMap.mpr ⟨_, present, rfl⟩)) initTyped
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have inside := innerIH body
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have postBindings := items_receipts after ownership (lookupStatement?_sound found).1
+          (fun binder expression present => by
+            simp only [nodeBinders, form, List.filterMap_append, List.mem_append]
+            exact .inr (List.mem_filterMap.mpr ⟨_, present, rfl⟩)) postTyped
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        have next := tailIH tail
+          (fun binding member => monomorphic binding (by simp [Tree.bindings, member]))
+        intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with ((member | member) | member) | member
+        · exact initialBindings binding member
+        · exact inside binding member
+        · exact postBindings binding member
+        · exact next binding member
 
 /-- The only unresolved binding condition is exposed on an actual accepted
 binding, retaining its original scope, payload and contextual projection. -/

@@ -330,6 +330,12 @@ mutual
     | returnUnit {mode scope context environment heap id rest node}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt none) :
         StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context (.returned .unit) heap
+    | continuing {mode scope context environment heap id rest node}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .continueStmt) :
+        StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context (.continuing environment) heap
+    | breaking {mode scope context environment heap id rest node}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .breakStmt) :
+        StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context (.breaking environment) heap
     | returnValue {childSize : Nat} {mode scope context environment before after id rest node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry childSize scope context environment before expression (.value value) after) :
@@ -367,6 +373,18 @@ mutual
         (branch : StatementsIn program registry false branchSize scope context environment middle
           (if truth then thenBody else elseBody.getD []) innerContext (.returned value) after) :
         StatementsIn program registry mode (stepSize [testSize, branchSize]) scope context environment before (id :: rest) context (.returned value) after
+    | ifContinuing {testSize branchSize : Nat} {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.continuing innerEnvironment) after) :
+        StatementsIn program registry mode (stepSize [testSize, branchSize]) scope context environment before (id :: rest) context (.continuing environment) after
+    | ifBreaking {testSize branchSize : Nat} {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.breaking innerEnvironment) after) :
+        StatementsIn program registry mode (stepSize [testSize, branchSize]) scope context environment before (id :: rest) context (.breaking environment) after
     | ifFault {testSize branchSize : Nat} {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
         (test : Expression program registry testSize scope context environment before condition (.value (.bool truth)) middle)
@@ -386,6 +404,14 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
         (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.returned value) after) :
         StatementsIn program registry mode (stepSize [innerSize]) scope context environment before (id :: rest) context (.returned value) after
+    | blockContinuing {innerSize : Nat} {mode scope context innerContext environment before after id rest node statements innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.continuing innerEnvironment) after) :
+        StatementsIn program registry mode (stepSize [innerSize]) scope context environment before (id :: rest) context (.continuing environment) after
+    | blockBreaking {innerSize : Nat} {mode scope context innerContext environment before after id rest node statements innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.breaking innerEnvironment) after) :
+        StatementsIn program registry mode (stepSize [innerSize]) scope context environment before (id :: rest) context (.breaking environment) after
     | blockFault {innerSize : Nat} {mode scope context innerContext environment before after id rest node statements failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
         (inner : StatementsIn program registry false innerSize scope context environment before statements innerContext (.fault failure) after) :
@@ -400,6 +426,14 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
         (matched : Match program registry matchSize scope context environment before resolution (.returned value) after) :
         StatementsIn program registry mode (stepSize [matchSize]) scope context environment before (id :: rest) context (.returned value) after
+    | matchContinuing {matchSize : Nat} {mode scope context environment before after id rest node resolution}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry matchSize scope context environment before resolution (.continuing environment) after) :
+        StatementsIn program registry mode (stepSize [matchSize]) scope context environment before (id :: rest) context (.continuing environment) after
+    | matchBreaking {matchSize : Nat} {mode scope context environment before after id rest node resolution}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry matchSize scope context environment before resolution (.breaking environment) after) :
+        StatementsIn program registry mode (stepSize [matchSize]) scope context environment before (id :: rest) context (.breaking environment) after
     | matchFault {matchSize : Nat} {mode scope context environment before after id rest node resolution failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
         (matched : Match program registry matchSize scope context environment before resolution (.fault failure) after) :
@@ -498,7 +532,7 @@ mutual
         StatementsIn program registry mode (stepSize [childSize]) scope context environment before (id :: rest) context (.fault failure) after
 
   /-- Finite loop iterations restore their original lexical scope while retaining
-  all condition and body heap effects. Loop-control transfers are a later extension. -/
+  all condition and body heap effects. Break leaves the loop; continue tests again. -/
   inductive While (program : Program) (registry : Registry) :
       Nat → Scope → Context → Environment → Heap → ExpressionId → List StatementId → BodyOutcome → Heap → Prop where
     | done {testSize : Nat} {scope context environment before after condition statements}
@@ -511,6 +545,10 @@ mutual
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false bodySize scope context environment middle statements innerContext (.returned value) after) :
         While program registry (stepSize [testSize, bodySize]) scope context environment before condition statements (.returned value) after
+    | breakFromBody {testSize bodySize : Nat} {scope context innerContext environment before middle after condition statements innerEnvironment}
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false bodySize scope context environment middle statements innerContext (.breaking innerEnvironment) after) :
+        While program registry (stepSize [testSize, bodySize]) scope context environment before condition statements (.fallthrough environment) after
     | bodyFault {testSize bodySize : Nat} {scope context innerContext environment before middle after condition statements failure}
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false bodySize scope context environment middle statements innerContext (.fault failure) after) :
@@ -518,6 +556,12 @@ mutual
     | next {testSize bodySize nextSize : Nat} {scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome}
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false bodySize scope context environment middle statements innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (next : While program registry nextSize scope context environment bodyHeap condition statements outcome after) :
+        While program registry (stepSize [testSize, bodySize, nextSize]) scope context environment before condition statements outcome after
+
+    | continueNext {testSize bodySize nextSize : Nat} {scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome}
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false bodySize scope context environment middle statements innerContext (.continuing innerEnvironment) bodyHeap)
         (next : While program registry nextSize scope context environment bodyHeap condition statements outcome after) :
         While program registry (stepSize [testSize, bodySize, nextSize]) scope context environment before condition statements outcome after
 
@@ -630,14 +674,30 @@ mutual
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.returned value) after) :
         ForLoop program registry (stepSize [testSize, branchSize]) scope context environment before condition post body (.returned value) after
+    | forBreakFromBody {testSize branchSize : Nat} {scope context innerContext environment before middle after condition post body innerEnvironment}
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.breaking innerEnvironment) after) :
+        ForLoop program registry (stepSize [testSize, branchSize]) scope context environment before condition post body (.fallthrough environment) after
     | postFailure {testSize branchSize postTraceSize : Nat} {scope context innerContext postContext environment innerEnvironment before middle bodyHeap after condition post body failure}
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
         (postTrace : ForItems program registry postTraceSize scope context environment bodyHeap post postContext (.fault failure) after) :
         ForLoop program registry (stepSize [testSize, branchSize, postTraceSize]) scope context environment before condition post body (.fault failure) after
+    | continuePostFailure {testSize branchSize postTraceSize : Nat} {scope context innerContext postContext environment innerEnvironment before middle bodyHeap after condition post body failure}
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.continuing innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry postTraceSize scope context environment bodyHeap post postContext (.fault failure) after) :
+        ForLoop program registry (stepSize [testSize, branchSize, postTraceSize]) scope context environment before condition post body (.fault failure) after
     | iterate {testSize branchSize postTraceSize nextSize : Nat} {scope context innerContext postContext environment innerEnvironment postEnvironment before middle bodyHeap postHeap after condition post body outcome}
         (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry postTraceSize scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
+        (next : ForLoop program registry nextSize scope context environment postHeap condition post body outcome after) :
+        ForLoop program registry (stepSize [testSize, branchSize, postTraceSize, nextSize]) scope context environment before condition post body outcome after
+
+    | continueIterate {testSize branchSize postTraceSize nextSize : Nat} {scope context innerContext postContext environment innerEnvironment postEnvironment before middle bodyHeap postHeap after condition post body outcome}
+        (test : Expression program registry testSize scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false branchSize scope context environment middle body innerContext (.continuing innerEnvironment) bodyHeap)
         (postTrace : ForItems program registry postTraceSize scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
         (next : ForLoop program registry nextSize scope context environment postHeap condition post body outcome after) :
         ForLoop program registry (stepSize [testSize, branchSize, postTraceSize, nextSize]) scope context environment before condition post body outcome after
@@ -720,7 +780,7 @@ end
 
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
-export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
+export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -730,6 +790,19 @@ end Statements
 /-! The four mutually recursive projections use the same rule handlers. -/
 local macro "erase_stage_grade" : tactic =>
   `(tactic| (
+    case breaking => apply Recursive.StatementsIn.breaking <;> assumption
+    case ifBreaking => apply Recursive.StatementsIn.ifBreaking <;> assumption
+    case blockBreaking => apply Recursive.StatementsIn.blockBreaking <;> assumption
+    case matchBreaking => apply Recursive.StatementsIn.matchBreaking <;> assumption
+    case continuing => apply Recursive.StatementsIn.continuing <;> assumption
+    case ifContinuing => apply Recursive.StatementsIn.ifContinuing <;> assumption
+    case blockContinuing => apply Recursive.StatementsIn.blockContinuing <;> assumption
+    case matchContinuing => apply Recursive.StatementsIn.matchContinuing <;> assumption
+    case breakFromBody => apply Recursive.While.breakFromBody <;> assumption
+    case continueNext => apply Recursive.While.continueNext <;> assumption
+    case forBreakFromBody => apply Recursive.ForLoop.forBreakFromBody <;> assumption
+    case continuePostFailure => apply Recursive.ForLoop.continuePostFailure <;> assumption
+    case continueIterate => apply Recursive.ForLoop.continueIterate <;> assumption
     case coercedValue => apply Recursive.Expression.coercedValue <;> assumption
     case coercedFault => apply Recursive.Expression.coercedFault <;> assumption
     case rawAtomicValue => apply Recursive.RawForm.rawAtomicValue <;> assumption
@@ -852,6 +925,54 @@ local macro "erase_stage_grade" : tactic =>
 
 local macro "construct_stage_grade" : tactic =>
   `(tactic| (
+    case breaking contains form =>
+      exact ⟨_, .breaking contains form⟩
+    case ifBreaking contains form test branch testIH branchIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_branch⟩ := branchIH
+      exact ⟨_, .ifBreaking contains form graded_test graded_branch⟩
+    case blockBreaking contains form inner innerIH =>
+      obtain ⟨_, graded_inner⟩ := innerIH
+      exact ⟨_, .blockBreaking contains form graded_inner⟩
+    case matchBreaking contains form matched matchedIH =>
+      obtain ⟨_, graded_matched⟩ := matchedIH
+      exact ⟨_, .matchBreaking contains form graded_matched⟩
+    case continuing contains form =>
+      exact ⟨_, .continuing contains form⟩
+    case ifContinuing contains form test branch testIH branchIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_branch⟩ := branchIH
+      exact ⟨_, .ifContinuing contains form graded_test graded_branch⟩
+    case blockContinuing contains form inner innerIH =>
+      obtain ⟨_, graded_inner⟩ := innerIH
+      exact ⟨_, .blockContinuing contains form graded_inner⟩
+    case matchContinuing contains form matched matchedIH =>
+      obtain ⟨_, graded_matched⟩ := matchedIH
+      exact ⟨_, .matchContinuing contains form graded_matched⟩
+    case breakFromBody test body testIH bodyIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_body⟩ := bodyIH
+      exact ⟨_, .breakFromBody graded_test graded_body⟩
+    case continueNext test body next testIH bodyIH nextIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_body⟩ := bodyIH
+      obtain ⟨_, graded_next⟩ := nextIH
+      exact ⟨_, .continueNext graded_test graded_body graded_next⟩
+    case forBreakFromBody test branch testIH branchIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_branch⟩ := branchIH
+      exact ⟨_, .forBreakFromBody graded_test graded_branch⟩
+    case continuePostFailure test branch postTrace testIH branchIH postTraceIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_branch⟩ := branchIH
+      obtain ⟨_, graded_postTrace⟩ := postTraceIH
+      exact ⟨_, .continuePostFailure graded_test graded_branch graded_postTrace⟩
+    case continueIterate test branch postTrace next testIH branchIH postTraceIH nextIH =>
+      obtain ⟨_, graded_test⟩ := testIH
+      obtain ⟨_, graded_branch⟩ := branchIH
+      obtain ⟨_, graded_postTrace⟩ := postTraceIH
+      obtain ⟨_, graded_next⟩ := nextIH
+      exact ⟨_, .continueIterate graded_test graded_branch graded_postTrace graded_next⟩
     case coercedValue contains nonempty raw path rawIH pathIH =>
       obtain ⟨_, graded_raw⟩ := rawIH
       obtain ⟨_, graded_path⟩ := pathIH

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedHeaderSourceTyping
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedCoercionExclusion
 import Solcore.Test.SourceCoreInitialLexicalFailureBodies
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedTerminalNamedInvocationPreservation
@@ -113,8 +115,12 @@ theorem ActualHeader.failed_heap
       sourceAt fixture.source_wellFormed (by simp [parameters]) applied
   have sourceEq := (RecursiveNamedPreparedStageScopes.registry (actualStagePrepared fixture)).source selected
   have unique : NodeOccurrencesUnique child.source := sourceEq ▸ actual.header.unique
-  rw [actual.failed_result_type] at converted
-  cases converted
+  obtain ⟨sourceFinal, sourceFacts, sourceTyped, _complete⟩ :=
+    RecursiveNamedHeaderSourceTyping.statements actual.header fixture.source_wellFormed
+  rw [← sourceEq] at sourceTyped
+  have faultOutcome := Staging.Recursive.TypedControlBoundary.body_fault
+    (Staging.Recursive.TypedControlBoundary.function unique sourceTyped rfl body.sound) converted
+  subst bodyOutcome
   rw [parameters] at parametersAllocated
   cases parametersAllocated
   rw [actual.failed_statements] at body

@@ -24,6 +24,14 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       size = Size.stepSize [innerSize] ∧ finalContext = context ∧ outcome = .fault failure ∧
       Size.StatementsIn program registry false innerSize invocation context environment before
         statements innerContext (.fault failure) after) ∨
+    (∃ innerSize innerContext innerEnvironment,
+      size = Size.stepSize [innerSize] ∧ finalContext = context ∧ outcome = .breaking environment ∧
+      Size.StatementsIn program registry false innerSize invocation context environment before
+        statements innerContext (.breaking innerEnvironment) after) ∨
+    (∃ innerSize innerContext innerEnvironment,
+      size = Size.stepSize [innerSize] ∧ finalContext = context ∧ outcome = .continuing environment ∧
+      Size.StatementsIn program registry false innerSize invocation context environment before
+        statements innerContext (.continuing innerEnvironment) after) ∨
     (∃ innerSize tailSize innerContext innerEnvironment middle,
       size = Size.stepSize [innerSize, tailSize] ∧
       Size.StatementsIn program registry false innerSize invocation context environment before
@@ -36,6 +44,9 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     subst other
     exact form
   cases trace with
+  | breaking actual same | continuing actual same
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
   | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
@@ -57,9 +68,17 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       have equal := (shape actual).symm.trans same
       cases equal
       exact .inr (.inl ⟨_, _, _, rfl, rfl, rfl, inner⟩)
+  | blockBreaking actual same inner =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inl ⟨_, _, _, rfl, rfl, rfl, inner⟩))
+  | blockContinuing actual same inner =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inr (.inl ⟨_, _, _, rfl, rfl, rfl, inner⟩)))
   | blockFallthrough actual same inner next =>
       have equal := (shape actual).symm.trans same
       cases equal
-      exact .inr (.inr ⟨_, _, _, _, _, rfl, inner, next⟩)
+      exact .inr (.inr (.inr (.inr ⟨_, _, _, _, _, rfl, inner, next⟩)))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedBlockSourceInversion

@@ -2134,6 +2134,12 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationSelectedBodyInter
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedBodyTyping
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
 
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsSyntax
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationControlNoEscape
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLoopOutcomes
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

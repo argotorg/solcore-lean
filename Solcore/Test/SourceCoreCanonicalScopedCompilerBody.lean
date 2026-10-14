@@ -34,7 +34,8 @@ private theorem returned_child {policy : SourceCoreLoops.Policy} {checked : Sour
       rfl
   | initialized read actualForm | returnUnit read actualForm | absent read actualForm
   | assigning read actualForm | assigned read actualForm | whileLoop read actualForm
-  | discard read actualForm | block read actualForm | conditional read actualForm =>
+  | discard read actualForm | block read actualForm | conditional read actualForm
+  | forLoop read actualForm | forBoundary read actualForm | breaking read actualForm | continuing read actualForm =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
       simp_all
@@ -70,7 +71,8 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
         List.map_nil, children, and_self]
   | returning read form | returnUnit read form | absent read form
   | assigning read form | assigned read form | whileLoop read form
-  | discard read form | block read form | conditional read form =>
+  | discard read form | block read form | conditional read form
+  | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans initialFound)
       cases same
       simp_all

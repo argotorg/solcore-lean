@@ -88,6 +88,10 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
       cases matched with
       | returned value =>
         exact ⟨context, _, _, .blockReturned (lookupStatement?_sound found) form lifted, .completed (.returned value)⟩
+      | breaking innerEnvironment =>
+        exact ⟨context, _, _, .blockBreaking (lookupStatement?_sound found) form lifted, .completed (.breaking environment)⟩
+      | continuing innerEnvironment =>
+        exact ⟨context, _, _, .blockContinuing (lookupStatement?_sound found) form lifted, .completed (.continuing environment)⟩
       | fault reason =>
         exact ⟨context, _, _, .blockFault (lookupStatement?_sound found) form lifted, .completed (.fault reason)⟩
       | fallthrough innerEnvironment =>

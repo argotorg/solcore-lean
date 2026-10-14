@@ -39,6 +39,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | returning rest contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | breaking actual form | continuing actual form
+    | blockBreaking actual form _ | blockContinuing actual form _
+    | matchBreaking actual form _ | matchContinuing actual form _
+    | ifBreaking actual form _ _ | ifContinuing actual form _ _
     | forInitializerFault actual form _ | forReturned actual form _ _ | forFault actual form _ _
     | forFallthrough actual form _ _ _
     | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
@@ -106,6 +110,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
   | tail contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | breaking actual form | continuing actual form
+    | blockBreaking actual form _ | blockContinuing actual form _
+    | matchBreaking actual form _ | matchContinuing actual form _
+    | ifBreaking actual form _ _ | ifContinuing actual form _ _
     | forInitializerFault actual form _ | forReturned actual form _ _ | forFault actual form _ _
     | forFallthrough actual form _ _ _
     | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _

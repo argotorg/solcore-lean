@@ -36,7 +36,7 @@ local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible
 
 variable (guard : Location → CallableIndexedHistory.NativeFrame → Prop)
 
-theorem preserves_at {budget size : Nat} {items : List ForItemForm} {expected : TypeSystem.Ty}
+theorem preserves_at {continuing : Bool} {budget size : Nat} {items : List ForItemForm} {expected : TypeSystem.Ty}
     (correct : Preserves (administrative := administrative) (receiving := registry) (frame := frame) (globals := globals)
       (stages := stages) (invocation := invocation) (faults := faults)
       bridge functions guard context scope items expected type code budget)
@@ -52,7 +52,7 @@ theorem preserves_at {budget size : Nat} {items : List ForItemForm} {expected : 
     {finalContext : SourceSemantics.Context} {outcome : Staging.Recursive.ForItemsOutcome}
     (trace : Staging.Recursive.Size.ForItems program stages size invocation context environment before items finalContext outcome after) :
     ∃ value finalStore finalMap finalWorld,
-      Evaluates (TypedImperativeFor.postValues type location false ++ actual) store
+      Evaluates (TypedImperativeFor.postValues type location continuing ++ actual) store
         (ForLoop.postCode (code.rename ξ)) value finalStore ∧
       Represents model finalMap finalWorld false expected type faults (restoredOutcome environment outcome) value ∧
       Progress values registry functions before after mapping finalMap world finalWorld store finalStore ∧
@@ -61,9 +61,9 @@ theorem preserves_at {budget size : Nat} {items : List ForItemForm} {expected : 
         callerProtocol.Relates state.retained reached.retained ∧
         Post bridge context expected (restoredOutcome environment outcome) reached.retained := by
   have postAgrees : EnvironmentsAgree ((fun index => index + 6).comp ξ) canonical
-      (TypedImperativeFor.postValues type location false ++ actual) :=
-    TypedImperativeFor.postValues_agree agrees type location false
-  obtain ⟨postContext, postTyped⟩ := TypedImperativeFor.postValues_typed false state.live.selfTyped state.live.actualTyped
+      (TypedImperativeFor.postValues type location continuing ++ actual) :=
+    TypedImperativeFor.postValues_agree agrees type location continuing
+  obtain ⟨postContext, postTyped⟩ := TypedImperativeFor.postValues_typed continuing state.live.selfTyped state.live.actualTyped
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, heaps, maps, worlds, preserved, metadata, last, retained, post⟩ :=
     correct within state.live.environments state.live.heaps state.live.locals postAgrees postTyped
       reference read state.live.contextUnmapped state.retained guarded ready trace
@@ -76,7 +76,7 @@ theorem preserves_at {budget size : Nat} {items : List ForItemForm} {expected : 
     by simpa only [TypedImperativeFor.post_rename] using evaluated,
     represented, progress, reached, retained, post⟩
 
-theorem reflects_at {budget size : Nat} {items : List ForItemForm} {expected : TypeSystem.Ty}
+theorem reflects_at {continuing : Bool} {budget size : Nat} {items : List ForItemForm} {expected : TypeSystem.Ty}
     (correct : Reflects (administrative := administrative) (receiving := registry) (frame := frame) (globals := globals)
       (stages := stages) (invocation := invocation) (faults := faults)
       bridge functions guard context scope items expected type code budget)
@@ -90,7 +90,7 @@ theorem reflects_at {budget size : Nat} {items : List ForItemForm} {expected : T
     (guarded : guard contextLocation native)
     (ready : Admission bridge context state.retained)
     {value : Value} {finalStore : Store}
-    (evaluated : EvaluationSize size (TypedImperativeFor.postValues type location false ++ actual) store
+    (evaluated : EvaluationSize size (TypedImperativeFor.postValues type location continuing ++ actual) store
       (ForLoop.postCode (code.rename ξ)) value finalStore) :
     ∃ sourceSize finalContext outcome after finalMap finalWorld,
       Staging.Recursive.Size.ForItems program stages sourceSize invocation context environment before items finalContext outcome after ∧
@@ -101,9 +101,9 @@ theorem reflects_at {budget size : Nat} {items : List ForItemForm} {expected : T
         callerProtocol.Relates state.retained reached.retained ∧
         Post bridge context expected (restoredOutcome environment outcome) reached.retained := by
   have postAgrees : EnvironmentsAgree ((fun index => index + 6).comp ξ) canonical
-      (TypedImperativeFor.postValues type location false ++ actual) :=
-    TypedImperativeFor.postValues_agree agrees type location false
-  obtain ⟨postContext, postTyped⟩ := TypedImperativeFor.postValues_typed false state.live.selfTyped state.live.actualTyped
+      (TypedImperativeFor.postValues type location continuing ++ actual) :=
+    TypedImperativeFor.postValues_agree agrees type location continuing
+  obtain ⟨postContext, postTyped⟩ := TypedImperativeFor.postValues_typed continuing state.live.selfTyped state.live.actualTyped
   obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented, heaps, maps, worlds, preserved, metadata, last, retained, post⟩ :=
     correct within state.live.environments state.live.heaps state.live.locals postAgrees postTyped
       reference read state.live.contextUnmapped state.retained guarded ready

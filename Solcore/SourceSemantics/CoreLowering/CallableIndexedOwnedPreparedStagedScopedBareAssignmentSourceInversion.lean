@@ -53,14 +53,19 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     cases same
     exact form
   cases trace with
+  | breaking actual same | continuing actual same =>
+      cases (shape actual).symm.trans same
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
   | forFallthrough actual same _ _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
+  | blockBreaking actual same _ | blockContinuing actual same _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
-  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _
   | letFault actual same _ _ =>

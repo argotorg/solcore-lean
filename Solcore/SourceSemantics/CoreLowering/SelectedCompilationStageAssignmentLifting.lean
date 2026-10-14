@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareAssignmentHeads
 

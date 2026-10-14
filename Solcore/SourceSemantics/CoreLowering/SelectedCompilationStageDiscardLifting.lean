@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageDiscardInversion
 
 set_option autoImplicit false

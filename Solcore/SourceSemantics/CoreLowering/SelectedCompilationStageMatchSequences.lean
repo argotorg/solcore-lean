@@ -75,6 +75,32 @@ private theorem fallthrough_environment {program registry size invocation contex
       cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
   | noBranch => exact Staging.Recursive.BodyOutcome.fallthrough.inj outcomeEq
 
+private theorem breaking_environment {program registry size invocation context before after resolution outer inner}
+    (trace : Staging.Recursive.Size.Match program registry size invocation context outer before
+      resolution (.breaking inner) after) : inner = outer := by
+  generalize outcomeEq : (Staging.Recursive.BodyOutcome.breaking inner) = outcome at trace
+  cases trace with
+  | scrutineeFault => cases outcomeEq
+  | patternFault => cases outcomeEq
+  | @arm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | @default _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | noBranch => cases outcomeEq
+
+private theorem continuing_environment {program registry size invocation context before after resolution outer inner}
+    (trace : Staging.Recursive.Size.Match program registry size invocation context outer before
+      resolution (.continuing inner) after) : inner = outer := by
+  generalize outcomeEq : (Staging.Recursive.BodyOutcome.continuing inner) = outcome at trace
+  cases trace with
+  | scrutineeFault => cases outcomeEq
+  | patternFault => cases outcomeEq
+  | @arm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | @default _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ outcome _ _ _ _ _ =>
+      cases outcome <;> simp_all [Staging.Recursive.BodyOutcome.restore]
+  | noBranch => cases outcomeEq
+
 private theorem stopped_not_fallthrough {program registry size invocation context before after resolution environment inner id statement}
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupStatement? id = some statement)
@@ -140,6 +166,16 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
       cases matched with
       | returned value =>
         exact ⟨context, _, _, .matchReturned (lookupStatement?_sound found) form lifted, .completed (.returned value)⟩
+      | breaking innerEnvironment =>
+        obtain ⟨stagedSize, measured⟩ := Staging.Recursive.Size.Match.of_trace lifted
+        have same := breaking_environment measured
+        subst innerEnvironment
+        exact ⟨context, _, _, .matchBreaking (lookupStatement?_sound found) form lifted, .completed (.breaking environment)⟩
+      | continuing innerEnvironment =>
+        obtain ⟨stagedSize, measured⟩ := Staging.Recursive.Size.Match.of_trace lifted
+        have same := continuing_environment measured
+        subst innerEnvironment
+        exact ⟨context, _, _, .matchContinuing (lookupStatement?_sound found) form lifted, .completed (.continuing environment)⟩
       | fault reason =>
         exact ⟨context, _, _, .matchFault (lookupStatement?_sound found) form lifted, .completed (.fault reason)⟩
       | fallthrough innerEnvironment =>

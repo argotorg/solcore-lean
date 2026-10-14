@@ -47,6 +47,8 @@ inductive ValuesOutcome where
 
 inductive BodyOutcome where
   | fallthrough (environment : Dynamic.Environment)
+  | breaking (environment : Dynamic.Environment)
+  | continuing (environment : Dynamic.Environment)
   | returned (value : Dynamic.Value)
   | fault (failure : Failure)
 

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
 

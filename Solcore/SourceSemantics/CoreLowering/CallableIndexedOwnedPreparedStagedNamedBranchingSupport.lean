@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedNamedBranchingReceipts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedSelectedBodyStaticSupport
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLambdaFormationHeads
@@ -213,7 +214,9 @@ theorem preserves
       tree catalogSites rfl shape originalTyping receipt.projection within environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted trace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    (by rw [stages.source selected]; exact header.unique) sourceTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented controlClosed
   obtain ⟨value, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented evaluated header.fellThrough header.escaped ξ
   have outcomeEq := CallableIndexedOwnedAdmittedStagedLexicalFooter.outcome_eq matched
@@ -222,6 +225,8 @@ theorem preserves
     maps, worlds, frame, metadata, reached.val, related, ?_⟩
   · simpa only [receipt.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
   · cases bodyOutcome with
+    | breaking environment => exact (controlClosed.1 environment rfl).elim
+    | continuing environment => exact (controlClosed.2 environment rfl).elim
     | returned => exact ⟨post.rows, post.successful⟩
     | fallthrough => exact ⟨post.rows, post.successful⟩
     | fault failure => cases failure with
@@ -306,7 +311,9 @@ theorem reflects
       graph tree catalogSites rfl shape originalTyping receipt.projection (Nat.le_of_lt strict) environments heaps locals agrees actualTyped reference read unmapped
       wrapped conditioned nestedAdmitted flowTrace
   have post := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    graph.nodeOccurrencesUnique sourceTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function receipt.projection represented controlClosed
   obtain ⟨bodyValue, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented flowTrace.sound header.fellThrough header.escaped ξ
   obtain ⟨sameValue, sameStore⟩ := evaluation_deterministic bodyTrace.sound evaluatedBody
@@ -316,6 +323,8 @@ theorem reflects
     trace, represented.body_result, representedBody, finalHeaps, maps, worlds, frame, metadata,
     reached.val, related, ?_⟩
   cases bodyOutcome with
+  | breaking environment => exact (controlClosed.1 environment rfl).elim
+  | continuing environment => exact (controlClosed.2 environment rfl).elim
   | returned => exact ⟨post.rows, post.successful⟩
   | fallthrough => exact ⟨post.rows, post.successful⟩
   | fault failure => cases failure with

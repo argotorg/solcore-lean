@@ -64,6 +64,10 @@ theorem Applies.semanticFault_plain {program : Program} {registry : Registry} {s
     have evidence : child.evidence = function.evidence := registry.evidence selected
     generalize typeEq : bodyInstance.resultType = type at resultRule
     cases resultRule with
+    | breaking =>
+      exact .globalBody instantiates rfl (.controlEscape roots parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.breaking_plain body) (Or.inl ⟨_, rfl⟩))
+    | continuing =>
+      exact .globalBody instantiates rfl (.controlEscape roots parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.continuing_plain body) (Or.inr ⟨_, rfl⟩))
     | fault =>
       exact .globalBody instantiates rfl
         (.statements roots parameters allocate
@@ -74,6 +78,10 @@ theorem Applies.semanticFault_plain {program : Program} {registry : Registry} {s
     have evidence : child.evidence = function.evidence := registry.evidence selected
     generalize typeEq : function.resultType = type at resultRule
     cases resultRule with
+    | breaking =>
+      exact .closureControlEscape rfl valid parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.breaking_plain body) (Or.inl ⟨_, rfl⟩)
+    | continuing =>
+      exact .closureControlEscape rfl valid parameters allocate (by simpa only [source, evidence, callableEvidence] using Statements.continuing_plain body) (Or.inr ⟨_, rfl⟩)
     | fault =>
       exact .closureBody rfl valid parameters allocate
         (by simpa only [source, evidence, callableEvidence] using Statements.semanticFault_plain body)

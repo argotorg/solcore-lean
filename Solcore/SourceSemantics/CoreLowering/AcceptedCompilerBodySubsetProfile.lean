@@ -19,7 +19,7 @@ def ids (source : TypedSource) (expressions : List ExpressionId) : List Statemen
 
 def LoopEdges (source : TypedSource) (expressions : List ExpressionId) (node : StatementNode) : Prop :=
   match node.form with
-  | .block body | .whileLoop _ body => ∀ id ∈ body, id ∈ ids source expressions
+  | .block body | .whileLoop _ body | .forLoop _ _ _ body => ∀ id ∈ body, id ∈ ids source expressions
   | .ifThen _ left right =>
       (∀ id ∈ left, id ∈ ids source expressions) ∧
       (∀ id ∈ right.getD [], id ∈ ids source expressions)
@@ -64,6 +64,11 @@ private def edges? (source : TypedSource) (expressions : List ExpressionId) (nod
             fun id member => of_decide_eq_true (List.all_eq_true.mp second id member)⟩⟩ else none
     else none
   case whileLoop condition body =>
+    exact if closed : body.all (fun id => decide (id ∈ ids source expressions)) = true then
+      some ⟨by
+        simp only [LoopEdges, form]
+        exact fun id member => of_decide_eq_true (List.all_eq_true.mp closed id member)⟩ else none
+  case forLoop initializer condition post body =>
     exact if closed : body.all (fun id => decide (id ∈ ids source expressions)) = true then
       some ⟨by
         simp only [LoopEdges, form]
@@ -125,7 +130,7 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
       simp only [StatementReady, form] at original
       exact ⟨rfl, by simp [Tree.bindings], by simpa [Tree.children] using original⟩
-  | returnUnit => simp [Tree.closed, Tree.bindings, Tree.children]
+  | returnUnit | breaking | continuing => simp [Tree.closed, Tree.bindings, Tree.children]
   | initialized read form statementType projected child generated childType remaining allocated ih =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
@@ -232,6 +237,36 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
         · rcases List.mem_append.mp member with member | member
           · exact inside.2.2 actual member
           · exact next.2.2 actual member
+  | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have original := (profile.at (present _ List.mem_cons_self) found).1
+      have edges := (profile.at (present _ List.mem_cons_self) found).2
+      simp only [LoopEdges, form] at edges
+      simp only [StatementReady, form] at original
+      have before := AcceptedCompilerBodyProfile.header_facts initial original.1 ready.1
+      have inside := innerIH ready.2.1 edges (Or.inl rfl)
+      have post := AcceptedCompilerBodyProfile.header_facts after original.2.2 ready.2.2.1
+      have next := tailIH ready.2.2.2 (fun id member => present id (List.mem_cons_of_mem _ member)) (finish.elim Or.inl (fun h => Or.inr (h.tail found (by simp [form, returns]))))
+      refine ⟨by simp only [Tree.closed, before.1, inside.1, post.1, next.1, Bool.and_true], ?_, ?_⟩
+      · intro binding member
+        simp only [Tree.bindings, List.mem_append] at member
+        rcases member with ((member | member) | member) | member
+        · exact before.2.1 binding member
+        · exact inside.2.1 binding member
+        · exact post.2.1 binding member
+        · exact next.2.1 binding member
+      · intro actual member
+        simp only [Tree.children, List.mem_append, List.mem_cons] at member
+        rcases member with member | rfl | ((member | member) | member)
+        · exact before.2.2 actual member
+        · exact original.2.1
+        · exact inside.2.2 actual member
+        · exact post.2.2 actual member
+        · exact next.2.2 actual member
+  | forBoundary read form outside accepted =>
+      have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
+      simp only [StatementReady, form] at original
+      exact False.elim (outside ⟨AcceptedCompilerBodyProfile.header_forms original.1, AcceptedCompilerBodyProfile.header_forms original.2.2⟩)
   | boundary read outside accepted =>
       have checked := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
       have original := expanded_of_ready checked

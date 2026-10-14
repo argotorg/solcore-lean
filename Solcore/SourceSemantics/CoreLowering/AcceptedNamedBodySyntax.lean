@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsSyntax
 import Solcore.SourceSemantics.CoreLowering.ScopedSourceBodyAdmission
 import Solcore.SourceSemantics.CoreLowering.RecursiveNamedStatementSyntaxFacts
 
@@ -71,6 +72,18 @@ private theorem discard_annotation {source : TypedSource} {control : ControlCont
     cases same
     simp_all
 
+private theorem for_annotation {source : TypedSource} {control : ControlContext}
+    {context final : SourceSemantics.Context} {id : StatementId} {facts : StatementFacts}
+    {node : StatementNode} {initializer post : List ForItemForm} {condition : ExpressionId} {body : List StatementId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .forLoop initializer condition post body)
+    (typed : StatementHasType source control context id final facts) : node.type = .unit := by
+  cases typed
+  all_goals
+    have same := Option.some.inj ((lookupStatement?_complete unique (by assumption)).symm.trans found)
+    cases same
+    simp_all
+
 /-- The support boundary is tested on the issued compiler tree. No separate
 statement recognizer result or preconstructed body shape occurs here. -/
 theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
@@ -90,7 +103,9 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
       cases actualMode with
       | false => exact .nil (.inl rfl)
       | true => cases closed
-  | boundary | assigning => cases closed
+  | breaking read form _ => exact .breaking _ (read_found (readPolicy ▸ read)) form
+  | continuing read form _ => exact .continuing _ (read_found (readPolicy ▸ read)) form
+  | boundary | assigning | forBoundary => cases closed
   | returning read form statementType child generated childType =>
       have found := read_found (readPolicy ▸ read)
       obtain ⟨_, _, _, head, _⟩ := head_tail typed
@@ -237,6 +252,33 @@ theorem Tree.scan {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompati
             (fun child member => children child (by simp [Tree.children, member]))
             (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
 
+  | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      have found := read_found (readPolicy ▸ read)
+      have allClosed := closed
+      simp only [Tree.closed, Bool.and_eq_true_iff] at allClosed
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have nodeUnit := for_annotation unique found form head
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | forLoop initTyped condition body postTyped =>
+        obtain ⟨node, contains, same⟩ := condition.stored_type
+        exact .forLoop found form nodeUnit
+          (initial.scan allClosed.1.1.1 unique
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) initTyped)
+          (lookupExpression?_complete unique contains) same
+          (children ⟨_, _, _, child, generated⟩ (by simp [Tree.children]))
+          (innerIH (control := control.enterLoop) allClosed.1.1.2
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) body)
+          (after.scan allClosed.1.2 unique
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) postTyped)
+          (tailIH allClosed.2
+            (fun child member => children child (by simp [Tree.children, member]))
+            (fun binding member => bindings binding (by simp [Tree.bindings, member])) tail)
+
 /-- A returned compiler branch has exactly its original expression child and
 no executed suffix, even if the source root list retains dead statements. -/
 theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompatibleCatalog.Checked}
@@ -267,6 +309,14 @@ theorem Tree.at_return {policy : SourceCoreLoops.Policy} {checked : SourceCoreCo
       simp_all
   | assigning read original _ _ _ | assigned read original _ _ _ _ | whileLoop read original _ _ _ _ _ _
       | discard read original _ _ _ _ | block read original _ _ | conditional read original _ _ _ _ _ _ =>
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      cases same
+      simp_all
+  | forLoop read original _ _ _ _ _ _ _ _ | forBoundary read original _ _ =>
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
+      cases same
+      simp_all
+  | breaking read original _ | continuing read original _ =>
       have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans found)
       cases same
       simp_all

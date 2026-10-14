@@ -384,7 +384,20 @@ theorem reflects_position {budget : Nat}
         exact CallableIndexedOwnedAdmittedStagedMatchSequences.reflects bridge functions condition
           selectedMeaning found form (.inr ⟨exactUnique, stops⟩) within
           environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-  | @breaking _ _ _ _ _ _ _ _ found form | @continuing _ _ _ _ _ _ _ _ found form
+  | @breaking context scope mode id node rest expected type found form =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.breaking_evaluates _ actual store)
+      exact ⟨_, _, .breaking environment, before, mapping, world,
+        .breaking (lookupStatement?_sound found) form, .breaking environment, heaps,
+        .refl _, .refl _, .refl _ _, .refl _, initial, callerProtocol.refl initial, admitted⟩
+  | @continuing context scope mode id node rest expected type found form =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.continuing_evaluates _ actual store)
+      exact ⟨_, _, .continuing environment, before, mapping, world,
+        .continuing (lookupStatement?_sound found) form, .continuing environment, heaps,
+        .refl _, .refl _, .refl _ _, .refl _, initial, callerProtocol.refl initial, admitted⟩
   | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _
     =>
       intro shape sourceTyped projection

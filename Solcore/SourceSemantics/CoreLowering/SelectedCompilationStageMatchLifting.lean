@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedMatchHeads
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageMatchSourceInversion
 
@@ -117,6 +118,8 @@ theorem restore_adapted {plainFinal finalContext outer : SourceSemantics.Context
   cases adapted with
   | completed matched => cases matched with
     | returned value => exact .completed (.returned value)
+    | breaking _ => exact .completed (.breaking environment)
+    | continuing _ => exact .completed (.continuing environment)
     | fallthrough inner => exact .completed (.fallthrough environment)
     | fault reason => exact .completed (.fault reason)
   | rejected origin call reason finalContext reached => exact .rejected origin call reason outer reached

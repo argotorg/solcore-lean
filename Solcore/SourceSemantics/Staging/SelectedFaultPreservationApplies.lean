@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.Staging.SelectedBodyPreservation
 import Solcore.SourceSemantics.Staging.RecursiveFaultPreservationSupport
 
@@ -36,11 +37,6 @@ private theorem monoBinders_monomorphic
       · simp [schemeEq, Scheme.mono]
       · exact ih selected member
 
-private theorem body_fault {type : Ty} {outcome : BodyOutcome} {failure : Failure}
-    (rule : BodyResult type outcome (.fault failure)) : outcome = .fault failure := by
-  cases rule
-  rfl
-
 /-- A selected method enters its independently typed body with an empty capture
 and the actual operand values; its recursive fault retains the allocated heap. -/
 theorem method_body_fault {size : Nat}
@@ -62,8 +58,6 @@ theorem method_body_fault {size : Nat}
     (body : Size.StatementsIn program registry true size child bodyContext environment bound roots finalContext outcome after)
     (resultRule : BodyResult bodyInstance.resultType outcome (.fault failure)) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
-  have outcomeEq := body_fault resultRule
-  subst outcome
   have signaturesEq : bodyInstance.context.signatures = context.signatures :=
     certificate.signatures_eq.trans runtime.signatures.symm
   have bodyBeforeTyped := beforeTyped.transportClosed signaturesEq runtime.closed
@@ -104,6 +98,9 @@ theorem method_body_fault {size : Nat}
   have childType := alignedBodyType
   have sourceEq : child.source = bodyInstance.source := registry.source selected
   rw [← sourceEq] at childType
+  have outcomeEq := TypedControlBoundary.body_fault
+    (TypedControlBoundary.function childRuntime.graph.nodeOccurrencesUnique childType rfl body.sound) resultRule
+  subst outcome
   obtain ⟨afterTyped, bodyExtends⟩ := statementsIH childRuntime childCovers
     boundEnvironment boundAtLexical childType body
   exact ⟨afterTyped.transportClosed (signaturesEq.symm.trans fields.signatures.symm)
@@ -123,8 +120,6 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
   | @global bodySize scope context before bound after function arguments environment
       parameterTypes bodyContext finalContext bodyInstance roots child outcome result
       instantiates covers rootsEq selected parameters allocate body resultRule =>
-      have outcomeEq := body_fault resultRule
-      subst outcome
       rcases callableTyped.global_inv with ordinary | staged
       · rcases ordinary with ⟨typeEq, _valid, _functionEvidence⟩
         obtain ⟨inputTypes, lexicalContext, facts, certificate⟩ := selectedBodies instantiates rootsEq selected
@@ -175,6 +170,9 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
         have childType := alignedBodyType
         have sourceEq : child.source = bodyInstance.source := registry.source selected
         rw [← sourceEq] at childType
+        have outcomeEq := TypedControlBoundary.body_fault
+          (TypedControlBoundary.function childRuntime.graph.nodeOccurrencesUnique childType rfl body.sound) resultRule
+        subst outcome
         obtain ⟨afterTyped, bodyExtends⟩ := statementsIH bodySize
           (Size.child_lt_stepSize (by simp)) childRuntime childCovers boundEnvironment boundAtLexical childType body
         exact ⟨afterTyped.transportClosed (signaturesEq.symm.trans fields.signatures.symm)
@@ -184,8 +182,6 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
         cases impossible
   | @closure bodySize scope context before bound after function arguments environment
       parameterTypes bodyContext finalContext child outcome result selected valid parameters allocate body resultRule =>
-      have outcomeEq := body_fault resultRule
-      subst outcome
       rcases callableTyped.closure_function_inv with
         ⟨parameterEq, resultEq, signaturesEq, code, closureEvidence, captures⟩
       subst parameter
@@ -237,6 +233,9 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
             exact fields.covers closureEvidence
           have childType := bodyType
           rw [← registry.source selected] at childType
+          have outcomeEq := TypedControlBoundary.body_fault
+            (TypedControlBoundary.function childRuntime.graph.nodeOccurrencesUnique childType rfl body.sound) resultRule
+          subst outcome
           obtain ⟨afterTyped, bodyExtends⟩ := statementsIH bodySize
             (Size.child_lt_stepSize (by simp)) childRuntime childCovers boundEnvironment boundAtCall childType body
           exact ⟨afterTyped.transportClosed (signaturesEq.symm.trans fields.signatures.symm)

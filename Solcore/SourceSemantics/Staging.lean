@@ -8,6 +8,9 @@ import Solcore.SourceSemantics.Staging.RecursiveTrace
 import Solcore.SourceSemantics.Staging.RecursiveTraceProperties
 import Solcore.SourceSemantics.Staging.RecursiveErasure
 
+import Solcore.SourceSemantics.Staging.RecursiveControlTransferFacts
+import Solcore.SourceSemantics.Staging.RecursiveControlViews
+
 /-!
 # Declarative source staging
 

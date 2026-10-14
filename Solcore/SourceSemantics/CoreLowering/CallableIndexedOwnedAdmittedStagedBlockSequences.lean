@@ -87,6 +87,18 @@ theorem reflects {budget : Nat}
         .blockReturned (lookupStatement?_sound statementFound) form headTrace,
         .returned payload, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
         middleState, headRelated, headPost⟩
+  | breaking innerEnvironment =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      exact ⟨_, context, _, middle, middleMap, middleWorld,
+        .blockBreaking (lookupStatement?_sound statementFound) form headTrace,
+        .breaking environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+        middleState, headRelated, headPost⟩
+  | continuing innerEnvironment =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_transfer _ headEval.sound)
+      exact ⟨_, context, _, middle, middleMap, middleWorld,
+        .blockContinuing (lookupStatement?_sound statementFound) form headTrace,
+        .continuing environment, middleHeaps, firstMaps, firstWorlds, firstFrame, firstMetadata,
+        middleState, headRelated, headPost⟩
   | fault matched =>
       obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound (LocalLoop.sequence_failure _ headEval.sound)
       exact ⟨_, context, _, middle, middleMap, middleWorld,
@@ -160,12 +172,12 @@ theorem preserves {budget : Nat}
       (bounded : headSize ≤ budget) :
       ∃ value finalStore finalMap finalWorld,
         Evaluates actual store ((LocalLoop.sequence type innerCode body).rename ξ) value finalStore ∧
-        Represents model finalMap finalWorld mode expected type faults headOutcome value ∧
+        Represents model finalMap finalWorld mode expected type faults (headOutcome.restore environment) value ∧
         CompatibleAmbientHeap.HeapRepresents compiled.compatible.checked receiving functions finalMap finalWorld after finalStore ∧
         LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
         AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
         ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
-          callerProtocol.Relates initial reached ∧ Post bridge context expected headOutcome reached := by
+          callerProtocol.Relates initial reached ∧ Post bridge context expected (headOutcome.restore environment) reached := by
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
         maps, worlds, preservation, metadata, reached, related, post⟩ :=
       innerCorrect bounded environments heaps locals agrees actualTyped
@@ -176,6 +188,16 @@ theorem preserves {budget : Nat}
           maps, worlds, preservation, metadata, reached, related, post⟩
         rw [LoopRenaming.sequence]
         exact LocalLoop.sequence_returned _ evaluated
+    | breaking innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .breaking environment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
+    | continuing innerEnvironment =>
+        refine ⟨_, finalStore, finalMap, finalWorld, ?_, .continuing environment, finalHeaps,
+          maps, worlds, preservation, metadata, reached, related, post⟩
+        rw [LoopRenaming.sequence]
+        exact LocalLoop.sequence_transfer _ evaluated
     | fault matched =>
         refine ⟨_, finalStore, finalMap, finalWorld, ?_, .fault matched, finalHeaps,
           maps, worlds, preservation, metadata, reached, related, post⟩
@@ -185,7 +207,15 @@ theorem preserves {budget : Nat}
   rcases CallableIndexedOwnedPreparedStagedScopedBlockSourceInversion.block_and_tail unique statementFound form trace with
     ⟨innerSize, innerContext, sourceValue, sameSize, contextEq, outcomeEq, innerTrace⟩ |
     ⟨innerSize, innerContext, failure, sameSize, contextEq, outcomeEq, innerTrace⟩ |
+    ⟨innerSize, innerContext, innerEnvironment, sameSize, contextEq, outcomeEq, innerTrace⟩ |
+    ⟨innerSize, innerContext, innerEnvironment, sameSize, contextEq, outcomeEq, innerTrace⟩ |
     ⟨innerSize, tailSize, innerContext, innerEnvironment, middle, sameSize, innerTrace, tailTrace⟩
+  · subst outcome
+    exact finish innerTrace (by intros; intro impossible; cases impossible)
+      (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)
+  · subst outcome
+    exact finish innerTrace (by intros; intro impossible; cases impossible)
+      (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)
   · subst outcome
     exact finish innerTrace (by intros; intro impossible; cases impossible)
       (Nat.le_trans (Nat.le_of_lt (sameSize ▸ Staging.Recursive.Size.child_lt_stepSize (by simp))) within)

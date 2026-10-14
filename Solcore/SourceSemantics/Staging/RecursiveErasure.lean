@@ -63,6 +63,12 @@ def StatementsPlain (program : Program) (mode : Bool) (scope : Scope) (context :
   | .returned value => if mode then
       FunctionStatementsExecute program context scope.evidence scope.source environment before ids finalContext (.returned value) after
     else StatementsExecute program context scope.evidence scope.source environment before ids finalContext (.returned value) after
+  | .breaking finalEnvironment => if mode then
+      FunctionStatementsExecute program context scope.evidence scope.source environment before ids finalContext (.breaking finalEnvironment) after
+    else StatementsExecute program context scope.evidence scope.source environment before ids finalContext (.breaking finalEnvironment) after
+  | .continuing finalEnvironment => if mode then
+      FunctionStatementsExecute program context scope.evidence scope.source environment before ids finalContext (.continuing finalEnvironment) after
+    else StatementsExecute program context scope.evidence scope.source environment before ids finalContext (.continuing finalEnvironment) after
   | .fault (.semantic reason) => if mode then
       FunctionStatementsFault program context scope.evidence scope.source environment before ids finalContext reason after
     else StatementsFault program context scope.evidence scope.source environment before ids finalContext reason after
@@ -79,6 +85,8 @@ def MatchPlain (program : Program) (scope : Scope) (context : Context)
   | .fallthrough finalEnvironment => StatementExecutes program context scope.evidence scope.source environment before id
       context (.fallthrough finalEnvironment) after
   | .returned value => StatementExecutes program context scope.evidence scope.source environment before id context (.returned value) after
+  | .breaking finalEnvironment => StatementExecutes program context scope.evidence scope.source environment before id context (.breaking finalEnvironment) after
+  | .continuing finalEnvironment => StatementExecutes program context scope.evidence scope.source environment before id context (.continuing finalEnvironment) after
   | .fault (.semantic reason) => StatementFaults program context scope.evidence scope.source environment before id reason after
   | .fault (.stage ..) => True
 
@@ -98,6 +106,8 @@ theorem MatchPlain.arm {program : Program} {scope : Scope} {context armContext f
   cases outcome with
   | fallthrough => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
   | returned => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
+  | breaking => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
+  | continuing => exact .matchArm found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
   | fault failure => cases failure with
     | stage => trivial
     | semantic => exact .matchArmBody found form contains scrutinee hiddenAllocated selected rfl rfl extended allocated body
@@ -116,6 +126,8 @@ theorem MatchPlain.default {program : Program} {scope : Scope} {context finalCon
   cases outcome with
   | fallthrough => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
   | returned => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
+  | breaking => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
+  | continuing => exact .matchDefault found form contains scrutinee hiddenAllocated selected body
   | fault failure => cases failure with
     | stage => trivial
     | semantic => exact .matchDefaultBody found form contains scrutinee hiddenAllocated selected body
@@ -129,6 +141,10 @@ def WhilePlain (program : Program) (scope : Scope) (context : Context)
       condition statements context (.fallthrough finalEnvironment) after
   | .returned value => WhileExecutes program context scope.evidence scope.source environment before
       condition statements context (.returned value) after
+  | .breaking finalEnvironment => WhileExecutes program context scope.evidence scope.source environment before
+      condition statements context (.breaking finalEnvironment) after
+  | .continuing finalEnvironment => WhileExecutes program context scope.evidence scope.source environment before
+      condition statements context (.continuing finalEnvironment) after
   | .fault (.semantic reason) => WhileFaults program context scope.evidence scope.source environment before
       condition statements reason after
   | .fault (.stage ..) => True
@@ -143,10 +159,29 @@ theorem WhilePlain.next {program : Program} {scope : Scope} {context innerContex
     WhilePlain program scope context environment before condition statements outcome after := by
   cases outcome with
   | returned => exact .nextFallthrough test body next
+  | breaking => exact .nextFallthrough test body next
+  | continuing => exact .nextFallthrough test body next
   | fallthrough => exact .nextFallthrough test body next
   | fault failure => cases failure with
     | stage => trivial
     | semantic => exact .nextFallthrough test body next
+
+theorem WhilePlain.continued {program : Program} {scope : Scope} {context innerContext : Context}
+    {environment innerEnvironment : Environment} {before middle bodyHeap after : Heap}
+    {condition : ExpressionId} {statements : List StatementId} {outcome : BodyOutcome}
+    (test : ExpressionEvaluates program context scope.evidence scope.source environment before condition (.bool true) middle)
+    (body : StatementsExecute program context scope.evidence scope.source environment middle statements
+      innerContext (.continuing innerEnvironment) bodyHeap)
+    (next : WhilePlain program scope context environment bodyHeap condition statements outcome after) :
+    WhilePlain program scope context environment before condition statements outcome after := by
+  cases outcome with
+  | returned => exact .nextContinue test body next
+  | breaking => exact .nextContinue test body next
+  | continuing => exact .nextContinue test body next
+  | fallthrough => exact .nextContinue test body next
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .nextContinue test body next
 
 
 /-- Successful header prefixes retain the exact stopping context and bindings. -/
@@ -180,6 +215,10 @@ def ForLoopPlain (program : Program) (scope : Scope) (context : Context)
       condition post body context (.fallthrough finalEnvironment) after
   | .returned value => ForLoopExecutes program context scope.evidence scope.source environment before
       condition post body context (.returned value) after
+  | .breaking finalEnvironment => ForLoopExecutes program context scope.evidence scope.source environment before
+      condition post body context (.breaking finalEnvironment) after
+  | .continuing finalEnvironment => ForLoopExecutes program context scope.evidence scope.source environment before
+      condition post body context (.continuing finalEnvironment) after
   | .fault (.semantic reason) => ForLoopFaults program context scope.evidence scope.source environment before
       condition post body reason after
   | .fault (.stage ..) => True
@@ -196,10 +235,31 @@ theorem ForLoopPlain.next {program : Program} {scope : Scope} {context innerCont
     ForLoopPlain program scope context environment before condition post body outcome after := by
   cases outcome with
   | returned => exact .nextFallthrough test branch postTrace next
+  | breaking => exact .nextFallthrough test branch postTrace next
+  | continuing => exact .nextFallthrough test branch postTrace next
   | fallthrough => exact .nextFallthrough test branch postTrace next
   | fault failure => cases failure with
     | stage => trivial
     | semantic => exact .nextFallthrough test branch postTrace next
+
+theorem ForLoopPlain.continued {program : Program} {scope : Scope} {context innerContext postContext : Context}
+    {environment innerEnvironment postEnvironment : Environment} {before middle bodyHeap postHeap after : Heap}
+    {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId} {outcome : BodyOutcome}
+    (test : ExpressionEvaluates program context scope.evidence scope.source environment before condition (.bool true) middle)
+    (branch : StatementsExecute program context scope.evidence scope.source environment middle body
+      innerContext (.continuing innerEnvironment) bodyHeap)
+    (postTrace : ForItemsExecute program context scope.evidence scope.source environment bodyHeap post
+      postContext postEnvironment postHeap)
+    (next : ForLoopPlain program scope context environment postHeap condition post body outcome after) :
+    ForLoopPlain program scope context environment before condition post body outcome after := by
+  cases outcome with
+  | returned => exact .nextContinue test branch postTrace next
+  | breaking => exact .nextContinue test branch postTrace next
+  | continuing => exact .nextContinue test branch postTrace next
+  | fallthrough => exact .nextContinue test branch postTrace next
+  | fault failure => cases failure with
+    | stage => trivial
+    | semantic => exact .nextContinue test branch postTrace next
 
 private theorem value_occurrence {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm} {value : Value}
@@ -235,6 +295,8 @@ theorem StatementsPlain.prepend {mode : Bool} {program : Program} {scope : Scope
           | semantic => exact .tail head tail
         | fallthrough => exact .cons head tail
         | returned => exact .cons head tail
+        | breaking => exact .cons head tail
+        | continuing => exact .cons head tail
   | true =>
       cases outcome with
       | fault failure =>
@@ -248,7 +310,7 @@ theorem StatementsPlain.prepend {mode : Bool} {program : Program} {scope : Scope
         cases rest with
         | nil => cases tail; exact .singleton contains notTail head
         | cons next rest => exact .cons head tail
-      | returned value =>
+      | returned value | breaking value | continuing value =>
         cases rest with
         | nil => cases tail
         | cons next rest => exact .cons head tail
@@ -267,6 +329,34 @@ theorem StatementsPlain.terminal {mode : Bool} {program : Program} {scope : Scop
       cases rest with
       | nil => exact .singleton contains notTail head
       | cons => exact FunctionStatementsExecute.terminal head (.returned _)
+theorem StatementsPlain.terminal_breaking {mode : Bool} {program : Program} {scope : Scope} {context : Context}
+    {environment : Environment} {before after : Heap} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {finalEnvironment : Environment}
+    (contains : ContainsStatement scope.source id node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (head : StatementExecutes program context scope.evidence scope.source environment before id context (.breaking finalEnvironment) after) :
+    StatementsPlain program mode scope context environment before (id :: rest) context (.breaking finalEnvironment) after := by
+  cases mode with
+  | false =>
+      exact StatementsExecute.terminal head (.breaking _)
+  | true =>
+      cases rest with
+      | nil => exact .singleton contains notTail head
+      | cons => exact FunctionStatementsExecute.terminal head (.breaking _)
+theorem StatementsPlain.terminal_continuing {mode : Bool} {program : Program} {scope : Scope} {context : Context}
+    {environment : Environment} {before after : Heap} {id : StatementId} {node : StatementNode}
+    {rest : List StatementId} {finalEnvironment : Environment}
+    (contains : ContainsStatement scope.source id node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (head : StatementExecutes program context scope.evidence scope.source environment before id context (.continuing finalEnvironment) after) :
+    StatementsPlain program mode scope context environment before (id :: rest) context (.continuing finalEnvironment) after := by
+  cases mode with
+  | false =>
+      exact StatementsExecute.terminal head (.continuing _)
+  | true =>
+      cases rest with
+      | nil => exact .singleton contains notTail head
+      | cons => exact FunctionStatementsExecute.terminal head (.continuing _)
 
 theorem StatementsPlain.head_fault {mode : Bool} {program : Program} {scope : Scope} {context : Context}
     {environment : Environment} {before after : Heap} {id : StatementId} {rest : List StatementId} {reason : SemanticFault}
@@ -294,6 +384,8 @@ theorem StatementsPlain.discard_value {program : Program} {scope : Scope}
     | semantic => exact .tail (.expression contains form child) tail
   | fallthrough => exact .cons (.expression contains form child) tail
   | returned => exact .cons (.expression contains form child) tail
+  | breaking => exact .cons (.expression contains form child) tail
+  | continuing => exact .cons (.expression contains form child) tail
 
 theorem StatementsPlain.if_execute {program : Program} {scope : Scope}
     {context innerContext : Context} {environment : Environment} {before middle after : Heap}
@@ -347,6 +439,10 @@ private theorem body_result {program : Program} {registry : Registry} {scope chi
     exact ⟨function.evidence, .closure rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) rfl⟩
   | unit =>
     exact ⟨function.evidence, .closureUnit rfl valid typeEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩⟩
+  | breaking =>
+    exact ⟨function.evidence, .closureControlEscape rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inl ⟨_, rfl⟩)⟩
+  | continuing =>
+    exact ⟨function.evidence, .closureControlEscape rfl valid parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inr ⟨_, rfl⟩)⟩
   | @fault _ failure =>
     cases failure with
     | stage => trivial
@@ -376,6 +472,10 @@ private theorem global_body_result {program : Program} {registry : Registry} {sc
   | unit =>
     exact ⟨function.evidence, .global instantiates rfl covers
       (.unit covers typeEq rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩)⟩
+  | breaking =>
+    exact ⟨function.evidence, .globalBody instantiates rfl (.controlEscape rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inl ⟨_, rfl⟩))⟩
+  | continuing =>
+    exact ⟨function.evidence, .globalBody instantiates rfl (.controlEscape rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inr ⟨_, rfl⟩))⟩
   | @fault _ failure =>
     cases failure with
     | stage => trivial
@@ -412,6 +512,10 @@ private theorem method_body_result {program : Program} {registry : Registry} {ch
     exact .returned covers rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) rfl
   | unit =>
     exact .unit covers typeEq rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) ⟨_, rfl⟩
+  | breaking =>
+    exact .controlEscape rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inl ⟨_, rfl⟩)
+  | continuing =>
+    exact .controlEscape rootsEq parameters allocate (by simpa [StatementsPlain, source, evidence] using body) (Or.inr ⟨_, rfl⟩)
   | @fault _ failure =>
     cases failure with
     | stage => trivial
@@ -722,6 +826,8 @@ local macro "erase_recursive_plain" : tactic =>
     case closure selected valid parameters allocate body result ih => exact body_result selected valid parameters allocate ih result
     case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
     case returnUnit contains form => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnUnit contains form)
+    case continuing contains form => exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (.continueStmt contains form)
+    case breaking contains form => exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (.breakStmt contains form)
     case returnValue contains form child ih => exact StatementsPlain.terminal contains (by intro e; simp [form]) (.returnValue contains form ih)
     case returnFault contains form child ih =>
       rename_i failure
@@ -738,6 +844,10 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact StatementsPlain.head_fault (.ifCondition contains form ih)
     case ifReturned contains form test branch a b =>
       exact StatementsPlain.terminal contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b)
+    case ifContinuing contains form test branch a b =>
+      exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b)
+    case ifBreaking contains form test branch a b =>
+      exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (StatementsPlain.if_execute contains form a b)
     case ifFault contains form test branch a b =>
       rename_i failure
       cases failure with
@@ -775,6 +885,10 @@ local macro "erase_recursive_plain" : tactic =>
 
     case blockReturned contains form inner ih =>
       exact StatementsPlain.terminal contains (by intro e; simp [form]) (.block contains form ih)
+    case blockContinuing contains form inner ih =>
+      exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (.block contains form ih)
+    case blockBreaking contains form inner ih =>
+      exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (.block contains form ih)
     case blockFault contains form inner ih =>
       rename_i failure
       cases failure with
@@ -798,6 +912,7 @@ local macro "erase_recursive_plain" : tactic =>
       | stage => trivial
       | semantic => exact .condition ih
     case returned test body testIH bodyIH => exact .returns testIH bodyIH
+    case breakFromBody test body testIH bodyIH => exact .breaks testIH bodyIH
     case bodyFault test body testIH bodyIH =>
       rename_i failure
       cases failure with
@@ -805,8 +920,14 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact .body testIH bodyIH
     case next test body next testIH bodyIH nextIH => exact WhilePlain.next testIH bodyIH nextIH
 
+    case continueNext test body next testIH bodyIH nextIH => exact WhilePlain.continued testIH bodyIH nextIH
+
     case matchReturned contains form matched ih =>
       exact StatementsPlain.terminal contains (by intro e; simp [form]) (ih _ _ contains form)
+    case matchContinuing contains form matched ih =>
+      exact StatementsPlain.terminal_continuing contains (by intro e; simp [form]) (ih _ _ contains form)
+    case matchBreaking contains form matched ih =>
+      exact StatementsPlain.terminal_breaking contains (by intro e; simp [form]) (ih _ _ contains form)
     case matchFault contains form matched ih =>
       rename_i failure
       cases failure with
@@ -882,13 +1003,21 @@ local macro "erase_recursive_plain" : tactic =>
       | stage => trivial
       | semantic => exact .body testIH branchIH
     case returnedFromBody test branch testIH branchIH => exact .returns testIH branchIH
+    case forBreakFromBody test branch testIH branchIH => exact .breaks testIH branchIH
     case postFailure test branch postTrace testIH branchIH postIH =>
       rename_i failure
       cases failure with
       | stage => trivial
       | semantic => exact .postFallthrough testIH branchIH postIH
+    case continuePostFailure test branch postTrace testIH branchIH postIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .postContinue testIH branchIH postIH
     case iterate test branch postTrace next testIH branchIH postIH nextIH =>
       exact ForLoopPlain.next testIH branchIH postIH nextIH
+    case continueIterate test branch postTrace next testIH branchIH postIH nextIH =>
+      exact ForLoopPlain.continued testIH branchIH postIH nextIH
   ))
 
 private theorem projection {program : Program} {registry : Registry} {scope : Scope}

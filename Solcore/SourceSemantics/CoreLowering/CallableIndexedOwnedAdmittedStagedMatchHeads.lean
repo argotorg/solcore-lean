@@ -85,6 +85,8 @@ theorem restore_rep {catalog projects definitions}
     Represents model mapping world mode raw type faults (outcome.restore environment) value := by
   cases represented with
   | returned payload => exact .returned payload
+  | breaking _ => exact .breaking environment
+  | continuing _ => exact .continuing environment
   | fault matched => exact .fault matched
   | fallthrough _ allowed => exact .fallthrough environment allowed
 
@@ -119,7 +121,7 @@ theorem restore_arm {source : TypedSource}
     cases failure with
     | semantic reason => exact ⟨rows, by intro result same; cases same⟩
     | stage origin call reason => exact rows
-  | fallthrough _ => exact CallableIndexedOwnedMatchPrefixAdmission.restore_arm bridge returnTo extended state post
+  | fallthrough _ | breaking _ | continuing _ => exact CallableIndexedOwnedMatchPrefixAdmission.restore_arm bridge returnTo extended state post
 
 /-- Default and empty selections restore the native frame at the original
 Source context and retain the actual selected body's postcondition. -/
@@ -141,6 +143,6 @@ theorem restore_parent
     cases failure with
     | semantic reason => exact ⟨rows, by intro result same; cases same⟩
     | stage origin call reason => exact rows
-  | fallthrough _ => exact CallableIndexedOwnedMatchPrefixAdmission.restore_parent bridge returnTo state post
+  | fallthrough _ | breaking _ | continuing _ => exact CallableIndexedOwnedMatchPrefixAdmission.restore_parent bridge returnTo state post
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedMatchHeads

@@ -110,7 +110,8 @@ private theorem assignment_details {policy : SourceCoreLoops.Policy}
       exact tail remaining ready
   | initialized read original | absent read original | returning read original
   | returnUnit read original | whileLoop read original
-  | discard read original | block read original | conditional read original =>
+  | discard read original | block read original | conditional read original
+  | forLoop read original | forBoundary read original | breaking read original | continuing read original =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans found)
       cases same
       simp_all
@@ -145,7 +146,8 @@ private theorem loop_details {policy : SourceCoreLoops.Policy}
         inside.2, tail.2.1, List.nil_append, and_self]
   | initialized read form | absent read form | returning read form | returnUnit read form
   | assigning read form | assigned read form
-  | discard read form | block read form | conditional read form =>
+  | discard read form | block read form | conditional read form
+  | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.loopFound)
       cases same
       rw [shape.loopForm] at form
@@ -176,7 +178,8 @@ theorem SelectedRelayShape.compiler_details {policy : SourceCoreLoops.Policy}
         List.map_nil, and_self]
   | absent read form | returning read form | returnUnit read form
   | assigning read form | assigned read form | whileLoop read form
-  | discard read form | block read form | conditional read form =>
+  | discard read form | block read form | conditional read form
+  | forLoop read form | forBoundary read form | breaking read form | continuing read form =>
       have same := Option.some.inj ((read_found (reader ▸ read)).symm.trans shape.initializedFound)
       cases same
       rw [shape.initializedForm] at form

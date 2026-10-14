@@ -84,6 +84,8 @@ theorem lifts {budget : Nat}
         .rejected origin call reason _ _⟩
     | completed matched =>
       cases matched with
+      | breaking innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed lifted).1 innerEnvironment rfl).elim
+      | continuing innerEnvironment => exact ((CallableIndexedOwnedAdmittedStagedForSourceBridge.closed lifted).2 innerEnvironment rfl).elim
       | returned value =>
         exact ⟨_, _, _, (CallableIndexedOwnedAdmittedStagedForSourceBridge.returned statementFound form lifted).sound, .completed (.returned value)⟩
       | fault reason =>

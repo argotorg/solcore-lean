@@ -25,12 +25,25 @@ theorem while_step (size : Nat)
       have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
       exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩
+  | @breakFromBody testSize bodySize scope context innerContext environment before middle after condition statements innerEnvironment test body =>
+      have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+      have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono first.heap_extends) first.heap_typed bodyTyped body
+      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, by intro value equal; cases equal⟩
   | @bodyFault testSize bodySize scope context innerContext environment before middle after condition statements failure test body =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
       exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩
   | @next testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome test body next =>
+      have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+      have middlePost := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono first.heap_extends) first.heap_typed bodyTyped body
+      have post := whileIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono (first.heap_extends.trans middlePost.heap_extends)) middlePost.heap_typed conditionTyped bodyTyped next
+      exact ⟨post.heap_typed, first.heap_extends.trans (middlePost.heap_extends.trans post.heap_extends), post.returned⟩
+
+  | @continueNext testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome test body next =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have middlePost := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
@@ -63,6 +76,11 @@ theorem for_loop_step (size : Nat)
       have result := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
       exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, result.returned (by simp)⟩
+  | @forBreakFromBody testSize branchSize scope context innerContext environment before middle after condition post body innerEnvironment test branch =>
+      have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+      have result := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
+      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, by intro value equal; cases equal⟩
   | @postFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
       before middle bodyHeap after condition post body failure test branch postTrace =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
@@ -71,7 +89,27 @@ theorem for_loop_step (size : Nat)
       have result := itemsIH postTraceSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans second.heap_extends)) second.heap_typed postTyped postTrace
       exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends), by intro value equal; cases equal⟩
+  | @continuePostFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
+      before middle bodyHeap after condition post body failure test branch postTrace =>
+      have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+      have second := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
+      have result := itemsIH postTraceSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono (first.heap_extends.trans second.heap_extends)) second.heap_typed postTyped postTrace
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends), by intro value equal; cases equal⟩
   | @iterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
+      before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
+      have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
+      have second := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
+      have third := itemsIH postTraceSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono (first.heap_extends.trans second.heap_extends)) second.heap_typed postTyped postTrace
+      have result := loopIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+        (locals.mono (first.heap_extends.trans (second.heap_extends.trans third.heap_extends)))
+        third.heap_typed conditionTyped bodyTyped postTyped next
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans (third.heap_extends.trans result.heap_extends)), result.returned⟩
+
+  | @continueIterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
       before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have second := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers

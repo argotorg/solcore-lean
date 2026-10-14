@@ -124,6 +124,23 @@ theorem reflects {budget : Nat}
           exact ⟨_, _, after, finalMap, finalWorld, .next conditionTrace bodyTrace nextTrace, related,
             progress.trans nextProgress, finalState, callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
 
+        | breaking innerEnvironment =>
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic evaluation.sound
+            (Core.LoopExecution.body_breaking conditionEval.sound bodyEval.sound)
+          exact ⟨_, _, bodyHeap, bodyMap, bodyWorld, .breakFromBody conditionTrace bodyTrace,
+            .fallthrough environment (.inl rfl), progress, bodyState,
+            callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
+        | continuing innerEnvironment =>
+          obtain ⟨nextSize, smaller, nextEval⟩ := branch.loop_next_continuing bodyEval.sound bodyState.live.selfRead
+          obtain ⟨nextSourceSize, outcome, after, finalMap, finalWorld, nextTrace, related, nextProgress,
+              finalState, finalRetained, finalPost⟩ :=
+            ih nextSize (Nat.lt_trans smaller branchSmaller)
+              (Nat.le_trans (Nat.le_of_lt (Nat.lt_trans smaller branchSmaller)) bounded) bodyState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
+              guarded bodyPost nextEval
+          exact ⟨_, _, after, finalMap, finalWorld, .continueNext conditionTrace bodyTrace nextTrace, related,
+            progress.trans nextProgress, finalState, callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+
 theorem preserves {budget : Nat}
     (children : ∀ childSize, childSize < budget → PreservesAt bridge context model stages invocation certificate faults childSize)
     (found : invocation.source.lookupExpression? condition = some node)
@@ -202,6 +219,29 @@ theorem preserves {budget : Nat}
           | returned payload =>
             exact ⟨_, bodyStore, bodyMap, bodyWorld, .returns conditionEval bodyEval, .returned payload,
               conditionProgress.trans bodyProgress, bodyState, callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
+    | breakFromBody testTrace bodyTrace =>
+        obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
+            conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at bridge functions
+            (children _ (Nat.lt_of_lt_of_le (Staging.Recursive.Size.child_lt_stepSize (by simp)) bounded))
+            tree found typed agrees state ready testTrace
+        cases conditionRelated with
+        | value payload =>
+          rw [nodeType] at payload
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress,
+              bodyState, bodyRetained, bodyPost⟩ :=
+            body_preserves_at bridge functions guard correct
+              (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+              agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2
+              guarded conditionPost.at_value.2 bodyTrace
+          cases bodyRelated with
+          | breaking innerEnvironment =>
+            exact ⟨_, bodyStore, bodyMap, bodyWorld, .breaks conditionEval bodyEval, .fallthrough environment (.inl rfl),
+              conditionProgress.trans bodyProgress, bodyState, callerProtocol.trans conditionRetained bodyRetained, bodyPost⟩
     | bodyFault testTrace bodyTrace =>
         obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
             conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
@@ -255,6 +295,39 @@ theorem preserves {budget : Nat}
                 guarded bodyPost next
             exact ⟨result, finalStore, finalMap, finalWorld,
               .nextFallthrough conditionEval bodyEval bodyState.live.selfRead nativeTrace,
+              related, progress.trans finalProgress, finalState,
+              callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
+
+    | continueNext testTrace bodyTrace next =>
+        obtain ⟨conditionValue, conditionStore, conditionMap, conditionWorld, conditionEval, conditionRelated,
+            conditionProgress, conditionState, conditionRetained, conditionPost⟩ :=
+          condition_preserves_at bridge functions
+            (children _ (Nat.lt_of_lt_of_le (Staging.Recursive.Size.child_lt_stepSize (by simp)) bounded))
+            tree found typed agrees state ready testTrace
+        cases conditionRelated with
+        | value payload =>
+          rw [nodeType] at payload
+          obtain ⟨boolean, sameSource, sameCore⟩ := bool_fields payload
+          cases sameSource
+          subst sameCore
+          obtain ⟨bodyValue, bodyStore, bodyMap, bodyWorld, bodyEval, bodyRelated, bodyProgress,
+              bodyState, bodyRetained, bodyPost⟩ :=
+            body_preserves_at bridge functions guard correct
+              (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+              agrees reference conditionState
+              (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead conditionProgress.2.2.2.1).2
+              guarded conditionPost.at_value.2 bodyTrace
+          cases bodyRelated with
+          | continuing innerEnvironment =>
+            have progress := conditionProgress.trans bodyProgress
+            obtain ⟨result, finalStore, finalMap, finalWorld, nativeTrace, related, finalProgress,
+                finalState, finalRetained, finalPost⟩ :=
+              ih _ (Staging.Recursive.Size.child_lt_stepSize (by simp))
+                (Nat.le_trans (Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp))) bounded)
+                bodyState (TypedLexicalWhile.retain state.live.contextUnmapped fixedRead progress.2.2.2.1).2
+                guarded bodyPost next
+            exact ⟨result, finalStore, finalMap, finalWorld,
+              .nextContinue conditionEval bodyEval bodyState.live.selfRead nativeTrace,
               related, progress.trans finalProgress, finalState,
               callerProtocol.trans (callerProtocol.trans conditionRetained bodyRetained) finalRetained, finalPost⟩
 

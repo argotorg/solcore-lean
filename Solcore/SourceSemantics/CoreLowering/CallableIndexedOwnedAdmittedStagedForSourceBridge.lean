@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLoopOutcomes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeadContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForSourceInversion
 
@@ -13,6 +14,20 @@ variable {program : Program} {stages : Registry} {invocation : Scope}
   {before middle after : Dynamic.Heap} {initial post : List ForItemForm}
   {test : ExpressionId} {body rest : List StatementId} {size tailSize : Nat}
   {id : StatementId} {node : StatementNode} {mode : Bool} {outcome : BodyOutcome}
+
+theorem closed
+    (trace : Trace program stages invocation context environment before initial test post body size outcome after) :
+    outcome.NoEscapedControl := by
+  cases trace with
+  | initializerFault _ => exact .fault _
+  | @loop _ _ _ _ _ result _ initialized executed =>
+    have closed := SelectedCompilationStageLoopOutcomes.for_closed executed
+    cases result with
+    | returned => exact .returned _
+    | fault => exact .fault _
+    | fallthrough => exact .fallthrough _
+    | breaking => exact (closed.1 _ rfl).elim
+    | continuing => exact (closed.2 _ rfl).elim
 
 theorem fallthrough_environment
     (trace : Trace program stages invocation context environment before initial test post body size (.fallthrough inner) after) :
@@ -30,6 +45,8 @@ theorem loop_restore
       cases CallableIndexedOwnedPreparedStagedScopedForSourceInversion.fallthrough_environment trace
       rfl
   | returned | fault => rfl
+  | breaking => exact ((SelectedCompilationStageLoopOutcomes.for_closed trace).1 _ rfl).elim
+  | continuing => exact ((SelectedCompilationStageLoopOutcomes.for_closed trace).2 _ rfl).elim
 
 theorem returned {value : Dynamic.Value}
     (found : invocation.source.lookupStatement? id = some node)

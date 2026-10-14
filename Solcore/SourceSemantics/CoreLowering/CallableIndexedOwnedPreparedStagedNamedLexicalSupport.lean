@@ -195,6 +195,8 @@ theorem preserves (layouts : header.layouts = compiled.indexed.layouts) {budget 
     maps, worlds, frame, metadata, reached.val, related, ?_⟩
   · simpa only [receipt.emitted, CallableIndexedOwnedAdmittedStagedLexicalFooter.finish_rename] using evaluatedBody
   · cases bodyOutcome with
+    | breaking environment => exact (represented.noEscapedControl.1 environment rfl).elim
+    | continuing environment => exact (represented.noEscapedControl.2 environment rfl).elim
     | returned => exact ⟨post.rows, post.successful⟩
     | fallthrough => exact ⟨post.rows, post.successful⟩
     | fault failure => cases failure with
@@ -255,6 +257,8 @@ theorem reflects (layouts : header.layouts = compiled.indexed.layouts) {budget :
     trace, represented.body_result, representedBody, finalHeaps, maps, worlds, frame, metadata,
     reached.val, related, ?_⟩
   cases bodyOutcome with
+  | breaking environment => exact (represented.noEscapedControl.1 environment rfl).elim
+  | continuing environment => exact (represented.noEscapedControl.2 environment rfl).elim
   | returned => exact ⟨post.rows, post.successful⟩
   | fallthrough => exact ⟨post.rows, post.successful⟩
   | fault failure => cases failure with

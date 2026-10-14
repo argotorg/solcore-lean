@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
+import Solcore.SourceSemantics.CoreLowering.ScopedSourceForItemsAdmission
 
 /-! Finite original statement admission separates syntax from lexical typing.
 The same scan yields the accepted body shape and recovers changing contexts
@@ -13,6 +13,10 @@ open Core Frontend SourceInference
 inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
     (expected : TypeSystem.Ty) : Bool → List StatementId → Prop where
   | nil {mode} (allowed : mode = false ∨ expected = .unit) : Scan source approved expected mode []
+  | breaking {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) : Scan source approved expected mode (id :: rest)
+  | continuing {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) : Scan source approved expected mode (id :: rest)
   | returnUnit {mode id node} (rest : List StatementId)
       (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt none)
       (sourceType : node.type = .unit) (result : expected = .unit) :
@@ -68,6 +72,15 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (conditionType : conditionNode.type = .bool) (value : approved condition)
       (inner : Scan source approved expected false body)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+  | forLoop {mode id node initializer condition conditionNode post body rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .forLoop initializer condition post body)
+      (sourceType : node.type = .unit)
+      (initial : ScopedSourceForItemsAdmission.Scan source approved initializer)
+      (conditionFound : source.lookupExpression? condition = some conditionNode)
+      (conditionType : conditionNode.type = .bool) (value : approved condition)
+      (inner : Scan source approved expected false body)
+      (after : ScopedSourceForItemsAdmission.Scan source approved post)
+      (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
   | assign {mode id node assignment rhs rhsNode binder rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment .equal rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -108,6 +121,8 @@ theorem Scan.shape {source approved expected mode statements}
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape source mode statements := by
   induction scan with
   | nil => exact .nil
+  | breaking rest found form => exact .breaking rest found form
+  | continuing rest found form => exact .continuing rest found form
   | returnUnit rest found form => exact .returnUnit rest found form
   | returning rest found form => exact .returnValue rest found form
   | tail found form => exact .tail found form
@@ -118,6 +133,8 @@ theorem Scan.shape {source approved expected mode statements}
   | conditional found form _ _ _ _ _ _ _ left right remaining => exact .conditional found form left right remaining
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
   | assign found form _ _ bare _ _ _ _ ih => exact .assign found form bare ih
+  | forLoop found form _ initial _ _ _ _ after _ inner remaining =>
+      exact .forLoop found form initial.shape after.shape inner remaining
 
 /-- Changing loop depth is harmless because each recursive body retains the
 same actual return type. All writes come from the original assignment typing. -/
@@ -129,6 +146,8 @@ theorem Scan.syntax {source approved expected mode statements}
     GenericImperativeMatch.Syntax source approved context (.statements mode statements) expected := by
   induction scan generalizing control context final facts with
   | nil allowed => exact .body (.nil allowed)
+  | breaking rest found form => exact .breaking found form
+  | continuing rest found form => exact .continuing found form
   | returnUnit rest found form sourceType expectedUnit =>
       subst expected
       exact .body (.returnUnit rest found form sourceType)
@@ -224,6 +243,18 @@ theorem Scan.syntax {source approved expected mode statements}
               subst child
               exact ⟨value, _, rhsFound, expression_at unique rhsFound rhs⟩
             · exact ih result tail
+
+  | forLoop found form sourceType initial conditionFound conditionType value _ after _ inner remaining =>
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | forLoop initTyped condition body postTyped =>
+        exact .forLoop found form sourceType
+          (ScopedSourceForItemsAdmission.initializers (initial.syntax unique initTyped) initTyped
+            (.initializersDone conditionFound conditionType (expression_at unique conditionFound condition) value
+              (inner (control := control.enterLoop) result body) (after.syntax unique postTyped)))
+          (remaining result tail)
 
 /-- The expression checker is a data-only parameter; the finite traversal uses
 its proof receipts without evaluating any selected semantic inventory. -/

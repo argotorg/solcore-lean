@@ -69,7 +69,7 @@ theorem match_control_step (catalog : SignatureCatalogWellFormed program.signatu
       have armFalls : armFacts.control.canFallthrough = true := by
         cases outcome with
         | fallthrough env => exact (bodyPost.fallthrough env rfl).2.2
-        | returned | fault => cases falls
+        | returned | breaking | continuing | fault => cases falls
       rw [summaryEq]
       exact ControlSummary.eraseValue_canFallthrough
         (MergeBodyControls.allows_of_mem (outcome := .fallthrough environment) merged armMember armFalls)
@@ -97,7 +97,7 @@ theorem match_control_step (catalog : SignatureCatalogWellFormed program.signatu
           have defaultFalls := by
             cases outcome with
             | fallthrough env => exact (bodyPost.fallthrough env rfl).2.2
-            | returned | fault => cases falls
+            | returned | breaking | continuing | fault => cases falls
           exact ControlSummary.eraseValue_canFallthrough
             (MergeBodyControls.allows_of_fallback (outcome := .fallthrough environment) merged defaultFalls)
   | @noBranch childSize scope context environment before middle hidden resolution node value location contains scrutinee allocated selected =>

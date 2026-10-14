@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageScopedLiftBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedWhileHeads
 
@@ -135,6 +136,25 @@ private theorem body_ready {before after : Dynamic.Heap} {finalContext : SourceS
     ((preserved contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read),
     (preserved contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1, last, conditioned, post⟩
 
+theorem body_continue_ready {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context}
+    {finalEnvironment : Dynamic.Environment}
+    (preservation : ∀ budget, FlowPreserves (administrative := administrative) (receiving := receiving)
+      (frame := frame) (globals := globals) (stages := stages) (invocation := invocation) (faults := faults)
+      bridge functions condition context scope false statements expected type loopCode budget)
+    (ready : ReadyAt before)
+    (trace : Staging.Recursive.StatementsIn program stages false invocation context environment before statements
+      finalContext (.continuing finalEnvironment) after) : ReadyAt after := by
+  obtain ⟨mapping, world, store, environments, heaps, locals, agrees, actualTyped, reference, read, unmapped,
+    initial, conditioned, admitted⟩ := ready
+  obtain ⟨size, measured⟩ := Staging.Recursive.Size.StatementsIn.of_trace trace
+  obtain ⟨_, finalStore, finalMap, finalWorld, _, _, finalHeaps, maps, worlds, preserved, metadata,
+    last, _, post⟩ := preservation size (Nat.le_refl _) environments heaps locals agrees actualTyped
+      reference read unmapped initial conditioned admitted measured
+  exact ⟨finalMap, finalWorld, finalStore, environments.extend maps worlds, finalHeaps, locals.mono metadata,
+    agrees, actualTyped.weaken worlds, reference,
+    ((preserved contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read),
+    (preserved contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1, last, conditioned, post⟩
+
 private theorem while_ready {budget : Nat}
     (children : ∀ childSize, childSize < budget → LiftsAt bridge context model stages invocation certificate childSize)
     (preservation : ∀ childSize, CallableIndexedOwnedAdmittedStagedExpressionBounds.PreservesAt
@@ -199,6 +219,13 @@ private theorem while_ready {budget : Nat}
             exact ⟨_, _, .bodyFault liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            have nextReady := body_continue_ready bridge functions condition bodyPreservation testReady liftedBody
+            obtain ⟨staged, reached, liftedNext, adaptedNext⟩ := ih _
+              (SourceExecutionSize.child_lt_stepSize (by simp))
+              (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within)
+              nextReady (.control next)
+            exact ⟨staged, reached, .continueNext liftedTest liftedBody liftedNext, adaptedNext⟩
+
       | breaks testTrace bodyTrace =>
         rcases test_value bridge functions condition children preservation found typed generated ready
           (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) within) testTrace with
@@ -214,6 +241,7 @@ private theorem while_ready {budget : Nat}
             exact ⟨_, _, .bodyFault liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            exact ⟨_, _, .breakFromBody liftedTest liftedBody, .completed (.fallthrough environment)⟩
       | returns testTrace bodyTrace =>
         rcases test_value bridge functions condition children preservation found typed generated ready
           (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) within) testTrace with
@@ -301,6 +329,12 @@ private theorem while_ready {budget : Nat}
             exact ⟨_, _, .bodyFault liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            have nextReady := body_continue_ready bridge functions condition bodyPreservation testReady liftedBody
+            obtain ⟨staged, reached, liftedNext, adaptedNext⟩ := ih _
+              (SourceExecutionSize.child_lt_stepSize (by simp))
+              (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within)
+              nextReady (.fault next)
+            exact ⟨staged, reached, .continueNext liftedTest liftedBody liftedNext, adaptedNext⟩
 
 theorem while_loop {budget : Nat}
     (children : ∀ childSize, childSize < budget → LiftsAt bridge context model stages invocation certificate childSize)

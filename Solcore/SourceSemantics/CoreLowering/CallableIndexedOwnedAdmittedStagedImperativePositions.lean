@@ -105,6 +105,8 @@ theorem represents_restore {mapping world expected type outcome value environmen
   cases related with
   | fallthrough _ allowed => exact .fallthrough _ allowed
   | returned payload => exact .returned payload
+  | breaking _ => exact .breaking environment
+  | continuing _ => exact .continuing environment
   | fault matched => exact .fault matched
 
 theorem post_restore {context expected outcome environment index} {reached : callerProtocol.State index}

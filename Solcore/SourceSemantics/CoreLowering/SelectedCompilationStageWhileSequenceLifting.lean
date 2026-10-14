@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLoopOutcomes
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageWhileSourceInversion
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageScopedSourceInversion
 
@@ -93,6 +94,8 @@ theorem lifts {budget : Nat}
         .rejected origin call reason _ _⟩
     | completed matched =>
       cases matched with
+      | breaking innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed_of_trace lifted).1 innerEnvironment rfl).elim
+      | continuing innerEnvironment => exact ((SelectedCompilationStageLoopOutcomes.while_closed_of_trace lifted).2 innerEnvironment rfl).elim
       | returned value =>
         exact ⟨_, _, _, .whileReturned (lookupStatement?_sound statementFound) form lifted, .completed (.returned value)⟩
       | fault reason =>

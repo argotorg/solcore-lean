@@ -39,12 +39,17 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
   | returning rest contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | breaking actual same | continuing actual same =>
+        cases (shape actual).symm.trans same
     | forInitializerFault actual form _ | forReturned actual form _ _ | forFault actual form _ _
     | forFallthrough actual form _ _ _
-    | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
-    | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
+    | matchBreaking actual form _ | matchContinuing actual form _
+  | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
+    | blockBreaking actual form _ | blockContinuing actual form _
+  | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
     | whileReturned actual form _ | whileFault actual form _ | whileFallthrough actual form _ _
-    | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _
+    | ifConditionFault actual form _ | ifBreaking actual form _ _ | ifContinuing actual form _ _
+  | ifReturned actual form _ _ | ifFault actual form _ _
     | ifFallthrough actual form _ _ _ =>
       have same := shape actual
       rw [form] at same
@@ -107,12 +112,17 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
   | tail contains form =>
     have shape := @statement_shape _ _ _ _ unique contains form
     cases trace with
+    | breaking actual same | continuing actual same =>
+        cases (shape actual).symm.trans same
     | forInitializerFault actual form _ | forReturned actual form _ _ | forFault actual form _ _
     | forFallthrough actual form _ _ _
-    | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
-    | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
+    | matchBreaking actual form _ | matchContinuing actual form _
+  | matchReturned actual form _ | matchFault actual form _ | matchFallthrough actual form _ _
+    | blockBreaking actual form _ | blockContinuing actual form _
+  | blockReturned actual form _ | blockFault actual form _ | blockFallthrough actual form _ _
     | whileReturned actual form _ | whileFault actual form _ | whileFallthrough actual form _ _
-    | ifConditionFault actual form _ | ifReturned actual form _ _ | ifFault actual form _ _
+    | ifConditionFault actual form _ | ifBreaking actual form _ _ | ifContinuing actual form _ _
+  | ifReturned actual form _ _ | ifFault actual form _ _
     | ifFallthrough actual form _ _ _ =>
       have same := shape actual
       rw [form] at same

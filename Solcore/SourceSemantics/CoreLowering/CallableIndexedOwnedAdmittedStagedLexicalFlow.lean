@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveControlTransferFacts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedLexicalAllocation
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedLexicalSourceInversion
@@ -19,11 +20,12 @@ open GenericLexicalStatements (Tree)
 open TypedLexicalControl (sequence_rename)
 universe u
 
-/-- Function-level meaning of the three actual staged body outcomes. -/
+/-- Function-level meaning of the actual staged body outcomes. -/
 def result : Staging.Recursive.BodyOutcome → Staging.Recursive.Outcome
   | .returned value => .value value
   | .fault failure => .fault failure
   | .fallthrough _ => .value .unit
+  | .breaking _ | .continuing _ => .fault (.semantic .controlEscapedFunction)
 
 inductive Represents {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
     {definitions : DataEnvironment} (model : GenericHeap.PayloadModel catalog projects definitions)
@@ -37,6 +39,16 @@ inductive Represents {catalog : SourceCoreDataCatalog.Catalog} {projects : Gener
         (.inLeft (LocalLoop.controlType type) (.word token))
   | fallthrough (environment : Dynamic.Environment) (rawUnit : raw = .unit) (coreUnit : type = .unit) :
       Represents model mapping world raw type faults (.fallthrough environment) (LocalLoop.fallthroughValue type)
+
+theorem Represents.noEscapedControl {catalog projects definitions}
+    {model : GenericHeap.PayloadModel catalog projects definitions}
+    {mapping world raw type faults outcome value}
+    (represented : Represents model mapping world raw type faults outcome value) :
+    outcome.NoEscapedControl := by
+  cases represented with
+  | returned => exact .returned _
+  | fault => exact .fault _
+  | fallthrough => exact .fallthrough _
 
 theorem Represents.body_result {catalog projects definitions}
     {model : GenericHeap.PayloadModel catalog projects definitions} {mapping world raw type faults outcome value}

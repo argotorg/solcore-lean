@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedNamedForItemsFlow
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedNamedGeneration
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedTerminalBodyCompilerReceipts
 
@@ -15,8 +15,20 @@ open CompatibleEncoding (bind_ok)
 /-- These are compiler branches expanded by this receipt, not a source checker. -/
 def expanded : StatementForm → Bool
   | .returnStmt _ | .letDecl _ _ | .assignValue _ _ _ | .whileLoop _ _
-    | .expression _ true | .block _ | .ifThen _ _ _ => true
+    | .expression _ true | .block _ | .ifThen _ _ _ | .forLoop _ _ _ _ | .breakStmt | .continueStmt => true
   | _ => false
+
+/-- Exact compiler continuation after all initializer declarations are in scope. -/
+def forNext (policy : SourceCoreLoops.Policy) (source : TypedSource)
+    (site : SourceCoreElaboration.ErrorSite) (result : Ty) (reasonAt : ExpressionId → Word)
+    (escaped : Word) (fuel : Nat) (condition : ExpressionId) (body : List StatementId)
+    (post : List ForItemForm) (scope : SourceCoreLocalCell.Scope) : Except SourceCoreBasic.Error Expr := do
+  let child ← policy.lowerExpression fuel source scope condition reasonAt
+  SourceCoreBasic.ensureType site .bool child.type
+  let loopBody ← SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope body result reasonAt false escaped
+  let postCode ← SourceCoreLoops.lowerForItems policy site fuel source scope post result reasonAt
+    (fun _ => pure (LocalLoop.fallthrough result))
+  pure (LocalLoop.iterate result child.expression loopBody postCode escaped)
 
 inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
     (result : Ty) (reasonAt : ExpressionId → Word) :
@@ -115,6 +127,38 @@ inductive Tree (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
       Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
         (LocalLoop.sequence result (LocalLoop.whileLoop result child.expression loopCode escaped) tail)
+  | breaking {mode escaped fuel scope id rest node stored}
+      (read : policy.readStatement source id = .ok (node, stored)) (form : node.form = .breakStmt)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ()) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) (LocalLoop.breaking result)
+  | continuing {mode escaped fuel scope id rest node stored}
+      (read : policy.readStatement source id = .ok (node, stored)) (form : node.form = .continueStmt)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ()) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) (LocalLoop.continuing result)
+  | forLoop {mode escaped fuel scope id rest node stored initializer condition post body
+      loopScope postScope loopCode postCode initialCode tail}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .forLoop initializer condition post body)
+      (statementType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .unit stored = .ok ())
+      (child : SourceCoreBasic.LoweredExpr)
+      (generated : policy.lowerExpression fuel source loopScope condition reasonAt = .ok child)
+      (conditionType : SourceCoreBasic.ensureType (.occurrence id.occurrence) .bool child.type = .ok ())
+      (initial : Items policy source (.occurrence id.occurrence) result reasonAt
+        (forNext policy source (.occurrence id.occurrence) result reasonAt escaped fuel condition body post)
+        loopScope (LocalLoop.iterate result child.expression loopCode postCode escaped) fuel scope initializer initialCode)
+      (inner : Tree policy source result reasonAt false escaped fuel loopScope body loopCode)
+      (after : Items policy source (.occurrence id.occurrence) result reasonAt
+        (fun _ => pure (LocalLoop.fallthrough result)) postScope (LocalLoop.fallthrough result) fuel loopScope post postCode)
+      (remaining : Tree policy source result reasonAt mode escaped fuel scope rest tail) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest)
+        (LocalLoop.sequence result initialCode tail)
+  | forBoundary {mode escaped fuel scope id rest node stored initializer condition post body code}
+      (read : policy.readStatement source id = .ok (node, stored))
+      (form : node.form = .forLoop initializer condition post body)
+      (outside : ¬ (HeaderForms initializer ∧ HeaderForms post))
+      (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
+        (id :: rest) result reasonAt mode escaped = .ok code) :
+      Tree policy source result reasonAt mode escaped (fuel + 1) scope (id :: rest) code
   | boundary {mode escaped fuel scope id rest node stored code}
       (read : policy.readStatement source id = .ok (node, stored))
       (outside : expanded node.form = false)
@@ -130,6 +174,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
     (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope
       statements result reasonAt mode escaped = .ok code) :
     Nonempty (Tree policy source result reasonAt mode escaped fuel scope statements code) := by
+  classical
   induction fuel generalizing mode scope statements code with
   | zero =>
       cases statements with
@@ -239,7 +284,45 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {source : TypedSource}
             obtain ⟨inner⟩ := ih loopGenerated
             obtain ⟨remaining⟩ := ih tailGenerated
             exact ⟨.whileLoop read form statementType child generated conditionType inner remaining⟩
-        | assignBitNot | forLoop | matchWith | breakStmt | continueStmt =>
+        | forLoop initializer condition post body =>
+            by_cases headers : HeaderForms initializer ∧ HeaderForms post
+            · simp only [form] at accepted
+              obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+              cases checked
+              obtain ⟨initialCode, initialAccepted, accepted⟩ := bind_ok accepted
+              obtain ⟨tail, tailGenerated, emitted⟩ := bind_ok accepted
+              cases emitted
+              change SourceCoreLoops.lowerForItems policy (.occurrence id.occurrence) fuel source scope initializer
+                result reasonAt (forNext policy source (.occurrence id.occurrence) result reasonAt escaped fuel condition body post) = .ok initialCode at initialAccepted
+              obtain ⟨loopScope, finish, ⟨initial⟩⟩ := Items.of_accepted headers.1 initialAccepted
+              have continuation := initial.finish_accepted
+              unfold forNext at continuation
+              obtain ⟨child, generated, continuation⟩ := bind_ok continuation
+              obtain ⟨checked, conditionType, continuation⟩ := bind_ok continuation
+              cases checked
+              obtain ⟨loopCode, loopGenerated, continuation⟩ := bind_ok continuation
+              obtain ⟨postCode, postGenerated, emitted⟩ := bind_ok continuation
+              cases emitted
+              obtain ⟨postScope, finish, ⟨after⟩⟩ := Items.of_accepted headers.2 postGenerated
+              have final := after.finish_accepted
+              cases final
+              obtain ⟨inner⟩ := ih loopGenerated
+              obtain ⟨remaining⟩ := ih tailGenerated
+              exact ⟨.forLoop read form statementType child generated conditionType initial inner after remaining⟩
+            · exact ⟨.forBoundary read form headers whole⟩
+        | breakStmt =>
+            simp only [form] at accepted
+            obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+            cases checked
+            cases accepted
+            exact ⟨.breaking read form statementType⟩
+        | continueStmt =>
+            simp only [form] at accepted
+            obtain ⟨checked, statementType, accepted⟩ := bind_ok accepted
+            cases checked
+            cases accepted
+            exact ⟨.continuing read form statementType⟩
+        | assignBitNot | matchWith =>
             exact ⟨.boundary read (by simp only [form, expanded]) whole⟩
 
 /-- The footer is retained once, around the exact recursively issued flow. -/
@@ -262,21 +345,6 @@ theorem body_of_accepted {policy : SourceCoreLoops.Policy} {fuel : Nat} {source 
   exact ⟨⟨flow, tree, (Except.ok.inj returned).symm⟩⟩
 
 
-/-- Ordered expanded expression actions, including repeated source occurrences. -/
-structure Child (policy : SourceCoreLoops.Policy) (source : TypedSource)
-    (reasonAt : ExpressionId → Word) where
-  fuel : Nat
-  scope : SourceCoreLocalCell.Scope
-  expression : ExpressionId
-  lowered : SourceCoreBasic.LoweredExpr
-  accepted : policy.lowerExpression fuel source scope expression reasonAt = .ok lowered
-
-structure Binding (policy : SourceCoreLoops.Policy) (source : TypedSource) where
-  scope : SourceCoreLocalCell.Scope
-  binder : TypedBinder
-  payload : Ty
-  projected : policy.lowerBinder source scope binder = .ok payload
-
 variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {result : Ty}
   {reasonAt : ExpressionId → Word} {mode : Bool}
 
@@ -286,20 +354,21 @@ def Tree.closed {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Bool :=
   match tree with
   | .nil => !mode
-  | .boundary .. | .assigning .. => false
-  | .returning .. | .returnUnit .. => true
+  | .boundary .. | .assigning .. | .forBoundary .. => false
+  | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.closed
   | .assigned _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.closed
   | .block _ _ inner tail => inner.closed && tail.closed
   | @Tree.conditional _ _ _ _ _ _ _ _ _ _ node _ _ _ _ _ _ _ _ _ _ _ _ left right tail =>
       decide (node.type = .unit) && left.closed && right.closed && tail.closed
   | .whileLoop _ _ _ _ _ _ inner tail => inner.closed && tail.closed
+  | .forLoop _ _ _ _ _ _ initial inner after tail => initial.closed && inner.closed && after.closed && tail.closed
 
 def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
     List (Child policy source reasonAt) :=
   match tree with
-  | .nil | .returnUnit .. | .boundary .. => []
+  | .nil | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing .. => []
   | @Tree.returning _ _ _ _ _ _ fuel scope _ _ _ _ expression _ _ _ child generated _ =>
       [⟨fuel, scope, expression, child, generated⟩]
   | @Tree.initialized _ _ _ _ _ _ fuel scope _ _ _ _ _ expression _ _ _ _ _ _ _ child generated _ tail _ =>
@@ -315,11 +384,14 @@ def Tree.children {mode : Bool} {escaped : Word} {fuel scope statements code}
   | @Tree.whileLoop _ _ _ _ _ _ fuel scope _ _ _ _ condition _ _ _ _ _ _ child generated _ inner tail =>
       ⟨fuel, scope, condition, child, generated⟩ :: (inner.children ++ tail.children)
 
+  | @Tree.forLoop _ _ _ _ _ _ fuel _ _ _ _ _ _ condition _ _ loopScope _ _ _ _ _ _ _ _ child generated _ initial inner after tail =>
+      initial.children ++ (⟨fuel, loopScope, condition, child, generated⟩ :: (inner.children ++ after.children ++ tail.children))
+
 def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) :
     List (Binding policy source) :=
   match tree with
-  | .nil | .returning .. | .returnUnit .. | .boundary .. => []
+  | .nil | .returning .. | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing .. => []
   | @Tree.initialized _ _ _ _ _ _ _ scope _ _ _ _ binder _ payload _ _ _ _ _ projected _ _ _ tail _ =>
       ⟨scope, binder, payload, projected⟩ :: tail.bindings
   | @Tree.absent _ _ _ _ _ _ _ scope _ _ _ _ binder payload _ _ _ _ _ projected tail _ =>
@@ -328,19 +400,13 @@ def Tree.bindings {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .block _ _ inner tail => inner.bindings ++ tail.bindings
   | .conditional _ _ _ _ _ left right tail => left.bindings ++ right.bindings ++ tail.bindings
   | .whileLoop _ _ _ _ _ _ inner tail => inner.bindings ++ tail.bindings
-
-/-- Bare equal writes retain the original declaration type as well as native layout. -/
-def Assignable (source : TypedSource) (assignment : AssignmentResolution)
-    (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
-  operator = .equal ∧ assignment.target.projections = [] ∧
-    ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
-      binder.scheme.body = assignment.target.type
+  | .forLoop _ _ _ _ _ _ initial inner after tail => initial.bindings ++ inner.bindings ++ after.bindings ++ tail.bindings
 
 /-- A refined tree exposes every supported assignment RHS from its actual callback. -/
 def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Prop :=
   match tree with
-  | .nil | .returning .. | .returnUnit .. | .boundary .. => True
+  | .nil | .returning .. | .returnUnit .. | .boundary .. | .forBoundary .. | .breaking .. | .continuing .. => True
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ | .assigned _ _ _ tail _ _ => tail.Ready
   | @Tree.assigning _ _ _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ _ _ tail _ =>
       ¬ Assignable source assignment operator ∧ tail.Ready
@@ -348,6 +414,7 @@ def Tree.Ready {mode : Bool} {escaped : Word} {fuel scope statements code}
   | .block _ _ inner tail => inner.Ready ∧ tail.Ready
   | .conditional _ _ _ _ _ left right tail => left.Ready ∧ right.Ready ∧ tail.Ready
   | .whileLoop _ _ _ _ _ _ inner tail => inner.Ready ∧ tail.Ready
+  | .forLoop _ _ _ _ _ _ initial inner after tail => initial.Ready ∧ inner.Ready ∧ after.Ready ∧ tail.Ready
 
 /-- The profile identifies the actual callback. Unsupported original writes
 keep their complete action and suffix in the returned tree. -/
@@ -362,6 +429,8 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
   classical
   induction tree with
   | nil => exact ⟨.nil, True.intro⟩
+  | breaking read form statementType => exact ⟨.breaking read form statementType, True.intro⟩
+  | continuing read form statementType => exact ⟨.continuing read form statementType, True.intro⟩
   | returning read form statementType child generated childType =>
       exact ⟨.returning read form statementType child generated childType, True.intro⟩
   | returnUnit read form statementType unitType =>
@@ -399,6 +468,14 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
       obtain ⟨inner, innerReady⟩ := innerIH
       obtain ⟨tail, tailReady⟩ := tailIH
       exact ⟨.whileLoop read form statementType child generated conditionType inner tail, innerReady, tailReady⟩
+  | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      obtain ⟨initial, initialReady⟩ := initial.refine matched
+      obtain ⟨inner, innerReady⟩ := innerIH
+      obtain ⟨after, afterReady⟩ := after.refine matched
+      obtain ⟨tail, tailReady⟩ := tailIH
+      exact ⟨.forLoop read form statementType child generated conditionType initial inner after tail,
+        initialReady, innerReady, afterReady, tailReady⟩
+  | forBoundary read form outside accepted => exact ⟨.forBoundary read form outside accepted, True.intro⟩
   | boundary read outside accepted => exact ⟨.boundary read outside accepted, True.intro⟩
 
 theorem Tree.accepted {escaped : Word} {fuel scope statements code}
@@ -407,6 +484,9 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
       result reasonAt mode escaped = .ok code := by
   induction tree with
   | nil => simp [SourceCoreLoops.lowerFlowStatementsWithPolicy]
+  | breaking read form statementType | continuing read form statementType =>
+      simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
+        bind, Except.bind, pure, Except.pure]
   | returning read form statementType child generated childType =>
       simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         generated, childType, bind, Except.bind, pure, Except.pure]
@@ -445,6 +525,19 @@ theorem Tree.accepted {escaped : Word} {fuel scope statements code}
   | whileLoop read form statementType child generated conditionType _ _ innerIH tailIH =>
       simp [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
         generated, conditionType, innerIH, tailIH, bind, Except.bind, pure, Except.pure]
+  | @forLoop mode escaped fuel scope id rest node stored initializer condition post body loopScope postScope
+      loopCode postCode initialCode tail read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType, bind, Except.bind]
+      change (do
+        let loop ← SourceCoreLoops.lowerForItems policy (.occurrence id.occurrence) fuel source scope initializer result reasonAt
+          (forNext policy source (.occurrence id.occurrence) result reasonAt escaped fuel condition body post)
+        let next ← SourceCoreLoops.lowerFlowStatementsWithPolicy policy fuel source scope rest result reasonAt mode escaped
+        pure (LocalLoop.sequence result loop next)) = .ok (LocalLoop.sequence result initialCode tail)
+      rw [initial.accepted]
+      simp only [bind, Except.bind]
+      rw [tailIH]
+      rfl
+  | forBoundary _ _ _ accepted => exact accepted
   | boundary _ _ accepted => exact accepted
 
 /-- A remaining compiler branch, retaining its exact action and local scope. -/
@@ -474,6 +567,11 @@ inductive Boundary (policy : SourceCoreLoops.Policy) (source : TypedSource)
       (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
         (id :: rest) result reasonAt mode escaped = .ok code) :
       Boundary policy source result reasonAt mode escaped
+  | header {mode escaped} (fuel : Nat) (scope : SourceCoreLocalCell.Scope) (id : StatementId)
+      (rest : List StatementId) (code : Expr)
+      (accepted : SourceCoreLoops.lowerFlowStatementsWithPolicy policy (fuel + 1) source scope
+        (id :: rest) result reasonAt mode escaped = .ok code) :
+      Boundary policy source result reasonAt mode escaped
   | nested {mode escaped} (boundary : Boundary policy source result reasonAt false escaped) :
       Boundary policy source result reasonAt mode escaped
 
@@ -482,7 +580,7 @@ theorem Tree.frontier {escaped : Word} {fuel scope statements code}
     (openBranch : tree.closed = false) : Nonempty (Boundary policy source result reasonAt mode escaped) := by
   induction tree with
   | @nil _ _ actualFuel actualScope => exact ⟨.fallthrough actualFuel actualScope (by simp [SourceCoreLoops.lowerFlowStatementsWithPolicy])⟩
-  | returning | returnUnit => cases openBranch
+  | returning | returnUnit | breaking | continuing => cases openBranch
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih => exact ih openBranch
   | assigning read form statementType remaining assigned ih =>
       exact ⟨.assignment _ _ _ _ _ (Tree.assigning read form statementType remaining assigned).accepted⟩
@@ -510,6 +608,15 @@ theorem Tree.frontier {escaped : Word} {fuel scope statements code}
       · obtain ⟨boundary⟩ := innerIH innerOpen
         exact ⟨.nested boundary⟩
       · exact tailIH tailOpen
+  | forLoop read form statementType child generated conditionType initial inner after remaining innerIH tailIH =>
+      simp only [Tree.closed, Bool.and_eq_false_iff] at openBranch
+      rcases openBranch with ((initialOpen | innerOpen) | afterOpen) | tailOpen
+      · exact ⟨.header _ _ _ _ _ (Tree.forLoop read form statementType child generated conditionType initial inner after remaining).accepted⟩
+      · obtain ⟨boundary⟩ := innerIH innerOpen
+        exact ⟨.nested boundary⟩
+      · exact ⟨.header _ _ _ _ _ (Tree.forLoop read form statementType child generated conditionType initial inner after remaining).accepted⟩
+      · exact tailIH tailOpen
+  | forBoundary read form outside accepted => exact ⟨.header _ _ _ _ _ accepted⟩
   | boundary read outside accepted => exact ⟨.statement _ _ _ _ _ _ _ read outside accepted⟩
 
 theorem Body.accepted {escaped fellThrough : Word} {fuel scope statements code}

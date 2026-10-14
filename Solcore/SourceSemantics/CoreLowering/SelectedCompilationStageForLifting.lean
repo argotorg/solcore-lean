@@ -165,6 +165,19 @@ theorem for_ready {budget : Nat}
             exact ⟨_, _, .bodyFailure liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            have bodyReady := body_continue_ready bridge functions condition bodyPreservation testReady liftedBody
+            rcases post_value bridge functions condition postLift postPreservation bodyReady
+              (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within) postTrace with
+              stopped | ⟨liftedPost, nextReady⟩
+            · obtain ⟨failedContext, origin, call, reason, reached, stopped⟩ := stopped
+              exact ⟨_, reached, .continuePostFailure liftedTest liftedBody stopped,
+                .rejected origin call reason context reached⟩
+            · obtain ⟨staged, reached, liftedNext, adaptedNext⟩ := ih _
+                (SourceExecutionSize.child_lt_stepSize (by simp))
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within)
+                nextReady (.control next)
+              exact ⟨staged, reached, .continueIterate liftedTest liftedBody liftedPost liftedNext, adaptedNext⟩
+
       | breaks testTrace bodyTrace =>
         rcases test_value bridge functions condition children preservation found typed generated ready
           (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) within) testTrace with
@@ -180,6 +193,7 @@ theorem for_ready {budget : Nat}
             exact ⟨_, _, .bodyFailure liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            exact ⟨_, _, .forBreakFromBody liftedTest liftedBody, .completed (.fallthrough environment)⟩
       | returns testTrace bodyTrace =>
         rcases test_value bridge functions condition children preservation found typed generated ready
           (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) within) testTrace with
@@ -275,7 +289,20 @@ theorem for_ready {budget : Nat}
             exact ⟨_, _, .bodyFailure liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
-
+            have bodyReady := body_continue_ready bridge functions condition bodyPreservation testReady liftedBody
+            obtain ⟨last, stagedPost, reached, liftedPost, adaptedPost⟩ := postLift
+              (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within)
+              bodyReady (.fault failed)
+            cases stagedPost with
+            | done env => cases adaptedPost with | completed matched => cases matched
+            | fault reason =>
+              cases adaptedPost with
+              | completed matched =>
+                cases matched
+                exact ⟨_, _, .continuePostFailure liftedTest liftedBody liftedPost, .completed (.fault _)⟩
+              | rejected origin call reason finalContext reached =>
+                exact ⟨_, reached, .continuePostFailure liftedTest liftedBody liftedPost,
+                  .rejected origin call reason context reached⟩
       | nextFallthrough testTrace bodyTrace postTrace next =>
         rcases test_value bridge functions condition children preservation found typed generated ready
           (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) within) testTrace with
@@ -318,5 +345,17 @@ theorem for_ready {budget : Nat}
             exact ⟨_, _, .bodyFailure liftedTest liftedBody, .rejected origin call reason context _⟩
           | completed matched =>
             cases matched
+            have bodyReady := body_continue_ready bridge functions condition bodyPreservation testReady liftedBody
+            rcases post_value bridge functions condition postLift postPreservation bodyReady
+              (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within) postTrace with
+              stopped | ⟨liftedPost, nextReady⟩
+            · obtain ⟨failedContext, origin, call, reason, reached, stopped⟩ := stopped
+              exact ⟨_, reached, .continuePostFailure liftedTest liftedBody stopped,
+                .rejected origin call reason context reached⟩
+            · obtain ⟨staged, reached, liftedNext, adaptedNext⟩ := ih _
+                (SourceExecutionSize.child_lt_stepSize (by simp))
+                (Nat.le_trans (Nat.le_of_lt (SourceExecutionSize.child_lt_stepSize (by simp))) within)
+                nextReady (.fault next)
+              exact ⟨staged, reached, .continueIterate liftedTest liftedBody liftedPost liftedNext, adaptedNext⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForLifting

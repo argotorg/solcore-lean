@@ -73,7 +73,7 @@ theorem of_actual
     simpa only [support.source, CallableIndexedNamedGeneration.source] using certificate.scan
   have returned : AcceptedCompilerBodyProfile.HasReturn function.source function.body := by
     simpa only [support.source, CallableIndexedNamedGeneration.source] using certificate.hasReturn
-  have result : function.resultType = certificate.result := scan.result_eq_of_return support.body.unique returned typed
+  have result : function.resultType = certificate.result := scan.result_eq_of_return support.body.unique returned typed rfl
   have syntaxTree := scan.syntax support.body.unique result typed
   rw [← result] at syntaxTree
   exact CallableIndexedOwnedPreparedStagedOrdinaryMethodScopedSupport.of_actual_with_catalog

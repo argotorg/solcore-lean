@@ -25,13 +25,19 @@ inductive Represents {catalog : SourceCoreDataCatalog.Catalog} {projects : Gener
   | fallthrough (environment : Dynamic.Environment) (allowed : mode = false ∨ raw = .unit) :
       Represents model mapping world mode raw type faults (.fallthrough environment) (LocalLoop.fallthroughValue type)
 
+  | breaking (environment : Dynamic.Environment) :
+      Represents model mapping world mode raw type faults (.breaking environment) (LocalLoop.breakingValue type)
+  | continuing (environment : Dynamic.Environment) :
+      Represents model mapping world mode raw type faults (.continuing environment) (LocalLoop.continuingValue type)
+
 theorem Represents.to_function {checked : SourceCoreCompatibleCatalog.Checked}
     {projects : GenericHeap.Projection} {definitions : DataEnvironment}
     {catalog : SourceCoreDataCatalog.Catalog}
     {model : GenericHeap.PayloadModel catalog projects definitions}
     {mapping world raw type faults outcome value}
     (projection : checked.catalog.project raw = .ok type)
-    (represented : Represents model mapping world true raw type faults outcome value) :
+    (represented : Represents model mapping world true raw type faults outcome value)
+    (closed : outcome.NoEscapedControl) :
     CallableIndexedOwnedAdmittedStagedLexicalFlow.Represents model mapping world raw type faults outcome value := by
   cases represented with
   | returned payload => exact .returned payload
@@ -40,6 +46,8 @@ theorem Represents.to_function {checked : SourceCoreCompatibleCatalog.Checked}
       have rawUnit : raw = .unit := allowed.resolve_left (by decide)
       subst raw
       exact .fallthrough environment rfl (Except.ok.inj projection).symm
+  | breaking environment => exact (closed.1 environment rfl).elim
+  | continuing environment => exact (closed.2 environment rfl).elim
 
 theorem Represents.of_function {catalog projects definitions}
     {model : GenericHeap.PayloadModel catalog projects definitions} {mapping world raw type faults outcome value}
@@ -61,6 +69,8 @@ theorem Represents.body_result {catalog projects definitions}
       have rawUnit : raw = .unit := allowed.resolve_left (by decide)
       subst raw
       exact .unit
+  | breaking => exact .breaking
+  | continuing => exact .continuing
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
@@ -75,7 +85,7 @@ def Post (context : SourceSemantics.Context) (raw : TypeSystem.Ty) (outcome : St
   match outcome with
   | .returned value => PostAdmission bridge context raw (.value value) reached
   | .fault failure => PostAdmission bridge context raw (.fault failure) reached
-  | .fallthrough _ => Admission bridge context reached
+  | .fallthrough _ | .breaking _ | .continuing _ => Admission bridge context reached
 
 variable {bridge}
 
@@ -85,7 +95,7 @@ theorem Post.rows {context raw outcome index} {reached : callerProtocol.State in
   cases outcome with
   | returned value => exact PostAdmission.rows (outcome := .value value) post
   | fault failure => exact PostAdmission.rows (outcome := .fault failure) post
-  | fallthrough environment => exact Admission.rows post
+  | fallthrough environment | breaking environment | continuing environment => exact Admission.rows post
 
 theorem Post.to_function {catalog projects definitions}
     {model : GenericHeap.PayloadModel catalog projects definitions}
@@ -100,14 +110,18 @@ theorem Post.to_function {catalog projects definitions}
       have rawUnit : raw = .unit := allowed.resolve_left (by decide)
       subst raw
       exact ⟨post.rows, by intro source same; cases same; exact ⟨.unit, post.heap⟩⟩
+  | breaking | continuing => exact ⟨post.rows, by intro source same; cases same⟩
 
 theorem Post.of_function {context raw outcome index} {reached : callerProtocol.State index}
-    (post : PostAdmission bridge context raw (result outcome) reached) :
+    (post : PostAdmission bridge context raw (result outcome) reached)
+    (closed : outcome.NoEscapedControl) :
     Post bridge context raw outcome reached := by
   cases outcome with
   | returned value => exact post
   | fault failure => exact post
   | fallthrough environment => exact post.at_value.2
+  | breaking environment => exact (closed.1 environment rfl).elim
+  | continuing environment => exact (closed.2 environment rfl).elim
 
 /-- Restoring a lexical binder preserves the reached heap and all existing
 captures. Branch fallthrough keeps admission at the enclosing context. -/
@@ -125,7 +139,7 @@ theorem restore_post (bindings : ProtectedStateTransition.Bindings callerProtoco
       exact CallableIndexedOwnedAdmittedStagedLexicalFlow.restore_post bridge bindings extended (outcome := .value source) reached post
   | fault failure =>
       exact CallableIndexedOwnedAdmittedStagedLexicalFlow.restore_post bridge bindings extended reached post
-  | fallthrough environment =>
+  | fallthrough environment | breaking environment | continuing environment =>
       exact ⟨(Dynamic.HeapWellTyped.iff_of_binderExtends extended).mpr post.heap,
         CallableIndexedOwnedIndirectExpressionHeads.StableRows.after_administrative
           (bridge.pool reached) (bridge.pool (bindings.restore reached)) post.rows (.refl _ _)⟩

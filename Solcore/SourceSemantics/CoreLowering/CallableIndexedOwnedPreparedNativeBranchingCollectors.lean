@@ -546,9 +546,32 @@ theorem collected_at
         (thenIH leftShape fields closed residual sourceSignatures declarations thenReached projection generatedThen thenTyped)
         (elseIH rightShape fields closed residual sourceSignatures declarations elseReached projection generatedElse elseTyped)
         thenStops elseStops ((GenericLexicalStatements.IssuedSuffix.of_accepted generatedSuffix).transport (statement_identity edited.metadata.symm))
-  | breaking found form | continuing found form =>
-    have no := shape.head_allowed found
-    simp only [form, allowedForm, Bool.false_eq_true] at no
+  | breaking found form =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      cases accepted
+      exact .breaking found form
+  | continuing found form =>
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      cases accepted
+      exact .continuing found form
   | @whileLoop context mode id node condition conditionNode statements rest expected found form conditionFound conditionType typed conditionSyntax loopSyntax remaining loopIH restIH =>
     obtain ⟨loopShape, restShape⟩ := shape.loop found form
     have conditionReached : Reaches source roots (.expression condition) :=

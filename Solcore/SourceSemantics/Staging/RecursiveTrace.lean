@@ -9,10 +9,10 @@ payloads, mapping indices, primitive and evidence-selected operators,
 conditionals, direct declarations, indirect calls and builtins. Output coercion
 paths on atomic forms and direct calls retain their original source metadata.
 Bodies cover monomorphic lets, bare plain assignments, discards, scoped blocks,
-conditional statements, finite while and for loops, ordered match arms and returns.
+conditional statements, finite while and for loops, ordered match arms, returns,
+and scoped break and continue transfers.
 Blocks and conditional arms restore lexical bindings while keeping heap effects.
-Projected or compound assignments and loop-control transfers require further
-rules. These judgments do not assert coverage of the full current compiler. -/
+Projected or compound assignments require further rules. These judgments do not assert coverage of the full current compiler. -/
 
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive
@@ -21,6 +21,8 @@ open Frontend Frontend.SourceInference Solcore.SourceSemantics.Dynamic
 /-- Leaving a match arm restores lexical bindings, while its heap is retained. -/
 def BodyOutcome.restore (environment : Environment) : BodyOutcome → BodyOutcome
   | .fallthrough _ => .fallthrough environment
+  | .breaking _ => .breaking environment
+  | .continuing _ => .continuing environment
   | .returned value => .returned value
   | .fault failure => .fault failure
 
@@ -31,6 +33,10 @@ inductive ForItemsOutcome where
 
 inductive BodyResult : TypeSystem.Ty → BodyOutcome → Outcome → Prop where
   | returned {type value} : BodyResult type (.returned value) (.value value)
+  | breaking {type environment} :
+      BodyResult type (.breaking environment) (.fault (.semantic .controlEscapedFunction))
+  | continuing {type environment} :
+      BodyResult type (.continuing environment) (.fault (.semantic .controlEscapedFunction))
   | unit {environment} : BodyResult .unit (.fallthrough environment) (.value .unit)
   | fault {type failure} : BodyResult type (.fault failure) (.fault failure)
 
@@ -372,6 +378,12 @@ mutual
     | returnUnit {mode scope context environment heap id rest node}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt none) :
         StatementsIn program registry mode scope context environment heap (id :: rest) context (.returned .unit) heap
+    | continuing {mode scope context environment heap id rest node}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .continueStmt) :
+        StatementsIn program registry mode scope context environment heap (id :: rest) context (.continuing environment) heap
+    | breaking {mode scope context environment heap id rest node}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .breakStmt) :
+        StatementsIn program registry mode scope context environment heap (id :: rest) context (.breaking environment) heap
     | returnValue {mode scope context environment before after id rest node expression value}
         (contains : ContainsStatement scope.source id node) (form : node.form = .returnStmt (some expression))
         (child : Expression program registry scope context environment before expression (.value value) after) :
@@ -409,6 +421,18 @@ mutual
         (branch : StatementsIn program registry false scope context environment middle
           (if truth then thenBody else elseBody.getD []) innerContext (.returned value) after) :
         StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | ifContinuing {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.continuing innerEnvironment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.continuing environment) after
+    | ifBreaking {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
+        (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
+        (branch : StatementsIn program registry false scope context environment middle
+          (if truth then thenBody else elseBody.getD []) innerContext (.breaking innerEnvironment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.breaking environment) after
     | ifFault {mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .ifThen condition thenBody elseBody)
         (test : Expression program registry scope context environment before condition (.value (.bool truth)) middle)
@@ -428,6 +452,14 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
         (inner : StatementsIn program registry false scope context environment before statements innerContext (.returned value) after) :
         StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | blockContinuing {mode scope context innerContext environment before after id rest node statements innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false scope context environment before statements innerContext (.continuing innerEnvironment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.continuing environment) after
+    | blockBreaking {mode scope context innerContext environment before after id rest node statements innerEnvironment}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
+        (inner : StatementsIn program registry false scope context environment before statements innerContext (.breaking innerEnvironment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.breaking environment) after
     | blockFault {mode scope context innerContext environment before after id rest node statements failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .block statements)
         (inner : StatementsIn program registry false scope context environment before statements innerContext (.fault failure) after) :
@@ -442,6 +474,14 @@ mutual
         (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
         (matched : Match program registry scope context environment before resolution (.returned value) after) :
         StatementsIn program registry mode scope context environment before (id :: rest) context (.returned value) after
+    | matchContinuing {mode scope context environment before after id rest node resolution}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry scope context environment before resolution (.continuing environment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.continuing environment) after
+    | matchBreaking {mode scope context environment before after id rest node resolution}
+        (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
+        (matched : Match program registry scope context environment before resolution (.breaking environment) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.breaking environment) after
     | matchFault {mode scope context environment before after id rest node resolution failure}
         (contains : ContainsStatement scope.source id node) (form : node.form = .matchWith resolution)
         (matched : Match program registry scope context environment before resolution (.fault failure) after) :
@@ -541,7 +581,7 @@ mutual
 
 
   /-- Finite loop iterations restore their original lexical scope while retaining
-  all condition and body heap effects. Loop-control transfers are a later extension. -/
+  all condition and body heap effects. Break leaves the loop; continue tests again. -/
   inductive While (program : Program) (registry : Registry) :
       Scope → Context → Environment → Heap → ExpressionId → List StatementId → BodyOutcome → Heap → Prop where
     | done {scope context environment before after condition statements}
@@ -554,6 +594,10 @@ mutual
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false scope context environment middle statements innerContext (.returned value) after) :
         While program registry scope context environment before condition statements (.returned value) after
+    | breakFromBody {scope context innerContext environment before middle after condition statements innerEnvironment}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false scope context environment middle statements innerContext (.breaking innerEnvironment) after) :
+        While program registry scope context environment before condition statements (.fallthrough environment) after
     | bodyFault {scope context innerContext environment before middle after condition statements failure}
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false scope context environment middle statements innerContext (.fault failure) after) :
@@ -561,6 +605,11 @@ mutual
     | next {scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome}
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (body : StatementsIn program registry false scope context environment middle statements innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (next : While program registry scope context environment bodyHeap condition statements outcome after) :
+        While program registry scope context environment before condition statements outcome after
+    | continueNext {scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (body : StatementsIn program registry false scope context environment middle statements innerContext (.continuing innerEnvironment) bodyHeap)
         (next : While program registry scope context environment bodyHeap condition statements outcome after) :
         While program registry scope context environment before condition statements outcome after
 
@@ -675,14 +724,30 @@ mutual
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false scope context environment middle body innerContext (.returned value) after) :
         ForLoop program registry scope context environment before condition post body (.returned value) after
+    | forBreakFromBody {scope context innerContext environment before middle after condition post body innerEnvironment}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.breaking innerEnvironment) after) :
+        ForLoop program registry scope context environment before condition post body (.fallthrough environment) after
     | postFailure {scope context innerContext postContext environment innerEnvironment before middle bodyHeap after condition post body failure}
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
         (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.fault failure) after) :
         ForLoop program registry scope context environment before condition post body (.fault failure) after
+    | continuePostFailure {scope context innerContext postContext environment innerEnvironment before middle bodyHeap after condition post body failure}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.continuing innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.fault failure) after) :
+        ForLoop program registry scope context environment before condition post body (.fault failure) after
     | iterate {scope context innerContext postContext environment innerEnvironment postEnvironment before middle bodyHeap postHeap after condition post body outcome}
         (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
         (branch : StatementsIn program registry false scope context environment middle body innerContext (.fallthrough innerEnvironment) bodyHeap)
+        (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
+        (next : ForLoop program registry scope context environment postHeap condition post body outcome after) :
+        ForLoop program registry scope context environment before condition post body outcome after
+
+    | continueIterate {scope context innerContext postContext environment innerEnvironment postEnvironment before middle bodyHeap postHeap after condition post body outcome}
+        (test : Expression program registry scope context environment before condition (.value (.bool true)) middle)
+        (branch : StatementsIn program registry false scope context environment middle body innerContext (.continuing innerEnvironment) bodyHeap)
         (postTrace : ForItems program registry scope context environment bodyHeap post postContext (.done postEnvironment) postHeap)
         (next : ForLoop program registry scope context environment postHeap condition post body outcome after) :
         ForLoop program registry scope context environment before condition post body outcome after
@@ -766,7 +831,7 @@ end
 /-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
-export StatementsIn (nil returnUnit returnValue returnFault tail discard expressionFault
+export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignBare assignBareFault assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)

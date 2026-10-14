@@ -46,6 +46,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
         rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique contains form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
   | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _

@@ -1,4 +1,5 @@
-import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLiftBounds
+import Solcore.SourceSemantics.Staging.RecursiveLiftOutcomes
+import Solcore.SourceSemantics.CoreLowering.RecursiveNamedCallBounds
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedPhysicalNamedBodyPorts
 
 set_option autoImplicit false
@@ -11,11 +12,13 @@ open CallableIndexedOwnedFunctionValues (Header Key OwnedKey)
 open CallableIndexedOwnedPreparedStagedNamedChildBounds (poolBridge)
 open Staging.Recursive
 
-/-- Only the actual supported control outcomes embed into the staged body.
-Loop-control transfers are separate ordinary cases, never erased here. -/
+/-- Each ordinary control outcome embeds into the staged body unchanged.
+The enclosing loop or function exit consumes its own control transfers. -/
 inductive BodyEmbeds : Dynamic.ControlOutcome → BodyOutcome → Prop where
   | returned (value) : BodyEmbeds (.returned value) (.returned value)
   | fallthrough (environment) : BodyEmbeds (.fallthrough environment) (.fallthrough environment)
+  | breaking (environment) : BodyEmbeds (.breaking environment) (.breaking environment)
+  | continuing (environment) : BodyEmbeds (.continuing environment) (.continuing environment)
   | fault (reason) : BodyEmbeds (.fault reason) (.fault (.semantic reason))
 
 /-- Completed bodies keep their exact final context and heap. A stage stop
@@ -77,6 +80,8 @@ theorem BodyAdapted.exit {plainFinal finalContext : SourceSemantics.Context}
       cases exit with
       | unit same => subst expected; exact ⟨_, .unit, .completed⟩
     | fault reason => cases exit; exact ⟨_, .fault, .completed⟩
+    | breaking environment => cases exit; exact ⟨_, .breaking, .completed⟩
+    | continuing environment => cases exit; exact ⟨_, .continuing, .completed⟩
   | rejected origin call reason finalContext reached =>
     exact ⟨_, .fault, .rejected origin call reason reached⟩
 

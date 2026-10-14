@@ -41,6 +41,12 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
   | returnValue {mode id node expression} (rest : List StatementId)
       (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt (some expression)) :
       Shape source mode (id :: rest)
+  | breaking {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      Shape source mode (id :: rest)
+  | continuing {mode id node} (rest : List StatementId)
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      Shape source mode (id :: rest)
   | tail {id node expression}
       (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false) :
       Shape source true [id]
@@ -97,7 +103,7 @@ def PositionShape (source : TypedSource) : GenericImperativeMatch.Position → P
       ItemShape items ∧ ItemShape post ∧ Shape source false statements
 
 def allowedForm : StatementForm → Bool
-  | .returnStmt _ | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ | .whileLoop _ _ | .block _ | .matchWith _ | .forLoop _ _ _ _ => true
+  | .returnStmt _ | .breakStmt | .continueStmt | .expression _ _ | .letDecl _ _ | .ifThen _ _ _ | .whileLoop _ _ | .block _ | .matchWith _ | .forLoop _ _ _ _ => true
   | .assignValue assignment .equal _ => assignment.target.projections.isEmpty
   | _ => false
 
@@ -110,7 +116,7 @@ theorem Shape.head_allowed {source mode id node rest}
     (shape : Shape source mode (id :: rest))
     (found : source.lookupStatement? id = some node) : allowedForm node.form = true := by
   cases shape with
-  | returnUnit _ actual form | returnValue _ actual form | tail actual form
+  | returnUnit _ actual form | returnValue _ actual form | breaking _ actual form | continuing _ actual form | tail actual form
   | discard actual form _ _ | absent actual form _ | initialized actual form _
   | conditional actual form _ _ _ | whileLoop actual form _ _ | block actual form _ _
   | matchWith actual form _ _ _ | forLoop actual form _ _ _ _ =>
@@ -129,7 +135,7 @@ theorem Shape.tail_of_let {source mode id node binder initializer rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -147,7 +153,7 @@ theorem Shape.discard_tail {source mode id node expression semicolon rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | absent actual same _
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | absent actual same _
   | initialized actual same _ | assign actual same _ _ | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
       rw [form] at same
@@ -172,7 +178,7 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
@@ -193,7 +199,7 @@ theorem Shape.branches {source mode id node condition thenBody elseBody rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
   | whileLoop actual same _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
@@ -214,7 +220,7 @@ theorem Shape.loop {source mode id node condition body rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
   | conditional actual same _ _ _ | block actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
@@ -235,7 +241,7 @@ theorem Shape.block_children {source mode id node body rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | matchWith actual same _ _ _ =>
       cases node_eq found actual
@@ -258,7 +264,7 @@ theorem Shape.match_children {source mode id node resolution rest}
       cases node_eq found actual
       rw [form] at same
       cases same
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _ =>
       cases node_eq found actual
@@ -285,7 +291,7 @@ theorem Shape.for_children {source mode id node initializer condition post body 
     (form : node.form = .forLoop initializer condition post body) :
     ItemShape initializer ∧ ItemShape post ∧ Shape source false body ∧ Shape source mode rest := by
   cases shape with
-  | returnUnit _ actual same | returnValue _ actual same | tail actual same
+  | returnUnit _ actual same | returnValue _ actual same | breaking _ actual same | continuing _ actual same | tail actual same
   | discard actual same _ _ | absent actual same _ | initialized actual same _ | assign actual same _ _
   | conditional actual same _ _ _ | whileLoop actual same _ _ | block actual same _ _
   | matchWith actual same _ _ _ =>

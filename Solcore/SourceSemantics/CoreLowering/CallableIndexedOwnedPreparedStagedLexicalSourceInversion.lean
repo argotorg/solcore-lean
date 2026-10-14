@@ -44,6 +44,10 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
         ((binder.id, location) :: environment) bound rest finalContext outcome after := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -91,6 +95,10 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
         ((binder.id, location) :: environment) bound rest finalContext outcome after) := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -131,6 +139,10 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
     finalContext = context ∧ outcome = .returned .unit ∧ after = before := by
   have shape := @statement_shape _ _ _ _ unique found form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same

@@ -33,6 +33,18 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
         condition (.value (.bool truth)) middle ∧
       Size.StatementsIn program registry false branchSize invocation context environment middle
         (if truth then thenBody else elseBody.getD []) innerContext (.fault failure) after) ∨
+    (∃ testSize branchSize truth innerEnvironment middle innerContext,
+      size = Size.stepSize [testSize, branchSize] ∧ finalContext = context ∧ outcome = .breaking environment ∧
+      Size.Expression program registry testSize invocation context environment before
+        condition (.value (.bool truth)) middle ∧
+      Size.StatementsIn program registry false branchSize invocation context environment middle
+        (if truth then thenBody else elseBody.getD []) innerContext (.breaking innerEnvironment) after) ∨
+    (∃ testSize branchSize truth innerEnvironment middle innerContext,
+      size = Size.stepSize [testSize, branchSize] ∧ finalContext = context ∧ outcome = .continuing environment ∧
+      Size.Expression program registry testSize invocation context environment before
+        condition (.value (.bool truth)) middle ∧
+      Size.StatementsIn program registry false branchSize invocation context environment middle
+        (if truth then thenBody else elseBody.getD []) innerContext (.continuing innerEnvironment) after) ∨
     (∃ testSize branchSize tailSize truth middle branchHeap innerContext innerEnvironment,
       size = Size.stepSize [testSize, branchSize, tailSize] ∧
       Size.Expression program registry testSize invocation context environment before
@@ -47,6 +59,9 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
     subst other
     exact form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | matchBreaking actual same _ | matchContinuing actual same _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
   | forFallthrough actual same _ _ _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
@@ -71,9 +86,17 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
       have equal := (shape actual).symm.trans same
       cases equal
       exact .inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, test, branch⟩))
+  | ifBreaking actual same test branch =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, test, branch⟩)))
+  | ifContinuing actual same test branch =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inr (.inr (.inl ⟨_, _, _, _, _, _, rfl, rfl, rfl, test, branch⟩))))
   | ifFallthrough actual same test branch next =>
       have equal := (shape actual).symm.trans same
       cases equal
-      exact .inr (.inr (.inr ⟨_, _, _, _, _, _, _, _, rfl, test, branch, next⟩))
+      exact .inr (.inr (.inr (.inr (.inr ⟨_, _, _, _, _, _, _, _, rfl, test, branch, next⟩))))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedConditionalSourceInversion

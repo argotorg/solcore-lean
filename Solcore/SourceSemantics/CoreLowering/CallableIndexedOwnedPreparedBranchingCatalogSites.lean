@@ -82,6 +82,22 @@ theorem header_sites {items : List ForItemForm} {body : Expr}
 
 namespace Collected
 
+ theorem breaking {context scope mode id node rest expected type}
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (LocalLoop.breaking type) := by
+  refine ⟨.breaking found form, ?_⟩
+  intro registry faults
+  exact .breaking (found := found) (form := form)
+
+ theorem continuing {context scope mode id node rest expected type}
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      Collected layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (LocalLoop.continuing type) := by
+  refine ⟨.continuing found form, ?_⟩
+  intro registry faults
+  exact .continuing (found := found) (form := form)
+
  theorem body {context scope mode statements expected type code}
       (syntaxTree : GenericLexicalStatements.Syntax source expressionSyntax context mode statements expected)
       (body : GenericLexicalStatements.Tree layouts owner active frame globals onError values source certificates context scope mode statements expected type code) :

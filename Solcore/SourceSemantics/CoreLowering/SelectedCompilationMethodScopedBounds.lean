@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveTypedControlBoundary
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodInvocationBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodPostAdmission
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationMethodScopedSupport
@@ -189,7 +190,9 @@ theorem source_continuation
       (Nat.le_of_lt within) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted trace
   have functionPost := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function packet.sourceAt.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    unique bodyTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function packet.sourceAt.projection represented controlClosed
   obtain ⟨value, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented evaluated
       principal.cached.compilation.own.fellThroughReason principal.cached.compilation.own.table.escapedReason entry.embedding
@@ -285,7 +288,9 @@ theorem native_continuation
       (Nat.le_of_lt strict) environments entry.heaps entry.locals agrees entry.actualTyped reference entry.read entry.unmapped
       initial conditioned admitted flowTrace
   have functionPost := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Post.to_function represented post
-  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function packet.sourceAt.projection represented
+  have controlClosed := Staging.Recursive.TypedControlBoundary.function
+    graph.nodeOccurrencesUnique bodyTyped rfl trace.sound
+  have represented := CallableIndexedOwnedAdmittedStagedFlowOutcomes.Represents.to_function packet.sourceAt.projection represented controlClosed
   obtain ⟨bodyValue, evaluatedBody, representedBody⟩ :=
     CallableIndexedOwnedAdmittedStagedLexicalFooter.evaluates represented flowTrace.sound
       principal.cached.compilation.own.fellThroughReason principal.cached.compilation.own.table.escapedReason entry.embedding

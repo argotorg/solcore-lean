@@ -24,6 +24,14 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       size = Size.stepSize [matchSize] ∧ finalContext = context ∧ outcome = .fault failure ∧
       Size.Match program registry matchSize invocation context environment before
         resolution (.fault failure) after) ∨
+    (∃ matchSize,
+      size = Size.stepSize [matchSize] ∧ finalContext = context ∧ outcome = .breaking environment ∧
+      Size.Match program registry matchSize invocation context environment before
+        resolution (.breaking environment) after) ∨
+    (∃ matchSize,
+      size = Size.stepSize [matchSize] ∧ finalContext = context ∧ outcome = .continuing environment ∧
+      Size.Match program registry matchSize invocation context environment before
+        resolution (.continuing environment) after) ∨
     (∃ matchSize tailSize middle,
       size = Size.stepSize [matchSize, tailSize] ∧
       Size.Match program registry matchSize invocation context environment before
@@ -36,6 +44,9 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     subst other
     exact form
   cases trace with
+  | breaking actual same | continuing actual same
+  | blockBreaking actual same _ | blockContinuing actual same _
+  | ifBreaking actual same _ _ | ifContinuing actual same _ _
   | forInitializerFault actual same _ | forReturned actual same _ _ | forFault actual same _ _
   | forFallthrough actual same _ _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
@@ -57,9 +68,17 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       have equal := (shape actual).symm.trans same
       cases equal
       exact .inr (.inl ⟨_, _, rfl, rfl, rfl, matched⟩)
+  | matchBreaking actual same matched =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inl ⟨_, rfl, rfl, rfl, matched⟩))
+  | matchContinuing actual same matched =>
+      have equal := (shape actual).symm.trans same
+      cases equal
+      exact .inr (.inr (.inr (.inl ⟨_, rfl, rfl, rfl, matched⟩)))
   | matchFallthrough actual same matched next =>
       have equal := (shape actual).symm.trans same
       cases equal
-      exact .inr (.inr ⟨_, _, _, rfl, matched, next⟩)
+      exact .inr (.inr (.inr (.inr ⟨_, _, _, rfl, matched, next⟩)))
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedMatchSourceInversion

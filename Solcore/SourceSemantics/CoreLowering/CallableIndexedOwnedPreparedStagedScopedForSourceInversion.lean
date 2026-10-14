@@ -39,7 +39,11 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
     subst other
     exact form
   cases trace with
+  | breaking actual same | continuing actual same =>
+      cases (shape actual).symm.trans same
+  | matchBreaking actual same _ | matchContinuing actual same _
   | matchReturned actual same _ | matchFault actual same _ | matchFallthrough actual same _ _
+  | blockBreaking actual same _ | blockContinuing actual same _
   | blockReturned actual same _ | blockFault actual same _ | blockFallthrough actual same _ _
   | whileReturned actual same _ | whileFault actual same _ | whileFallthrough actual same _ _
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
@@ -47,7 +51,8 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
   | assignBare actual same _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
-  | ifConditionFault actual same _ | ifReturned actual same _ _ | ifFault actual same _ _
+  | ifConditionFault actual same _ | ifBreaking actual same _ _ | ifContinuing actual same _ _
+  | ifReturned actual same _ _ | ifFault actual same _ _
   | ifFallthrough actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
       cases impossible
@@ -75,6 +80,7 @@ theorem fallthrough_environment {program : Program} {registry : Registry} {invoc
   | ind size ih =>
     cases trace with
     | finished => rfl
-    | iterate _ _ _ next => exact ih _ (Size.child_lt_stepSize (by simp)) next
+    | forBreakFromBody => rfl
+    | iterate _ _ _ next | continueIterate _ _ _ next => exact ih _ (Size.child_lt_stepSize (by simp)) next
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForSourceInversion

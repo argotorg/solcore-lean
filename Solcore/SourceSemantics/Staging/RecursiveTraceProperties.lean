@@ -36,6 +36,8 @@ private theorem body_result_stage {type : TypeSystem.Ty} {outcome : BodyOutcome}
     (failed : result = .fault (.stage originScope call reason)) : outcome = .fault (.stage originScope call reason) := by
   cases converted with
   | returned => cases failed
+  | breaking => cases failed
+  | continuing => cases failed
   | unit => cases failed
   | fault => exact congrArg BodyOutcome.fault (Outcome.fault.inj failed)
 

@@ -135,6 +135,12 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         | returned value =>
           exact ⟨context, _, _, .ifReturned (lookupStatement?_sound statementFound) form liftedTest lifted,
             .completed (.returned value)⟩
+        | breaking innerEnvironment =>
+          exact ⟨context, _, _, .ifBreaking (lookupStatement?_sound statementFound) form liftedTest lifted,
+            .completed (.breaking environment)⟩
+        | continuing innerEnvironment =>
+          exact ⟨context, _, _, .ifContinuing (lookupStatement?_sound statementFound) form liftedTest lifted,
+            .completed (.continuing environment)⟩
         | fault reason =>
           exact ⟨context, _, _, .ifFault (lookupStatement?_sound statementFound) form liftedTest lifted,
             .completed (.fault reason)⟩

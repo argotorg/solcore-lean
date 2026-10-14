@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.Staging.RecursiveControlViews
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerSource
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedImperativePositions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForSequences
@@ -411,7 +412,20 @@ theorem preserves_position {budget : Nat}
         exact CallableIndexedOwnedAdmittedStagedMatchSequences.preserves bridge functions condition
           selectedMeaning unique found form (.inr stops) within
           environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
-  | @breaking _ _ _ _ _ _ _ _ found form | @continuing _ _ _ _ _ _ _ _ found form
+  | @breaking context scope mode id node rest expected type found form =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
+      obtain ⟨rfl, rfl, rfl⟩ := Staging.Recursive.Size.StatementsIn.breaking_view unique found form trace
+      exact ⟨_, store, mapping, world, LocalLoop.breaking_evaluates _ actual store,
+        .breaking environment, heaps, .refl _, .refl _, .refl _ _, .refl _,
+        initial, callerProtocol.refl initial, admitted⟩
+  | @continuing context scope mode id node rest expected type found form =>
+      intro shape sourceTyped projection
+      intro size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted finalContext outcome after trace
+      obtain ⟨rfl, rfl, rfl⟩ := Staging.Recursive.Size.StatementsIn.continuing_view unique found form trace
+      exact ⟨_, store, mapping, world, LocalLoop.continuing_evaluates _ actual store,
+        .continuing environment, heaps, .refl _, .refl _, .refl _ _, .refl _,
+        initial, callerProtocol.refl initial, admitted⟩
   | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _
     =>
       intro shape sourceTyped projection
