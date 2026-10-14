@@ -43,6 +43,14 @@ Each endpoint returns either the original outcome and exact final Source heap wi
 
 Complete compiler-form and actual-pass preservation remain unfinished. The accepted compiler profile, actual startup/input receipts and typed public input conditions remain explicit.
 
+### Loops and scoped control transfers
+
+The common compiler profile accepts for-loop headers with monomorphic declarations, discarded expressions and bare assignments. It retains each actual compiler action, initializer/post order, generated scope and nested body. Break and continue retain their original loop depth and stop before the statement suffix.
+
+The existing closed public forward endpoints need no additional control-flow premise. `SelectedCompilationStageActualLifting` handles ordinary break/continue traces; the physical flow family represents the corresponding native control values. Blocks, conditionals and match arms restore the outside environment and retain heap effects. For-loop continue executes the full post, including its failures and earlier stage rejections; break skips it. At an actual function boundary, original selected body typing derives `NoEscapedControl` internally.
+
+A small loop fixture issues an automatic `Profiled` session. Its independent Source trace for initialized for-header, true condition, break and outer return reaches closed initial whole-output forwarding. A separate regression keeps the complete original loop corpus and selects ten actual cache rows through the common profile. Its runtime tests cover continue, nested loops, header scope restoration, failure prefixes and later calls in the returned session. These runtime cases are distinct from the independently constructed Source trace.
+
 ### Body control and ordinary primitive expressions
 
 `AcceptedNamedBodyFlow.Tree` now retains accepted discard, block and conditional actions. `AcceptedCompilerBodyProfile` and `AcceptedCompilerBodySubsetProfile` derive their body certificates from the same finite profile used by `validateCheckedProfile`. Nested scope and binder checks are internal. Conditionals currently require the original statement annotation to be unit, and the outer body still requires an explicit return.

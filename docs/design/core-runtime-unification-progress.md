@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## For-loop compilation and scoped transfers reach public execution (2026-10-14)
+
+The automatic profile now follows the actual compilation of for-loop initializer, condition, post and body, including nested break and continue statements. The compiler receipts retain header order, original binder ownership, lexical scope and child fuel. The same checked public-session constructor derives the resulting body support internally.
+
+Ordinary Source lifting, staged preservation and physical forward/reflection carry break and continue through blocks, conditionals and match arms. A for-loop continue runs the post before testing the next iteration; break skips the post and remaining body. Post failures retain their exact reached heap, and earlier stage rejection retains the actual rejected guard. At function boundaries, original selected body typing rules out escaped loop control; no new public no-escape premise is needed.
+
+The Source-first consumer uses a separate one-function fixture. It constructs the original initializer allocation, true condition, break and outer return before public execution, then supplies that trace to closed initial whole-output forwarding. Its native heaps are `2 / 9`. A runtime companion keeps the complete original twelve-definition loop corpus and its ten selected cache rows. It checks post order, continue, break, shadowing, nested loops, early return, three uninitialized-read faults and later reuse in the same session, with heaps `11 / 30 / 40 / 50 / 60 / 79 / 94 / 101 / 105 / 112 / 115 / 125`. The companion is runtime coverage; an independent ordinary Source derivation is not supplied for every corpus function. Both fixtures exercise zero-fuel suspension and resumption.
+
+Validation: 102 changed or new modules checked in a coherent graph of 7,762 modules, including 2,583 affected modules. The eleven focused runtime markers and 1,168 endpoint audits pass. Full build (7,802 jobs), registered tests, kernel policy and the same 1,168 canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Automatic match admission, non-unit conditional annotations, outer fallthrough and tail expressions, broader assignments, generalized locals, factory/coercion profiles and remaining actual-pass obligations are unfinished. Runtime unification remains complete; full compiler meaning preservation remains incomplete. Core instructions and public runtime behavior are unchanged.
+
 ## Coercion factories reach the same certified public session (2026-10-14)
 
 The automatic compiler profile now covers a returned closure whose direct call has an original output coercion, together with the selected closed implementation methods. The producer retains the complete coercion suffix, method identity, dictionary, cached body and original raw metadata. Primitive method certificates come from actual accepted compilation. Existing full-program clients use the same selected producer through their existing compatibility interface.

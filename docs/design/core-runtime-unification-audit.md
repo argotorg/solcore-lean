@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## For-loop and scoped control audit (2026-10-14)
+
+The compiler-derived body tree retains actual for-header actions, ordered initializers and posts, condition code, body code and predecessor fuel. Source admission checks original monomorphic binder metadata and each expression/body edge. Break and continue are represented as scoped outcomes, so a following statement is not evaluated after a transfer. Blocks, conditionals and match arms restore the outer environment while retaining reached heap effects.
+
+Ordinary-to-staged lifting and physical preservation/reflection agree on the transfer path. Continue executes the for-post, including post faults and earlier stage rejection; break skips it. Function wrappers derive the absence of escaped transfers from the actual original function-body typing at loop depth zero. Existing named, closure and method public signatures retain their prior premises. The lexical-failure heap regression now derives this boundary fact before interpreting the fault, rather than inverting a body result without ruling out control transfer.
+
+Independent reviews cover the staged outcome schema, function boundaries, physical loops, ordinary lifting, actual compiler receipts and public consumers. The small Source-first fixture proves initializer/break/return meaning before execution. The unchanged original loop corpus supplies separate runtime coverage for ten selected functions, including post order, lexical restoration, nested loops, early return, exact fault prefixes and session reuse. These runtime checks are not recorded as independent Source derivations.
+
+Validation: 102 changed or new modules checked in an exact source/object graph of 7,762 modules; all imported-object edges are pinned. The eleven focused runtime markers and 1,168 endpoint audits pass. Full build (7,802 jobs), registered tests, kernel policy and the same 1,168 canonical endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`, and twelve unrelated workspace changes remain excluded.
+
+The profile still requires an explicit outer return and supports a bounded compiler fragment. Automatic match admission, non-unit conditional annotations, broader locals/assignments/factories/coercions and remaining actual-pass composition are open. No general termination or full compiler-completeness result is claimed.
+
 ## Coercion profile and Source-first public audit (2026-10-14)
 
 The new `coercedFactory` and `closedMethod` profile alternatives authenticate the original selected cache rows. Coercion factories retain the whole original suffix and call requirements. Selected implementation methods use genuine cached body typing and primitive compiler receipts; closed parameters and assumptions remain explicit profile checks. Original occurrence uniqueness rules out an accidental local-initializer use of the returned lambda. No separate evaluator, compiler restriction or runtime flag is introduced.
