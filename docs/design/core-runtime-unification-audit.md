@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Body control and primitive receipt audit (2026-10-14)
+
+New body constructors retain authentic accepted child actions for expression discard, blocks and unit-annotated conditional statements. Nested bodies use the compiler's actual non-function mode; the suffix resumes the original scope. Conditional receipts retain condition, then-branch, else-branch and suffix in compiler order. Binder checks visit both branches and restore lexical bindings at the boundary.
+
+Ordinary operator receipts come from the actual compatible-expression compiler step. Builtin-call receipts use the native builtin inventory and descriptor, including its parameter/result types, callee read type and exact generated expression. Child traversal preserves argument positions and repeated IDs. Removing the old blanket requirement that operators have trait evidence enables genuine primitive operators; it does not remove raw metadata checks or admit unsupported output coercions.
+
+Independent review covers the production changes and Source-first consumers. The discard and complement traces precede public completion and enter the existing closed public forward theorems. Additional runtime cases exercise control flow, failure prefixes and continuation; they do not claim independent ordinary traces for every program in the corpus. The proof-only profile still rejects a checker/compiler-accepted conditional with a non-unit original annotation.
+
+Validation: 29 changed or new modules checked in a coherent graph of 7,718 modules; focused runtime companions, full build, registered runtime suite, kernel policy and 906 endpoint audits pass. Only `propext`, `Classical.choice` and `Quot.sound` occur in audited proofs. The removed `Profile.requirements` audit is replaced by the actual primitive/builtin receipts and their connected consumers. Twelve unrelated workspace changes remain excluded.
+
+For-loop admission, staged break/continue, broader function shapes and full actual-pass composition remain open. This checkpoint adds proof producers and regression coverage without changing the runtime or Core language.
+
 ## Direct callable and full output audit (2026-10-14)
 
 The direct ordinary-to-public proof covers all three actual retained callable shapes. Named calls use the original selected Source instance and dictionary. Closure calls retain the complete captured environment and exact compiled administrative context. Builtins use their independent application rules. Actual packed validation and retained history supply the receiving registry and both physical values. No outer stage guard is invented for a direct packed start; rejected guards come from real nested body expressions.

@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Body control and primitive compiler actions (2026-10-14)
+
+The common compiler profile now accepts discarded expressions, lexical blocks and unit-annotated conditional statements. The body proof follows the actual accepted compiler actions, retains child fuel and both compiled branches, and restores the caller scope before the following statements. The subset profile also checks every nested body edge. These receipts feed the existing checked public-session constructors and selected meaning-preservation family.
+
+Primitive unary/binary operators and builtin-call expressions now use the same expression producer. Operator receipts retain the actual native checks and emitted code. Builtin receipts retain the real descriptor, input/output types and ordered argument actions. Original output coercions, requirements and initializer exclusions remain checked; the earlier direct-only method and factory grammar stays narrow.
+
+Two new consumers build ordinary Source executions before public completion. The discard example allocates its parameter, evaluates the discarded read, then evaluates the return and supplies that trace to closed whole-output forwarding. The complement example supplies its independent allocation/read/bitwise-not trace to the scalar forward theorem. Their fixtures contain actual checker, compiler, profile, bootstrap and start receipts, with no manually supplied body-validity law or completed public result.
+
+Registered runtime tests cover lexical restoration, block return, both conditional branches, discarded-read failure and later execution in the returned session. They preserve zero-fuel suspension and check heap sequences `2 / 5`, `2 / 17 / 32`, `3 / 9 / 24` and `4 / 10 / 22 / 34 / 43 / 55`. The unchanged primitive corpus has twenty cache rows and twenty public calls, with initial, complement and final heaps `21 / 24 / 123`; malformed operand and metadata cases remain rejected by the proof profile.
+
+Validation: 29 changed or new modules checked in a coherent graph of 7,718 modules; focused runtime companions, full build, registered runtime suite, kernel policy and 906 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+The profile still requires an explicit outer return. A conditional whose original annotation is non-unit remains outside the profile, even when both branches return and the compiler accepts it; the regression records this boundary. For, break/continue, broader local/factory forms, output-coercion profile producers, general staged transformations and the remaining actual-pass preservation obligations are unfinished. No runtime behavior or Core instruction changes in this checkpoint. Runtime unification is complete; full compiler meaning preservation remains incomplete.
+
 ## Direct callable, complete outputs and composite expressions (2026-10-14)
 
 `SelectedCompilationStageClosedDirectForward` connects ordinary calls through retained named, closure and builtin handles to the actual packed public entry. It recovers the receiving registry, argument representation and captured environment from the current history and successful input processing. Success supplies the genuine callable arity; the semantic-fault endpoint retains an explicit arity condition because a packed unit or product alone does not determine the number of arguments.

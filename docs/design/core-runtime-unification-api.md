@@ -43,6 +43,14 @@ Each endpoint returns either the original outcome and exact final Source heap wi
 
 Complete compiler-form and actual-pass preservation remain unfinished. The accepted compiler profile, actual startup/input receipts and typed public input conditions remain explicit.
 
+### Body control and ordinary primitive expressions
+
+`AcceptedNamedBodyFlow.Tree` now retains accepted discard, block and conditional actions. `AcceptedCompilerBodyProfile` and `AcceptedCompilerBodySubsetProfile` derive their body certificates from the same finite profile used by `validateCheckedProfile`. Nested scope and binder checks are internal. Conditionals currently require the original statement annotation to be unit, and the outer body still requires an explicit return.
+
+`AcceptedOrdinaryExpressionReceipt` derives primitive operator and builtin-call certificates from actual compilation. `AcceptedNamedExpressionFlow.Step` includes `primitive` and `builtin`; their ordered child actions feed `GeneralSyntax`. The general expression profile admits these forms and supplies `ReachedOrdinaryForms`, `ordinaryArguments` and `ordinaryMetadata`. The obsolete `Profile.requirements` accessor has been removed. `directForms` retains the earlier restricted grammar.
+
+Callers use the same checked `Profiled` constructors and closed public forward/reflection APIs. The new registered discard and complement companions demonstrate independent Source traces entering whole-output and scalar forwarding respectively. Successful compilation alone still does not imply acceptance of the complete proof profile.
+
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
 `2d82255c` connects accepted constructor compilation to the expression proof producer. `fc157381` carries constructor payloads and their retained callable handles through the common certified public session.

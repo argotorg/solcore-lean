@@ -22,7 +22,9 @@ The additive `Profiled` session retains the genuine static profile and checker r
 
 The selected public connection now also covers retained named, closure and builtin handles, whole structured outputs and their ordered nested handle selections. Forward output retains actual reimport and full value representation. Initial, later named and direct output reflection recover the ordinary Source result and exact reached heap. All use actual selected support, startup/input receipts and retained history.
 
-The selected compiler profile additionally derives group, nonempty tuple and conditional expression support from actual compiler receipts, preserving operand order and the existing metadata checks.
+The selected compiler profile derives group, nonempty tuple, conditional, primitive operator and builtin-call expression support from actual compiler receipts, preserving operand order, original metadata and native descriptors. It also derives discarded-expression, lexical-block and unit-annotated conditional statement support. These forms use the same checked public-session producer; independent discard and complement Source traces reach the closed public forward theorems.
+
+The body profile still requires an explicit outer return and rejects non-unit conditional annotations, including some compiler-accepted cases where both branches return. For-loop admission, staged break/continue and broader local/factory and coercion profiles remain unfinished.
 
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
