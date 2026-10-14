@@ -20,7 +20,11 @@ The additive `Profiled` session retains the genuine static profile and checker r
 
 `SelectedCompilationStageActualLifting.lifts_roots` now closes ordinary-to-staged lifting for the accepted selected profile. It preserves the original value or semantic fault and exact final heap, or produces an authentic earlier stage rejection at its exact prefix heap. The closed initial and later named-call forward APIs consume independent ordinary Source outcomes. Actual bootstrap and input processing supply their physical state conditions; callers do not provide a staged trace or recursive body theorem.
 
-Direct retained-handle calls and whole structured outputs still need the same ordinary-to-public connection. Complete compiler-form and actual-pass coverage also remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
+The selected public connection now also covers retained named, closure and builtin handles, whole structured outputs and their ordered nested handle selections. Forward output retains actual reimport and full value representation. Initial, later named and direct output reflection recover the ordinary Source result and exact reached heap. All use actual selected support, startup/input receipts and retained history.
+
+The selected compiler profile additionally derives group, nonempty tuple and conditional expression support from actual compiler receipts, preserving operand order and the existing metadata checks.
+
+Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
@@ -1721,7 +1725,7 @@ If existing semantics lacks rules, supply them with source-language reasons and 
 
 Declarative stage classification does not imply that every runtime indirect-call guard accepts. In particular, `Staging.HasStage.indirectCall` classifies the callee and arguments without requiring their stages to satisfy the dynamically selected callable's parameter and result contract. A proof of ordinary `Dynamic` execution may therefore require genuine guard acceptance at each reached call; that is an intermediate profile, not the complete public theorem.
 
-`Staging.CallBoundary` already gives independent acceptance and rejection rules at one call boundary. `Staging.Recursive` propagates the original staged failure through nested expressions, lexical scopes, and callable bodies. Its current rules cover only the documented subset and must be extended for remaining forms, including evidence, coercions, assignments, and loops, before claiming complete public coverage. Successful staged execution and ordinary semantic faults project to the existing `Dynamic` judgments. A stage rejection has its own outcome and public diagnostic; do not convert it into a `Dynamic.SemanticFault` or claim that a boundary-only theorem closes the recursive proof. These proof extensions require no new Core syntax or runtime backend.
+`Staging.CallBoundary` gives independent acceptance and rejection rules at a call boundary. `Staging.Recursive` propagates outcomes through nested expressions, lexical scopes and callable bodies. The selected proof family now covers evidence, coercion methods, assignments and loops, with closed recursion and public adapters. The compiler profile still limits which actual programs receive those certificates. Successful staged execution and ordinary semantic faults project to the existing `Dynamic` judgments. A stage rejection retains its own outcome, public diagnostic and reached prefix heap. These proofs require no new Core syntax or runtime backend.
 
 Distinguish full correctness from parsing and name resolution of raw source from this compilation theorem.
 Track the connection that supplies declarative assumptions from executable checking / stage analysis as separate theorems.

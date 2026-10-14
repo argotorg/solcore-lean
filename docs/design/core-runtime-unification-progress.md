@@ -6,6 +6,22 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Direct callable, complete outputs and composite expressions (2026-10-14)
+
+`SelectedCompilationStageClosedDirectForward` connects ordinary calls through retained named, closure and builtin handles to the actual packed public entry. It recovers the receiving registry, argument representation and captured environment from the current history and successful input processing. Success supplies the genuine callable arity; the semantic-fault endpoint retains an explicit arity condition because a packed unit or product alone does not determine the number of arguments.
+
+`SelectedCompilationStageClosedOutputForward.initial` and `.later` extend named calls to complete structured results. These endpoints and the direct `.output` endpoint retain the whole result's real reimport receipt and `ValueRep`, then allow ordered selection of nested callable leaves into the returned history. Host and Source raw result types remain distinct when only their runtime views agree. A selection that skips data is not used as evidence that those data have the right meaning.
+
+The reverse connection is explicit as well. `Initial.reflect_output_plain`, `Profiled.reflect_output_plain` and `Profiled.reflect_direct_output_plain` derive an ordinary Source result from actual public success and retain its full value representation, reached heap and earlier history. They derive the body support and named descriptor internally. Forward calls continue to allow a genuine earlier stage rejection with the exact prefix heap and public failure continuation.
+
+The same compiler profile now derives group, nonempty tuple and conditional expression certificates from the actual compiler actions. It retains repeated operand IDs, source order, the production tuple packer, both compiled branches and the Boolean condition check. Existing narrow method/factory profiles keep their former grammar; no Core instruction, runtime mode or compiler restriction is added.
+
+The named/builtin direct companion independently constructs Source outcomes and checks handle reuse after failure, with public heap sizes `6 / 9 / 6 / 9 / 12 / 12`. The captured-closure companion independently constructs the factory allocation and captured read before execution, then checks repeated direct calls returning `37`, including zero-fuel resumption, with heaps `2 / 5 / 5 / 5`. The constructor companion builds independent Source allocation/read/construction traces and proves full-output forwarding for an initial call and a later call in the returned state. It returns `Wrap(37)` and `Wrap(52)` with heaps `2 / 5 / 8`. Composite regressions use the original arithmetic, conditional and tuple programs through actual checking, automatic profile issuance and public execution. They check successful results and reached fault prefixes; they do not supply independent ordinary Source traces for every composite program.
+
+Validation: 35 changed or new modules checked in a coherent graph of 7,708 modules; the new runtime companions, full build, registered runtime suite, kernel policy and 855 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+These results close the selected public result boundaries under the existing accepted profile. Complete compiler-form coverage, general staged transformations and the remaining actual-pass preservation obligations are still open. Runtime unification is complete; the full compiler meaning-preservation goal remains incomplete.
+
 ## Ordinary Source executions reach public named calls (2026-10-14)
 
 `SelectedCompilationStageActualLifting.lifts_roots` lifts finite ordinary Dynamic executions through the actual selected staging rules. Strong induction over the original Source trace closes named, closure, builtin, operator-method and coercion-method calls. Lexical declarations, assignment, branches, matching and loops use the actual intermediate states. Earlier stage rejection stops the remaining expressions and preserves the exact prefix heap.

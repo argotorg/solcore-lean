@@ -33,7 +33,15 @@ Each endpoint returns either the original outcome and exact final Source heap wi
 
 `SelectedCompilationStageActualLifting.lifts_roots` closes recursive expression/body lifting by the size of the ordinary Source trace. `SelectedCompilationStagePublicProgramLifting.named_bodies` connects it to actual selected named packets. These internal producers leave no body-meaning or root-lifting callback at the closed public APIs.
 
-Direct retained-handle invocation and whole structured-output meaning still need equivalent ordinary-to-public wrappers. Existing staged direct/output interfaces remain available. Complete compiler-form and actual-pass preservation also remain unfinished; the accepted compiler profile and typed public input conditions remain explicit.
+### Direct handles and complete outputs
+
+`SelectedCompilationStageClosedDirectForward.{scalar,fault,output}` consumes a retained entry, successful packed start, history-backed input and independent ordinary callable outcome. Success derives the true argument arity; faults require the corresponding `Arity` witness. A real body guard may yield the separate `StageStopped` outcome.
+
+`SelectedCompilationStageClosedOutputForward.{initial,later}` provides complete output forwarding for named calls. It shares `SelectedCompilationStageClosedDirectForward.Output.ForwardAt` with direct calls: sufficient execution/output budgets, the exact returned heap, whole-value reimport and `ValueRep`, preserved earlier entries, and ordered collection of any selected nested handles. `ReturnedValue` records both host and Source raw types and their actual runtime-type agreement.
+
+`Initial.reflect_output_plain`, `Profiled.reflect_output_plain` and `Profiled.reflect_direct_output_plain` in `SelectedCompilationCertifiedPublicOutputReflection` start from actual public success. They return the ordinary Source result, its complete representation and the same reached physical state with prior entries. The direct form also recovers genuine unpacking and arity. Reflection does not require a Source execution premise.
+
+Complete compiler-form and actual-pass preservation remain unfinished. The accepted compiler profile, actual startup/input receipts and typed public input conditions remain explicit.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 

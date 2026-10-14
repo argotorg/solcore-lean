@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Direct callable and full output audit (2026-10-14)
+
+The direct ordinary-to-public proof covers all three actual retained callable shapes. Named calls use the original selected Source instance and dictionary. Closure calls retain the complete captured environment and exact compiled administrative context. Builtins use their independent application rules. Actual packed validation and retained history supply the receiving registry and both physical values. No outer stage guard is invented for a direct packed start; rejected guards come from real nested body expressions.
+
+Packing is not an arity proof. Successful ordinary application derives arity from the real callable case, while the fault entry point keeps a genuine `Arity` condition. The full output contract retains host/Source runtime-type compatibility, actual reimport and the entire `ValueRep`, in addition to ordered nested handle selection. This avoids treating a skipped data leaf as semantic evidence.
+
+Initial and later named whole-output forward proofs use actual successful encoding and the existing `History.first`/`History.next` constructors. Whole-output reflection uses actual completion and the closed selected body reflection family. The public wrappers derive named descriptors internally. Forward and reflection keep the original source program, result metadata, exact reached heap and earlier captures.
+
+Validation: 35 changed or new modules checked in a coherent graph of 7,708 modules; the new runtime companions, full build, registered runtime suite, kernel policy and 855 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Independent reviews cover the packed bridge, direct public endpoints, named output forwarding and complete output reflection. The compiler profile also accepts the actual group, nonempty tuple and conditional branches. Receipts retain source-ordered children, repeated IDs, the real tuple packing code and both accepted conditional branches. Runtime semantics still executes only the selected branch. Metadata and special-hook exclusions remain checked. The existing direct-only profile retains its narrow grammar.
+
+Primitive operators, builtin-call expressions, additional statement forms, more general local/factory shapes, and wider staged transformations still require compiler producers. Actual-pass composition remains incomplete.
+
 ## Ordinary-to-staged and public forward connection audit (2026-10-14)
 
 The closed selected lifting family recurses on the original ordinary Source trace. A smaller ordinary trace supplies each recursive call; the independently closed staged-preservation family supplies physical facts at intermediate states. The proof retains actual method selection, complete invocation dictionaries, closure code and captured environments, and the ordering of operand and coercion effects.
