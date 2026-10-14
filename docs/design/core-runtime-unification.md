@@ -30,7 +30,9 @@ The profile now follows accepted for-loop initializer, condition, post and body 
 
 The automatic profile now also follows accepted match statements. The actual match callback retains every ordered original arm/default request, its scope, predecessor fuel and emitted code. Original pattern typing supplies binder ownership and the branch context. One checked public issuance connects an independently constructed Source trace, including hidden and pattern allocations and an outer-variable write, to closed whole-output forwarding. Non-unit match annotations remain tied to the original Source return context.
 
-The body profile still requires an explicit outer return and rejects non-unit conditional annotations, including some compiler-accepted cases where both branches return. Broader local, factory and coercion profiles remain unfinished. The coercion factory profile currently requires leaf direct-call arguments and closed implementation parameters and assumptions.
+The body profile now accepts final expressions, Unit fallthrough and guaranteed returns through blocks, both conditional branches or every match arm with a present default. Completion is indexed by the original result type. Original Source typing supplies that raw type for named functions, selected methods and captured closures. Conditional annotations may be Unit or the actual return type. Five independent Source traces reach closed initial whole-output forwarding through the same checked public session.
+
+Broader assignments, generalized locals and factory/coercion shapes remain unfinished. The coercion factory profile still requires leaf direct-call arguments and closed implementation parameters and assumptions. A nonfinal bare expression in function mode remains outside the proof profile; admitting it requires the corresponding staged-discard connection.
 
 Complete compiler-form and actual-pass coverage remain unfinished. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 

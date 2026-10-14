@@ -4,6 +4,14 @@ Last updated: 2026-10-14.
 
 Runtime unification and removal of the old typed-source evaluator were completed in `a3168382`. This document describes the current public API. The second goal, the proof of meaning preservation for the complete public compiler, remains in progress. See the [implementation record](core-runtime-unification-progress.md) for the latest implementation and validation checkpoint.
 
+## Original completion in automatic body profiles (2026-10-14)
+
+`AcceptedCompilerBodyCompletion.Finish` checks completion at an original raw result type, with separate function and nested-body modes. `AcceptedNamedBodyFinish` derives `Tree.complete` from that finite check and the authentic formed compiler tree. `AcceptedNamedBodyFlow.Tree.scan_complete` (defined in `AcceptedNamedBodySyntax`) then constructs Source admission while retaining original typing, binder ownership and every compiled child.
+
+`CompilerProgramStaticProfile.Scoped` records `finish` at the selected function's `inferredBodyType`. `ScopedFactory.body` uses the actual lambda result as the final `AcceptedCompilerBodySubsetProfile.Profile` index; its validator takes that result explicitly. The named, method and closure producers derive their existing semantic certificates from these receipts. Public checked-session and closed-forward signatures are unchanged.
+
+`SourceCoreSelectedCompletionSourceFirst` supplies five independent ordinary Source traces before public completion. The profile consumer also checks separate failure/reuse and captured Unit-fallthrough runtime sequences. Nonfinal bare function-mode expressions remain outside the supported profile; no Core opcode or runtime mode is added.
+
 ## Selected compilation proof interface (2026-10-14)
 
 Public runtime APIs are unchanged. The new proof entry points use `SelectedCompilationBodyTyping.Bodies compiled`, which retains global signature/identity facts and validity of the original ordinary or method bodies selected by the actual compiled cache. They continue to interpret `Program.ofChecked compiled.sourceProgram`; callers do not construct a filtered program.

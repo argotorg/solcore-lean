@@ -6,6 +6,20 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Original body completion reaches the public proof (2026-10-14)
+
+The automatic compiler profile now derives body completion at the original result type. It accepts final expressions, empty or ordinary Unit fallthrough, and guaranteed returns through a block, both conditional branches or every ordered match arm with a present default. Genuine accepted compiler actions retain tail and discard order, nested non-function mode, child fuel and emitted code. The raw completion check also retains the forms of emitted suffix statements after a stopping head.
+
+Original Source typing supplies the exact result equality for named functions, selected methods and captured closures. Closure admission no longer requires an explicit return statement. Conditional annotations may be Unit or the original return type. Public constructors derive these facts internally without an additional body-meaning or completed-execution premise.
+
+Five independent Source traces precede public execution: both branches of the original conditional program, a named final expression, empty Unit completion and Unit completion after a local copy. Their exact Source heaps contain three/two, one, zero and two cells respectively. The same automatic issuance reaches closed initial whole-output forwarding, retaining a genuine earlier-stage-stop alternative. Native heap-size sequences are `2 / 11`, `2 / 8`, `2 / 5`, `2 / 2` and `2 / 8`.
+
+A separate seven-root runtime corpus checks fallthrough, tail and conditional read faults, semicolon discard, terminal block/match returns and later reuse in the same session. Its native heap sizes are `8 / 11 / 14 / 17 / 20 / 26 / 29 / 35 / 41 / 47`. A captured Unit-fallthrough lambda is invoked twice through the same retained handle, with native heap sizes `2 / 5 / 8 / 11`. These companions supply runtime coverage; they do not add independent Source derivations for every call.
+
+Validation: 37 changed or new modules checked in a coherent graph of 7,779 modules, including 2,482 affected modules. All 13 focused runtime markers and 1,263 endpoint audits pass. Full build (7,819 jobs), registered tests, kernel policy and the same canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+The proof profile still excludes nonfinal bare expressions in function mode, broader assignments, generalized locals and general factory/coercion shapes. Full compiler-form and actual-pass composition remain unfinished. Runtime unification remains complete; full compiler meaning preservation remains incomplete. Core instructions and public execution behavior are unchanged.
+
 ## Match compilation reaches the same Source and public proof (2026-10-14)
 
 The automatic compiler profile now admits match statements through the actual compatible match callback. Receipts retain every ordered original arm/default request, its lexical scope, predecessor fuel and emitted code. Original Source pattern typing supplies the hidden local and pattern binder context. Named functions, selected methods and returned closures derive this support from their existing compiler receipts. The public constructors require no additional branch-typing, body-meaning or whole-program validity premise.

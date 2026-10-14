@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Raw body completion and public-session audit (2026-10-14)
+
+Completion retains the original raw result type instead of searching only for an explicit outer return. Tail expressions require their genuine original annotation. Function-mode fallthrough requires Unit. A terminal block or conditional and a present-default match retain original stopping evidence; every ordered match arm must stop. Original Source typing proves the exact result equality. The actual closure parameter context supplies the same fact for captured lambdas.
+
+The accepted body tree records real tail/discard actions, predecessor fuel and emitted order. `Finish` and `TailForms` account for emitted suffixes after guaranteed returns, while the compiler's direct-return rule may omit its suffix. Nonfinal bare expressions in function mode are rejected until staged discard supports that form; widening only the finite shape check would not establish the needed semantics.
+
+Five independent Source traces reach closed initial whole-output forwarding before any completed public result is assumed. Separate runtime companions check exact fault heap sizes, reuse and repeated invocation of a captured Unit-fallthrough lambda. Those runtime cases are not reported as independent Source proofs. Existing public-session constructors gain no body-meaning, completed-run or unrelated-body-validity premise.
+
+Validation: 37 changed or new modules checked in a coherent graph of 7,779 modules, including 2,482 affected modules. All 13 focused runtime markers and 1,263 endpoint audits pass. Full build (7,819 jobs), registered tests, kernel policy and the same canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+Complete compiler-form coverage and actual-pass composition remain unfinished. This unit changes proof admission and tests without changing Core instructions or public runtime behavior.
+
 ## Actual match compiler and public-session audit (2026-10-14)
 
 Actual callback inversion retains every original arm/default request, including duplicate requests in order. Each child keeps its real fuel, lexical scope and code. The original-case provenance relation supplies coverage of every retained request; occurrence membership alone is not used to reconstruct arm typing. Original pattern typing and local identity ownership supply the hidden local and complete binder context.
