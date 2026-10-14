@@ -16,7 +16,7 @@ open CallableIndexedOwnedPreparedStagedGeneralCallerMethodProfiles (MetadataFor)
 
 /-- The restricted lane is used by existing direct/read method and closure
 producers. The general lane additionally accepts indirect and method calls. -/
-def supportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false) : ExpressionForm → Bool
+private def legacySupportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false) : ExpressionForm → Bool
   | .reference _ (.local _) | .reference _ (.builtinBoolean _)
     | .literal _ | .integerLiteral _ _ | .tuple []
     | .call _ _ (.declaration _) => true
@@ -25,8 +25,15 @@ def supportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConst
   | .constructor _ _ => allowConstructors && !directOnly
   | _ => false
 
-/-- These are operand positions in their actual evaluation order. A direct
-callee is a static declaration reference, while an indirect callee is first. -/
+def compositeForm : ExpressionForm → Bool
+  | .group _ | .tuple (_ :: _) | .conditional _ _ _ => true
+  | _ => false
+
+def supportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false)
+    (form : ExpressionForm) : Bool :=
+  legacySupportedForm directOnly allowIndices allowConstructors form || (!directOnly && compositeForm form)
+
+/-- Every child is listed in actual compiler order, including both compiled branches. -/
 def operands : ExpressionForm → List ExpressionId
   | .call _ arguments (.declaration _) => arguments
   | .call callee arguments (.indirect _) => callee :: arguments
@@ -34,6 +41,9 @@ def operands : ExpressionForm → List ExpressionId
   | .binary left _ right => [left, right]
   | .index base key => [base, key]
   | .constructor _ ids => ids
+  | .group inner => [inner]
+  | .tuple ids => ids
+  | .conditional test yes no => [test, yes, no]
   | _ => []
 
 def supportedIds (source : TypedSource) (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false) : List ExpressionId :=
@@ -52,7 +62,7 @@ private theorem supported_mem {source : TypedSource} {directOnly allowIndices al
   exact congrArg some same
 
 private theorem old_form_of_supported {directOnly : Bool} {form : ExpressionForm}
-    (supported : supportedForm directOnly false false form = true) :
+    (supported : legacySupportedForm directOnly false false form = true) :
     LeafForm form ∨ DirectForm form ∨
       (directOnly = false ∧ (IndirectForm form ∨ MethodForm form)) := by
   match form with
@@ -63,11 +73,11 @@ private theorem old_form_of_supported {directOnly : Bool} {form : ExpressionForm
   | .tuple [] => exact .inl (.literal .unit)
   | .call callee arguments (.declaration instantiation) => exact .inr (.inl ⟨callee, arguments, instantiation, rfl⟩)
   | .call callee arguments (.indirect metadata) =>
-      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [supportedForm]), .inl ⟨callee, arguments, metadata, rfl⟩⟩)
+      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [legacySupportedForm]), .inl ⟨callee, arguments, metadata, rfl⟩⟩)
   | .unary operator operand =>
-      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [supportedForm]), .inr (.inl ⟨operator, operand, rfl⟩)⟩)
+      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [legacySupportedForm]), .inr (.inl ⟨operator, operand, rfl⟩)⟩)
   | .binary left operator right =>
-      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [supportedForm]), .inr (.inr ⟨operator, left, right, rfl⟩)⟩)
+      exact .inr (.inr ⟨(by cases directOnly <;> simp_all [legacySupportedForm]), .inr (.inr ⟨operator, left, right, rfl⟩)⟩)
   | .reference name resolution =>
       cases resolution with
       | «local» binder => exact .inl (.read name binder)
@@ -77,38 +87,59 @@ private theorem old_form_of_supported {directOnly : Bool} {form : ExpressionForm
     | .constructor _ _ | .call _ _ (.builtinFunction _) | .lambda _ _ _ => cases supported
 
 private theorem index_form_of_supported {directOnly allowIndices : Bool} {form : ExpressionForm}
-    (supported : supportedForm directOnly allowIndices false form = true) :
+    (supported : legacySupportedForm directOnly allowIndices false form = true) :
     (LeafForm form ∨ DirectForm form ∨
       (directOnly = false ∧ (IndirectForm form ∨ MethodForm form))) ∨
       (allowIndices = true ∧ directOnly = false ∧ IndexForm form) := by
-  by_cases old : supportedForm directOnly false false form = true
+  by_cases old : legacySupportedForm directOnly false false form = true
   · exact .inl (old_form_of_supported old)
-  · cases form <;> try simp_all [supportedForm]
+  · cases form <;> try simp_all [legacySupportedForm]
     case reference name resolution => cases resolution <;> simp_all
     case tuple elements => cases elements <;> simp_all
     case call callee arguments resolution => cases resolution <;> simp_all
     case index base key =>
       cases directOnly <;> cases allowIndices <;> simp_all [IndexForm]
 
-private theorem form_of_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
-    (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
+private theorem form_of_legacySupported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
+    (supported : legacySupportedForm directOnly allowIndices allowConstructors form = true) :
     ((LeafForm form ∨ DirectForm form ∨
       (directOnly = false ∧ (IndirectForm form ∨ MethodForm form))) ∨
       (allowIndices = true ∧ directOnly = false ∧ IndexForm form)) ∨
       (allowConstructors = true ∧ directOnly = false ∧ ConstructorForm form) := by
-  by_cases old : supportedForm directOnly allowIndices false form = true
+  by_cases old : legacySupportedForm directOnly allowIndices false form = true
   · exact .inl (index_form_of_supported old)
-  · cases form <;> try simp_all [supportedForm]
+  · cases form <;> try simp_all [legacySupportedForm]
     case reference name resolution => cases resolution <;> simp_all
     case tuple elements => cases elements <;> simp_all
     case call callee arguments resolution => cases resolution <;> simp_all
     case constructor instantiation ids =>
       cases directOnly <;> cases allowConstructors <;> simp_all [ConstructorForm]
 
+private theorem composite_of_true {form : ExpressionForm} (yes : compositeForm form = true) :
+    CompositeForm form := by
+  cases form <;> try cases yes
+  case group inner => exact .group inner
+  case conditional test yes no => exact .conditional test yes no
+  case tuple ids =>
+    cases ids with
+    | nil => cases yes
+    | cons first rest => exact .tuple first rest
+
+private theorem form_of_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
+    (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
+    (((LeafForm form ∨ DirectForm form ∨ (directOnly = false ∧ (IndirectForm form ∨ MethodForm form))) ∨
+      (allowIndices = true ∧ directOnly = false ∧ IndexForm form)) ∨
+      (allowConstructors = true ∧ directOnly = false ∧ ConstructorForm form)) ∨
+      (directOnly = false ∧ CompositeForm form) := by
+  rcases Bool.or_eq_true_iff.mp supported with old | composite
+  · exact .inl (form_of_legacySupported old)
+  · obtain ⟨general, form⟩ := Bool.and_eq_true_iff.mp composite
+    exact .inr ⟨by cases directOnly <;> simp_all, composite_of_true form⟩
+
 private theorem policy_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
     (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
     CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.SupportedForm form := by
-  rcases form_of_supported supported with ((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩
+  rcases form_of_supported supported with (((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩) | ⟨_, composite⟩
   · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
     · exact .literal atomic
     · exact .read name binder
@@ -122,6 +153,11 @@ private theorem policy_supported {directOnly allowIndices allowConstructors : Bo
   · exact .index base key
 
   · exact .constructor instantiation ids
+
+  · cases composite
+    · exact .group _
+    · exact .tuple _
+    · exact .conditional _ _ _
 
 def SiteReady (rows : List SourceSpecialization.SpecializedFunction) (node : ExpressionNode) : Prop :=
   match node.form with
@@ -260,33 +296,25 @@ theorem covered (profile : Profile prepared named source rows directOnly allowIn
     (found : source.lookupExpression? id = some node)
     (callee : ExpressionId) (arguments : List ExpressionId) (instantiation : DeclarationInstantiation)
     (form : node.form = .call callee arguments (.declaration instantiation)) : DirectSite rows instantiation := by
-  have member := supported_mem found (show supportedForm directOnly allowIndices allowConstructors node.form = true by simp only [form, supportedForm])
+  have member := supported_mem found (show supportedForm directOnly allowIndices allowConstructors node.form = true by simp [form, supportedForm, legacySupportedForm])
   have facts := profile.at_node member found
   simpa only [SiteReady, form] using facts.2.2.1
 
-theorem forms (profile : Profile prepared named source rows directOnly false false) : ReachedMethodForms source profile.Reached := by
+theorem compositeForms (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedCompositeForms source profile.Reached := by
   intro id node reached found
-  rcases old_form_of_supported (profile.at_node reached found).1 with leaf | direct | ⟨_, rest⟩
-  · exact .inl leaf
-  · exact .inr (.inl direct)
-  · exact .inr (.inr rest)
+  rcases form_of_supported (profile.at_node reached found).1 with (((leaf | direct | ⟨_, rest⟩) | ⟨_, _, index⟩) | ⟨_, _, constructor⟩) | ⟨_, composite⟩
+  · exact .inl (.inl (.inl (.inl leaf)))
+  · exact .inl (.inl (.inl (.inr (.inl direct))))
+  · exact .inl (.inl (.inl (.inr (.inr rest))))
+  · exact .inl (.inl (.inr index))
+  · exact .inl (.inr constructor)
+  · exact .inr composite
 
-theorem indexForms (profile : Profile prepared named source rows directOnly allowIndices false) : ReachedIndexForms source profile.Reached := by
-  intro id node reached found
-  rcases index_form_of_supported (profile.at_node reached found).1 with (leaf | direct | ⟨_, rest⟩) | ⟨_, _, index⟩
-  · exact .inl (.inl leaf)
-  · exact .inl (.inr (.inl direct))
-  · exact .inl (.inr (.inr rest))
-  · exact .inr index
+theorem forms (profile : Profile prepared named source rows directOnly false false) : ReachedCompositeForms source profile.Reached := profile.compositeForms
 
-theorem constructorForms (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedConstructorForms source profile.Reached := by
-  intro id node reached found
-  rcases form_of_supported (profile.at_node reached found).1 with ((leaf | direct | ⟨_, rest⟩) | ⟨_, _, index⟩) | ⟨_, _, constructor⟩
-  · exact .inl (.inl (.inl leaf))
-  · exact .inl (.inl (.inr (.inl direct)))
-  · exact .inl (.inl (.inr (.inr rest)))
-  · exact .inl (.inr index)
-  · exact .inr constructor
+theorem indexForms (profile : Profile prepared named source rows directOnly allowIndices false) : ReachedCompositeForms source profile.Reached := profile.compositeForms
+
+theorem constructorForms (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedCompositeForms source profile.Reached := profile.compositeForms
 
 theorem arguments (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedMethodArguments source profile.Reached := by
   refine ⟨⟨?_, ?_⟩, ?_, ?_⟩
@@ -329,9 +357,11 @@ theorem noInitializer (profile : Profile prepared named source rows directOnly a
 
 theorem directForms (profile : Profile prepared named source rows true allowIndices allowConstructors) : ReachedForms source profile.Reached := by
   intro id node reached found
-  rcases form_of_supported (profile.at_node reached found).1 with ((leaf | direct | ⟨impossible, _⟩) | ⟨_, impossible, _⟩) | ⟨_, impossible, _⟩
+  rcases form_of_supported (profile.at_node reached found).1 with (((leaf | direct | ⟨impossible, _⟩) | ⟨_, impossible, _⟩) | ⟨_, impossible, _⟩) | ⟨impossible, _⟩
   · exact .inl leaf
   · exact .inr direct
+  · cases impossible
+
   · cases impossible
 
   · cases impossible
@@ -367,6 +397,17 @@ theorem constructorRanges (profile : Profile prepared named source rows directOn
 theorem constructorMetadata (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedConstructorMetadata prepared named source profile.Reached := by
   obtain ⟨receipt, accepted⟩ := profile.metadataAccepted
   exact ReachedConstructorMetadata.of_accepted accepted
+
+theorem compositeArguments (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedCompositeArguments source profile.Reached := by
+  refine ⟨profile.constructorArguments, ?_⟩
+  intro id node reached found form child member
+  apply (profile.at_node reached found).2.1 child
+  generalize eq : node.form = shape at form
+  cases form <;> simpa only [eq, operands, AcceptedCompositeExpressionReceipt.operands] using member
+
+theorem compositeMetadata (profile : Profile prepared named source rows directOnly allowIndices allowConstructors) : ReachedCompositeMetadata prepared named source profile.Reached := by
+  obtain ⟨receipt, accepted⟩ := profile.metadataAccepted
+  exact ReachedCompositeMetadata.of_accepted accepted
 
 end Profile
 

@@ -1,6 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionTree
 
-/-! The compiler trace supplies original expression syntax or an exact path to
+/-! The compiler trace supplies original expression grammar or an exact path to
 an unexpanded action. Successful traversal covers every ordered argument. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -68,6 +68,24 @@ theorem Trace.syntax_or_boundary
         exact .inl (.index receipt.found receipt.form receipt.keyFound receipt.scalar
           (all (_, receipt.first) (by simp only [Step.children, List.mem_cons_self]))
           (all (_, receipt.second) (by simp [Step.children])))
+      | composite head plain receipt =>
+        have grammar : ∀ child ∈ AcceptedCompositeExpressionReceipt.operands receipt.node.form,
+            GeneralSyntax source child directSites := by
+          intro child member
+          obtain ⟨code, present⟩ := (mapM_receipt receipt.generated).2.2 child member
+          exact all (child, code) present
+        have form := receipt.form
+        generalize same : receipt.node.form = shape at form
+        cases form with
+        | group inner =>
+          exact .inl (.group receipt.found same (grammar inner (by simp [same, AcceptedCompositeExpressionReceipt.operands])))
+        | tuple first rest =>
+          exact .inl (.tuple receipt.found same (by simpa only [same, AcceptedCompositeExpressionReceipt.operands] using grammar))
+        | conditional test yes no =>
+          exact .inl (.conditional receipt.found same
+            (grammar test (by simp [same, AcceptedCompositeExpressionReceipt.operands]))
+            (grammar yes (by simp [same, AcceptedCompositeExpressionReceipt.operands]))
+            (grammar no (by simp [same, AcceptedCompositeExpressionReceipt.operands])))
       | method head selected receipt =>
         have childrenSyntax : ∀ child ∈ receipt.arguments, GeneralSyntax source child directSites := by
           intro child member

@@ -52,8 +52,8 @@ theorem Produced.scan (produced : Produced prepared header parameters result sta
     | inl grammar => exact grammar
     | inr residual =>
       obtain ⟨boundary⟩ := residual
-      exact False.elim (boundary.impossible_constructors expressions.metadata expressions.constructorForms expressions.noInitializer
-        expressions.constructorArguments expressions.constructorMetadata expressions.requirements expressions.indexOperands expressions.constructorRanges (members child member))
+      exact False.elim (boundary.impossible_composites expressions.metadata expressions.compositeForms expressions.noInitializer
+        expressions.compositeArguments expressions.compositeMetadata expressions.requirements expressions.indexOperands expressions.constructorRanges (members child member))
   obtain ⟨inner, final, facts, typed⟩ := SelectedCompilationAcceptedFactories.inner_typing
     produced.actual.roots produced.actual.found produced.actual.form produced.action.head.found produced.form certified
   obtain ⟨_facts, certificate⟩ := certified

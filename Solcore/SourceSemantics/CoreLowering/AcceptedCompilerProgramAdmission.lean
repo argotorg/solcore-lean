@@ -75,8 +75,8 @@ private theorem scoped_of_header
     (by
       intro child member residual
       obtain ⟨residual⟩ := residual
-      exact residual.impossible_constructors expressions.metadata expressions.constructorForms expressions.noInitializer
-        expressions.constructorArguments expressions.constructorMetadata expressions.requirements expressions.indexOperands expressions.constructorRanges (children child member)) wellFormed
+      exact residual.impossible_composites expressions.metadata expressions.compositeForms expressions.noInitializer
+        expressions.compositeArguments expressions.compositeMetadata expressions.requirements expressions.indexOperands expressions.constructorRanges (children child member)) wellFormed
   exact ⟨⟨.scoped (AcceptedNamedBodyAdmission.source_of_header prepared aligned selected same admission),
     no_lambdas profile.lambdas⟩⟩
 
