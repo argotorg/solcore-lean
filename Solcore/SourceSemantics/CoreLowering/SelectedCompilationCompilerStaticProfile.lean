@@ -23,7 +23,7 @@ private def allProof? {α : Type} (predicate : α → Prop)
         · exact same ▸ head
         · exact tail item member⟩
 
-def row? (compiled : SourceCoreUnifiedCompilation.Compiled)
+private def ordinaryRow? (compiled : SourceCoreUnifiedCompilation.Compiled)
     (signatures : SignatureCatalogWellFormed compiled.sourceProgram.signatures)
     {index : Nat} (named : SourceCoreGeneralFunctions.Function)
     (selected : compiled.indexed.base.functions[index]? = some named)
@@ -45,6 +45,31 @@ def row? (compiled : SourceCoreUnifiedCompilation.Compiled)
       pure (.ordinary eligible (fun definition member =>
         of_decide_eq_true (List.all_eq_true.mp excluded definition member)) profile)
     else none
+
+/-- The existing accepted lane has priority. Only its rejected rows try the
+closed coercion extension, which retains the same original cache position. -/
+def row? (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (signatures : SignatureCatalogWellFormed compiled.sourceProgram.signatures)
+    {index : Nat} (named : SourceCoreGeneralFunctions.Function)
+    (selected : compiled.indexed.base.functions[index]? = some named)
+    (rows : List SourceSpecialization.SpecializedFunction) : Option (Row compiled named rows) :=
+  match ordinaryRow? compiled signatures named selected rows with
+  | some profile => some profile
+  | none => do
+    let closed ← CompilerCoercedMethodProfile.certify compiled
+    if _absent : compiled.sourceProgram.signatures.functions.all (fun signature =>
+        decide (named.specialized.declaration ≠ signature.id)) = true then
+      let profile ← CompilerCoercedMethodProfile.primitive? compiled named
+      pure (.closedMethod profile closed)
+    else
+      let ⟨eligible⟩ ← SelectedCompilationOrdinarySyntaxTable.eligible? compiled signatures
+        (max 1 compiled.indexed.fuel) named selected
+      if excluded : (Program.ofChecked compiled.sourceProgram).methods.all (fun definition =>
+          decide (named.specialized.function.typedBody.owner ≠ definition.body.source.owner)) = true then
+        let profile ← coercedFactory? compiled named rows
+        pure (.coercedFactory eligible (fun definition member =>
+          of_decide_eq_true (List.all_eq_true.mp excluded definition member)) profile closed)
+      else none
 
 def validateProfile (compiled : SourceCoreUnifiedCompilation.Compiled)
     (signatures : SignatureCatalogWellFormed compiled.sourceProgram.signatures) :

@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CompilerCoercedExpressionProfile
+import Solcore.SourceSemantics.CoreLowering.CompilerCoercedMethodProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodySubsetProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerBodyProfile
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompilerExpressionProfile
@@ -144,6 +146,73 @@ def factory? (compiled : SourceCoreUnifiedCompilation.Compiled)
           | _ => none
       | _ => none
 
+structure CoercedFactory (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) where
+  outer : StatementId
+  rest : List StatementId
+  outerNode : StatementNode
+  expression : ExpressionId
+  node : ExpressionNode
+  parameters : List TypedBinder
+  result : TypeSystem.Ty
+  statement : StatementId
+  returnNode : StatementNode
+  inner : ExpressionId
+  roots : statements named.specialized.function.typedBody = outer :: rest
+  outerFound : named.specialized.function.typedBody.lookupStatement? outer = some outerNode
+  outerForm : outerNode.form = .returnStmt (some expression)
+  found : named.specialized.function.typedBody.lookupExpression? expression = some node
+  form : node.form = .lambda parameters result [statement]
+  requirements : node.requirements = []
+  coercions : node.coercions = []
+  ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
+    (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
+      binding.initializer = expression)) = none
+  returnFound : named.specialized.function.typedBody.lookupStatement? statement = some returnNode
+  returnForm : returnNode.form = .returnStmt (some inner)
+  innerProfile : CompilerCoercedExpressionProfile.Profile compiled named named.specialized.function.typedBody rows inner
+  lambdas : ∀ actual ∈ named.specialized.function.typedBody.nodes, LambdaAllowed (some node) actual
+
+def coercedFactory? (compiled : SourceCoreUnifiedCompilation.Compiled)
+    (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) :
+    Option (CoercedFactory compiled named rows) := do
+  match roots : statements named.specialized.function.typedBody with
+  | [] => none
+  | outer :: rest =>
+    match outerFound : named.specialized.function.typedBody.lookupStatement? outer with
+    | none => none
+    | some outerNode =>
+      match outerForm : outerNode.form with
+      | .returnStmt (some expression) =>
+        match found : named.specialized.function.typedBody.lookupExpression? expression with
+        | none => none
+        | some node =>
+          match form : node.form with
+          | .lambda parameters result [statement] =>
+            if requirements : node.requirements = [] then
+              if coercions : node.coercions = [] then
+                if ordinary : compiled.indexed.base.locals.bindings.find? (fun binding => decide
+                    (binding.caller = (CallableIndexedNamedGeneration.context compiled.indexed named).owner ∧
+                      binding.initializer = expression)) = none then
+                  match returnFound : named.specialized.function.typedBody.lookupStatement? statement with
+                  | none => none
+                  | some returnNode =>
+                    match returnForm : returnNode.form with
+                    | .returnStmt (some inner) =>
+                      do
+                        let innerProfile ← CompilerCoercedExpressionProfile.certify compiled named
+                          named.specialized.function.typedBody rows inner
+                        let ⟨lambdas⟩ ← lambdas? named.specialized.function.typedBody (some node)
+                        pure ⟨outer, rest, outerNode, expression, node, parameters, result,
+                          statement, returnNode, inner, roots, outerFound, outerForm, found, form,
+                          requirements, coercions, ordinary, returnFound, returnForm, innerProfile, lambdas⟩
+                    | _ => none
+                else none
+              else none
+            else none
+          | _ => none
+      | _ => none
+
 /-- The scoped factory retains its complete original lambda body. A flat
 statement subset covers that body's roots and every nested loop child. -/
 structure ScopedFactory (compiled : SourceCoreUnifiedCompilation.Compiled)
@@ -223,10 +292,31 @@ def NoOrdinary (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) : Prop :=
   ∀ signature ∈ compiled.sourceProgram.signatures.functions, named.specialized.declaration ≠ signature.id
 
+theorem primitive_lambdas {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {named : SourceCoreGeneralFunctions.Function}
+    (profile : CompilerCoercedMethodProfile.Primitive compiled named) :
+    ∀ node ∈ named.specialized.function.typedBody.nodes, LambdaAllowed none node := by
+  obtain ⟨receipt, accepted⟩ := profile.formsAccepted
+  have all := SelectedCompilationPrimitiveMethodNodeFacts.nodes_of_accepted accepted
+  intro node member
+  cases node with
+  | statement node => exact True.intro
+  | expression node =>
+    have allowed := all (.expression node) member node rfl
+    cases form : node.form
+    case lambda parameters result body =>
+      rw [form] at allowed
+      cases allowed
+    all_goals simp only [LambdaAllowed, form]
+
 inductive Row (compiled : SourceCoreUnifiedCompilation.Compiled)
     (named : SourceCoreGeneralFunctions.Function) (rows : List SourceSpecialization.SpecializedFunction) where
   | ordinary (eligible : Eligible compiled named.specialized) (excluded : Excluded compiled named)
       (profile : Ordinary compiled named rows)
+  | coercedFactory (eligible : Eligible compiled named.specialized) (excluded : Excluded compiled named)
+      (profile : CoercedFactory compiled named rows) (closed : CompilerCoercedMethodProfile.Closed compiled)
+  | closedMethod (profile : CompilerCoercedMethodProfile.Primitive compiled named)
+      (closed : CompilerCoercedMethodProfile.Closed compiled)
   | method (excluded : NoOrdinary compiled named)
       (range : SourceSemantics.ParameterSubstitution.RangeWellFormed
         (SourceSemantics.Context.ofSignatures compiled.sourceProgram.signatures)

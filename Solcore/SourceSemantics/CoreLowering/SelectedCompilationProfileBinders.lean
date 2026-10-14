@@ -145,6 +145,10 @@ theorem of_row {compiled : SourceCoreUnifiedCompilation.Compiled}
   have monomorphic : SourceMonomorphic named.specialized.function.typedBody := by
     cases profile with
     | method _ _ _ profile => exact mono_without_lambdas accepted profile.lambdas
+    | closedMethod profile _ => exact mono_without_lambdas accepted (primitive_lambdas profile)
+    | coercedFactory _ _ profile _ =>
+      exact mono_returned_lambda accepted specializedClosed
+        profile.outerFound profile.outerForm profile.found profile.lambdas
     | ordinary _ _ profile =>
       cases profile with
       | «scoped» profile => exact mono_without_lambdas accepted profile.lambdas

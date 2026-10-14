@@ -28,6 +28,8 @@ theorem ranges_of_profile {compiled : SourceCoreUnifiedCompilation.Compiled}
   cases row with
   | ordinary eligible _ _ => exact eligible.range
   | method _ range _ _ => exact range
+  | coercedFactory eligible _ _ _ => exact eligible.range
+  | closedMethod profile _ => exact profile.range
 
 /-- A final method origin supplies its complete original checker body. Its
 retained raw range permits the same structural instance certificate used by
