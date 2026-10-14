@@ -6,6 +6,22 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Actual checking supplies selected body typing (2026-10-14)
+
+`SelectedCompilationCheckedBodyTyping.of_checked` derives `SelectedCompilationBodyTyping.Bodies` from the original successful checker receipt and the accepted compiler profile. It retains the complete original checked program. Callers supply no recursive inference theorem, body certificate or whole-program body-validity proof.
+
+For bodies in the selected compilation scope admitted by the profile, the mutual inference proof covers expressions, statements, match cases and for-loop headers. Unannotated declarations use the actual final substitution, canonical local binder table and solved requirement ledger. Residual type variables remain permitted. The original function owner is derived from checking and retained through recursive contexts.
+
+The existing specialization checks and compiler profile imply that all initialized local binders in each selected original body are monomorphic. This includes stored statements after a return and loop headers. Factory profiles permit one returned lambda; the authentic occurrence graph prevents that same node from also initializing a local. No executable validation rule or Core instruction was added.
+
+`SelectedCompilationCheckedPublicSession` adds six constructors for automatic and profiled sessions, including real initial entries and cache rows. They derive body typing internally before using the existing initialization, history and failure interfaces. The seven-call evidence sequence uses them at the original checker budgets `1024` and `1000`; three distinct closures, results `33 / true / 33 / 55` and the reached store sizes are unchanged. The lexical-failure sequence also uses the new producer, preserving named-handle issuance, a direct failure with output fuel `0`, both absent heap cells and the later `identity(37)` call.
+
+The selected-scope regression derives body typing for the compiled identity while retaining the unrelated checker-accepted conversion with no executable `coerce` method. It keeps two original functions and one compiled cache row.
+
+Validation: 82 affected modules checked in one coherent dependency graph; the full build, registered runtime tests, kernel policy and 505 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Remaining work includes complete compiler-form coverage and the forward connection from ordinary Source traces through actual stage guards. That connection must allow an earlier stage rejection at its real prefix heap: compiled indirect calls can reject a runtime argument to a comptime parameter before evaluating the argument. The supported compiler profile remains an explicit condition. Runtime unification is complete; semantic preservation for the full compiler remains incomplete.
+
 ## Selected failures preserve reusable public sessions (2026-10-14)
 
 The selected preservation family now covers successful results, semantic faults and stage rejection while retaining the reached heap. Its registry body certificates come from the actual prepared cache, original checker receipt, selected body typing and existing static profile. Method certificates preserve the complete raw substitution and authentic final origin; ordinary and anonymous rows cannot substitute for a method body.

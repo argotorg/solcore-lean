@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Actual checker and selected public initialization audit (2026-10-14)
+
+The selected body producer is now closed over the actual mutually recursive checker. Its public premises are the original successful checking receipt and accepted compiler profile. It retains every original declaration and method identity, complete raw substitutions and the original checking budget. It does not infer validity of unrelated bodies.
+
+Review and validation cover the full dependency chain: actual specialization and occurrence uniqueness supply monomorphic initialized binders; actual local-state projection and final solving supply generalization evidence; actual checking supplies the source owner; strong induction over checker fuel closes expression, statement, match and for-header inference; selected ordinary and method receipts supply body validity. The public constructor consumes that validity internally. No recursive body-soundness callback remains at the entry point.
+
+The two public consumer modules preserve all six theorem declarations and runtime definitions while replacing their three manual `Bodies.of_program` arguments. The original evidence sequence and lexical/direct-failure continuation pass. A separate selected-scope regression retains the unrelated conversion with no executable method while deriving body typing for the compiled identity.
+
+Validation: 82 affected modules checked in one coherent dependency graph; the full build, registered runtime tests, kernel policy and 505 endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+The profile still covers a supported compiler fragment. Stage rejection is observable behavior: an indirect call with a comptime parameter can reject before argument effects. Future ordinary-trace lifting must retain that earlier rejection and exact prefix heap. Full compiler coverage and this forward lifting remain open.
+
 ## Selected failure preservation and checker audit (2026-10-14)
 
 The selected preservation family now covers successful results, semantic faults and stage rejection while retaining the reached heap. Its registry body certificates come from the actual prepared cache, original checker receipt, selected body typing and existing static profile. Method certificates preserve the complete raw substitution and authentic final origin; ordinary and anonymous rows cannot substitute for a method body.

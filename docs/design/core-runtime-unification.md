@@ -16,7 +16,9 @@ Static named, closure and method support is now issued internally from the accep
 
 The additive `Profiled` session retains the genuine static profile and checker receipt, derives selected registry body certificates internally, and connects initial, later named and direct-call failures to the same reusable history and reached heap.
 
-Deriving selected body typing from the complete actual checker, covering every compiler form and lifting ordinary Source executions through the stage guards remain work in progress. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
+`SelectedCompilationCheckedBodyTyping.of_checked` now derives selected body typing from actual checker success and the existing compiler profile. The mutually recursive inference proof is closed, including unannotated declarations, match cases and for-loop headers. `SelectedCompilationCheckedPublicSession` uses this producer for automatic and profiled public initialization; callers no longer supply a body-typing certificate. The original checker budget and complete program remain unchanged.
+
+Covering every compiler form and lifting ordinary Source executions through authentic stage guards remain work in progress. A lift must preserve an earlier stage rejection and its reached prefix heap when a compiled guard rejects. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 

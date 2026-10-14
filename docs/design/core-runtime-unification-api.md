@@ -18,7 +18,12 @@ The selected public-session modules cover successful initialization and later ca
 
 `Profiled.forward_initial_failure`, `reflect_initial_failure`, `forward_failure` and `reflect_failure` connect initial and later named failures. `forward_direct_failure` and `reflect_direct_failure` cover packed direct calls through retained handles. The corresponding `_plain` reflection endpoints expose ordinary Source failures or actual rejected stage guards. All preserve the returned state for later calls; sufficient-fuel failure conclusions allow every output budget. Successful operations use the inherited `.toIssued` interface. Existing arbitrary `Issued` clients remain available.
 
-Selected body typing remains a premise until its actual checker producer is complete. Full compiler coverage and ordinary-to-staged execution lifting also remain unfinished. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
+Use `SelectedCompilationCheckedBodyTyping.of_checked checked profile` to obtain selected body typing from actual checking. The public constructors in `SelectedCompilationCheckedPublicSession` derive this proof internally:
+
+- `of_checked_profile`, `from_checked_profile_initial_start` and `from_checked_profile_initial_row` return `Issued` sessions.
+- `profiled_of_checked_profile`, `from_checked_profiled_initial_start` and `from_checked_profiled_initial_row` retain the checker receipt and profile in `Profiled` sessions.
+
+These constructors preserve the existing preparation, compilation, bootstrap and startup premises; later outcome APIs retain their execution and resume receipts. They require no supplied body certificate or recursive soundness premise. The earlier constructors and `Bodies.of_program` remain available. Full compiler coverage and ordinary-to-staged execution lifting are still unfinished; the accepted compiler profile and stage-aware Source trace remain conditions of the forward execution theorem.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
