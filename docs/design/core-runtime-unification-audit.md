@@ -8,6 +8,20 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Selected failure preservation and checker audit (2026-10-14)
+
+The selected preservation family now covers successful results, semantic faults and stage rejection while retaining the reached heap. Its registry body certificates come from the actual prepared cache, original checker receipt, selected body typing and existing static profile. Method certificates preserve the complete raw substitution and authentic final origin; ordinary and anonymous rows cannot substitute for a method body.
+
+`SelectedCompilationCertifiedPublicSession.Profiled` retains the accepted static profile and original checking receipt alongside `Issued`. It derives registry body support internally. Initial named calls, later named calls and direct calls through retained handles now have failure reflection and sufficient-fuel failure bounds. Reflection also exposes the ordinary Source failure or the rejected stage guard. The original session, handle history, invocation dictionary and reached heap are preserved for subsequent calls.
+
+The registered lexical-failure companion uses the original checker budget `1000` and compiler budget `100`. It follows an initial uninitialized-variable failure, named-handle issuance, a direct failure with output fuel `0`, and `identity(37)` in the returned session. The same handle and both absent heap cells survive the sequence. A fresh-session `identity(37)` path is checked separately. The fixture still supplies selected body typing through `Bodies.of_program`; it does not prove the general checker producer.
+
+The actual expression typing dispatcher now covers every expression form using the recursive statement contracts. Statement support includes control flow, assignments, annotated declarations and for-loop components. The remaining checker connection includes unannotated declaration generalization, its later uses and the complete mutual statement proof. Private work on those obligations is not part of this checkpoint.
+
+Validation: 128 affected modules checked as one coherent graph; five focused runtime companions and 412 endpoint audits pass. Canonical build (7,623 jobs), the complete registered tests (14,910 build jobs and successful runtime exit), kernel policy and the same endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. The twelve unrelated workspace changes remain excluded.
+
+Remaining work is the actual checker-to-selected-body producer, complete compiler coverage and lifting arbitrary ordinary Source executions through the stage guards. The supported compiler profile and selected body typing remain explicit conditions.
+
 ## Selected static issuance and public-session audit (2026-10-14)
 
 Static support is reconstructed from actual named, closure and method compiler receipts. The method interface consumes the genuine typed selector; coercion chains retain a certificate for each selected step. The executable profile uses checker-derived signatures and preserves the original cache order.

@@ -12,9 +12,11 @@ This scope matters because checker acceptance does not imply that every definiti
 
 `SelectedCompilationBodyTyping.Bodies` records the selected ordinary and method definitions using their actual cache rows and original checking provenance. The selected catalog constructs exact header certificates and ordered parameter shapes from those records. `SelectedCompilationPhysicalMixedCallerFamily` closes the ordinary, method and indirect-call recursion using a shared finite grade. The selected public bounds carry the original arguments, captures, dictionaries and reached heaps through named, closure and builtin calls.
 
-Static named, closure and method support is now issued internally from the accepted compiler profile and selected body certificates. The selected public-session path constructs its initial state from real bootstrap and startup, preserves successful calls and handle issuance, and exposes ordinary Source outcomes. The executable profile needs only signatures derived from actual checker success; it no longer requires validity of unrelated bodies.
+Static named, closure and method support is now issued internally from the accepted compiler profile and selected body certificates. The selected public-session path constructs its initial state from real bootstrap and startup, preserves successful and failed calls and handle issuance, and exposes ordinary Source outcomes. The executable profile needs only signatures derived from actual checker success; it no longer requires validity of unrelated bodies.
 
-Deriving selected body typing from the complete actual checker, preserving heap typing after failed calls in this selected path, covering every compiler form and lifting ordinary Source executions through the stage guards remain work in progress. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
+The additive `Profiled` session retains the genuine static profile and checker receipt, derives selected registry body certificates internally, and connects initial, later named and direct-call failures to the same reusable history and reached heap.
+
+Deriving selected body typing from the complete actual checker, covering every compiler form and lifting ordinary Source executions through the stage guards remain work in progress. A successful supported-fragment profile remains an explicit condition; compilation success alone is not yet proved to produce complete semantic support. Earlier checkpoint sections below describe their original premises.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 

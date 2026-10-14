@@ -14,7 +14,11 @@ Public runtime APIs are unchanged. The new proof entry points use `SelectedCompi
 
 The selected public-session modules cover successful initialization and later calls, direct callable invocation, named and builtin handle issuance, output collection and ordinary Source outcomes. They retain the existing session and history types. The additive `IssuedEntry.physicalNamedSelected` constructor records the exact named Source instance certificate used at issuance.
 
-Selected body typing remains a premise until its actual checker producer is complete. The selected failure-continuation proof and complete compiler coverage remain unfinished. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
+`SelectedCompilationCertifiedPublicSession.Profiled` extends `Issued` with the genuine static profile and original checker receipt. Use `profiled_of_profile`, `from_profiled_initial_start` or `from_profiled_initial_row` to retain those facts. `Profiled.registryBodies` derives selected registry support from the actual prepared cache and existing profile checks.
+
+`Profiled.forward_initial_failure`, `reflect_initial_failure`, `forward_failure` and `reflect_failure` connect initial and later named failures. `forward_direct_failure` and `reflect_direct_failure` cover packed direct calls through retained handles. The corresponding `_plain` reflection endpoints expose ordinary Source failures or actual rejected stage guards. All preserve the returned state for later calls; sufficient-fuel failure conclusions allow every output budget. Successful operations use the inherited `.toIssued` interface. Existing arbitrary `Issued` clients remain available.
+
+Selected body typing remains a premise until its actual checker producer is complete. Full compiler coverage and ordinary-to-staged execution lifting also remain unfinished. Existing whole-program proof clients remain available through the older interfaces and `Bodies.of_program`. Do not treat the selected interface as a completed checker-to-public-execution theorem.
 
 ## Constructor payloads use the common compiler profile (2026-10-14)
 
