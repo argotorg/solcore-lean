@@ -87,7 +87,7 @@ theorem Tree.complete_of_formed {policy : SourceCoreLoops.Policy}
   induction tree generalizing expected with
   | nil => cases finish <;> simp_all [Tree.complete]
   | returning | returnUnit | breaking | continuing => rfl
-  | assigning | boundary | forBoundary | matching => cases formed
+  | assigning | bitNotting | boundary | forBoundary | matching => cases formed
   | tailValue read form _ _ _ _ =>
     have atHead := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form, Bool.true_eq_false, false_or] at atHead
@@ -101,6 +101,10 @@ theorem Tree.complete_of_formed {policy : SourceCoreLoops.Policy}
     simp only [FinishAt, form] at next
     exact ih formed next
   | assigned read form _ _ _ _ ih =>
+    have next := finish_at finish (original_read (readPolicy ▸ read))
+    simp only [FinishAt, form] at next
+    exact ih formed next
+  | bitNotted read form _ _ _ _ ih =>
     have next := finish_at finish (original_read (readPolicy ▸ read))
     simp only [FinishAt, form] at next
     exact ih formed next

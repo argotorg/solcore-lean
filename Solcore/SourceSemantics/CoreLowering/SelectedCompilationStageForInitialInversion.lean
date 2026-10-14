@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialBounds
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentInversion
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsBitNotInversion
 
 set_option autoImplicit false
 set_option Elab.async false
@@ -148,5 +149,27 @@ theorem assign {assignment : AssignmentResolution} {operator : Syntax.ValueAssig
     subst outcome
     exact .inr (.inr ⟨child, _, value, middle, updated, _, Nat.lt_trans strict childStrict, tailStrict,
       .value evaluated, written, tail⟩)
+
+theorem bitNot {assignment : AssignmentResolution}
+    (bare : assignment.target.projections = [])
+    (trace : PlainInitial program invocation context environment before
+      (.assignBitNot assignment :: items) test post body size outcome after) :
+    (∃ reason, outcome = .fault reason ∧ after = before ∧
+      Dynamic.SourcePlaceBitNotFaults program context invocation.evidence invocation.source environment
+        before assignment.target reason before) ∨
+    (∃ tailSize target updated written, tailSize < size ∧
+      Staging.Recursive.BareTarget environment before assignment.target target ∧
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+        before target updated written ∧
+      PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
+  rcases head trace with ⟨_, reason, _, same, failed⟩ |
+    ⟨_, _, _, _, _, _, _, tailStrict, same, executed, tail⟩
+  · obtain ⟨sameHeap, failed⟩ := SelectedCompilationStageForItemsBitNotInversion.item_fault bare failed
+    exact .inl ⟨reason, same, sameHeap, failed⟩
+  · obtain ⟨target, updated, rfl, rfl, snapshot, written⟩ :=
+      SelectedCompilationStageForItemsBitNotInversion.item_value bare executed
+    rw [restored tail] at same
+    subst outcome
+    exact .inr ⟨_, target, updated, _, tailStrict, snapshot, written, tail⟩
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialInversion

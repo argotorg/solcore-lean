@@ -266,7 +266,7 @@ theorem preserves_numeric
       environments heaps locals slot rootTyped resolve
     have same := Option.some.inj (selected.symm.trans resolution.selectedEq)
     obtain ⟨replacement, native, represented, applies, evaluated, valid⟩ :=
-      CompatiblePlaceNumericBitNotModifier.success observations profile resolution.snapshotRelated
+      CompatiblePlaceNumericBitNotModifier.success profile resolution.snapshotRelated
         (environment := [.inRight .unit resolution.snapshot]) (rhs := .unit) (.var (index := 0) rfl) none resolution.store invalidOperand
     exact (valid (same ▸ invalid)).elim
 

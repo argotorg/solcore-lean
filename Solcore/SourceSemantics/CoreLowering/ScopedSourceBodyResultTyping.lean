@@ -41,6 +41,8 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
   | assign found form declaration targetType profile bare rhsFound rhsType value _ ih =>
     exact .assign found form declaration targetType profile bare rhsFound rhsType (mapped _ value) ih
 
+  | bitNot found form declaration targetType profile bare _ ih =>
+    exact .bitNot found form declaration targetType profile bare ih
   | terminalBlock found form sourceType _ stops remaining inner =>
     exact .terminalBlock found form sourceType inner stops remaining
   | terminalConditional found form sourceType conditionFound conditionType value _ _ first second remaining left right =>
@@ -145,6 +147,10 @@ theorem Scan.result_eq_of_return {source : TypedSource} {approved : ExpressionId
     obtain ⟨_, _, _, _, tail⟩ := head_tail typed
     exact remaining (return_in_tail found (by simp [form, returns]) present) tail noLoop
   | assign found form _ _ _ _ _ _ _ _ ih =>
+    obtain ⟨_, _, _, _, tail⟩ := head_tail typed
+    exact ih (return_in_tail found (by simp [form, returns]) present) tail noLoop
+
+  | bitNot found form _ _ _ _ _ ih =>
     obtain ⟨_, _, _, _, tail⟩ := head_tail typed
     exact ih (return_in_tail found (by simp [form, returns]) present) tail noLoop
 

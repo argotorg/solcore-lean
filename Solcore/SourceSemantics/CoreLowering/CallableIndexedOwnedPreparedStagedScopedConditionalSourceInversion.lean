@@ -70,6 +70,7 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
   | letUninitialized actual same _ _ _ _ | letInitialized actual same _ _ _ _ _ | letFault actual same _ _
+  | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same

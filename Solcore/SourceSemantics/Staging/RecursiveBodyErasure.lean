@@ -73,6 +73,11 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     cases failure with
     | stage => trivial
     | semantic => exact StatementsPlain.head_fault (.expression contains form child.semanticFault_plain)
+  case bitNotBare contains form snapshot write _next nextIH =>
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
+      (.assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)) nextIH
+  case bitNotBareFault contains form _bare failed =>
+    exact StatementsPlain.head_fault (.assignBitNot contains form failed)
   case assignBare contains form snapshot child write _next _childIH nextIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
@@ -200,6 +205,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     cases failure with
     | stage => trivial
     | semantic => exact .head (.expression child.semanticFault_plain)
+  case bitNot snapshot write _next nextIH =>
+    exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
+  case bitNotFault _bare failed => exact .head (.assignBitNot failed)
   case assignment snapshot child write next _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
   case assignmentFailure snapshot child _childIH =>
@@ -334,6 +342,9 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
     cases failure with
     | stage => trivial
     | semantic => exact .head (.expression child.semanticFault_plain)
+  case bitNot snapshot write _next nextIH =>
+    exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
+  case bitNotFault _bare failed => exact .head (.assignBitNot failed)
   case assignment snapshot child write next _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) child.value_plain write)) nextIH
   case assignmentFailure snapshot child _childIH =>

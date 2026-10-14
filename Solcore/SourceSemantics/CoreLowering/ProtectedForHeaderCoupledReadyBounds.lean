@@ -59,7 +59,7 @@ variable {diagnosticPolicy : AssignmentDiagnosticPolicy}
   {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
   {first : Nat} {table : SourceCoreAssignmentFaultSites.Table}
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers in
 theorem preserves_fault_coupled_bounded_for
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -107,7 +107,7 @@ theorem preserves_fault_coupled_bounded_for
   exact Tree.preserves_fault_reachable_bounded_for_with_eliminator
     (values := values) (source := source) (certificates := certificates)
     (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
@@ -119,7 +119,7 @@ theorem preserves_fault_coupled_bounded_for
     (GenericForHeader.Structural.of_coupled coupled tokens)
     valid itemsFacts environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers in
 theorem reflects_coupled_bounded_for
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -162,7 +162,7 @@ theorem reflects_coupled_bounded_for
   exact Tree.reflects_reachable_bounded_for_with_eliminator
     (values := values) (source := source) (certificates := certificates)
     (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)

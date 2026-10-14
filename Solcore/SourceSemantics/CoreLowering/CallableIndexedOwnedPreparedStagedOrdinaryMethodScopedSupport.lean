@@ -110,7 +110,8 @@ def support_general_with_catalog
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
     support.body.valid.ledger support.body.projection
-    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile)
+    (fun origin rawWord => choiceIssued.unary code support.caller.selected support.source receiver origin rawWord) syntaxTree
     (certificates := fun context scope id lowered => Nonempty (Σ rawType,
       Root compiled headers stages code.policy code.lowerBody code.compilation compiled.indexed.fuel
         context child code.reasonAt scope id lowered rawType faults))

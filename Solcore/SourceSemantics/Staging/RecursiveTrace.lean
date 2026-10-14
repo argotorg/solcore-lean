@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.RecursiveBareTarget
+import Solcore.SourceSemantics.Staging.RecursiveBareBitNot
 
 /-! A finite recursive staged profile. Every callee, argument and selected body
 uses these same mutually recursive judgments. Staging rejection propagates
@@ -571,6 +571,25 @@ mutual
         (missing : heap.Dangling location) :
         StatementsIn program registry mode scope context environment heap (id :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
+    /-- Bare unary assignment reads its snapshot and performs a real write,
+    without an expression child for the compiler's administrative Unit. -/
+    | bitNotBare {mode scope context finalContext environment before written after
+          id rest node assignment target updated outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (snapshot : BareTarget environment before assignment.target target)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+          before target updated written)
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | bitNotBareFault {mode scope context environment before id rest node assignment reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (bare : assignment.target.projections = [])
+        (failed : SourcePlaceBitNotFaults program context scope.evidence scope.source environment
+          before assignment.target reason before) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context
+          (.fault (.semantic reason)) before
     | letUninitialized {mode scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
@@ -729,6 +748,19 @@ mutual
         (missing : heap.Dangling location) :
         ForItems program registry scope context environment heap (.assignValue assignment operator rhs :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
+    | bitNot {scope context finalContext environment before written after assignment target updated rest outcome}
+        (snapshot : BareTarget environment before assignment.target target)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+          before target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
+    | bitNotFault {scope context environment before assignment rest reason}
+        (bare : assignment.target.projections = [])
+        (failed : SourcePlaceBitNotFaults program context scope.evidence scope.source environment
+          before assignment.target reason before) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context
+          (.fault (.semantic reason)) before
+
 
   /-- Finite for iteration runs each post header in the original loop scope.
   Body/post local bindings are restored, while their heap effects persist. -/
@@ -856,7 +888,7 @@ end
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
-  assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements

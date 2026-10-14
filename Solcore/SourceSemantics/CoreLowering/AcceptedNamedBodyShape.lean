@@ -38,8 +38,9 @@ theorem Items.closed_shape {policy : SourceCoreLoops.Policy} {source : TypedSour
   | absent _ _ _ ih => exact .absent (ih closed)
   | initialized _ _ _ _ _ _ ih => exact .initialized (ih closed)
   | discard _ _ _ ih => exact .discard (ih closed)
-  | assigning => cases closed
+  | assigning | bitNotting => cases closed
   | assigned _ receipt _ ih => exact .assign receipt.sourceProfile receipt.bare (ih closed)
+  | bitNotted _ receipt _ ih => exact .bitNot receipt.sourceProfile receipt.bare (ih closed)
 
 private theorem arm_shapes {compilation : SourceCoreCompatibleDataMatches.Context}
     {source : TypedSource} {id : StatementId} {scope : SourceCoreLocalCell.Scope} {type : TypeSystem.Ty}
@@ -93,6 +94,8 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
     exact .absent (original_read (readPolicy ▸ read)) form (ih formed)
   | assigned read form _ _ receipt _ ih =>
     exact .assign (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
+  | bitNotted read form _ _ receipt _ ih =>
+    exact .bitNot (original_read (readPolicy ▸ read)) form receipt.sourceProfile receipt.bare (ih formed)
   | discard read form _ _ _ _ ih =>
     exact .discard (original_read (readPolicy ▸ read)) form (.inl rfl) (ih formed)
   | valueDiscard read form _ _ _ _ remaining ih =>
@@ -120,6 +123,6 @@ theorem Tree.formed_shape {policy : SourceCoreLoops.Policy} {checked : SourceCor
     exact .forLoop (original_read (readPolicy ▸ read)) form
       (initial.closed_shape formed.1.1.1) (after.closed_shape formed.1.2)
       (innerIH formed.1.1.2) (tailIH formed.2)
-  | boundary | assigning | forBoundary | matching => cases formed
+  | boundary | assigning | bitNotting | forBoundary | matching => cases formed
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow

@@ -32,6 +32,7 @@ private theorem let_return {policy : SourceCoreLoops.Policy} {checked : SourceCo
         and_self]
   | returning read form | returnUnit read form | absent read form
   | assigning read form | assigned read form | whileLoop read form
+  | bitNotting read form | bitNotted read form
   | discard read form | block read form | conditional read form
   | valueDiscard read form
   | matching read form | matched read form

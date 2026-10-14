@@ -128,4 +128,20 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
           cases locations
           exact False.elim (missing.excludes_read read)
 
+theorem bitNot {assignment : AssignmentResolution}
+    (trace : Size.ForItems program registry size invocation context environment before
+      (.assignBitNot assignment :: rest) finalContext outcome after) :
+    (∃ reason, size = Size.stepSize [] ∧ finalContext = context ∧
+      outcome = .fault (.semantic reason) ∧ after = before ∧
+      Dynamic.SourcePlaceBitNotFaults program context invocation.evidence invocation.source
+        environment before assignment.target reason before) ∨
+    (∃ tailSize target updated written,
+      size = Size.stepSize [tailSize] ∧ BareTarget environment before assignment.target target ∧
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+        before target updated written ∧
+      Size.ForItems program registry tailSize invocation context environment written rest finalContext outcome after) := by
+  cases trace with
+  | bitNot snapshot write remaining => exact .inr ⟨_, _, _, _, rfl, snapshot, write, remaining⟩
+  | bitNotFault _ failed => exact .inl ⟨_, rfl, rfl, rfl, rfl, failed⟩
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion

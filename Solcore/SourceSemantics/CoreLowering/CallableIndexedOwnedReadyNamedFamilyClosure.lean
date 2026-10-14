@@ -128,7 +128,7 @@ theorem preserves_at (size : Nat) : ∀ index : Index (headers := headers) (regi
       (readiness (bridge (headers := headers) owner)) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (inputs compilation owner wellFormed index).facts functions program (origin compilation index) size := by
   apply CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.preserves_at
-    (origin compilation) functions program observations
+    (origin compilation) functions program
     (fun _ => body_protocol (headers := headers) owner)
     (fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producer compilation functions owner sameLayouts) (acquire compilation functions owner sameLayouts)
@@ -165,7 +165,7 @@ theorem reflects_at (size : Nat) : ∀ index : Index (headers := headers) (regis
       (readiness (bridge (headers := headers) owner)) (CallableIndexedOwnedAllocationProducer.StableOwner keys)
       (inputs compilation owner wellFormed index).facts functions program (origin compilation index) size := by
   apply CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.reflects_at
-    (origin compilation) functions program observations
+    (origin compilation) functions program
     (fun _ => body_protocol (headers := headers) owner)
     (fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producer compilation functions owner sameLayouts) (acquire compilation functions owner sameLayouts)

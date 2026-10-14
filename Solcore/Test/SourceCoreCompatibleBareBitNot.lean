@@ -32,8 +32,6 @@ private def noFunctions (catalog : SourceCoreCompatibleCatalog.Catalog) : Functi
   runtime_hasType := False.elim
   source_function := False.elim
   extend := fun impossible _ _ _ => False.elim impossible
-private theorem observations : FunctionObservations checked.catalog (noFunctions checked.catalog) (fun _ _ => False) := by
-  intro _ _ _ _ _ _ _ impossible; exact impossible.elim
 private theorem localAgrees (initial : Option Dynamic.Value) :
     Dynamic.EnvironmentAgrees (sourceHeap initial) wordContext.locals sourceEnvironment :=
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
@@ -74,7 +72,7 @@ theorem actual_reflects {certified : Certified checked.catalog.definitions (nati
   obtain ⟨heaps, reference⟩ := empty.allocate initialRep Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [] (scope .word) sourceEnvironment (nativeEnvironment .word) :=
     .cons reference (.nil .nil)
-  exact CompatibleBareBitNotLowering.reflects writable rfl (.inl rfl) observations environments heaps (localAgrees initial)
+  exact CompatibleBareBitNotLowering.reflects writable rfl (.inl rfl) environments heaps (localAgrees initial)
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) True.intro completed
 
 private theorem absentFault : Dynamic.SourcePlaceBitNotFaults program wordContext [] (source .word) sourceEnvironment
@@ -92,7 +90,7 @@ theorem actual_absent {certified : Certified checked.catalog.definitions (native
     Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [] (scope .word) sourceEnvironment (nativeEnvironment .word) :=
     .cons reference (.nil .nil)
-  exact (CompatibleBareBitNotLowering.preserves_fault writable rfl (.inl rfl) observations environments heaps (localAgrees none)
+  exact (CompatibleBareBitNotLowering.preserves_fault writable rfl (.inl rfl) environments heaps (localAgrees none)
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) absentFault).2.2
 
 private def seven : Word := Word.ofNatModulo 7
@@ -116,7 +114,7 @@ theorem actual_preserves {code : Expr}
   obtain ⟨heaps, reference⟩ := empty.allocate (GenericHeap.CellRepresents.initialized (ValueRep.word seven)) Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [] (scope .word) sourceEnvironment (nativeEnvironment .word) :=
     .cons reference (.nil .nil)
-  exact CompatibleBareBitNotLowering.preserves writable rfl (.inl rfl) observations environments heaps
+  exact CompatibleBareBitNotLowering.preserves writable rfl (.inl rfl) environments heaps
     (localAgrees (some (.word seven))) accepted sourceUpdate
 
 private def exercise (raw : TypeSystem.Ty) (type : Core.Ty) (initial expected : Value) (succeeds : Bool) : IO Unit := do

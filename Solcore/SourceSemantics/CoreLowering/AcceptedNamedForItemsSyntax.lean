@@ -69,4 +69,12 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
             (ih closed (fun child member => children child (by simp [Items.children, member]))
               (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
 
+  | bitNotting => cases closed
+  | bitNotted remaining receipt targetType ih =>
+      cases typed with
+      | cons head tail =>
+        exact .bitNot receipt.declaration targetType receipt.sourceProfile receipt.bare
+          (ih closed (fun child member => children child (by simpa only [Items.children] using member))
+            (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
+
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow

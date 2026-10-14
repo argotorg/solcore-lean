@@ -14,10 +14,10 @@ variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {result : Ty}
 def Tree.formed {mode : Bool} {escaped : Word} {fuel scope statements code}
     (tree : Tree policy source result reasonAt mode escaped fuel scope statements code) : Bool :=
   match tree with
-  | .boundary .. | .assigning .. | .forBoundary .. | .matching .. => false
+  | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. => false
   | .nil | .returning .. | .returnUnit .. | .breaking .. | .continuing .. | .tailValue .. => true
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.formed
-  | .assigned _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.formed
+  | .assigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.formed
   | .valueDiscard _ _ _ _ _ _ tail => !mode && tail.formed
   | .block _ _ inner tail => inner.formed && tail.formed
   | .conditional _ _ _ _ _ left right tail => left.formed && right.formed && tail.formed
@@ -31,11 +31,11 @@ def Tree.complete {mode : Bool} {escaped : Word} {fuel scope statements code}
     (expected : TypeSystem.Ty) : Bool :=
   match tree with
   | .nil => !mode || decide (expected = .unit)
-  | .boundary .. | .assigning .. | .forBoundary .. | .matching .. => false
+  | .boundary .. | .assigning .. | .bitNotting .. | .forBoundary .. | .matching .. => false
   | .returning .. | .returnUnit .. | .breaking .. | .continuing .. => true
   | @Tree.tailValue _ _ _ _ _ _ _ _ node _ _ _ _ _ _ _ _ => decide (node.type = expected)
   | .initialized _ _ _ _ _ _ _ tail _ | .absent _ _ _ _ tail _ => tail.complete expected
-  | .assigned _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.complete expected
+  | .assigned _ _ _ tail _ _ | .bitNotted _ _ _ tail _ _ | .discard _ _ _ _ _ tail => tail.complete expected
   | .valueDiscard _ _ _ _ _ _ tail => !mode && tail.complete expected
   | @Tree.block _ _ _ _ _ _ _ _ _ _ _ _ statements _ _ _ _ inner tail =>
       inner.complete expected && tail.formed &&
@@ -65,9 +65,9 @@ theorem Tree.complete_formed {mode : Bool} {escaped : Word} {fuel scope statemen
     {expected : TypeSystem.Ty} (complete : tree.complete expected = true) : tree.formed = true := by
   induction tree with
   | nil | returning | returnUnit | breaking | continuing | tailValue => rfl
-  | assigning | boundary | forBoundary | matching => cases complete
+  | assigning | bitNotting | boundary | forBoundary | matching => cases complete
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih
-  | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih complete
+  | assigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih complete
   | valueDiscard read form notTail child generated statementType remaining ih =>
     simp only [Tree.complete, Bool.and_eq_true] at complete
     exact and_true ⟨complete.1, ih complete.2⟩
@@ -96,9 +96,9 @@ theorem Tree.closed_complete {mode : Bool} {escaped : Word} {fuel scope statemen
     simp only [Tree.closed] at closed
     simp [Tree.complete, closed]
   | returning | returnUnit | breaking | continuing => rfl
-  | tailValue | assigning | boundary | forBoundary | matching => cases closed
+  | tailValue | assigning | bitNotting | boundary | forBoundary | matching => cases closed
   | initialized _ _ _ _ _ _ _ _ _ ih | absent _ _ _ _ _ _ ih
-  | assigned _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih closed
+  | assigned _ _ _ _ _ _ ih | bitNotted _ _ _ _ _ _ ih | discard _ _ _ _ _ _ ih => exact ih closed
   | valueDiscard read form notTail child generated statementType remaining ih =>
     simp only [Tree.closed, Bool.and_eq_true] at closed
     exact and_true ⟨closed.1, ih closed.2⟩

@@ -18,8 +18,6 @@ variable   {values : ValuesContext} {source : TypedSource}
   {registry : SourceCoreRawMetadata.Registry}
   (program : SourceSemantics.Program) (evidence : Dynamic.EvidenceEnvironment)
   {faults : FunctionCalls.FaultRep}
-  {identities : Dynamic.Value → Word → Prop}
-  (observations : FunctionObservations values.checked.catalog functions identities)
   {assignment : AssignmentResolution}
   (head : Head context scope assignment)
   {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
@@ -31,7 +29,7 @@ variable   {values : ValuesContext} {source : TypedSource}
   (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
   (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
 
-include observations environments heaps locals agrees actualTyped in
+include environments heaps locals agrees actualTyped in
 /-- The actual Head selects the native continuation below the outer budget;
 source reconstruction, heap receipts and seven slots stay in the same branch. -/
 theorem header_continuation_below (errors : head.Errors faults) (budget : Nat)
@@ -48,7 +46,7 @@ theorem header_continuation_below (errors : head.Errors faults) (budget : Nat)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       remainingSize < budget ∧ EvaluationSize remainingSize (slots ++ actual) written
         (shift 7 (next.rename ξ)) value finalStore) := by
-  cases Head.reflects_sized functions program evidence observations head environments heaps locals agrees actualTyped errors completed with
+  cases Head.reflects_sized functions program evidence head environments heaps locals agrees actualTyped errors completed with
   | inl fault =>
     obtain ⟨sourceSize, reason, token, after, finalMap, finalWorld, trace, _rest⟩ := fault
     exact .inl ⟨sourceSize, reason, after, trace⟩

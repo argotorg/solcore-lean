@@ -24,8 +24,7 @@ variable {Records : Type v} (protocol : Protocol.{u, v} Records)
   (functions : FunctionModel values.checked.catalog ambient)
   (definitions : layouts.definitions = ambient.definitions) (registered : frameLayout.Registered ambient.definitions)
   {registry : SourceCoreRawMetadata.Registry} (program : Program) (evidence : Dynamic.EvidenceEnvironment)
-  {faults : FunctionCalls.FaultRep} {identities : Dynamic.Value → Word → Prop}
-  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  {faults : FunctionCalls.FaultRep}
   (producer : OrdinaryAllocation.Producer protocol layouts frameLayout
     (CompatibleAmbientHeap.payloadModel values.checked registry functions))
   (acquire : ∀ location native, guard location native → OrdinaryAllocation.ReadyAt producer location native)
@@ -80,7 +79,7 @@ theorem post_preserves_bounded_for_with_header_result
     by simpa only [post_rename] using agreement.wrap tail.toTailFor.fallthrough_evaluates,
     progress, reached, retained, reachedReady⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers solved in
+include definitions registered producer acquire stateTransport stateBindings sites transfers solved in
 theorem post_preserves_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -115,7 +114,7 @@ theorem post_preserves_bounded_for
   obtain ⟨tail, maps, worlds, preservation, metadata, related, ⟨returnTo⟩, tailReady, agreement⟩ :=
     Tree.preserves_prefix_bounded_for_with_return (solved := solved)
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := protocol) (condition := guard) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
@@ -157,7 +156,7 @@ theorem post_fault_reachable_bounded_for_with_header_result
     by simpa only [post_rename] using evaluated,
     matched, progress, reached, retained, faultReady⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers in
 theorem post_fault_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -195,7 +194,7 @@ theorem post_fault_reachable_bounded_for
   obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, heaps, maps, worlds, preservation, metadata, transition⟩ :=
     Tree.preserves_fault_reachable_bounded_for
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := protocol) (condition := guard) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
@@ -253,7 +252,7 @@ theorem post_reflects_reachable_bounded_for_with_header_result
     exact .inr ⟨sourceSize, finalContext, reason, token, after, finalMap, finalWorld, trace, same, matched,
       progress, reached, retained, faultReady⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers solved in
+include definitions registered producer acquire stateTransport stateBindings sites transfers solved in
 theorem post_reflects_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -296,7 +295,7 @@ theorem post_reflects_reachable_bounded_for
   obtain ⟨postContext, postTyped⟩ := postValues_typed continued state.live.selfTyped state.live.actualTyped
   have result := Tree.reflects_reachable_bounded_for (solved := solved)
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := protocol) (condition := guard) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
@@ -311,7 +310,7 @@ theorem post_reflects_reachable_bounded_for
 
 end WithReady
 
-include definitions registered observations producer acquire stateTransport stateBindings solved in
+include definitions registered producer acquire stateTransport stateBindings solved in
 theorem post_preserves_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -342,7 +341,7 @@ theorem post_preserves_bounded_for
         protocol.Relates state.retained reached.retained := by
   have result := WithReady.post_preserves_bounded_for
     (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (guard := guard) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
@@ -361,7 +360,7 @@ theorem post_preserves_bounded_for
   obtain ⟨finalStore, finalMap, finalWorld, evaluated, progress, reached, related, _ready⟩ := result
   exact ⟨finalStore, finalMap, finalWorld, evaluated, progress, reached, related⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings in
+include definitions registered producer acquire stateTransport stateBindings in
 theorem post_fault_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -395,7 +394,7 @@ theorem post_fault_reachable_bounded_for
         protocol.Relates state.retained reached.retained := by
   have result := WithReady.post_fault_reachable_bounded_for
     (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (guard := guard) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
@@ -416,7 +415,7 @@ theorem post_fault_reachable_bounded_for
   obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, progress, reached, related, _ready⟩ := result
   exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, progress, reached, related⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings solved in
+include definitions registered producer acquire stateTransport stateBindings solved in
 theorem post_reflects_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -456,7 +455,7 @@ theorem post_reflects_reachable_bounded_for
         protocol.Relates state.retained reached.retained) := by
   have result := WithReady.post_reflects_reachable_bounded_for
     (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (guard := guard) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)

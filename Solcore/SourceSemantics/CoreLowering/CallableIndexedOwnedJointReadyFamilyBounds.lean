@@ -75,7 +75,7 @@ theorem preserves_at
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) (inputs wellFormed index).facts
       functions (Program.ofChecked compiled.sourceProgram) (origin index) size := by
   exact CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.preserves_at (registry := registry) (faults := faults)
-    origin functions (Program.ofChecked compiled.sourceProgram) observations
+    origin functions (Program.ofChecked compiled.sourceProgram)
     protocol (fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producer functions sameLayouts) (acquire functions sameLayouts) transport bindings
     (fun index => readiness (bridge index)) (inputs wellFormed) expressions
@@ -94,7 +94,7 @@ theorem reflects_at (functionTypes : FunctionRuntimeViews functions)
       (CallableIndexedOwnedAllocationProducer.StableOwner keys) (inputs wellFormed index).facts
       functions (Program.ofChecked compiled.sourceProgram) (origin index) size := by
   exact CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.reflects_at (registry := registry) (faults := faults)
-    origin functions (Program.ofChecked compiled.sourceProgram) observations
+    origin functions (Program.ofChecked compiled.sourceProgram)
     protocol (fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producer functions sameLayouts) (acquire functions sameLayouts) transport bindings
     (fun index => readiness (bridge index)) (inputs wellFormed) expressions

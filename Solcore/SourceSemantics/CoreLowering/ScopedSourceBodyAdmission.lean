@@ -103,6 +103,14 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
+  | bitNot {mode id node assignment binder rest}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (targetType : binder.scheme.body = assignment.target.type)
+      (profile : assignment.target.type = .word)
+      (bare : assignment.target.projections = [])
+      (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
+
   | terminalBlock {mode id node body rest}
       (found : source.lookupStatement? id = some node) (form : node.form = .block body)
       (sourceType : node.type = expected)
@@ -180,6 +188,7 @@ theorem Scan.shape {source approved expected mode statements}
   | conditional found form _ _ _ _ _ _ _ left right remaining => exact .conditional found form left right remaining
   | whileLoop found form _ _ _ _ _ inner remaining => exact .whileLoop found form inner remaining
   | assign found form _ _ profile bare _ _ _ _ ih => exact .assign found form profile bare ih
+  | bitNot found form _ _ profile bare _ ih => exact .bitNot found form profile bare ih
   | matching found form _ _ _ _ _ _ _ arms fallback remaining =>
       exact .matchWith found form arms fallback remaining
   | forLoop found form _ initial _ _ _ _ after _ inner remaining =>
@@ -283,6 +292,16 @@ theorem Scan.syntax {source approved expected mode statements}
           subst child
           exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
         · exact ih result tail
+
+  | bitNot found form declaration targetType profile bare _ ih =>
+      obtain ⟨_, _, _, head, tail⟩ := head_tail typed
+      have original := form_at unique found head
+      rw [form] at original
+      cases original with
+      | assignBitNot assignment =>
+        exact .bitNot found form
+          (ScopedSourceForItemsAdmission.bitNot_facts declaration targetType bare assignment)
+          bare (.inl (by rw [profile]; rfl)) (ih result tail)
 
   | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
       obtain ⟨middle, headFacts, tailFacts, head, tail⟩ := head_tail typed

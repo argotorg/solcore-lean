@@ -46,6 +46,7 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -98,6 +99,7 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -143,6 +145,7 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   cases trace with
   | breaking actual same | continuing actual same =>
       cases (shape actual).symm.trans same
+  | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
       have impossible := (shape actual).symm.trans same

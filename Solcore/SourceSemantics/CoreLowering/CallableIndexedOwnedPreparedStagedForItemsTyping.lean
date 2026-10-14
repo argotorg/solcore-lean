@@ -62,4 +62,13 @@ theorem assignment {assignment : AssignmentResolution} {operator : Solcore.Synta
       cases head with
       | assignValue actual => exact ⟨actual, final, tail⟩
 
+theorem bitNot {assignment : AssignmentResolution}
+    (facts : Facts source control context (.assignBitNot assignment :: rest)) :
+    SourceBitNotAssignmentValid source context assignment ∧ Facts source control context rest := by
+  obtain ⟨final, typed⟩ := facts
+  cases typed with
+  | cons head tail =>
+      cases head with
+      | assignBitNot actual => exact ⟨actual, final, tail⟩
+
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedForItemsTyping

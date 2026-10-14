@@ -1,3 +1,5 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerBitNotSource
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareBitNotHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForInitializerSource
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedImperativePositions
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForSequences
@@ -406,12 +408,39 @@ theorem reflects_position {budget : Nat}
       exact ⟨_, _, .continuing environment, before, mapping, world,
         .continuing (lookupStatement?_sound found) form, .continuing environment, heaps,
         .refl _, .refl _, .refl _ _, .refl _, initial, callerProtocol.refl initial, admitted⟩
-  | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _
-    =>
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
       intro shape sourceTyped projection
       intro size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
-      have impossible := shape.head_allowed found
-      simp only [form, CallableIndexedOwnedPreparedStagedBranchingTree.allowedForm, Bool.false_eq_true] at impossible
+      obtain ⟨_, bare, tailShape⟩ := shape.bitNot_tail found form
+      have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not graph.nodeOccurrencesUnique
+        (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
+      have result := CallableIndexedOwnedAdmittedStagedBareBitNotHeads.reflects_bounded (compiled := compiled) (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative) bridge functions transport
+        head environments heaps locals agrees actualTyped initial admitted assignmentTyped headErrors completed
+      cases result with
+      | fault trace same matched finalHeaps maps worlds preservation reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [], context, _, _, _, _,
+            .bitNotBareFault (lookupStatement?_sound found) form head.bare trace, .fault (semantic _ _ matched),
+            finalHeaps, maps, worlds, preservation, .refl _, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic _) reached stable
+      | success snapshot write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
+          have tailTyped := ProtectedStateImperativeStatementSuffixTyping.bitNot graph.nodeOccurrencesUnique sourceTyped found form
+          obtain ⟨sourceSize, finalContext, outcome, after, finalMap, finalWorld, trace, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih tailShape tailTyped projection (Nat.le_trans (Nat.le_of_lt strict) within)
+              (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted
+              (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
+          exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
+            .bitNotBare (lookupStatement?_sound found) form snapshot write trace, represented,
+            finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
+            metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @forLoop context scope mode id node items test post statements rest expected type initialCode body found form initialTree remaining initialErrors remainingErrors initialIH remainingIH =>
       intro shape sourceTyped projection
       obtain ⟨initialShape, postShape, loopShape, restShape⟩ := shape.for_children found form
@@ -590,9 +619,37 @@ theorem reflects_position {budget : Nat}
             CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_assignment snapshot childTrace write trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
-  | initializerBitNot =>
-      intro shape sourceTyped projection
-      cases shape.1
+  | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
+      intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted completed
+      obtain ⟨_, bare, tailShape⟩ := shape.1.bitNot_tail
+      have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
+      have result := CallableIndexedOwnedAdmittedStagedBareBitNotHeads.reflects_bounded (compiled := compiled) (values := .initial compiled.compatible.checked)
+        (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative) bridge functions transport
+        head environments heaps locals agrees actualTyped initial admitted assignmentTyped headErrors completed
+      cases result with
+      | fault trace same matched finalHeaps maps worlds preservation reached related stable =>
+          cases same
+          refine ⟨Staging.Recursive.Size.stepSize [Staging.Recursive.Size.stepSize []], _, _, _, _,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.bitNot_fault head.bare trace, .fault (semantic _ _ matched),
+            finalHeaps, maps, worlds, preservation, .refl _, reached, related, ?_⟩
+          exact fault_post bridge (context := context) (expected := expected)
+            (failure := .semantic _) reached stable
+      | success snapshot write middleHeaps maps worlds preservation metadata count typed reached related nextAdmitted strict remaining =>
+          have tailTyped := (InitializerTyping.bitNot sourceTyped).2
+          obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented,
+              finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+            ih ⟨tailShape, shape.2⟩ tailTyped projection (Nat.le_trans (Nat.le_of_lt strict) within)
+              (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+              (DataPlaceChildExpressions.prefix_agrees agrees _) typed reference
+              ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+              (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+              reached conditioned nextAdmitted
+              (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
+          exact ⟨Staging.Recursive.Size.stepSize [sourceSize], outcome, after, finalMap, finalWorld,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_bitNot snapshot write trace, represented,
+            finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
+            metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 
 include bridge bindings definitions registered producer acquire transport extension in
 theorem reflects_at {budget : Nat}

@@ -375,7 +375,7 @@ theorem reflectsAt_for (diagnosticPolicy : AssignmentDiagnosticPolicy) (function
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-    exact ProtectedBitNotStatements.assignment_reflects functions program evidence observations transport
+    exact ProtectedBitNotStatements.assignment_reflects functions program evidence transport
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped installed evaluated
 
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>

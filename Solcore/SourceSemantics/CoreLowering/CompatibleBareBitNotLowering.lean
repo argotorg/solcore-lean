@@ -25,13 +25,12 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
   (bare : assignment.target.projections = [])
   (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
     SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
-  {identities : Dynamic.Value → Word → Prop}
-  (observations : FunctionObservations compilation.checked.catalog functions identities)
+
   (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
   (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
 
-include rootTyped bare profile observations environments heaps locals
+include rootTyped bare profile environments heaps locals
 
 /-- Every completed actual compiler output has an independent unary failure
 or snapshot-write trace. The real seven-slot continuation is recovered only
@@ -45,7 +44,7 @@ theorem reflects
       environment coreEnvironment before store mapping world next outputType result finalStore := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
-  exact CompatibleBareBitNotMeaning.reflects layout bare observations (view ▸ profile) environments heaps locals slot
+  exact CompatibleBareBitNotMeaning.reflects layout bare (view ▸ profile) environments heaps locals slot
     (rootEq ▸ rootTyped binder binding) token (lowering ▸ completed)
 
 /-- An independent successful snapshot trace executes to Unit and the related
@@ -62,7 +61,7 @@ theorem preserves
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   rw [lowering]
-  exact CompatibleBareBitNotMeaning.preserves layout bare observations (view ▸ profile) environments heaps locals slot
+  exact CompatibleBareBitNotMeaning.preserves layout bare (view ▸ profile) environments heaps locals slot
     (rootEq ▸ rootTyped binder binding) trace _ _
 
 /-- A source fault is exactly the absent unary operand; actual generated code
@@ -77,7 +76,7 @@ theorem preserves_fault
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   rw [lowering]
-  exact CompatibleBareBitNotMeaning.preserves_fault layout bare observations (view ▸ profile) environments heaps locals slot
+  exact CompatibleBareBitNotMeaning.preserves_fault layout bare (view ▸ profile) environments heaps locals slot
     (rootEq ▸ rootTyped binder binding) trace _ _ _ _
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotLowering

@@ -69,7 +69,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
   {source : TypedSource} {prepared : Prepared} {place : PlaceResolution} {scope : Scope}
   {administrativeContext actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
   {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store} {index : Nat} {ξ : Renaming}
-  {identities : Dynamic.Value → Word → Prop}
+
 
 /-- Erasing sizes preserves the independent source outcome and actual seven slots. -/
 theorem ResultAt.erase {size : Nat} {faults : FaultRep} {next : Expr} {output : Ty}
@@ -100,7 +100,7 @@ private theorem writes_functional {heap left right : Dynamic.Heap} {location : D
       exact congrArg Dynamic.Heap.mk (cells firstWrite secondWrite)
 
 theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = [])
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -155,7 +155,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
               subst_vars
               obtain ⟨replacement, native, generatedAfter, finalStore, slots, generated, generatedWrite,
                 related, finalHeaps, frame, metadata, count, typed, agreement⟩ :=
-                initialized_prefix layout observations profile heaps reference currentRead nativeRead related
+                initialized_prefix layout profile heaps reference currentRead nativeRead related
                   (agrees nativeLookup) actualTyped operator invalid
               have same := CompatiblePlaceBitNotModifier.functional generated applies
               subst replacement
@@ -166,7 +166,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
 /-- The sole runtime premise is completion of the real renamed code. It
 produces an independent source fault/write and the actual typed continuation. -/
 theorem reflects_sized (layout : Layout prepared) (bare : place.projections = [])
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -208,7 +208,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
       (evidence := evidence) (source := source) bare sourceLookup sourceRead Dynamic.RootInitialValue.initialized
     obtain ⟨updated, replacement, after, written, slots, applies, sourceWrite, represented, finalHeaps,
-      frame, metadata, count, typed, _agreement, remaining⟩ := initialized_prefix_sized layout observations profile heaps
+      frame, metadata, count, typed, _agreement, remaining⟩ := initialized_prefix_sized layout profile heaps
         reference sourceRead nativeRead related (agrees nativeLookup) actualTyped operator invalid
     obtain ⟨sourceSize, sourceTrace⟩ := SourceExecutionSize.SourcePlaceSnapshotUpdate.has_size
       (.intro trace (.intro sourceRead rfl .initialized (.leaf applies) sourceWrite))
@@ -216,7 +216,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     exact .success sourceTrace represented finalHeaps frame metadata count typed smaller continuation
 
 theorem reflects (layout : Layout prepared) (bare : place.projections = [])
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -236,7 +236,7 @@ theorem reflects (layout : Layout prepared) (bare : place.projections = [])
     Result compilation.checked registry functions program context evidence source faults prepared place environment before store
       mapping world actual actualContext ξ next output result finalStore := by
   obtain ⟨size, sized⟩ := evaluation_has_size completed
-  exact (reflects_sized layout bare observations profile environments heaps locals agrees actualTyped slot rootTyped token sized).erase
+  exact (reflects_sized layout bare profile environments heaps locals agrees actualTyped slot rootTyped token sized).erase
 
 private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dynamic.Location} {cell : Dynamic.Cell}
     {reason : Dynamic.SemanticFault}
@@ -263,7 +263,7 @@ private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dy
 /-- Every independent fault of a live numeric bare root is the absent unary
 operand. Generated helpers and the continuation do not alter either heap. -/
 theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [])
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -320,7 +320,7 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
         cases represented with
         | initialized related =>
           have profile := cellType ▸ profile
-          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.success observations profile related
+          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.success profile related
             (environment := [_]) (rhs := .unit) (.var (index := 0) rfl) operator store invalid
           exact (valid invalidOperand).elim
 

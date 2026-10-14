@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedEmptyLambdaBodySupport
@@ -104,6 +105,10 @@ theorem of_branching
     apply congrArg some
     funext expression fuel source scope site assignment operator rhs output next reasonAt
     cases operator <;> rfl
+  have unaryPolicy : CompatibleBitNotStatements.Policy policy (.initial compiled.compatible.checked)
+      (fun site root => diagnostics.placeReason named.signature.key site root none)
+      (fun site root => compilation.own.assignments.reasonAt site root .bitNot)
+      (fun site root type => diagnostics.placeReason named.signature.key site root (some type)) := rfl
   obtain ⟨first, assignmentPrepared⟩ :=
     CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared selected compilation issued
   rw [← source] at assignmentPrepared
@@ -116,6 +121,14 @@ theorem of_branching
     exact PreparedBranchingAssignmentDiagnostics.operands assignmentPrepared
       (fun reason token represented => included reason token
         (CallableIndexedOwnedIssuedAssignmentRecipes.operands compilation issued receiver represented)) occurrence rawProfile
+  have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+        (compilation.own.assignments.reasonAt site assignment.target.root .bitNot) := by
+    intro site assignment origin rawWord
+    exact GenericAssignmentUnaryDiagnostics.prepared_unary_included assignmentPrepared
+      (fun reason token represented => included reason token
+        (CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.compilation_unary compilation issued receiver represented))
+      origin rawWord
   let baseMatch : SourceCoreCompatibleDataMatches.Context :=
     ⟨.initial compiled.compatible.checked, (context compiled.indexed named).solvedRequirements,
       some (allocator compiled.indexed named), none⟩
@@ -145,7 +158,7 @@ theorem of_branching
       (by intro id member; cases member)
       frame.code.graph.nodeOccurrencesUnique
       (show policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked from rfl)
-      binderPolicy allocationPolicy assignments operands
+      binderPolicy allocationPolicy assignments unaryPolicy operands unary
       matchPolicy rfl rfl matchAllocator hidden catalog matchLedger
       (certificates := fun _ _ _ _ => True)
       (by intros; exact True.intro)

@@ -1,4 +1,4 @@
-import Solcore.SourceSemantics.Staging.SelectedBareWritePreservation
+import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -128,6 +128,17 @@ theorem for_items_step (size : Nat)
               | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
                   exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+  | bitNotFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+  | @bitNot nextSize scope context finalContext environment before written after assignment target updated rest outcome
+      snapshot write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_bitNot locals heap assignmentTyped snapshot write
+              have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono writtenExtends) writtenTyped tailTyped next
+              exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
   | unbound | dangling => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation

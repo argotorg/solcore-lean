@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingTree
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeLexicalCollectors
@@ -145,6 +146,7 @@ variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecial
   {reasonAt : ExpressionId → Word} {policy : SourceCoreLoops.Policy}
   {definitions : DataEnvironment} {administrative : Core.Context}
   {initial : SourceSemantics.Context}
+  {invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
   {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
   {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
   {missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
@@ -209,6 +211,16 @@ private theorem header_operand {source : TypedSource} {site : SourceCoreElaborat
   · exact .header found form (List.mem_append_left _ (List.mem_append_right _ member))
   · exact .header found form (List.mem_append_right _ (List.mem_append_right _ member))
 
+private theorem header_unary {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
+    {items : List ForItemForm} {assignment : AssignmentResolution}
+    (origin : AssignmentDiagnosticOrigins.HeaderOrigin source site items)
+    (member : .assignBitNot assignment ∈ items) :
+    GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment := by
+  rcases origin with ⟨id, node, initializer, condition, post, body, found, form, rfl, beforeItems, rfl⟩ |
+    ⟨id, node, initializer, condition, post, body, found, form, rfl, beforeItems, rfl⟩
+  · exact .header found form (List.mem_append_left _ (List.mem_append_right _ member))
+  · exact .header found form (List.mem_append_right _ (List.mem_append_right _ member))
+
 theorem collected_at
     (edited : LocalView source view changed) (avoids : Avoids source roots changed)
     (unique : NodeOccurrencesUnique source)
@@ -218,11 +230,14 @@ theorem collected_at
     (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
       (layouts.allocatorAt owner active onError)))
     (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs →
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
     {matchCompilation : SourceCoreCompatibleDataMatches.Context}
     (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
     (matchValues : matchCompilation.values = values)
@@ -764,9 +779,29 @@ theorem collected_at
       · exact catalog
       · exact ⟨by simpa only [SourceCoreCompatibleDataMatches.Context.signatures, SourceCoreCompatibleDataMatches.Context.checked, matchValues] using sourceSignatures,
           fields.solvedRequirements.trans ledger⟩
-  | bitNot found form _ _ _ _ _ =>
-    have no := shape.head_allowed found
-    simp only [form, allowedForm, Bool.false_eq_true] at no
+  | @bitNot context mode id node assignment rest expected found form writable bare profile remaining ih =>
+    obtain ⟨rawWord, _, restShape⟩ := shape.bitNot_tail found form
+    cases fuel with
+    | zero => cases accepted
+    | succ fuel =>
+      simp only [CompilerAccepted, SourceCoreLoops.lowerFlowStatementsWithPolicy] at accepted
+      obtain ⟨⟨actual, stored⟩, read, accepted⟩ := bind_ok accepted
+      have same := Option.some.inj ((read_found (readPolicy ▸ read)).symm.trans (edited.metadata.symm.statement found))
+      subst actual
+      simp only [form] at accepted
+      obtain ⟨checked, _, accepted⟩ := bind_ok accepted
+      cases checked
+      simp only [unaryPolicy] at accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      obtain ⟨head, emitted, token⟩ := CompatibleBitNotStatements.Head.of_lower_with_token
+        (fun binder binding => writable binder ((rootBinder edited.metadata _).trans binding))
+        bare profile accepted
+      rw [emitted]
+      exact .bitNot found form head
+        (ih restShape fields closed residual sourceSignatures declarations
+          (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
+          (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
+        (by simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary (.statement found form) rawWord)
   | @forLoop context mode id node initializer condition post statements rest expected found form sourceType initialSyntax remaining initialIH restIH =>
     obtain ⟨initialShape, postShape, bodyShape, restShape⟩ := shape.for_children found form
     cases fuel with
@@ -813,11 +848,13 @@ theorem collected_at
     obtain ⟨_, conditionNative⟩ := iterate_condition loopTyped
     have accessible : Reaches source roots (.expression condition) := reached _ (by simp)
     obtain ⟨postTree, postSites⟩ := CallableIndexedOwnedPreparedNativeBranchingHeaderCollectors.collected
-      edited avoids unique binderPolicy allocationPolicy assignments children postSyntax shape.2.1
+      edited avoids unique binderPolicy allocationPolicy assignments unaryPolicy children postSyntax shape.2.1
       fields closed residual sourceSignatures declarations
       (fun child member => reached _ (by simp [member]))
       (fun member profile => operands (header_operand
         (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member) profile)
+      (fun member rawWord => unary (header_unary
+        (AssignmentDiagnosticOrigins.ForOriginFor.post_origin (tracked := true) origin) member) rawWord)
       postGenerated postTyped
     refine Collected.initializersDone conditionFound conditionType
       ⟨conditionNode, conditionFound, typed, children context fields declarations conditionSyntax accessible conditionFound typed conditionGenerated conditionNative⟩
@@ -948,7 +985,27 @@ theorem collected_at
         (ih ⟨restShape, shape.2⟩ fields closed residual sourceSignatures declarations
           (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin, generatedBody, nextReceipt⟩
           (TypedImperative.Native.execute_continuation (emittedOriginal ▸ nativeTyped))) (operands (AssignmentDiagnosticOrigins.HeaderOriginFor.operand (tracked := true) (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) sourceProfile) bare
-  | initializerBitNot => cases shape.1
+  | @initializerBitNot context assignment rest condition post statements expected writable bare profile remaining ih =>
+    obtain ⟨rawWord, _, restShape⟩ := shape.1.bitNot_tail
+    obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
+    cases headerFuel with
+    | zero => cases accepted
+    | succ headerFuel =>
+      simp only [SourceCoreLoops.lowerForItems, unaryPolicy] at accepted
+      obtain ⟨body, generatedBody, accepted⟩ := bind_ok accepted
+      obtain ⟨head, emitted, token⟩ := CompatibleBitNotStatements.Head.of_lower_with_token
+        (fun binder binding => writable binder ((rootBinder edited.metadata _).trans binding))
+        bare profile accepted
+      rw [emitted]
+      exact .initializerBitNot head
+        (ih ⟨restShape, shape.2⟩ fields closed residual sourceSignatures declarations
+          (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using
+            (List.mem_append_right (ForItemForm.references _) member))) projection
+          ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin,
+            generatedBody, nextReceipt⟩ (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
+        (by simpa only [CompatibleBitNotStatements.Head.Errors, token] using (unary
+          (AssignmentDiagnosticOrigins.HeaderOriginFor.unary (tracked := true)
+            (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) rawWord))
 
 
 theorem collected
@@ -960,11 +1017,14 @@ theorem collected
     (allocationPolicy : policy.sourceCells = some (SourceCoreCallableIndexedAllocationFrames.allocator frame globals
       (layouts.allocatorAt owner active onError)))
     (assignments : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missingDefault)
+    (unaryPolicy : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missingDefault)
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs →
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
     {matchCompilation : SourceCoreCompatibleDataMatches.Context}
     (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
     (matchValues : matchCompilation.values = values)
@@ -999,7 +1059,7 @@ theorem collected
       (TypedCertificate source certificates) definitions administrative context scope
       (.statements mode statements) expected type code := by
   cases atStatements
-  exact collected_at edited avoids unique readPolicy binderPolicy allocationPolicy assignments operands
+  exact collected_at edited avoids unique readPolicy binderPolicy allocationPolicy assignments unaryPolicy operands unary
     matchPolicy matchValues matchDefinitions matchAllocator hidden catalog ledger children
     syntaxTree shape fields closed residual sourceSignatures declarations reached projection accepted nativeTyped
 

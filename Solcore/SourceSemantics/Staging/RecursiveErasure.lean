@@ -860,6 +860,11 @@ local macro "erase_recursive_plain" : tactic =>
       cases failure with
       | stage => trivial
       | semantic => exact StatementsPlain.head_fault (.expression contains form ih)
+    case bitNotBare contains form snapshot write _next nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)) nextIH
+    case bitNotBareFault contains form _bare failed =>
+      exact StatementsPlain.head_fault (.assignBitNot contains form failed)
     case assignBare contains form snapshot child write _next childIH nextIH =>
       exact StatementsPlain.prepend contains (by intro expression; simp [form])
         (.assignValue contains form (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
@@ -985,6 +990,9 @@ local macro "erase_recursive_plain" : tactic =>
       cases failure with
       | stage => trivial
       | semantic => exact .head (.expression childIH)
+    case bitNot snapshot write _next nextIH =>
+      exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
+    case bitNotFault _bare failed => exact .head (.assignBitNot failed)
     case assignment snapshot child write next childIH nextIH =>
       exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves _ _ _ _) childIH write)) nextIH
     case assignmentFailure snapshot child childIH =>

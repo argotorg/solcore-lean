@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedStaticSupport
@@ -69,6 +70,9 @@ private def invalidOperand (site : SourceCoreElaboration.ErrorSite) (root : Reso
     (operator : Solcore.Syntax.ValueAssignOp) : Word :=
   if operator = .equal then Word.zero else principal.cached.compilation.own.assignments.reasonAt site root (.value operator)
 
+private def invalidUnary (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId) : Word :=
+  principal.cached.compilation.own.assignments.reasonAt site root .bitNot
+
 private def missingDefault (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId) (type : TypeSystem.Ty) : Word :=
   principal.cached.diagnostics.placeReason principal.named.signature.key site root (some type)
 
@@ -80,6 +84,10 @@ private theorem assignments : CompatibleAssignmentStatements.AssignmentPolicy
   apply congrArg some
   funext expression fuel source scope site assignment operator rhs output next reasonAt
   cases operator <;> rfl
+
+private theorem unaryPolicy : CompatibleBitNotStatements.Policy
+    (policy principal.cached.compilation) (.initial compiled.compatible.checked)
+    (invalidProjection principal) (invalidUnary principal) (missingDefault principal) := rfl
 
 /-- The exact cached method preparation and public issuer supply its operand tokens. -/
 theorem operands_of_diagnostic
@@ -98,6 +106,22 @@ theorem operands_of_diagnostic
     (fun _ _ represented => CallableIndexedOwnedAssignmentProvenance.cached_operands
       principal.cached diagnostic receiver represented) origin profile
 
+/-- Cached method provenance includes the actual unary entries in its full source. -/
+theorem unary_of_diagnostic
+    (diagnostic : CallableIndexedOwnedPreparedStagedMethodTerminalSupport.DiagnosticAt principal.cached)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    {site assignment}
+    (origin : GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment)
+    (rawWord : assignment.target.type = .word) :
+    CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+      (.invalidUnaryOperand .bitNot) (invalidUnary principal site assignment.target.root) := by
+  obtain ⟨first, prepared⟩ := CallableIndexedOwnedAssignmentProvenance.method_assignments principal diagnostic
+  exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
+    (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.cached_unary
+      principal.cached diagnostic receiver represented) origin rawWord
+
 variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
 
 include ready member wellFormed in
@@ -109,6 +133,9 @@ theorem collected
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (invalidOperand principal site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+        (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
@@ -146,7 +173,7 @@ theorem collected
       change SourceCoreGeneralFunctions.contextualBinder _ _ _ _ _ _ _ = _
       simp only [SourceCoreGeneralFunctions.contextualBinder, monomorphic, List.isEmpty_nil, ↓reduceIte]
       rfl)
-    rfl (assignments principal) operands (match_policy principal) rfl rfl rfl
+    rfl (assignments principal) (unaryPolicy principal) operands unary (match_policy principal) rfl rfl rfl
     (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
     packet.sourceAt.valid.ledger
@@ -169,6 +196,9 @@ theorem of_compiler
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (invalidOperand principal site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
+      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+        (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax principal.sourceBody.source expressionSyntax
       packet.sourceAt.context (.statements true principal.cached.compilation.statements) principal.sourceBody.resultType)
@@ -187,6 +217,6 @@ theorem of_compiler
   constructor
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, collected principal packet ready member wellFormed operands syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, collected principal packet ready member wellFormed operands unary syntaxTree (children child selected)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodScopedCollectors

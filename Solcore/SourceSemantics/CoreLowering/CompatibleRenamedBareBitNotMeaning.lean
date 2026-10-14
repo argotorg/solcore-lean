@@ -19,8 +19,7 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 construction derives the modifier, setter, store write and both directions of
 the continuation agreement from that independent operation. -/
 theorem initialized_prefix (layout : Layout prepared)
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (heaps : HeapRepresents checked registry functions mapping world heap store)
@@ -44,7 +43,7 @@ theorem initialized_prefix (layout : Layout prepared)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
     frame, metadata, count, typed, agreement, _⟩ :=
-    initialized_prefix_sized layout observations profile heaps reference read nativeRead represented lookup actualTyped operator invalid
+    initialized_prefix_sized layout profile heaps reference read nativeRead represented lookup actualTyped operator invalid
   exact ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
     frame, metadata, count, typed, agreement⟩
 

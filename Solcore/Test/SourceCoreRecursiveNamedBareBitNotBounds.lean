@@ -34,7 +34,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
 
-include rootTyped bare profile observations environments heaps locals agrees
+include rootTyped bare profile environments heaps locals agrees
 
 theorem actual_lower_reflects_sized
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
@@ -48,7 +48,7 @@ theorem actual_lower_reflects_sized
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   refine ⟨prepared, ?_⟩
-  exact CompatibleRenamedBareBitNot.reflects_sized layout bare observations (view ▸ profile) environments heaps locals agrees actualTyped slot
+  exact CompatibleRenamedBareBitNot.reflects_sized layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
     (rootEq ▸ rootTyped binder binding) token (lowering ▸ completed)
 
 end Lowering

@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentProvenance
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMethodEvidenceScopedRoots
@@ -197,7 +198,16 @@ theorem of_actual_with_evidence
     exact PreparedBranchingAssignmentDiagnostics.operands prepared
       (fun _ _ represented => CallableIndexedOwnedAssignmentProvenance.cached_operands
         principal.cached diagnostic receiver represented) origin profile
-  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified operands syntaxTree
+  have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
+      assignment.target.type = .word → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+        (.invalidUnaryOperand .bitNot)
+        (GenericAssignmentUnaryDiagnostics.unaryToken principal.cached.compilation.own.assignments site assignment.target.root) := by
+    intro site assignment origin rawWord
+    obtain ⟨first, prepared⟩ := CallableIndexedOwnedAssignmentProvenance.method_assignments principal diagnostic
+    exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
+      (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.cached_unary
+        principal.cached diagnostic receiver represented) origin rawWord
+  apply SelectedCompilationMethodScopedCollectors.of_compiler principal packet ready member bodies.signatures certified operands unary syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native
   exact of_child_with_evidence principal packet diagnostic receiver bodies certified sourceForms supported metadata rows covered resolved selected fields
     declarations tree found typed accepted

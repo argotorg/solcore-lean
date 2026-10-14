@@ -87,6 +87,22 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
               have post := expression_value wellFormed runtime covers locals heap rhsTyped child
               exact ⟨post.heap_typed, post.heap_extends⟩
+  | bitNotBareFault => exact ⟨heap, .refl _⟩
+  | @bitNotBare nextSize mode scope context finalContext environment before written after
+      id rest node assignment target updated outcome contains form snapshot write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped⟩ := statement_head_tail typed
+      have execution : StatementExecutes program context scope.evidence scope.source environment before id
+          context (.fallthrough environment) written :=
+        .assignBitNot contains form (.intro (snapshot.resolves _ _ _ _) write)
+      have sameContext := execution.final_context_of_typing runtime.graph headTyped
+      subst staticMiddle
+      have preserved := wellFormed.wholeLanguagePreservation.statements
+        context scope.evidence scope.source environment before written [id]
+        (.fallthrough environment) control context context _ runtime covers locals heap
+        (.singleton headTyped) (.cons execution .nil)
+      obtain ⟨afterTyped, tailExtends⟩ := statementsIH nextSize (Size.child_lt_stepSize (by simp))
+        runtime covers (locals.mono preserved.heap_extends) preserved.heap_typed tailTyped next
+      exact ⟨afterTyped, preserved.heap_extends.trans tailExtends⟩
   | assignBareUnbound | assignBareDangling => exact ⟨heap, .refl _⟩
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
       id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>
@@ -569,6 +585,14 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ =>
             have post := expression_value wellFormed runtime covers locals heap rhsTyped child
             exact ⟨post.heap_typed, post.heap_extends⟩
+  | bitNotFault => exact ⟨heap, .refl _⟩
+  | @bitNot nextSize scope context finalContext environment before written after assignment target updated rest outcome
+      snapshot write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) next
   | unbound | dangling => exact ⟨heap, .refl _⟩
 
 /-- Finite for faults keep every condition, body, and post-header prefix. -/

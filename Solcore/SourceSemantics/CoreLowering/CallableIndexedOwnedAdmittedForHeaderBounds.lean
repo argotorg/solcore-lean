@@ -84,7 +84,7 @@ theorem preserves_prefix_bounded_for
       Dynamic.EnvironmentAgrees after staticFinal.locals finalEnvironment := by
   obtain ⟨tail, maps, worlds, frame, metadata, related, returned, tailReady, continued⟩ := ProtectedForHeader.Stateful.WithReady.Tree.preserves_prefix_bounded_for_with_return
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -144,7 +144,7 @@ theorem preserves_fault_reachable_bounded_for
       FaultTransition (readiness bridge) state ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   exact ProtectedForHeader.Stateful.WithReady.Tree.preserves_fault_reachable_bounded_for
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -196,7 +196,7 @@ theorem reflects_reachable_bounded_for
       context environment ⟨scope, mapping, world, before, store, canonical⟩ state items value finalStore := by
   exact ProtectedForHeader.Stateful.WithReady.Tree.reflects_reachable_bounded_for
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -249,7 +249,7 @@ theorem post_preserves_bounded_for
         callerProtocol.Relates state.retained reached.retained ∧ (readiness bridge).Ready context reached.retained := by
   exact ProtectedForHeader.Stateful.WithReady.post_preserves_bounded_for (solved := [])
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (guard := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -298,7 +298,7 @@ theorem post_fault_reachable_bounded_for
         callerProtocol.Relates state.retained reached.retained ∧ (readiness bridge).FaultReady reached.retained := by
   exact ProtectedForHeader.Stateful.WithReady.post_fault_reachable_bounded_for
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (guard := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -356,7 +356,7 @@ theorem post_reflects_reachable_bounded_for
         callerProtocol.Relates state.retained reached.retained ∧ (readiness bridge).FaultReady reached.retained) := by
   exact ProtectedForHeader.Stateful.WithReady.post_reflects_reachable_bounded_for (solved := [])
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (guard := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)

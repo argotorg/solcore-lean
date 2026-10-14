@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.Staging.SelectedBranchPreservation
-import Solcore.SourceSemantics.Staging.SelectedBareWritePreservation
+import Solcore.SourceSemantics.Staging.SelectedBitNotWritePreservation
 import Solcore.SourceSemantics.Staging.SelectedMatchControlPreservation
 set_option autoImplicit false
 set_option Elab.async false
@@ -56,6 +56,21 @@ theorem statements_step (size : Nat)
               have resultEq := complete rfl
               simp [BodyCompletes, BodyFacts.singleton, ControlSummary.ordinary] at resultEq
               exact resultEq ▸ post.value_typed _ rfl
+  | bitNotBareFault => exact fault_statements heap (.refl _)
+  | @bitNotBare nextSize mode scope context finalContext environment before written after
+      id rest node assignment target updated outcome contains form snapshot write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_bitNot locals heap assignmentTyped snapshot write
+          have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+            (locals.mono writtenExtends) writtenTyped tailTyped next
+          have headFalls : headFacts.control.canFallthrough = true := by
+            have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+            cases controlTyped
+            rfl
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
   | assignBareUnbound | assignBareDangling => exact fault_statements heap (.refl _)
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
       id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>

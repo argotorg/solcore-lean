@@ -113,6 +113,14 @@ private theorem assignments (actual : ReturningAt header) (action : ExpressionAt
   funext expression fuel source scope site assignment operator rhs output next reasonAt
   cases operator <;> rfl
 
+private theorem unary (actual : ReturningAt header) (action : ExpressionAt prepared actual) :
+    CompatibleBitNotStatements.Policy
+      (AcceptedContextualLambdaReceipt.bodyPolicy action.root action.fuel)
+      (.initial compiled.compatible.checked)
+      (fun site root => prepared.diagnostics.placeReason prepared.named.signature.key site root none)
+      (fun site root => prepared.compilation.own.assignments.reasonAt site root .bitNot)
+      (fun site root type => prepared.diagnostics.placeReason prepared.named.signature.key site root (some type)) := rfl
+
 private theorem match_policy (actual : ReturningAt header) (action : ExpressionAt prepared actual) :
     CompatibleMatchAmbientLowering.PolicySuccess
       (AcceptedContextualLambdaReceipt.bodyPolicy action.root action.fuel)
@@ -159,7 +167,8 @@ theorem of_returning {outer : StatementId} {rest : List StatementId} {outerNode 
   have accepted := compiler.bodyCompiled
   rw [AcceptedContextualLambdaReceipt.body_callback action.root action.fuel] at accepted
   obtain ⟨body⟩ := AcceptedNamedBodyFlow.body_of_accepted accepted
-  obtain ⟨tree, ready⟩ := body.tree.refine (assignments prepared actual action) (match_policy prepared actual action)
+  obtain ⟨tree, ready⟩ := body.tree.refine (assignments prepared actual action) (unary prepared actual action)
+    (match_policy prepared actual action)
   exact ⟨⟨actual, action, actualForm, reported, read, actualRequirements, actualCoercions,
     actualOrdinary, compiler, ⟨body.flow, tree, body.emitted⟩, ready⟩⟩
 

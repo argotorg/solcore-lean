@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedBareBitNotReceipt
 
 /-! Actual compiler receipts for for-loop header items. Each header retains
 its exact continuation action, final lexical scope and generated expression
@@ -32,8 +33,15 @@ def Assignable (source : TypedSource) (assignment : AssignmentResolution)
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       binder.scheme.body = assignment.target.type
 
-def HeaderForms (items : List ForItemForm) : Prop :=
-  ∀ item ∈ items, ∀ assignment, item ≠ .assignBitNot assignment
+/-- Unary writes have the same original declaration requirement, with no RHS. -/
+def BitNotAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
+  assignment.target.type = .word ∧ assignment.target.projections = [] ∧
+    ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+      binder.scheme.body = assignment.target.type
+
+/-- Every current header form has a raw compiler receipt. Target eligibility
+is checked separately when that receipt is refined. -/
+def HeaderForms (_items : List ForItemForm) : Prop := True
 
 inductive Items (policy : SourceCoreLoops.Policy) (source : TypedSource)
     (site : SourceCoreElaboration.ErrorSite) (result : Ty) (reasonAt : ExpressionId → Word)
@@ -73,6 +81,17 @@ inductive Items (policy : SourceCoreLoops.Policy) (source : TypedSource)
         (LocalLoop.controlType result) tail reasonAt code)
       (targetType : receipt.binder.scheme.body = assignment.target.type) :
       Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignValue assignment operator expression :: rest) code
+  | bitNotting {fuel scope assignment rest tail code}
+      (remaining : Items policy source site result reasonAt next finalScope finish fuel scope rest tail)
+      (accepted : SourceCoreLoops.lowerForItems policy site (fuel + 1) source scope
+        (.assignBitNot assignment :: rest) result reasonAt next = .ok code) :
+      Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignBitNot assignment :: rest) code
+  | bitNotted {fuel scope assignment rest tail code}
+      (remaining : Items policy source site result reasonAt next finalScope finish fuel scope rest tail)
+      (receipt : AcceptedBareBitNotReceipt.Receipt policy fuel source scope site assignment
+        (LocalLoop.controlType result) tail reasonAt code)
+      (targetType : receipt.binder.scheme.body = assignment.target.type) :
+      Items policy source site result reasonAt next finalScope finish (fuel + 1) scope (.assignBitNot assignment :: rest) code
 
 namespace Items
 variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
@@ -81,7 +100,7 @@ variable {policy : SourceCoreLoops.Policy} {source : TypedSource} {site : Source
   {finalScope : SourceCoreLocalCell.Scope} {finish : Expr}
   {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {items : List ForItemForm} {code : Expr}
 
-theorem of_accepted (forms : HeaderForms items)
+theorem of_accepted (_forms : HeaderForms items)
     (accepted : SourceCoreLoops.lowerForItems policy site fuel source scope items result reasonAt next = .ok code) :
     ∃ finalScope finish, Nonempty (Items policy source site result reasonAt next finalScope finish fuel scope items code) := by
   induction fuel generalizing scope items code with
@@ -93,7 +112,7 @@ theorem of_accepted (forms : HeaderForms items)
     cases items with
     | nil => exact ⟨scope, code, ⟨.nil rfl accepted⟩⟩
     | cons item rest =>
-      have tailForms : HeaderForms rest := fun item member => forms item (List.mem_cons_of_mem _ member)
+      have tailForms : HeaderForms rest := True.intro
       cases item with
       | letDecl binder initializer =>
         simp only [SourceCoreLoops.lowerForItems] at accepted
@@ -119,7 +138,24 @@ theorem of_accepted (forms : HeaderForms items)
         obtain ⟨tail, generatedTail, assigned⟩ := bind_ok accepted
         obtain ⟨finalScope, finish, ⟨remaining⟩⟩ := ih tailForms generatedTail
         exact ⟨finalScope, finish, ⟨.assigning remaining assigned⟩⟩
-      | assignBitNot assignment => exact False.elim (forms _ List.mem_cons_self assignment rfl)
+      | assignBitNot assignment =>
+        have whole := accepted
+        simp only [SourceCoreLoops.lowerForItems] at accepted
+        cases selected : policy.assignBitNotWithExpression with
+        | some callback =>
+          simp only [selected] at accepted
+          obtain ⟨tail, generatedTail, _assigned⟩ := bind_ok accepted
+          obtain ⟨finalScope, finish, ⟨remaining⟩⟩ := ih tailForms generatedTail
+          exact ⟨finalScope, finish, ⟨.bitNotting remaining whole⟩⟩
+        | none =>
+          simp only [selected] at accepted
+          cases legacy : policy.assignBitNot with
+          | none => simp only [legacy] at accepted; cases accepted
+          | some callback =>
+            simp only [legacy] at accepted
+            obtain ⟨tail, generatedTail, _assigned⟩ := bind_ok accepted
+            obtain ⟨finalScope, finish, ⟨remaining⟩⟩ := ih tailForms generatedTail
+            exact ⟨finalScope, finish, ⟨.bitNotting remaining whole⟩⟩
 
 theorem accepted (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) :
     SourceCoreLoops.lowerForItems policy site fuel source scope items result reasonAt next = .ok code := by
@@ -135,24 +171,27 @@ theorem accepted (tree : Items policy source site result reasonAt next finalScop
     simpa only [SourceCoreLoops.lowerForItems, ih, bind, Except.bind] using assigned
   | assigned remaining receipt targetType ih =>
     simpa only [SourceCoreLoops.lowerForItems, ih, bind, Except.bind] using receipt.accepted
+  | bitNotting _ accepted _ => exact accepted
+  | bitNotted remaining receipt targetType ih =>
+    simpa only [SourceCoreLoops.lowerForItems, receipt.selected, ih, bind, Except.bind] using receipt.accepted
 
 theorem finish_accepted (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) :
     next finalScope = .ok finish := by
   induction tree with
   | nil same accepted => exact same ▸ accepted
   | absent _ _ _ ih | initialized _ _ _ _ _ _ ih | discard _ _ _ ih
-      | assigning _ _ ih | assigned _ _ _ ih => exact ih
+      | assigning _ _ ih | assigned _ _ _ ih | bitNotting _ _ ih | bitNotted _ _ _ ih => exact ih
 
 def closed {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : Bool :=
   match tree with
   | .nil .. => true
-  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ => remaining.closed
-  | .assigning .. => false
+  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .bitNotted remaining _ _ => remaining.closed
+  | .assigning .. | .bitNotting .. => false
 
 def children {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : List (Child policy source reasonAt) :=
   match tree with
   | .nil .. => []
-  | .absent _ remaining _ | .assigning remaining _ => remaining.children
+  | .absent _ remaining _ | .assigning remaining _ | .bitNotting remaining _ | .bitNotted remaining _ _ => remaining.children
   | @Items.initialized _ _ _ _ _ _ _ _ fuel scope _ expression _ _ _ _ _ child generated _ remaining _ =>
       ⟨fuel, scope, expression, child, generated⟩ :: remaining.children
   | @Items.discard _ _ _ _ _ _ _ _ fuel scope expression _ _ child generated remaining =>
@@ -167,20 +206,24 @@ def bindings {fuel scope items code} (tree : Items policy source site result rea
       ⟨scope, binder, payload, projected⟩ :: remaining.bindings
   | @Items.initialized _ _ _ _ _ _ _ _ _ scope binder _ payload _ _ _ projected _ _ _ remaining _ =>
       ⟨scope, binder, payload, projected⟩ :: remaining.bindings
-  | .discard _ _ remaining | .assigning remaining _ | .assigned remaining _ _ => remaining.bindings
+  | .discard _ _ remaining | .assigning remaining _ | .assigned remaining _ _ | .bitNotting remaining _ | .bitNotted remaining _ _ => remaining.bindings
 
 def Ready {fuel scope items code} (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) : Prop :=
   match tree with
   | .nil .. => True
-  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ => remaining.Ready
+  | .absent _ remaining _ | .initialized _ _ _ _ remaining _ | .discard _ _ remaining | .assigned remaining _ _ | .bitNotted remaining _ _ => remaining.Ready
   | @Items.assigning _ _ _ _ _ _ _ _ _ _ assignment operator _ _ _ _ remaining _ =>
       ¬ Assignable source assignment operator ∧ remaining.Ready
+  | @Items.bitNotting _ _ _ _ _ _ _ _ _ _ assignment _ _ _ remaining _ =>
+      ¬ BitNotAssignable source assignment ∧ remaining.Ready
 
 theorem refine {values : SourceCoreCompatibleValues.Context}
     {invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
     {invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word}
     {missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
     (matched : CompatibleAssignmentStatements.AssignmentPolicy policy values invalidProjection invalidOperand missing)
+    {invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
+    (unary : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing)
     (tree : Items policy source site result reasonAt next finalScope finish fuel scope items code) :
     ∃ refined : Items policy source site result reasonAt next finalScope finish fuel scope items code, refined.Ready := by
   classical
@@ -205,6 +248,18 @@ theorem refine {values : SourceCoreCompatibleValues.Context}
   | assigned remaining receipt targetType ih =>
     obtain ⟨tail, ready⟩ := ih
     exact ⟨.assigned tail receipt targetType, ready⟩
+  | @bitNotting fuel scope assignment rest tail code remaining assigned ih =>
+    obtain ⟨refined, ready⟩ := ih
+    by_cases supported : BitNotAssignable source assignment
+    · obtain ⟨profile, bare, type⟩ := supported
+      have lowered := assigned
+      simp only [SourceCoreLoops.lowerForItems, unary, remaining.accepted, bind, Except.bind] at lowered
+      obtain ⟨receipt⟩ := AcceptedBareBitNotReceipt.of_accepted unary profile bare unary lowered
+      exact ⟨.bitNotted refined receipt (type receipt.binder receipt.declaration), ready⟩
+    · exact ⟨.bitNotting refined assigned, supported, ready⟩
+  | bitNotted remaining receipt targetType ih =>
+    obtain ⟨tail, ready⟩ := ih
+    exact ⟨.bitNotted tail receipt targetType, ready⟩
 
 end Items
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedBodyFlow

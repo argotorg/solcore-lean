@@ -180,7 +180,8 @@ theorem of_actual_with_evidence
     Support principal packet headers stages
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply CallableIndexedOwnedPreparedStagedMethodScopedCollectors.of_compiler principal packet ready member wellFormed
-    (CallableIndexedOwnedPreparedStagedMethodScopedCollectors.operands_of_diagnostic principal diagnostic receiver) syntaxTree
+    (CallableIndexedOwnedPreparedStagedMethodScopedCollectors.operands_of_diagnostic principal diagnostic receiver)
+    (CallableIndexedOwnedPreparedStagedMethodScopedCollectors.unary_of_diagnostic principal diagnostic receiver) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations tree found typed accepted _nativeType _native
   exact of_child_with_evidence principal packet diagnostic receiver wellFormed sourceForms supported metadata rows covered resolved selected fields
     declarations tree found typed accepted

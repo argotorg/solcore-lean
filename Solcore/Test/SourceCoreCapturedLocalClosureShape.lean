@@ -71,7 +71,8 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
-  | assignBare contains otherForm _ _ _ _ =>
+  | assignBare contains otherForm _ _ _ _
+  | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
@@ -237,7 +238,8 @@ theorem ActualHeader.returned_capture
       have impossible := (same contains) ▸ otherForm
       rw [observed.shape.initializedForm] at impossible
       cases impossible
-    | assignBare contains otherForm _ _ _ _ =>
+    | assignBare contains otherForm _ _ _ _
+    | bitNotBare contains otherForm _ _ _ =>
       have impossible := (same contains) ▸ otherForm
       rw [observed.shape.initializedForm] at impossible
       cases impossible

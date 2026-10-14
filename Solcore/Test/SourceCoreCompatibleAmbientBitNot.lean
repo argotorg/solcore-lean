@@ -123,8 +123,6 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
   (bare : assignment.target.projections = [])
   (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
     SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
-  {identities : Dynamic.Value → Word → Prop}
-  (observations : FunctionObservations compilation.checked.catalog functions identities)
   {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
   {before : Dynamic.Heap} {store : Store}
   (environments : DataHeap.EnvRepresents (definitions := artifact.layouts.definitions) (storageCatalog compilation.checked.catalog)
@@ -136,7 +134,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
     (LanguageResult.success .unit) reasonAt invalid invalidOperand missing artifact.layouts.definitions
     (SourceCoreLocalCell.coreContext scope ++ administrativeContext) = .ok certified)
 
-include rootTyped bare profile observations environments heaps locals accepted
+include rootTyped bare profile environments heaps locals accepted
 
 /-- No universal child theorem is needed for an actual bare-root assignment.
 Both initialized writes and absent-operand faults are reconstructed from the
@@ -151,7 +149,7 @@ theorem checked_bare_run_reflects
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   apply terminal
-  exact CompatibleBareBitNotLowering.reflects rootTyped bare profile observations environments heaps locals
+  exact CompatibleBareBitNotLowering.reflects rootTyped bare profile environments heaps locals
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) token (runStateful_evaluation_sound completed)
 
 /-- The source trace constructs the actual finite Core execution and final
@@ -162,7 +160,7 @@ theorem checked_bare_preserves {updated : Dynamic.Value} {after : Dynamic.Heap}
     ∃ finalStore, Evaluates coreEnvironment store certified.expression (.inRight .word .unit) finalStore ∧
       CompatibleAmbientHeap.HeapRepresents compilation.checked registry functions mapping world after finalStore ∧
       AdministrativePreserved mapping store mapping finalStore ∧ Dynamic.HeapMetadataExtend before after :=
-  CompatibleBareBitNotLowering.preserves rootTyped bare profile observations environments heaps locals
+  CompatibleBareBitNotLowering.preserves rootTyped bare profile environments heaps locals
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) trace
 
 /-- The only bare numeric source fault is the missing unary operand. Its
@@ -172,7 +170,7 @@ theorem checked_bare_fault_preserves {reason : Dynamic.SemanticFault} {after : D
     (trace : Dynamic.SourcePlaceBitNotFaults program context evidence source environment before assignment.target reason after) :
     reason = .invalidUnaryOperand .bitNot ∧ after = before ∧
       Evaluates coreEnvironment store certified.expression (.inLeft .unit (.word invalidOperand)) store :=
-  CompatibleBareBitNotLowering.preserves_fault rootTyped bare profile observations environments heaps locals
+  CompatibleBareBitNotLowering.preserves_fault rootTyped bare profile environments heaps locals
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) trace
 end Bare
 

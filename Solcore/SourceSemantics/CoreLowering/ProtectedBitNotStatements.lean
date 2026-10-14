@@ -20,11 +20,9 @@ variable {frameLayout : SourceCoreCallableIndexedFrames.Layout} {globals : Nat}
   {registry : SourceCoreRawMetadata.Registry}
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   {faults : FunctionCalls.FaultRep}
-  {identities : Dynamic.Value → Word → Prop}
-  (observations : FunctionObservations values.checked.catalog functions identities)
   {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
 
-include observations transport in
+include transport in
 theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution}
     {rest : List StatementId} {expected : TypeSystem.Ty} {type : Ty} {body : Expr}
@@ -49,7 +47,7 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
     obtain ⟨rfl, same, updated, assigned⟩ := bitNot_view unique (lookupStatement?_sound found) form first
     cases same
     obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
-      head.preserves_prefix functions program evidence observations
+      head.preserves_prefix functions program evidence
         environments heaps locals agrees actualTyped assigned
     obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
       continuationMeaning valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -72,13 +70,13 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
       ⟨rfl, first⟩ | ⟨_, _, _, first, tail⟩
     · have assigned := bitNot_fault unique (lookupStatement?_sound found) form first
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
-        head.preserves_fault functions program evidence observations
+        head.preserves_fault functions program evidence
           environments heaps locals agrees headErrors assigned body (LocalLoop.controlType type)
       exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds, frame, metadata,
         _, _, _, .here, environments.extend maps worlds, locals.mono metadata⟩
     · exact go first (by cases mode <;> exact .fault tail)
 
-include observations transport in
+include transport in
 theorem assignment_reflects
     {mode : Bool} {id : StatementId} {node : StatementNode}
     {assignment : AssignmentResolution}
@@ -90,7 +88,7 @@ theorem assignment_reflects
     (continuationMeaning : Reflects (entry := entry) (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode rest expected type body) :
     Reflects (entry := entry) (frameLayout := frameLayout) (globals := globals) (administrative := administrative) (scope := scope) (source := source) (context := context) (registry := registry) functions program evidence (solved := solved) (faults := faults) mode (id :: rest) expected type (head.emit body (LocalLoop.controlType type)) := by
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped installed evaluated
-  rcases head.reflects functions program evidence observations
+  rcases head.reflects functions program evidence
     environments heaps locals agrees actualTyped headErrors evaluated with
     ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
     ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩

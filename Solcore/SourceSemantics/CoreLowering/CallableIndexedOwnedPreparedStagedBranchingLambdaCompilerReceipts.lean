@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedIssuedAssignmentRecipes
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedMixedBodyStaticSupport
@@ -22,12 +23,14 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
 
 structure Choice where
   invalidProjection : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
+  invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
   invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Solcore.Syntax.ValueAssignOp → Word
   missingDefault : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   packet : Branching code stages
   callback : packet.policy.lowerExpression = FunctionCode.children code.policy code.lowerBody code.fuel code.compilation
   reason : packet.reasonAt = code.reasonAt
   assignments : CompatibleAssignmentStatements.AssignmentPolicy packet.policy (.initial compiled.compatible.checked) invalidProjection invalidOperand missingDefault
+  unaryPolicy : CompatibleBitNotStatements.Policy packet.policy (.initial compiled.compatible.checked) invalidProjection invalidUnary missingDefault
   readPolicy : packet.policy.readStatement = SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked
   binderPolicy : ∀ scope binder, binder.scheme.quantified = [] →
     packet.policy.lowerBinder code.view scope binder =
@@ -52,7 +55,8 @@ def Choice.Issued (named : Named) (choice : Choice code (stages := stages)) : Pr
   ∃ (diagnostics : SourceCoreDataPlaceFaultSites.Program) (namedCode : Expr)
     (compilation : Compilation compiled.indexed named diagnostics namedCode),
       CallableIndexedOwnedContextualLambdaIssuedRecipes.IssuedAt compiled.indexed diagnostics ∧
-      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments
+      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments ∧
+      choice.invalidUnary = GenericAssignmentUnaryDiagnostics.unaryToken compilation.own.assignments
 
 /-- The actual retained lowerer supplies all allocator and binder callbacks;
 none is inferred from a native result type. -/
@@ -64,7 +68,8 @@ private theorem choose_with_token (named : Named)
     (shape : CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.source true function.body)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     ∃ choice : Choice code (stages := stages),
-      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments := by
+      choice.invalidOperand = GenericAssignmentDiagnostics.token compilation.own.assignments ∧
+      choice.invalidUnary = GenericAssignmentUnaryDiagnostics.unaryToken compilation.own.assignments := by
   let expression := FunctionCode.children code.policy code.lowerBody code.fuel code.compilation
   let policy := loop_policy compiled.indexed named compilation.own.assignments diagnostics expression
   have callback : code.lowerBody expression = SourceCoreLoops.lowerStatementsWithPolicy policy :=
@@ -85,6 +90,7 @@ private theorem choose_with_token (named : Named)
     exact ⟨_, CallableIndexedAmbient.definitions_exact compiled.indexed⟩
   refine ⟨{
     invalidProjection := fun site root => diagnostics.placeReason named.signature.key site root none
+    invalidUnary := fun site root => compilation.own.assignments.reasonAt site root .bitNot
     invalidOperand := fun site root operator => if operator = .equal then Word.zero else compilation.own.assignments.reasonAt site root (.value operator)
     missingDefault := fun site root type => diagnostics.placeReason named.signature.key site root (some type)
     packet := {
@@ -105,6 +111,7 @@ private theorem choose_with_token (named : Named)
     callback := rfl
     reason := rfl
     assignments := ?_
+    unaryPolicy := rfl
     readPolicy := rfl
     binderPolicy := ?_
     allocationPolicy := rfl
@@ -113,7 +120,7 @@ private theorem choose_with_token (named : Named)
     matchValues := rfl
     matchDefinitions := rfl
     matchAllocator := rfl
-    matchLedger := by rw [sameCompilation] }, rfl⟩
+    matchLedger := by rw [sameCompilation] }, rfl, rfl⟩
   · refine ⟨rfl, rfl, ?_⟩
     change some _ = some _
     apply congrArg some
@@ -143,8 +150,8 @@ theorem choose_issued (named : Named)
     (child : Staging.Recursive.Scope) (selected : stages.Closure function child) :
     ∃ choice : Choice code (stages := stages), choice.Issued code named := by
   obtain ⟨diagnostics, namedCode, compilation, _rootFuel, issued, recipe, _policy, _same⟩ := retained
-  obtain ⟨choice, token⟩ := choose_with_token code named compilation recipe sameCompilation shape child selected
-  exact ⟨choice, diagnostics, namedCode, compilation, issued, token⟩
+  obtain ⟨choice, token, unaryToken⟩ := choose_with_token code named compilation recipe sameCompilation shape child selected
+  exact ⟨choice, diagnostics, namedCode, compilation, issued, token, unaryToken⟩
 
 /-- Actual full-source preparation and receiver issuance interpret each admitted token. -/
 theorem Choice.Issued.operands {named : Named} {choice : Choice code (stages := stages)}
@@ -161,12 +168,33 @@ theorem Choice.Issued.operands {named : Named} {choice : Choice code (stages := 
     AssignmentOperandDiagnostics.OperandsLaw
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
       (choice.invalidOperand site assignment.target.root operator) := by
-  obtain ⟨diagnostics, namedCode, compilation, actual, token⟩ := issued
+  obtain ⟨diagnostics, namedCode, compilation, actual, token, _unaryToken⟩ := issued
   obtain ⟨first, prepared⟩ := CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared selected compilation actual
   rw [token]
   rw [sourceEq] at origin
   exact PreparedBranchingAssignmentDiagnostics.operands prepared
     (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands compilation actual receiver represented)
     origin profile
+
+/-- The same retained compiler table supplies every original unary diagnostic. -/
+theorem Choice.Issued.unary {named : Named} {choice : Choice code (stages := stages)}
+    (issued : choice.Issued code named) {index : Nat}
+    (selected : compiled.indexed.base.functions[index]? = some named)
+    (sourceEq : function.source = source named)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed
+      completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    (origin : GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment)
+    (rawWord : assignment.target.type = .word) :
+    CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+      (.invalidUnaryOperand .bitNot) (choice.invalidUnary site assignment.target.root) := by
+  obtain ⟨diagnostics, namedCode, compilation, actual, _operandToken, token⟩ := issued
+  obtain ⟨first, prepared⟩ := CallableIndexedOwnedIssuedAssignmentRecipes.assignments_prepared selected compilation actual
+  rw [token]
+  rw [sourceEq] at origin
+  exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
+    (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.compilation_unary
+      compilation actual receiver represented) origin rawWord
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedBranchingLambdaCompilerReceipts

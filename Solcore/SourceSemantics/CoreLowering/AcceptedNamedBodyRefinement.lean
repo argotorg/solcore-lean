@@ -25,7 +25,14 @@ theorem of_header {compiled : SourceCoreUnifiedCompilation.Compiled}
       (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
     rw [aligned.policy]
     exact RecursiveNamedPreparedHeaderPolicies.Prepared.assignments prepared
-  obtain ⟨tree, ready⟩ := actual.tree.refine matched
+  have unary : CompatibleBitNotStatements.Policy header.policy
+      (.initial compiled.compatible.checked)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
+    rw [aligned.policy]
+    exact RecursiveNamedPreparedHeaderPolicies.Prepared.unary prepared
+  obtain ⟨tree, ready⟩ := actual.tree.refine matched unary
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned)
   exact ⟨⟨actual.flow, tree, actual.emitted⟩, ready⟩
 

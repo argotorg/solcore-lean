@@ -18,8 +18,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context}
   {store : Store} {index : Nat}
 
 theorem preserves (layout : Layout prepared) (bare : place.projections = [])
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -68,7 +67,7 @@ theorem preserves (layout : Layout prepared) (bare : place.projections = [])
               simp only at cellType
               subst_vars
               obtain ⟨replacement, changedValue, replacementRep, actualApplies, modifier, _⟩ :=
-                CompatiblePlaceNumericBitNotModifier.success observations profile related
+                CompatiblePlaceNumericBitNotModifier.success profile related
                   (environment := rhsEnvironment prepared.route.rootType target .unit (.inRight .unit nativeValue) .unit coreEnvironment)
                   (rhs := .var 0) (.var (index := 1) rfl) operator store invalid
               have same := CompatiblePlaceBitNotModifier.functional actualApplies applies

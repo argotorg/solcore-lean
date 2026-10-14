@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicUnaryAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPublicAssignmentDiagnostics
 import Solcore.SourceSemantics.CoreLowering.CallableMethodBodyCoherence
@@ -42,6 +43,9 @@ def of_imperative_compiler
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
+      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
@@ -63,7 +67,7 @@ def of_imperative_compiler
   refine ⟨certified, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, SelectedCompilationNamedBranchingCollectors.collected_of_imperative prepared aligned ready certified bodies.signatures member receipt operands syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, SelectedCompilationNamedBranchingCollectors.collected_of_imperative prepared aligned ready certified bodies.signatures member receipt operands unary syntaxTree (children child selected)⟩
 
 
 include aligned in
@@ -114,7 +118,18 @@ def of_actual_with_catalog
     exact PreparedBranchingAssignmentDiagnostics.operands assignmentPrepared
       (fun _ _ represented => CallableIndexedOwnedPublicAssignmentDiagnostics.prepared_operands
         prepared diagnostic receiver represented) origin profile
+  have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
+      assignment.target.type = .word → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+        (.invalidUnaryOperand .bitNot)
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root) := by
+    intro site assignment origin rawWord
+    obtain ⟨first, assignmentPrepared⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.assignments_at_header
+      prepared diagnostic aligned
+    exact GenericAssignmentUnaryDiagnostics.prepared_unary_included assignmentPrepared
+      (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.prepared_unary
+        prepared diagnostic receiver represented) origin rawWord
   apply of_imperative_compiler prepared aligned ready bodies certified member receipt operands
+    unary
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected

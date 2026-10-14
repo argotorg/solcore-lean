@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleRawScalarFields
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
 import Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
 import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
@@ -13,10 +14,10 @@ open SourceCoreCompatibleDataPlaces
 variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions checked.catalog.definitions}
     {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
-  {identities : Dynamic.Value → Word → Prop}
+
 
 theorem word_success
-    (observations : FunctionObservations checked.catalog functions identities)
+
     {sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}
     (profile : SourceCoreRawMetadata.runtimeType sourceType = .word)
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
@@ -27,11 +28,7 @@ theorem word_success
       Dynamic.BitNotSnapshot (some source) result ∧
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧
       ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot source := by
-  have projected : checked.catalog.project sourceType = .ok .word := by
-    rw [← checked.catalog.project_runtimeType sourceType, profile]; rfl
-  have same := Except.ok.inj (represented.projection.symm.trans projected)
-  subst type
-  obtain ⟨word, rfl, rfl⟩ := CompatiblePlaceModifier.word_fields observations represented
+  obtain ⟨word, rfl, rfl, rfl⟩ := CompatibleRawScalarFields.word_fields represented profile
   obtain ⟨applies, evaluated, valid⟩ := DataPlaceModifier.word_bitNot_success word selected operator store invalid
   exact ⟨_, _, .compatible (actual := .word) profile (.word word.bitNot), applies, evaluated, valid⟩
 

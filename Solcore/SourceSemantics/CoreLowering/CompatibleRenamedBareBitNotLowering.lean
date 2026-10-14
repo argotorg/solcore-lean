@@ -18,20 +18,20 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
   {reasonAt : ExpressionId → Word} {invalid invalidOperand : Word} {missing : TypeSystem.Ty → Word}
   {administrativeContext actualContext : Core.Context} {environment : Dynamic.Environment} {canonical actual : Environment}
   {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store} {ξ : Renaming}
-  {identities : Dynamic.Value → Word → Prop}
+
   (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
     WritableLocal context assignment.target.root binder.scheme.body)
   (bare : assignment.target.projections = [])
   (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
     SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
-  (observations : FunctionObservations compilation.checked.catalog functions identities)
+
   (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
     mapping world administrativeContext scope environment canonical)
   (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
   (locals : Dynamic.EnvironmentAgrees before context.locals environment)
   (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
 
-include rootTyped bare profile observations environments heaps locals agrees
+include rootTyped bare profile environments heaps locals agrees
 
 theorem reflects_of_lower
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
@@ -45,7 +45,7 @@ theorem reflects_of_lower
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   refine ⟨prepared, ?_⟩
-  exact reflects layout bare observations (view ▸ profile) environments heaps locals agrees actualTyped slot
+  exact reflects layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
     (rootEq ▸ rootTyped binder binding) token (lowering ▸ completed)
 
 theorem preserves_prefix_of_lower
@@ -64,7 +64,7 @@ theorem preserves_prefix_of_lower
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   obtain ⟨replacement, finalStore, slots, represented, finalHeaps, frame, metadata, count, typed, agreement⟩ :=
-    preserves_prefix layout bare observations (view ▸ profile) environments heaps locals agrees actualTyped slot
+    preserves_prefix layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
       (rootEq ▸ rootTyped binder binding) trace (binaryOperator (prepared.route.leafType = .integer) operator) invalidOperand
   exact ⟨prepared, replacement, finalStore, slots, represented, finalHeaps, frame, metadata, count, typed,
     lowering.symm ▸ agreement next output⟩
@@ -79,7 +79,7 @@ theorem preserves_fault_of_lower
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   rw [lowering]
-  exact preserves_fault layout bare observations (view ▸ profile) environments heaps locals agrees slot
+  exact preserves_fault layout bare (view ▸ profile) environments heaps locals agrees slot
     (rootEq ▸ rootTyped binder binding) trace _ _ _ _
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNot

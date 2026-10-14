@@ -85,6 +85,10 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | whileFallthrough actual same _ _ =>
       cases (shape actual).symm.trans same
+  | bitNotBare actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | bitNotBareFault actual same _ _ =>
+      cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBareFault actual same _ _ =>
@@ -180,6 +184,10 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
   | whileFault actual same _ =>
       cases (shape actual).symm.trans same
   | whileFallthrough actual same _ _ =>
+      cases (shape actual).symm.trans same
+  | bitNotBare actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | bitNotBareFault actual same _ _ =>
       cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>
       cases (shape actual).symm.trans same

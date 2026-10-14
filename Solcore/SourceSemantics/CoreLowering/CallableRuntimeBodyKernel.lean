@@ -169,7 +169,7 @@ variable
   (transfers : AllocationTransfers protocol readiness stateBindings function.source)
   (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program function.evidence function.source)
 
-include body definitions registered observations escapedFault producer acquire stateTransport stateBindings extend sites initializerSites assignmentSites transfers snapshots in
+include body definitions registered escapedFault producer acquire stateTransport stateBindings extend sites initializerSites assignmentSites transfers snapshots in
 /-- Preserve at the original source body grade, retaining the actual reached state. -/
 theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
     (assignments : ∀ context, validity context → Assignment.AssignmentPrefixPreservesAt protocol readiness assignmentFacts functions
@@ -230,7 +230,7 @@ theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
     (functions := functions) (definitions := definitions) (registered := registered)
     (program := program) (evidence := function.evidence) (protocol := protocol) (producer := producer) (conditionGate := conditionGate)
     (acquire := acquire) (stateTransport := stateTransport) (stateBindings := stateBindings)
-    (budget := budget) (observations := observations) (meaningMost := expressions)
+    (budget := budget) (meaningMost := expressions)
     (readiness := readiness) (facts := facts) (headFacts := headFacts) (exprFacts := exprFacts)
     (loopFacts := loopFacts) (initializerFacts := initializerFacts) (initializerSites := initializerSites)
     (assignmentFacts := assignmentFacts) (snapshotFacts := snapshotFacts) (sites := sites)
@@ -243,7 +243,7 @@ theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
     protocol readiness conditionGate facts body.emitted validity size flow body.initialValid bodyFacts
     environments heaps locals agrees typed reference read unmapped initial gate ready trace
 
-include body definitions registered observations escapedFault producer acquire stateTransport stateBindings extend sites initializerSites assignmentSites transfers snapshots in
+include body definitions registered escapedFault producer acquire stateTransport stateBindings extend sites initializerSites assignmentSites transfers snapshots in
 /-- Reflect the original native finish and return an independent source grade. -/
 theorem BodyFor.reflects_sized (budget size : Nat) (within : size ≤ budget)
     (assignments : ∀ context, validity context → Assignment.AssignmentReflectsAt protocol readiness assignmentFacts functions
@@ -303,7 +303,7 @@ theorem BodyFor.reflects_sized (budget size : Nat) (within : size ≤ budget)
     (program := program) (evidence := function.evidence)
     (protocol := protocol) (conditionGate := conditionGate) (producer := producer)
     (stateTransport := stateTransport) (stateBindings := stateBindings) (acquire := acquire)
-    (budget := budget) (reflection := expressions) (observations := observations)
+    (budget := budget) (reflection := expressions)
     (readiness := readiness) (facts := facts) (headFacts := headFacts) (exprFacts := exprFacts)
     (loopFacts := loopFacts) (initializerFacts := initializerFacts) (initializerSites := initializerSites)
     (assignmentFacts := assignmentFacts) (snapshotFacts := snapshotFacts) (sites := sites)
@@ -362,7 +362,7 @@ theorem BodyFor.preserves_sized (budget size : Nat) (within : size ≤ budget)
     (body := body) (functions := functions) (definitions := definitions) (registered := registered)
     (program := program) (protocol := protocol) (conditionGate := conditionGate) (producer := producer)
     (acquire := acquire) (stateTransport := stateTransport) (stateBindings := stateBindings)
-    (validity := validity) (extend := extend) (observations := observations) (escapedFault := escapedFault)
+    (validity := validity) (extend := extend) (escapedFault := escapedFault)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
     (facts := fun _ _ _ _ => True) (headFacts := fun _ _ _ => True) (exprFacts := fun _ _ _ => True)
     (loopFacts := fun _ _ _ _ _ => True) (initializerFacts := fun _ _ _ _ _ _ => True)
@@ -440,7 +440,7 @@ theorem BodyFor.reflects_sized (budget size : Nat) (within : size ≤ budget)
     (body := body) (functions := functions) (definitions := definitions) (registered := registered)
     (program := program) (protocol := protocol) (conditionGate := conditionGate) (producer := producer)
     (acquire := acquire) (stateTransport := stateTransport) (stateBindings := stateBindings)
-    (validity := validity) (extend := extend) (observations := observations) (escapedFault := escapedFault)
+    (validity := validity) (extend := extend) (escapedFault := escapedFault)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
     (facts := fun _ _ _ _ => True) (headFacts := fun _ _ _ => True) (exprFacts := fun _ _ _ => True)
     (loopFacts := fun _ _ _ _ _ => True) (initializerFacts := fun _ _ _ _ _ _ => True)

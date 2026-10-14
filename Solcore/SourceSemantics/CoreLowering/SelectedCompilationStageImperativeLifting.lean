@@ -1,10 +1,12 @@
 import Solcore.SourceSemantics.CoreLowering.ProtectedLoopStatementControlShape
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageLexicalTreeLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageAssignmentLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageBitNotLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageWhileSequenceLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageMatchTreeHeads
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForSequenceLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForInitialBitNotLifting
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedScopedImperativePreservation
 
 set_option autoImplicit false
@@ -323,12 +325,16 @@ theorem lifts_position {budget : Nat}
       cases mode <;> exact trace.sound
     obtain ⟨rfl, rfl, rfl⟩ := ProtectedLoopStatements.continuing_view unique found form ordinary
     exact ⟨_, _, _, .continuing (lookupStatement?_sound found) form, .completed (.continuing environment)⟩
-  | @bitNot _ _ _ _ _ _ _ _ _ _ found form _ _ _ _ _ =>
+  | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
       finalContext outcome after trace
-    have impossible := shape.head_allowed found
-    simp only [form, CallableIndexedOwnedPreparedStagedBranchingTree.allowedForm, Bool.false_eq_true] at impossible
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail found form
+    have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
+      (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
+    exact SelectedCompilationStageBitNotLifting.lifts bridge functions transport condition unique found form head assignmentTyped
+      (ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form) projection)
+      within environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted trace
   | @forLoop context scope mode id node items test post statements rest expected type initialCode body found form initialTree remaining initialErrors remainingErrors initialIH remainingIH =>
     intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ
       contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted
@@ -382,9 +388,13 @@ theorem lifts_position {budget : Nat}
     exact SelectedCompilationStageForInitialLifting.assign bridge functions condition transport extension unique head bare
       (InitializerTyping.assignment sourceTyped).1 (typedChildren context) (typedPreservation context)
       (ih ⟨tailShape, shape.2⟩ (InitializerTyping.assignment sourceTyped).2 projection) within ready trace
-  | initializerBitNot =>
+  | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
     intro shape sourceTyped projection
-    cases shape.1
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.1.bitNot_tail
+    intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
+    exact SelectedCompilationStageForInitialLifting.bitNot bridge functions transport condition head
+      (InitializerTyping.bitNot sourceTyped).1
+      (ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection) within ready trace
 
 include bridge bindings definitions registered producer acquire transport extension in
 theorem lifts_at {budget : Nat}

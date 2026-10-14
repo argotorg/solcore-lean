@@ -205,7 +205,7 @@ private theorem family_preserves (size : Nat) :
       (actual_origin functions owner receipt wellFormed) size := by
   have closed := CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.preserves_at
     (ι := Unit) (origins := fun _ => actual_origin functions owner receipt wellFormed)
-    (functions := functions) (program := Program.ofChecked compiled.sourceProgram) (observations := observations)
+    (functions := functions) (program := Program.ofChecked compiled.sourceProgram)
     (protocols := fun _ => protocol headers keys)
     (conditionGate := fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producers := fun _ => marked (headers := headers) (keys := keys) functions prepared member)
@@ -235,7 +235,7 @@ private theorem family_reflects (functionTypes : FunctionRuntimeViews functions)
       (actual_origin functions owner receipt wellFormed) size := by
   have closed := CallableRuntimeBodyMutualMeaning.Stateful.WithReady.Family.reflects_at
     (ι := Unit) (origins := fun _ => actual_origin functions owner receipt wellFormed)
-    (functions := functions) (program := Program.ofChecked compiled.sourceProgram) (observations := observations)
+    (functions := functions) (program := Program.ofChecked compiled.sourceProgram)
     (protocols := fun _ => protocol headers keys)
     (conditionGate := fun _ => CallableIndexedOwnedAllocationProducer.StableOwner keys)
     (producers := fun _ => marked (headers := headers) (keys := keys) functions prepared member)

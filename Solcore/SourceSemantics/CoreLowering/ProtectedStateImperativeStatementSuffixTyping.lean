@@ -78,4 +78,19 @@ theorem assignment
   rw [form] at original
   cases original <;> rfl
 
+/-- A unary assignment keeps the original suffix context. -/
+theorem bitNot
+    {source : TypedSource} {context : SourceSemantics.Context}
+    {id : StatementId} {rest : List StatementId} {node : StatementNode}
+    {resolution : AssignmentResolution}
+    (unique : NodeOccurrencesUnique source)
+    (typed : Statements source context (id :: rest))
+    (found : source.lookupStatement? id = some node)
+    (form : node.form = .assignBitNot resolution) :
+    Statements source context rest := by
+  apply suffix_of_form unique typed found
+  intro control final original
+  rw [form] at original
+  cases original <;> rfl
+
 end Solcore.SourceSemantics.CoreLowering.ProtectedStateImperativeStatementSuffixTyping

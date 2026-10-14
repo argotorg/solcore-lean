@@ -114,7 +114,7 @@ variable {values : SourceCoreCompatibleValues.Context}
   (readinesses : ∀ i, Readiness (protocols i))
   (inputs : ∀ i, Inputs (protocols i) (readinesses i) (stateBindings i) program (origins i))
 
-include observations producers acquire stateTransport stateBindings inputs in
+include producers acquire stateTransport stateBindings inputs in
 /-- The original measured family closes actual ready entries through the same kernel. -/
 theorem preserves_at
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
@@ -144,7 +144,7 @@ theorem preserves_at
   exact CallableRuntimeBodyKernel.Stateful.WithReady.BodyFor.preserves_sized
     (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
     (registered := (origins i).registered) (program := program)
-    (observations := observations) (escapedFault := (origins i).escapedFault) (extend := (origins i).extend)
+    (escapedFault := (origins i).escapedFault) (extend := (origins i).extend)
     (protocol := protocols i) (producer := producers i) (conditionGate := conditionGate i)
     (acquire := acquire i) (stateTransport := stateTransport i) (stateBindings := stateBindings i)
     (readiness := readinesses i) (facts := (inputs i).facts) (headFacts := (inputs i).headFacts)
@@ -156,7 +156,7 @@ theorem preserves_at
     entry.original.environments entry.original.heaps entry.original.locals entry.original.lookups entry.original.actualTyped
     entry.original.reference entry.original.read entry.original.unmapped entry.original.initial entry.original.gate entry.ready trace
 
-include observations producers acquire stateTransport stateBindings inputs in
+include producers acquire stateTransport stateBindings inputs in
 /-- The original measured family closes actual ready entries through the same kernel. -/
 theorem reflects_at
     (expressionMeaning : ∀ i context, (origins i).validity context → ∀ budget child, child ≤ budget →
@@ -186,7 +186,7 @@ theorem reflects_at
   exact CallableRuntimeBodyKernel.Stateful.WithReady.BodyFor.reflects_sized
     (body := (origins i).body) (functions := functions) (definitions := (origins i).definitions)
     (registered := (origins i).registered) (program := program)
-    (observations := observations) (escapedFault := (origins i).escapedFault) (extend := (origins i).extend)
+    (escapedFault := (origins i).escapedFault) (extend := (origins i).extend)
     (protocol := protocols i) (producer := producers i) (conditionGate := conditionGate i)
     (acquire := acquire i) (stateTransport := stateTransport i) (stateBindings := stateBindings i)
     (readiness := readinesses i) (facts := (inputs i).facts) (headFacts := (inputs i).headFacts)
@@ -237,7 +237,7 @@ theorem preserves_at
     (size : Nat) : ∀ i,
     CallableRuntimeBodyOrigins.Stateful.PreservesAt (protocols i) (conditionGate i) functions program (origins i) size := by
   have closed := WithReady.Family.preserves_at
-    (origins := origins) (functions := functions) (program := program) (observations := observations)
+    (origins := origins) (functions := functions) (program := program)
     (protocols := protocols) (conditionGate := conditionGate) (producers := producers) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readinesses := fun i => RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial (protocols i))
@@ -274,7 +274,7 @@ theorem reflects_at
     (size : Nat) : ∀ i,
     CallableRuntimeBodyOrigins.Stateful.ReflectsAt (protocols i) (conditionGate i) functions program (origins i) size := by
   have closed := WithReady.Family.reflects_at
-    (origins := origins) (functions := functions) (program := program) (observations := observations)
+    (origins := origins) (functions := functions) (program := program)
     (protocols := protocols) (conditionGate := conditionGate) (producers := producers) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readinesses := fun i => RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial (protocols i))

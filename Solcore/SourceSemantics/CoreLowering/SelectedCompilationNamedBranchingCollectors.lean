@@ -102,6 +102,9 @@ theorem collected_of_imperative
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
@@ -142,13 +145,20 @@ theorem collected_of_imperative
       (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
     rw [aligned.policy]
     exact RecursiveNamedPreparedHeaderPolicies.Prepared.assignments prepared
+  have unaryPolicy : CompatibleBitNotStatements.Policy header.policy
+      (.initial compiled.compatible.checked)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared)
+      (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault prepared) := by
+    rw [aligned.policy]
+    exact RecursiveNamedPreparedHeaderPolicies.Prepared.unary prepared
   exact CallableIndexedOwnedPreparedNativeBranchingCollectors.collected
     (expressionSyntax := expressionSyntax) (certificates := certificates) (LocalView.refl _)
     (by intro id member; cases member) header.unique
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_read prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_binder prepared aligned)
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_allocator prepared aligned)
-    assignments operands
+    assignments unaryPolicy operands unary
     (RecursiveNamedPreparedHeaderPolicies.Prepared.header_match prepared aligned) rfl rfl
     (RecursiveNamedPreparedHeaderPolicies.Prepared.match_allocator prepared aligned)
     (SelectedCompilationHeaderFacts.hidden_fresh certified)

@@ -523,6 +523,25 @@ mutual
         (missing : heap.Dangling location) :
         StatementsIn program registry mode (stepSize []) scope context environment heap (id :: rest) context
           (.fault (.semantic (.danglingLocation location))) heap
+    /-- Bare unary assignment reads its snapshot and performs a real write,
+    without an expression child for the compiler's administrative Unit. -/
+    | bitNotBare {nextSize : Nat} {mode scope context finalContext environment before written after
+          id rest node assignment target updated outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (snapshot : BareTarget environment before assignment.target target)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+          before target updated written)
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
+    | bitNotBareFault {mode scope context environment before id rest node assignment reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (bare : assignment.target.projections = [])
+        (failed : SourcePlaceBitNotFaults program context scope.evidence scope.source environment
+          before assignment.target reason before) :
+        StatementsIn program registry mode (stepSize []) scope context environment before (id :: rest) context
+          (.fault (.semantic reason)) before
     | letUninitialized {nextSize : Nat} {mode scope context middleContext finalContext environment before bound after id rest node binder location outcome}
         (contains : ContainsStatement scope.source id node) (form : node.form = .letDecl binder none)
         (monomorphic : binder.scheme.quantified = [])
@@ -681,7 +700,20 @@ mutual
           (.fault (.semantic (.danglingLocation location))) heap
 
   /-- Finite for iteration runs each post header in the original loop scope.
-  Body/post local bindings are restored, while their heap effects persist. -/
+  Body/post local bindings are restored, while their heap effects persist. -/    | bitNot {nextSize : Nat} {scope context finalContext environment before written after assignment target updated rest outcome}
+        (snapshot : BareTarget environment before assignment.target target)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+          before target updated written)
+        (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
+        ForItems program registry (stepSize [nextSize]) scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
+    | bitNotFault {scope context environment before assignment rest reason}
+        (bare : assignment.target.projections = [])
+        (failed : SourcePlaceBitNotFaults program context scope.evidence scope.source environment
+          before assignment.target reason before) :
+        ForItems program registry (stepSize []) scope context environment before (.assignBitNot assignment :: rest) context
+          (.fault (.semantic reason)) before
+
+
   inductive ForLoop (program : Program) (registry : Registry) :
       Nat → Scope → Context → Environment → Heap → ExpressionId → List ForItemForm → List StatementId → BodyOutcome → Heap → Prop where
     | testFault {testSize : Nat} {scope context environment before after condition post body failure}
@@ -805,7 +837,7 @@ end
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
-  assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
+  bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBareUnbound assignBareDangling letUninitialized letInitialized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
 end Statements
@@ -899,6 +931,10 @@ local macro "erase_stage_grade" : tactic =>
     case ifFault => apply Recursive.StatementsIn.ifFault <;> assumption
     case ifFallthrough => apply Recursive.StatementsIn.ifFallthrough <;> assumption
     case expressionFault => apply Recursive.StatementsIn.expressionFault <;> assumption
+    case bitNotBare => apply Recursive.StatementsIn.bitNotBare <;> assumption
+    case bitNotBareFault => apply Recursive.StatementsIn.bitNotBareFault <;> assumption
+    case bitNot => apply Recursive.ForItems.bitNot <;> assumption
+    case bitNotFault => apply Recursive.ForItems.bitNotFault <;> assumption
     case assignBare => apply Recursive.StatementsIn.assignBare <;> assumption
     case assignBareFault => apply Recursive.StatementsIn.assignBareFault <;> assumption
     case assignBareOperands => apply Recursive.StatementsIn.assignBareOperands <;> assumption
@@ -1227,6 +1263,15 @@ local macro "construct_stage_grade" : tactic =>
     case expressionFault contains form child ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .expressionFault contains form graded_child⟩
+    case bitNotBare contains form snapshot write next nextIH =>
+      obtain ⟨nextSize, gradedNext⟩ := nextIH
+      exact ⟨_, .bitNotBare contains form snapshot write gradedNext⟩
+    case bitNotBareFault contains form bare failed =>
+      exact ⟨_, .bitNotBareFault contains form bare failed⟩
+    case bitNot snapshot write next nextIH =>
+      obtain ⟨nextSize, gradedNext⟩ := nextIH
+      exact ⟨_, .bitNot snapshot write gradedNext⟩
+    case bitNotFault bare failed => exact ⟨_, .bitNotFault bare failed⟩
     case assignBare contains form snapshot child write next childIH nextIH =>
       obtain ⟨childSize, childGraded⟩ := childIH
       obtain ⟨nextSize, nextGraded⟩ := nextIH

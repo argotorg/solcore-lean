@@ -81,6 +81,15 @@ theorem assignment {assignment : AssignmentResolution} {operator : Solcore.Synta
   | cons head tail =>
     cases head with
     | assignValue actual => exact ⟨actual, control, loopContext, postContext, bodyFinal, bodyFacts, tail, condition, body, post⟩
+theorem bitNot {assignment : AssignmentResolution}
+    (typed : InitializerTyping source context (.assignBitNot assignment :: rest) test post statements) :
+    SourceBitNotAssignmentValid source context assignment ∧
+    InitializerTyping source context rest test post statements := by
+  obtain ⟨control, loopContext, postContext, bodyFinal, bodyFacts, initial, condition, body, post⟩ := typed
+  cases initial with
+  | cons head tail =>
+    cases head with
+    | assignBitNot actual => exact ⟨actual, control, loopContext, postContext, bodyFinal, bodyFacts, tail, condition, body, post⟩
 end InitializerTyping
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}

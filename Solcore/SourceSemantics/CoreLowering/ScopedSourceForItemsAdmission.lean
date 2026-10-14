@@ -34,6 +34,12 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
+  | bitNot {assignment binder rest}
+      (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+      (targetType : binder.scheme.body = assignment.target.type)
+      (profile : assignment.target.type = .word)
+      (bare : assignment.target.projections = [])
+      (remaining : Scan source approved rest) : Scan source approved (.assignBitNot assignment :: rest)
 
 theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop} {items : List ForItemForm}
     (scan : Scan source approved items) (mapped : ∀ id, approved id → other id) : Scan source other items := by
@@ -44,6 +50,8 @@ theorem Scan.map {source : TypedSource} {approved other : ExpressionId → Prop}
   | discard found value _ ih => exact .discard found (mapped _ value) ih
   | assign declaration target profile bare found type value _ ih => exact .assign declaration target profile bare found type (mapped _ value) ih
 
+  | bitNot declaration target profile bare _ ih => exact .bitNot declaration target profile bare ih
+
 theorem Scan.shape {source approved items} (scan : Scan source approved items) :
     CallableIndexedOwnedPreparedStagedBranchingTree.ItemShape items := by
   induction scan with
@@ -52,6 +60,8 @@ theorem Scan.shape {source approved items} (scan : Scan source approved items) :
   | initialized _ _ _ _ _ _ _ ih => exact .initialized ih
   | discard _ _ _ ih => exact .discard ih
   | assign _ _ profile bare _ _ _ _ ih => exact .assign profile bare ih
+
+  | bitNot _ _ profile bare _ ih => exact .bitNot profile bare ih
 
 private theorem expression_at {source : TypedSource} {context : SourceSemantics.Context}
     {id : ExpressionId} {node : ExpressionNode} {type : TypeSystem.Ty}
@@ -99,6 +109,25 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
         · exact .inl equal
         · exact .inr (.inl (by rw [target, word]; rfl))
 
+/-- Actual original unary typing supplies the declared writable root. -/
+theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
+    {assignment : AssignmentResolution} {binder : TypedBinder}
+    (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
+    (targetType : binder.scheme.body = assignment.target.type)
+    (bare : assignment.target.projections = [])
+    (typed : SourceBitNotAssignmentValid source context assignment) :
+    ∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
+      WritableLocal context assignment.target.root actual.scheme.body := by
+  cases typed with
+  | intro place _ =>
+    cases place with
+    | intro writable projections target =>
+      intro actual actualFound
+      cases Except.ok.inj (declaration.symm.trans actualFound)
+      rw [bare] at projections
+      cases projections
+      exact targetType.symm ▸ target.symm ▸ writable
+
 theorem Scan.syntax {source approved items} (scan : Scan source approved items)
     (unique : NodeOccurrencesUnique source) {control : ControlContext}
     {context final : SourceSemantics.Context}
@@ -137,6 +166,14 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
             subst child
             exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
           · exact ih tail
+
+  | bitNot declaration targetType profile bare remaining ih =>
+      cases typed with
+      | cons head tail =>
+        cases head with
+        | assignBitNot assignment =>
+          exact .bitNot (bitNot_facts declaration targetType bare assignment) bare
+            (.inl (by rw [profile]; rfl)) (ih tail)
 
 
 private theorem binder_final {owner : Resolved.DeclarationId} {context left right : SourceSemantics.Context}

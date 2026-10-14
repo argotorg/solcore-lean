@@ -116,7 +116,7 @@ theorem Profile.at {source : TypedSource} {expressions : List ExpressionId} {roo
   exact ready
 
 private theorem expanded_of_ready {source : TypedSource} {expressions : List ExpressionId}
-    {node : StatementNode} (ready : StatementReady source (fun id => id ∈ expressions) node) :
+    {node : StatementNode} (_ready : StatementReady source (fun id => id ∈ expressions) node) :
     expanded node.form = true := by
   cases form : node.form <;> simp_all [StatementReady, AcceptedNamedBodyFlow.expanded]
 
@@ -183,6 +183,10 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
       simp only [StatementReady, form] at original
       exact False.elim (ready.1 original.1)
+  | bitNotting read form statementType remaining assigned ih =>
+      have original := (profile.at (present _ List.mem_cons_self) (read_found (readPolicy ▸ read))).1
+      simp only [StatementReady, form] at original
+      exact False.elim (ready.1 original)
   | assigned read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1
@@ -193,6 +197,10 @@ private theorem facts_general {policy : SourceCoreLoops.Policy} {checked : Sourc
       rcases List.mem_cons.mp member with rfl | member
       · exact original.2
       · exact next.2.2 actual member
+  | bitNotted read form statementType remaining receipt targetType ih =>
+      have found := read_found (readPolicy ▸ read)
+      exact ih ready (fun id member => present id (List.mem_cons_of_mem _ member))
+        (finish.tail found (by simp [form, stopsHere]))
   | discard read form child generated statementType remaining tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := (profile.at (present _ List.mem_cons_self) found).1

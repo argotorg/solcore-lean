@@ -41,6 +41,9 @@ def of_imperative_compiler
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
+      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+        (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.Syntax header.function.source expressionSyntax
@@ -62,7 +65,7 @@ def of_imperative_compiler
   refine ⟨complete, zero, wellFormed, ?_⟩
   intro child selected
   rw [stages.source selected]
-  exact ⟨expressionSyntax, CallableIndexedOwnedPreparedNamedBranchingCollectors.collected_of_imperative prepared aligned ready wellFormed member receipt operands syntaxTree (children child selected)⟩
+  exact ⟨expressionSyntax, CallableIndexedOwnedPreparedNamedBranchingCollectors.collected_of_imperative prepared aligned ready wellFormed member receipt operands unary syntaxTree (children child selected)⟩
 
 
 include aligned in
@@ -98,6 +101,7 @@ def of_actual
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   apply of_imperative_compiler prepared aligned ready wellFormed complete zero member receipt
     (CallableIndexedOwnedPreparedNamedBranchingCollectors.operands_of_diagnostic prepared aligned diagnostic receiver)
+    (CallableIndexedOwnedPreparedNamedBranchingCollectors.unary_of_diagnostic prepared aligned diagnostic receiver)
     (RecursiveNamedPreparedStageScopes.registry actual) syntaxTree
   intro child selected context fields scope fuel id node lowered declarations approved found typed accepted nativeType native
   have sameSource := (RecursiveNamedPreparedStageScopes.registry actual).source selected

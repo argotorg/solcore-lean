@@ -138,7 +138,7 @@ theorem preserves_fault_with_payload_bounded_for
       FaultTransition (readiness bridge) state ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   exact ProtectedForHeader.Stateful.WithReady.Tree.preserves_fault_reachable_bounded_for_with_eliminator
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)
@@ -156,7 +156,7 @@ theorem preserves_fault_with_payload_bounded_for
       (fun context valid child within => CallableIndexedOwnedAdmittedLexicalReadiness.preserves_at bridge _ (boundedMeaning context valid child within))
       receipt valid ⟨staticFinal, itemTyping⟩ environments heaps locals agrees actualTyped reference read unmapped state gate ready trace bounded
 
-include definitions registered observations producer acquire stateTransport stateBindings unique wellFormed unary in
+include definitions registered producer acquire stateTransport stateBindings unique wellFormed unary in
 theorem reflects_with_payload_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (runtime : ∀ context, validity context → Dynamic.SourceRuntimeValid program context source)
@@ -194,7 +194,7 @@ theorem reflects_with_payload_bounded_for
       context environment ⟨scope, mapping, world, before, store, canonical⟩ state items value finalStore := by
   exact ProtectedForHeader.Stateful.WithReady.Tree.reflects_reachable_bounded_for_with_eliminator
       (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := callerProtocol) (condition := condition) (producer := producer) (acquire := acquire)
       (stateTransport := stateTransport) (stateBindings := stateBindings)
       (readiness := readiness bridge) (facts := ProtectedStateForHeaderSourceSites.Facts source control)

@@ -40,6 +40,9 @@ theorem collected
       (operator = .equal ∨ assignment.target.type = .word) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (choice.invalidOperand site assignment.target.root operator))
+    (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment →
+      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+        (choice.invalidUnary site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
     (syntaxTree : GenericImperativeMatch.Syntax function.source expressionSyntax
@@ -66,7 +69,7 @@ theorem collected
   have declarations := CallableIndexedOwnedPreparedLambdaScopeDeclarations.at_parameters (values := .initial compiled.compatible.checked) code inputs frame captured
   exact CallableIndexedOwnedPreparedNativeBranchingCollectors.collected edited
     (CallableIndexedLambdaBodyViewEdits.avoids view) frame.code.graph.nodeOccurrencesUnique
-    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments operands
+    choice.readPolicy choice.binderPolicy choice.allocationPolicy choice.assignments choice.unaryPolicy operands unary
     choice.matchPolicy choice.matchValues choice.matchDefinitions choice.matchAllocator hidden catalog
     (ledger.trans choice.matchLedger.symm) children
     syntaxTree rfl choice.packet.shape (.refl _) runtime.variables_closed runtime.residual_variables_open sourceSignatures

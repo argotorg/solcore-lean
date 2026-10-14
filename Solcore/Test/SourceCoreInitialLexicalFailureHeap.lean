@@ -85,6 +85,7 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | expressionFault contains otherForm _ | letFault contains otherForm _ _
   | discard contains otherForm _ _ | letUninitialized contains otherForm _ _ _ _
   | assignBare contains otherForm _ _ _ _
+  | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
@@ -140,6 +141,7 @@ theorem ActualHeader.failed_heap
   | returnFault contains otherForm _ | expressionFault contains otherForm _
   | letFault contains otherForm _ _ | discard contains otherForm _ _
   | assignBare contains otherForm _ _ _ _
+  | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
   | letInitialized contains otherForm _ _ _ _ _ =>
@@ -213,7 +215,7 @@ private theorem returned_expression
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible
-  | assignBare contains otherForm _ _ _ _ =>
+  | assignBare contains otherForm _ _ _ _ | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm
     rw [form] at impossible
     cases impossible

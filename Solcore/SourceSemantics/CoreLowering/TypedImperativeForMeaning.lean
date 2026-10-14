@@ -235,7 +235,7 @@ theorem Tree.preservesAt (unique : NodeOccurrencesUnique source)
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before after store ξ contextLocation native outcome resultContext
       environments heaps locals agrees actualTyped reference read unmapped trace
-    exact CompatibleBitNotStatements.assignment_preserves functions program evidence observations
+    exact CompatibleBitNotStatements.assignment_preserves functions program evidence
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped trace
 
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>
@@ -423,7 +423,7 @@ theorem Tree.reflectsAt (functionTypes : FunctionRuntimeViews functions) (unique
   | @bitNot context scope mode id node assignment rest expected type body found form head remaining remainingErrors headErrors ih =>
     intro contextValid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
       environments heaps locals agrees actualTyped reference read unmapped evaluated
-    exact CompatibleBitNotStatements.assignment_reflects functions program evidence observations
+    exact CompatibleBitNotStatements.assignment_reflects functions program evidence
       found form head headErrors unique ih contextValid environments heaps locals agrees actualTyped reference read unmapped evaluated
 
   | @forLoop context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialErrors remainingErrors initialIH restIH =>

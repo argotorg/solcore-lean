@@ -39,6 +39,9 @@ def invalidOperand (site : SourceCoreElaboration.ErrorSite) (root : Resolved.Loc
     (operator : Solcore.Syntax.ValueAssignOp) : Word :=
   if operator = .equal then Word.zero else cached.compilation.own.assignments.reasonAt site root (.value operator)
 
+def invalidUnary (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId) : Word :=
+  cached.compilation.own.assignments.reasonAt site root .bitNot
+
 def missingDefault (site : SourceCoreElaboration.ErrorSite) (root : Resolved.LocalId)
     (type : TypeSystem.Ty) : Word :=
   cached.diagnostics.placeReason cached.named.signature.key site root (some type)
@@ -52,6 +55,11 @@ theorem assignments : CompatibleAssignmentStatements.AssignmentPolicy
   apply congrArg some
   funext expression fuel source scope site assignment operator rhs output next reasonAt
   cases operator <;> rfl
+
+/-- The unary callback uses the same retained method assignment table. -/
+theorem unary : CompatibleBitNotStatements.Policy
+    (policy cached) (.initial compiled.compatible.checked)
+    (invalidProjection cached) (invalidUnary cached) (missingDefault cached) := rfl
 
 theorem read : (policy cached).readStatement =
     SourceCoreCompatibleDataExpressions.readStatement compiled.compatible.checked := rfl
@@ -72,7 +80,7 @@ theorem match_policy : CompatibleMatchAmbientLowering.PolicySuccess
 callbacks. The result preserves code, source, roots, scopes and child budgets. -/
 theorem of_cached : ∃ receipt : BodyAt cached, receipt.tree.Ready := by
   obtain ⟨body⟩ := body_of_accepted cached.compilation.bodyCompiled
-  obtain ⟨tree, ready⟩ := body.tree.refine (assignments cached) (match_policy cached)
+  obtain ⟨tree, ready⟩ := body.tree.refine (assignments cached) (unary cached) (match_policy cached)
   exact ⟨⟨body.flow, tree, body.emitted⟩, ready⟩
 
 /-- Full cached specialization authenticates the method policy at this child. -/

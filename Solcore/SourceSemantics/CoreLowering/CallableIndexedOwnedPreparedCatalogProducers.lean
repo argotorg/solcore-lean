@@ -98,7 +98,7 @@ theorem preserving_loops
     (CallableIndexedOwnedPostReceiptOperations.faultat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative) (faults := faults) bridge functions evidence guard validity budget PreparedHP PreparedR (post_receipt diagnosticPolicy) (CallableIndexedOwnedHeaderReceiptOperations.prepared_FaultAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget meaning assignments))
     meaning
 
-include definitions registered observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded in
+include definitions registered producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded in
 theorem reflecting_loops
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -115,7 +115,7 @@ theorem reflecting_loops
       (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
   exact CallableIndexedOwnedAdmittedCatalogProducers.reflecting_loops_with_receipts (stateTransport := stateTransport) (unique := unique)
     bridge functions evidence guard validity budget PreparedR PreparedHP
-    (CallableIndexedOwnedPostReceiptOperations.reflectsat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative) (faults := faults) bridge functions evidence guard validity budget PreparedHP PreparedR (post_receipt diagnosticPolicy) (CallableIndexedOwnedHeaderReceiptOperations.prepared_ReflectsAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered evidence observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget reflection assignments))
+    (CallableIndexedOwnedPostReceiptOperations.reflectsat_of_header_receipt (source := source) (certificates := certificates) (administrative := administrative) (faults := faults) bridge functions evidence guard validity budget PreparedHP PreparedR (post_receipt diagnosticPolicy) (CallableIndexedOwnedHeaderReceiptOperations.prepared_ReflectsAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered evidence guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget reflection assignments))
     reflection
 
 include definitions registered extension faithful observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded runtimeOf in
@@ -139,7 +139,7 @@ theorem preserving_heads
     (CallableIndexedOwnedHeaderReceiptOperations.prepared_FaultAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered extension evidence faithful observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget meaning assignments)
     meaning
 
-include definitions registered extension observations producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded runtimeOf in
+include definitions registered extension producer acquire stateTransport stateBindings unique wellFormed runtime covers extend unaryTyped issued unaryIncluded runtimeOf in
 theorem reflecting_heads
     (reflection : ∀ context, validity context → Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.ReflectsAt bridge
@@ -156,7 +156,7 @@ theorem reflecting_heads
       (certificates := certificates) (ambient := ambient) (registry := registry) (faults := faults) := by
   exact CallableIndexedOwnedAdmittedCatalogProducers.reflecting_heads_with_receipts
     bridge functions definitions registered extension evidence guard producer acquire stateTransport stateBindings unique validity extend budget runtimeOf PreparedR
-    (CallableIndexedOwnedHeaderReceiptOperations.prepared_ReflectsAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered evidence observations guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget reflection assignments)
+    (CallableIndexedOwnedHeaderReceiptOperations.prepared_ReflectsAt (AP := PreparedAP) (UP := PreparedUP) (unary := (fun head receipt => GenericForHeader.Structural.PreparedUnary.errors receipt unaryTyped issued unaryIncluded)) bridge functions definitions registered evidence guard producer.toOrdinary acquire stateTransport stateBindings unique wellFormed validity runtime covers extend budget reflection assignments)
     reflection
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedCatalogProducers

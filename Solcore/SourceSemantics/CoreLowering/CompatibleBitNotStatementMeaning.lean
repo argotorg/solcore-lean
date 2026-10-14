@@ -15,8 +15,7 @@ variable   {values : ValuesContext} {source : TypedSource}
   {registry : SourceCoreRawMetadata.Registry}
   (program : Program) (evidence : Dynamic.EvidenceEnvironment)
   {faults : FunctionCalls.FaultRep}
-  {identities : Dynamic.Value → Word → Prop}
-  (observations : FunctionObservations values.checked.catalog functions identities)
+
   {assignment : AssignmentResolution}
   (head : Head context scope assignment)
   {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment}
@@ -28,7 +27,7 @@ variable   {values : ValuesContext} {source : TypedSource}
   (agrees : ReadOnly.EnvironmentsAgree ξ canonical actual)
   (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
 
-include observations environments heaps locals agrees actualTyped in
+include environments heaps locals agrees actualTyped in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
       environment before assignment.target updated after) :
@@ -40,11 +39,11 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨_, finalStore, slots, _, finalHeaps, frame, metadata, count, typed, continuation⟩ :=
-    CompatibleRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare observations head.profile
+    CompatibleRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare head.profile
       environments heaps locals agrees actualTyped head.slot head.writable trace (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
   exact ⟨finalStore, mapping, world, slots, finalHeaps, .refl _, .refl _, frame, metadata, count, typed, continuation⟩
 
-include observations environments heaps locals agrees in
+include environments heaps locals agrees in
 theorem preserves_fault (errors : head.Errors faults)
     {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     (trace : Dynamic.SourcePlaceBitNotFaults program context evidence source environment before assignment.target reason after)
@@ -55,11 +54,11 @@ theorem preserves_fault (errors : head.Errors faults)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   obtain ⟨rfl, rfl, evaluated⟩ := CompatibleRenamedBareBitNot.preserves_fault (compilation := values)
-    head.layout head.bare observations head.profile environments heaps locals agrees head.slot head.writable trace
+    head.layout head.bare head.profile environments heaps locals agrees head.slot head.writable trace
       next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
   exact ⟨head.invalid, store, mapping, world, evaluated, errors, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
 
-include observations environments heaps locals agrees actualTyped in
+include environments heaps locals agrees actualTyped in
 theorem reflects (errors : head.Errors faults)
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (completed : Evaluates actual store ((head.emit next output).rename ξ) value finalStore) :
@@ -77,7 +76,7 @@ theorem reflects (errors : head.Errors faults)
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  cases CompatibleRenamedBareBitNot.reflects (compilation := values) head.layout head.bare observations head.profile
+  cases CompatibleRenamedBareBitNot.reflects (compilation := values) head.layout head.bare head.profile
     environments heaps locals agrees actualTyped head.slot head.writable errors completed with
   | fault trace same matched stores =>
     subst finalStore

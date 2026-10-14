@@ -131,7 +131,8 @@ private def support_mixed
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
     support.body.valid.ledger support.body.projection
-    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile)
+    (fun origin rawWord => choiceIssued.unary code support.caller.selected support.source receiver origin rawWord) syntaxTree
     (certificates := fun context => Certificate headers support.caller bodyRegistry faults context child)
     (fun context fields current fuel id node lowered declarations tree reached found typed accepted _nativeType native => by
       have accepted : SourceCoreFunctions.lowerExpressionWithPolicy code.policy code.lowerBody (min fuel code.fuel)

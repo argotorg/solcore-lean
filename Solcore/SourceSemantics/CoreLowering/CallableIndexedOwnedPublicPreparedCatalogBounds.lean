@@ -139,7 +139,7 @@ theorem preserves_flow (budget : Nat)
     (validity := Validity header) (extend := fun valid extended => CallableIndexedOwnedPublicPreparedSourceSites.validity_extend header valid extended)
     (budget := budget)
     (sites := inputs.sites) (assignmentSites := inputs.assignments) (initializerSites := inputs.initializers)
-    (transfers := inputs.transfers) (snapshots := inputs.snapshots) (observations := observations)
+    (transfers := inputs.transfers) (snapshots := inputs.snapshots)
     (assignments := fun context valid => CallableIndexedOwnedAdmittedForHeaderReadiness.assignment_prefix
       (values := (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)) (ambient := (CallableIndexedAmbient.ambientDefinitions compiled.indexed)) (certificate := (CallableIndexedOwnedReadyNamedFamilyClosure.certificates (headers := headers) compilation header) context) (administrative := (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) (faults := faults)
       bridge functions extension (header.function.evidence) transport faithful observations header.unique wellFormed valid.2 valid.1.covers budget (below context valid))
@@ -226,20 +226,20 @@ theorem reflects_flow (budget : Nat) (_functionTypes : FunctionRuntimeViews func
     (producer := producer) (stateTransport := transport) (stateBindings := bindings) (acquire := acquire)
     (validity := Validity header) (extend := fun valid extended => CallableIndexedOwnedPublicPreparedSourceSites.validity_extend header valid extended)
     (budget := budget) (sites := inputs.sites) (assignmentSites := inputs.assignments) (initializerSites := inputs.initializers)
-    (transfers := inputs.transfers) (snapshots := inputs.snapshots) (observations := observations)
+    (transfers := inputs.transfers) (snapshots := inputs.snapshots)
     (reflection := fun context valid child within => CallableIndexedOwnedAdmittedLexicalReadiness.reflects_at bridge _ (_reflection context valid child within))
     receipt.unaryTyped receipt.assignments unaryIncluded receipt.catalog assignments header.unique
     (CallableIndexedOwnedPreparedCatalogProducers.reflecting_heads
       (values := (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)) (ambient := (CallableIndexedAmbient.ambientDefinitions compiled.indexed)) (source := (header.function.source)) (expressionSyntax := expressionSyntax header)
       (certificates := (CallableIndexedOwnedReadyNamedFamilyClosure.certificates (headers := headers) compilation header)) (administrative := (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) (factory := (AssignmentDiagnosticOrigins.Factory.prepared receipt.operandsTyped receipt.assignments)) (invalidProjection := (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection issued.original.prepared)) (missingDefault := (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault issued.original.prepared))
-      bridge functions header.definitions_eq header.registered extension (header.function.evidence) observations condition producer acquire transport bindings header.unique wellFormed
+      bridge functions header.definitions_eq header.registered extension (header.function.evidence) condition producer acquire transport bindings header.unique wellFormed
       (Validity header) (fun _ valid => valid.2) (fun _ valid => valid.1.covers)
       (fun valid extended => CallableIndexedOwnedPublicPreparedSourceSites.validity_extend header valid extended)
       budget .reachable (fun _ valid => valid.1) receipt.unaryTyped receipt.assignments unaryIncluded _reflection assignments)
     (CallableIndexedOwnedPreparedCatalogProducers.reflecting_loops
       (values := (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)) (ambient := (CallableIndexedAmbient.ambientDefinitions compiled.indexed)) (source := (header.function.source)) (expressionSyntax := expressionSyntax header)
       (certificates := (CallableIndexedOwnedReadyNamedFamilyClosure.certificates (headers := headers) compilation header)) (administrative := (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: administrative)) (factory := (AssignmentDiagnosticOrigins.Factory.prepared receipt.operandsTyped receipt.assignments)) (invalidProjection := (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidProjection issued.original.prepared)) (missingDefault := (RecursiveNamedPreparedHeaderPolicies.Prepared.missingDefault issued.original.prepared))
-      bridge functions header.definitions_eq header.registered (header.function.evidence) observations condition producer acquire transport bindings header.unique wellFormed
+      bridge functions header.definitions_eq header.registered (header.function.evidence) condition producer acquire transport bindings header.unique wellFormed
       (Validity header) (fun _ valid => valid.2) (fun _ valid => valid.1.covers)
       (fun valid extended => CallableIndexedOwnedPublicPreparedSourceSites.validity_extend header valid extended)
       budget .reachable receipt.unaryTyped receipt.assignments unaryIncluded _reflection assignments)

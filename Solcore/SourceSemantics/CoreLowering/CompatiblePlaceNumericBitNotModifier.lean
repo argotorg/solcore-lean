@@ -10,8 +10,7 @@ open Core Frontend GeneralHeap CompatiblePayload CompatibleEquality SourceCoreCo
 theorem success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
     {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations checked.catalog functions identities)
+
     {sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}
     (profile : SourceCoreRawMetadata.runtimeType sourceType = .word ∨ SourceCoreRawMetadata.runtimeType sourceType = .integer)
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
@@ -23,7 +22,7 @@ theorem success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧
       ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot source := by
   rcases profile with word | integer
-  · exact CompatiblePlaceBitNotModifier.word_success observations word represented selected operator store invalid
-  · exact IntegerBitNotSnapshot.compatible_success observations integer represented selected operator store invalid
+  · exact CompatiblePlaceBitNotModifier.word_success word represented selected operator store invalid
+  · exact IntegerBitNotSnapshot.compatible_success integer represented selected operator store invalid
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceNumericBitNotModifier

@@ -98,7 +98,7 @@ local notation "PreparedR" => ProtectedStateImperativeCatalogPayload.StructuralH
   (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions)
   (administrative := administrative) PreparedAP PreparedUP
 
-include definitions registered stateTransport stateBindings producer acquire meaningMost observations extend sites transfers assignmentSites initializerSites snapshots assignments in
+include definitions registered stateTransport stateBindings producer acquire meaningMost extend sites transfers assignmentSites initializerSites snapshots assignments in
 theorem preservesAt_match_coupled
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -142,7 +142,7 @@ theorem preservesAt_match_coupled
     (snapshotFacts := snapshotFacts) (producer := producer) (stateTransport := stateTransport)
     (stateBindings := stateBindings) (acquire := acquire) (validity := validity) (extend := extend)
     (budget := budget) (sites := sites) (assignmentSites := assignmentSites) (initializerSites := initializerSites)
-    (transfers := transfers) (snapshots := snapshots) (observations := observations)
+    (transfers := transfers) (snapshots := snapshots)
     (assignments := assignments) (meaningMost := meaningMost)
     PreparedAP PreparedUP PreparedHP PreparedMP PreparedR
     (ProtectedStateImperativeCatalogPayload.structural_header_algebra
@@ -154,7 +154,7 @@ theorem preservesAt_match_coupled
     assignmentFaultsWithPayload unique headFor loopFor
     (GenericImperativeMatch.Structural.of_coupled PreparedMP matchSupplier coupled tokens)
 
-include definitions registered stateTransport stateBindings producer acquire meaningMost observations extend sites transfers assignmentSites initializerSites snapshots assignments in
+include definitions registered stateTransport stateBindings producer acquire meaningMost extend sites transfers assignmentSites initializerSites snapshots assignments in
 theorem preservesAt_match_catalog_coupled
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -194,7 +194,7 @@ theorem preservesAt_match_catalog_coupled
     (snapshotFacts := snapshotFacts) (producer := producer) (stateTransport := stateTransport)
     (stateBindings := stateBindings) (acquire := acquire) (validity := validity) (extend := extend)
     (budget := budget) (sites := sites) (assignmentSites := assignmentSites) (initializerSites := initializerSites)
-    (transfers := transfers) (snapshots := snapshots) (observations := observations)
+    (transfers := transfers) (snapshots := snapshots)
     (assignments := assignments) (meaningMost := meaningMost)
     PreparedAP PreparedUP PreparedHP PreparedMP PreparedR
     (ProtectedStateImperativeCatalogPayload.structural_header_algebra
@@ -285,7 +285,7 @@ local notation "PreparedR" => ProtectedStateImperativeCatalogPayload.StructuralH
   (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions)
   (administrative := administrative) PreparedAP PreparedUP
 
-include definitions registered stateTransport stateBindings producer acquire reflection observations extend sites transfers assignmentSites initializerSites snapshots in
+include definitions registered stateTransport stateBindings producer acquire reflection extend sites transfers assignmentSites initializerSites snapshots in
 theorem reflectsAt_match_coupled
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -329,7 +329,7 @@ theorem reflectsAt_match_coupled
     (snapshotFacts := snapshotFacts) (producer := producer) (stateTransport := stateTransport)
     (stateBindings := stateBindings) (acquire := acquire) (validity := validity) (extend := extend)
     (budget := budget) (sites := sites) (assignmentSites := assignmentSites) (initializerSites := initializerSites)
-    (transfers := transfers) (snapshots := snapshots) (observations := observations)
+    (transfers := transfers) (snapshots := snapshots)
     (reflection := reflection)
     PreparedAP PreparedUP PreparedHP PreparedMP PreparedR
     (ProtectedStateImperativeCatalogPayload.structural_header_algebra
@@ -341,7 +341,7 @@ theorem reflectsAt_match_coupled
     assignmentsWithPayload _unique headFor loopFor
     (GenericImperativeMatch.Structural.of_coupled PreparedMP matchSupplier coupled tokens)
 
-include definitions registered stateTransport stateBindings producer acquire reflection observations extend sites transfers assignmentSites initializerSites snapshots in
+include definitions registered stateTransport stateBindings producer acquire reflection extend sites transfers assignmentSites initializerSites snapshots in
 theorem reflectsAt_match_catalog_coupled
     (unaryTyped : EmittedDiagnosticTokenPlan.UnaryTyped source)
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
@@ -381,7 +381,7 @@ theorem reflectsAt_match_catalog_coupled
     (snapshotFacts := snapshotFacts) (producer := producer) (stateTransport := stateTransport)
     (stateBindings := stateBindings) (acquire := acquire) (validity := validity) (extend := extend)
     (budget := budget) (sites := sites) (assignmentSites := assignmentSites) (initializerSites := initializerSites)
-    (transfers := transfers) (snapshots := snapshots) (observations := observations)
+    (transfers := transfers) (snapshots := snapshots)
     (reflection := reflection)
     PreparedAP PreparedUP PreparedHP PreparedMP PreparedR
     (ProtectedStateImperativeCatalogPayload.structural_header_algebra

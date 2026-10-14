@@ -34,8 +34,7 @@ theorem resolves {program : Program} {context : SourceSemantics.Context} {eviden
 /-- A present numeric root creates a single mapped write. Getter and setter
 allocate no administrative cells, so both map and world are unchanged. -/
 theorem initialized_commit (layout : Layout prepared)
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     {sourceValue : Dynamic.Value} {value : Value} {environment : Environment}
@@ -51,7 +50,7 @@ theorem initialized_commit (layout : Layout prepared)
       Nonempty (CompatiblePlaceBitNotCommit.Execution checked registry functions prepared [] environment store mapping world
         target [] value heap after replacement operator invalid) := by
   obtain ⟨replacement, changed, related, applies, modified, _⟩ :=
-    CompatiblePlaceNumericBitNotModifier.success observations profile represented
+    CompatiblePlaceNumericBitNotModifier.success profile represented
       (environment := rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit environment)
       (rhs := .var 0) (.var (index := 1) rfl) operator store invalid
   have written := DataPlaceCommitReflection.source_writes read replacement
@@ -84,8 +83,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {place : PlaceResolution} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {faults : FaultRep} {index : Nat}
     (layout : Layout prepared) (bare : place.projections = [])
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -120,7 +118,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     have trace := resolves (program := program) (context := context) (evidence := evidence) (source := source)
       bare sourceLookup sourceRead Dynamic.RootInitialValue.initialized
     obtain ⟨replacement, sourceAfter, applies, written, ⟨commit⟩⟩ :=
-      initialized_commit layout observations profile heaps reference sourceRead nativeRead related operator invalid
+      initialized_commit layout profile heaps reference sourceRead nativeRead related operator invalid
     have update : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
         environment heap place replacement sourceAfter :=
       .intro trace (.intro sourceRead rfl .initialized (.leaf applies) written)

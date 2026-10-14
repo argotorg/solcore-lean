@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CompatibleRawScalarFields
 import Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
 import Solcore.SourceSemantics.CoreLowering.DataPlaceCommitReflection
 
@@ -41,8 +42,7 @@ theorem native_reflects (value : Int) {environment : Environment} {snapshot rhs 
 theorem compatible_success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
     {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations checked.catalog functions identities)
+
     {sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}
     (profile : SourceCoreRawMetadata.runtimeType sourceType = .integer)
     (represented : ValueRep checked registry functions mapping world sourceType source value type)
@@ -53,11 +53,7 @@ theorem compatible_success {checked : Checked} {registry : SourceCoreRawMetadata
       Dynamic.BitNotSnapshot (some source) result ∧
       Evaluates environment store (modified type operator true snapshot rhs invalid) (.inRight .word native) store ∧
       ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot source := by
-  have projected : checked.catalog.project sourceType = .ok .integer := by
-    rw [← checked.catalog.project_runtimeType sourceType, profile]; rfl
-  have same := Except.ok.inj (represented.projection.symm.trans projected)
-  subst type
-  obtain ⟨integer, rfl, rfl⟩ := CompatiblePlaceModifier.integer_fields observations represented
+  obtain ⟨integer, rfl, rfl, rfl⟩ := CompatibleRawScalarFields.integer_fields represented profile
   obtain ⟨applies, evaluated, valid⟩ := native_success integer selected operator store invalid
   exact ⟨_, _, .compatible (actual := .integer) profile (.integer (~~~integer)), applies, evaluated, valid⟩
 

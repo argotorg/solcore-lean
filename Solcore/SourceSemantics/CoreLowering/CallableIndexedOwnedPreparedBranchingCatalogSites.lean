@@ -198,6 +198,18 @@ namespace Collected
   intro registry
   exact .assign (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) (reachable_bare (empty_steps head.shape bare) operands)
 
+ theorem bitNot {context scope mode id node assignment rest expected type body}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
+      (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode rest) expected type body)
+    (unary : head.Errors faults) :
+      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.statements mode (id :: rest)) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.bitNot found form head remaining.tree, ?_⟩
+  intro registry
+  exact .bitNot (found := found) (form := form) (head := head) (remaining := remaining.tree) (remaining.sites registry) unary
+
  theorem matchWith {context scope mode id node resolution scrutineeNode rest expected type matched body selfReason control caseFacts}
       (found : source.lookupStatement? id = some node) (form : node.form = .matchWith resolution)
       (scrutineeFound : source.lookupExpression? resolution.scrutinee = some scrutineeNode)
@@ -385,6 +397,18 @@ namespace Collected
   exact .initializerAssign (head := head) (remaining := remaining.tree)
     (remaining.sites registry)
     (reachable_bare (empty_steps head.shape bare) operands)
+ theorem initializerBitNot {context scope assignment rest body condition post statements expected type}
+      (head : CompatibleBitNotStatements.Head context scope assignment)
+      (remaining : Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers rest condition post statements) expected type body)
+      (unary : head.Errors faults) :
+      Collected (faults := faults) layouts owner active frame globals onError values source expressionSyntax certificates definitions administrative
+        context scope (.initializers (.assignBitNot assignment :: rest) condition post statements) expected type (head.emit body (LocalLoop.controlType type)) := by
+  refine ⟨.initializerBitNot head remaining.tree, ?_⟩
+  intro registry
+  exact .initializerBitNot (head := head) (remaining := remaining.tree)
+    (remaining.sites registry)
+    unary
 
 end Collected
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedBranchingCatalogSites

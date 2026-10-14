@@ -214,8 +214,7 @@ variable {Records : Type v} (protocol : Protocol.{u, v} Records)
   (functions : FunctionModel values.checked.catalog ambient)
   (definitions : layouts.definitions = ambient.definitions) (registered : frame.Registered ambient.definitions)
   {registry : SourceCoreRawMetadata.Registry} (program : Program) (evidence : Dynamic.EvidenceEnvironment)
-  {faults : FunctionCalls.FaultRep} {identities : Dynamic.Value → Word → Prop}
-  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+  {faults : FunctionCalls.FaultRep}
   (producer : OrdinaryAllocation.Producer protocol layouts frame (CompatibleAmbientHeap.payloadModel values.checked registry functions))
   (acquire : ∀ location native, conditionGate location native → OrdinaryAllocation.ReadyAt producer location native)
   (stateTransport : AdministrativeTransport protocol) (stateBindings : Bindings protocol)
@@ -273,7 +272,7 @@ theorem header_reflects_at_with_result (size : Nat) (bounded : size ≤ budget)
     exact ⟨_, _, _, _, _, .fault (.forInitializer (lookupStatement?_sound found) form trace),
       (by intro next impossible; cases impossible), .fault matched, heaps, maps, worlds, frame, metadata, transition⟩
 
-include definitions registered observations producer acquire stateTransport stateBindings assignments reflection extend solved in
+include definitions registered producer acquire stateTransport stateBindings assignments reflection extend solved in
 theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget)
     (found : source.lookupStatement? id = some node) (form : node.form = .forLoop items condition post statements)
     {continuation : SourceSemantics.Context → Scope → Expr → Prop}
@@ -291,7 +290,7 @@ theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget)
   intro valid mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
     environments heaps locals agrees actualTyped reference read unmapped initial guarded evaluated
   have result := ProtectedForHeader.Stateful.Tree.reflects_reachable_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-        (program := program) (evidence := evidence) (observations := observations)
+        (program := program) (evidence := evidence)
         (protocol := protocol) (condition := conditionGate) (producer := producer) (acquire := acquire)
         (stateTransport := stateTransport) (stateBindings := stateBindings)
         validity extend budget assignments reflection header errors
@@ -300,7 +299,7 @@ theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget)
     (protocol := protocol) (conditionGate := conditionGate) (validity := validity) (budget := budget)
     size bounded found form loopCorrect initial result
 
-include definitions registered observations producer acquire stateTransport stateBindings assignments reflection extend solved in
+include definitions registered producer acquire stateTransport stateBindings assignments reflection extend solved in
 theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget)
     {condition : ExpressionId} {conditionNode : ExpressionNode}
     {statements : List StatementId} {post : List ForItemForm} {expected : TypeSystem.Ty}
@@ -327,7 +326,7 @@ theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget)
       intro actualContext environment canonical actual ξ contextLocation location actualAgrees actualReference actualValid
         child small mapping world before store finalStore value state native realRead guarded continued execution
       exact ProtectedForHeader.Stateful.post_reflects_reachable_bounded_for (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-        (program := program) (evidence := evidence) (observations := observations)
+        (program := program) (evidence := evidence)
         (protocol := protocol) (guard := conditionGate) (producer := producer) (acquire := acquire)
         (stateTransport := stateTransport) (stateBindings := stateBindings)
         validity extend budget assignments reflection postTree postErrors
@@ -403,16 +402,14 @@ variable (extension : SourceCoreRawMetadata.Extends values.registry registry)
 variable {context : SourceSemantics.Context} {scope : Scope} {id : StatementId} {node : StatementNode}
   {items post : List ForItemForm} {condition : ExpressionId} {statements : List StatementId}
   {expected : TypeSystem.Ty} {type : Ty} {code conditionCode postCode : Expr} {selfReason : Word}
-  {identities : Dynamic.Value → Word → Prop}
-  (faithful : DataEquality.IdentityFaithful identities)
-  (observations : CompatibleEquality.FunctionObservations values.checked.catalog functions identities)
+
 
 
 variable (reflection : ∀ context, validity context →
   Below budget (fun size => ExpressionReflectsAt protocol readiness program evidence
     (CompatibleAmbientHeap.payloadModel values.checked registry functions) exprFacts (certificates context)
     (context := context) (source := source) (faults := faults) size))
-include definitions registered stateTransport stateBindings producer acquire reflection observations extend sites transfers assignmentSites initializerSites snapshots in
+include definitions registered stateTransport stateBindings producer acquire reflection extend sites transfers assignmentSites initializerSites snapshots in
 theorem reflectsAt_match_with_eliminator
     (AP : GenericImperativeMatch.Structural.AssignmentPayload (values := values) (source := source) (certificates := certificates) (administrative := administrative) (definitions := ambient.definitions)) (UP : GenericImperativeMatch.Structural.UnaryPayload)
     (HP : GenericImperativeMatch.Structural.HeaderPayload (layouts := layouts) (owner := owner) (active := active) (frame := frame) (globals := globals) (onError := onError) (values := values) (source := source) (certificates := certificates) (definitions := ambient.definitions) (administrative := administrative)) (MP : GenericImperativeMatch.Structural.MatchPayload)
@@ -671,7 +668,7 @@ theorem reflectsAt_match_with_eliminator
     · intro context scope mode id node assignment rest expected type body found form head remaining ih headErrors
       intro size bounded contextValid sourceFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value environments heaps locals agrees actualTyped reference read unmapped installed guarded initialReady evaluated
       apply measure_result
-      rcases head.reflects_sized functions program evidence observations
+      rcases head.reflects_sized functions program evidence
         environments heaps locals agrees actualTyped (unaryErrors headErrors) evaluated with
         ⟨sourceSize, reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
         ⟨sourceSize, updated, middle, written, middleMap, middleWorld, slots, remainingSize, trace, middleHeaps, maps, worlds, frame, metadata, count, typed, smaller, continuation⟩
@@ -770,7 +767,7 @@ theorem reflectsAt_match_with_eliminator
         (ReachableMatchContinuations.DefaultStopped.terminates exactUnique stops)
   exact eliminator _ algebra
 
-include definitions registered stateTransport stateBindings producer acquire reflection observations extend sites transfers assignmentSites initializerSites snapshots assignments in
+include definitions registered stateTransport stateBindings producer acquire reflection extend sites transfers assignmentSites initializerSites snapshots assignments in
 theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (_unique : NodeOccurrencesUnique source)
     {context : SourceSemantics.Context} {scope : Scope} {position : Position}
     {expected : TypeSystem.Ty} {type : Ty} {code : Expr}
@@ -800,7 +797,7 @@ theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (_
     (snapshotFacts := snapshotFacts) (producer := producer) (stateTransport := stateTransport)
     (stateBindings := stateBindings) (acquire := acquire) (validity := validity) (extend := extend)
     (budget := budget) (sites := sites) (assignmentSites := assignmentSites) (initializerSites := initializerSites)
-    (transfers := transfers) (snapshots := snapshots) (observations := observations)
+    (transfers := transfers) (snapshots := snapshots)
     (reflection := reflection)
     (fun head => head.ErrorsFor diagnosticPolicy registry faults) (fun head => head.Errors faults)
     (fun postTree => GenericForHeader.Tree.ErrorsFor diagnosticPolicy registry faults postTree)
@@ -899,7 +896,7 @@ theorem reflecting_heads_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy)
     obtain ⟨header, errors⟩ := reflects_goal_forget_true (protocol := protocol) (conditionGate := conditionGate)
       (functions := functions) (program := program) (evidence := evidence) child
     exact Stateful.header_reflects_at_with (protocol := protocol) (conditionGate := conditionGate) (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (producer := producer.toOrdinary) (acquire := acquire) (stateTransport := stateTransport) (stateBindings := stateBindings)
       (validity := validity) (extend := extend) (budget := budget) (solved := solved)
       (assignments := assignments) (reflection := reflection)
@@ -939,7 +936,7 @@ theorem reflecting_loops_trivial (diagnosticPolicy : AssignmentDiagnosticPolicy)
   | mk conditionFound _conditionType conditionTree loopTree postTree postErrors nativeTyped child =>
     apply loop_reflects_of_true (protocol := protocol) (conditionGate := conditionGate) (functions := functions) (program := program) (evidence := evidence)
     exact Stateful.loop_reflects_at_with (protocol := protocol) (conditionGate := conditionGate) (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (producer := producer.toOrdinary) (acquire := acquire) (stateTransport := stateTransport) (stateBindings := stateBindings)
       (validity := validity) (extend := extend) (budget := budget) (solved := solved)
       (assignments := assignments) (reflection := reflection)
@@ -1048,7 +1045,7 @@ theorem reflectsAt_match_with (diagnosticPolicy : AssignmentDiagnosticPolicy) (f
     (initializerSites := ProtectedStateImperativeCatalogReady.InitializerSites.trivial source)
     (assignmentSites := ProtectedStateImperativeCatalogReady.AssignmentSites.trivial source)
     (producer := producer) (stateTransport := stateTransport) (stateBindings := stateBindings) (acquire := acquire)
-    (validity := validity) (extend := extend) (budget := budget) (observations := observations)
+    (validity := validity) (extend := extend) (budget := budget)
     (transfers := RecursiveNamedLexicalContracts.Stateful.WithReady.AllocationTransfers.trivial (protocol := protocol) stateBindings source)
     (snapshots := ProtectedForHeader.Stateful.WithReady.SnapshotTransfers.trivial protocol validity program evidence source)
     (assignments := fun context valid => ProtectedForHeader.Stateful.WithReady.assignment_reflection_trivial
@@ -1113,7 +1110,7 @@ theorem header_reflects_at_with (size : Nat) (bounded : size ≤ budget) (functi
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, restores, represented, finalHeaps, maps, worlds, preservation, metadata, _transition⟩ :=
     Stateful.header_reflects_at_with
       (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
       (producer := ForCompatibility.legacyProducer functions transport bindings)
       (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)
@@ -1154,7 +1151,7 @@ theorem loop_reflects_at_with (size : Nat) (bounded : size ≤ budget) (function
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, preservation, metadata, transition⟩ :=
     Stateful.loop_reflects_at_with
       (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-      (program := program) (evidence := evidence) (observations := observations)
+      (program := program) (evidence := evidence)
       (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (conditionGate := fun _ _ => True)
       (producer := ForCompatibility.legacyProducer functions transport bindings)
       (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)

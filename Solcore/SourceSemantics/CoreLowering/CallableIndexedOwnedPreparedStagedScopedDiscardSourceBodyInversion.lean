@@ -96,6 +96,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
     have impossible := shape actual
     rw [same] at impossible
     cases impossible
+  | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignBare actual same _ _ _ _ =>
     have impossible := shape actual
     rw [same] at impossible

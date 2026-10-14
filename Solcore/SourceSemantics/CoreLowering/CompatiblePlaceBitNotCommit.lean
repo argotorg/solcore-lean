@@ -91,7 +91,7 @@ theorem of_write_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
     obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
     rw [resolution.selectedEq] at applies
     obtain ⟨replacement', replacementValue, replacementRep, applies', modifiedEvaluated, _⟩ :=
-      CompatiblePlaceNumericBitNotModifier.success observations profile snapshotRep
+      CompatiblePlaceNumericBitNotModifier.success profile snapshotRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit coreEnvironment)
         (.var (index := 1) rfl) operator resolution.store invalid

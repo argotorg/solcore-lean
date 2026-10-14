@@ -181,7 +181,7 @@ theorem Tree.reflects (functionTypes : FunctionRuntimeViews functions)
       exact reflected.prepend (.assignValue trace) maps worlds preservation metadata
 
   | @bitNot context scope assignment rest body head remaining remainingErrors headErrors ih =>
-    rcases head.reflects functions program evidence observations
+    rcases head.reflects functions program evidence
       environments heaps locals agrees actualTyped headErrors evaluated with
       ⟨reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
       ⟨updated, middle, written, middleMap, middleWorld, slots, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, remainingEval⟩

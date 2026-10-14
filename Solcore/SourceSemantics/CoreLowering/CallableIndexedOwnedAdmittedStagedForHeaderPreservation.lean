@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedBareBitNotHeads
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForPostContracts
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedForItemsTyping
@@ -338,6 +339,48 @@ theorem preserves_at {budget : Nat}
         exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
           maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
           last, callerProtocol.trans related lastRelated, post⟩
-  | bitNot remainingErrors headErrors ih => cases shape
+  | @bitNot context scope assignment rest body head remaining tailSites headErrors ih =>
+      obtain ⟨_word, _bare, tailShape⟩ := shape.bitNot_tail
+      have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
+      rcases CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion.bitNot trace with
+        ⟨reason, sameSize, contextEq, outcomeEq, heapEq, failed⟩ |
+        ⟨tailSize, target, updated, written, sameSize, snapshot, write, remainingTrace⟩
+      ·
+        subst finalContext
+        subst outcome
+        subst after
+        obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
+            preservation, reached, related, stable⟩ :=
+          CallableIndexedOwnedAdmittedStagedBareBitNotHeads.preserves_fault
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions transport head environments heaps locals agrees initial admitted
+            headErrors failed body (LocalLoop.controlType type)
+        exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault (semantic _ _ matched), finalHeaps,
+          maps, worlds, preservation, .refl _, reached, related, fault_post bridge (context := context) (expected := expected) (failure := .semantic reason) reached stable⟩
+      · have tailWithin : tailSize ≤ budget := Nat.le_trans (Nat.le_of_lt (by
+          rw [sameSize]; exact Staging.Recursive.Size.child_lt_stepSize (by simp))) within
+        obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
+            count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
+          CallableIndexedOwnedAdmittedStagedBareBitNotHeads.preserves_value
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
+            snapshot write
+        obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
+            finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
+          ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
+            (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
+            ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
+            (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
+            reached conditioned nextAdmitted remainingTrace
+        have native := (continuation body (LocalLoop.controlType type)).wrap (by
+          simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
+            SourceCoreDataPlaces.shift] using evaluated)
+        exact ⟨value, finalStore, finalMap, finalWorld, native, represented, finalHeaps,
+          maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
+          last, callerProtocol.trans related lastRelated, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderPreservation

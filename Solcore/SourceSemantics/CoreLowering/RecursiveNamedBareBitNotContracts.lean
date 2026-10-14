@@ -21,8 +21,7 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 Core derivation. Source updates have no expression child; continuation
 agreement transports results but supplies no execution-size bound. -/
 theorem initialized_prefix_sized (layout : Layout prepared)
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (heaps : HeapRepresents checked registry functions mapping world heap store)
@@ -51,7 +50,7 @@ theorem initialized_prefix_sized (layout : Layout prepared)
         ∃ remainingSize, remainingSize < size ∧ CoreProof.EvaluationSize remainingSize (slots ++ actual)
           finalStore (shift 7 (next.rename ξ)) result after := by
   obtain ⟨updated, replacement, related, applies, modified, _⟩ :=
-    CompatiblePlaceNumericBitNotModifier.success observations profile represented
+    CompatiblePlaceNumericBitNotModifier.success profile represented
       (environment := rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
       (snapshot := .var 1) (rhs := .var 0) (.var rfl) operator store invalid
   have written := DataPlaceCommitReflection.source_writes read updated

@@ -670,9 +670,6 @@ theorem extraction_of_typed_position_with_coupled (residualMode : Bool) (diagnos
     declarations projection accepted nativeTyped
   exact ⟨receipt.original⟩
 
-abbrev extraction_of_typed_position_with_coupled.match_1_11 :=
-  @extraction_of_typed_position_with_catalog_coupled.match_1_11
-
 theorem extraction_of_typed_position_with_tokens (residualMode : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand)
     (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
@@ -718,8 +715,6 @@ theorem extraction_of_typed_position_with_tokens (residualMode : Bool) (diagnost
       context scope position expected type code) := by
   obtain ⟨produced⟩ := extraction_of_typed_position_with_coupled residualMode diagnosticPolicy factory matchPolicy matchValues matchDefinitions matchAllocator matchChildStatic readPolicy binderPolicy allocationPolicy expressions assignments unaryPolicy unique assignmentExpressions syntaxTree closed residual sourceSignatures declarations projection accepted nativeTyped
   exact ⟨produced.original.original⟩
-
-abbrev extraction_of_typed_position_with_tokens.match_1_11 := @extraction_of_typed_position_with_coupled.match_1_11
 
 theorem extraction_of_typed_position_with_emitted (residualMode : Bool) (diagnosticPolicy : AssignmentDiagnosticPolicy) {tracked : Bool}
     (factory : AssignmentDiagnosticOrigins.Factory tracked diagnosticPolicy source invalidOperand)

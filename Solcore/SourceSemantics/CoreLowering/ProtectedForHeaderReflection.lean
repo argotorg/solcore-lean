@@ -56,7 +56,7 @@ variable (readiness : Readiness protocol)
   (sites : StaticSites facts itemFacts exprFacts assignmentFacts snapshotFacts program evidence source)
   (transfers : AllocationTransfers protocol readiness stateBindings source)
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers in
 theorem Tree.reflects_reachable_bounded_for_with_eliminator
     (AP : GenericForHeader.Structural.AssignmentPayload values source certificates administrative ambient.definitions)
     (UP : GenericForHeader.Structural.UnaryPayload)
@@ -238,7 +238,7 @@ theorem Tree.reflects_reachable_bounded_for_with_eliminator
       have headErrors := unaryErrors head headPayload
       have itemFact := sites.head itemsFacts
       have snapshotFact := sites.snapshot itemFact
-      rcases head.reflects_sized functions program evidence observations
+      rcases head.reflects_sized functions program evidence
         environments heaps locals agrees actualTyped headErrors evaluated with
         ⟨sourceSize, reason, token, after, finalMap, finalWorld, trace, rfl, matched, finalHeaps, maps, worlds, preservation, metadata⟩ |
         ⟨sourceSize, updated, middle, written, middleMap, middleWorld, slots, remainingSize, trace, middleHeaps, maps, worlds, preservation, metadata, count, typed, smaller, remainingEval⟩
@@ -257,7 +257,7 @@ theorem Tree.reflects_reachable_bounded_for_with_eliminator
         exact reflected.prepend middleState (stateTransport.related state maps worlds preservation metadata) (.assignBitNot trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
   exact eliminator M algebra valid itemsFacts environments heaps locals agrees actualTyped reference read unmapped state gate ready evaluated bounded
 
-include definitions registered observations producer acquire stateTransport stateBindings sites transfers in
+include definitions registered producer acquire stateTransport stateBindings sites transfers in
 theorem Tree.reflects_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (snapshots : SnapshotTransfers protocol readiness validity snapshotFacts program evidence source)
@@ -293,7 +293,7 @@ theorem Tree.reflects_reachable_bounded_for
       context environment ⟨scope, mapping, world, before, store, canonical⟩ state items value finalStore := by
   exact Tree.reflects_reachable_bounded_for_with_eliminator
     (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := readiness) (facts := facts) (itemFacts := itemFacts) (exprFacts := exprFacts)
@@ -305,7 +305,7 @@ theorem Tree.reflects_reachable_bounded_for
 
 end WithReady
 
-include definitions registered observations producer acquire stateTransport stateBindings in
+include definitions registered producer acquire stateTransport stateBindings in
 theorem Tree.reflects_reachable_bounded_for
     (validity : SourceSemantics.Context → Prop)
     (extend : ∀ {context next : SourceSemantics.Context} {binder : TypedBinder},
@@ -339,7 +339,7 @@ theorem Tree.reflects_reachable_bounded_for
       context environment ⟨scope, mapping, world, before, store, canonical⟩ state items value finalStore := by
   have result := WithReady.Tree.reflects_reachable_bounded_for
     (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := protocol) (condition := condition) (producer := producer) (acquire := acquire)
     (stateTransport := stateTransport) (stateBindings := stateBindings)
     (readiness := RecursiveNamedLexicalContracts.Stateful.WithReady.Readiness.trivial protocol)
@@ -425,7 +425,7 @@ theorem Tree.reflects_reachable_bounded_for
       context environment before items mapping world store value finalStore := by
   have result := Stateful.Tree.reflects_reachable_bounded_for
     (solved := solved) (functions := functions) (definitions := definitions) (registered := registered)
-    (program := program) (evidence := evidence) (observations := observations)
+    (program := program) (evidence := evidence)
     (protocol := ProtectedStateTransition.Lexical.legacyProtocol entry) (condition := fun _ _ => True)
     (producer := legacyProducer functions transport bindings)
     (acquire := fun location native _ => ProtectedStateTransition.OrdinaryAllocation.administrative_readyAt _ _ _ _ _ _ location native)

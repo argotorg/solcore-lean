@@ -20,13 +20,10 @@ def HeaderReady (source : TypedSource) (reached : ExpressionId → Prop) : ForIt
   | .letDecl binder initializer => binder.scheme.quantified = [] ∧ ∀ expression ∈ initializer.toList, reached expression
   | .expression expression => reached expression
   | .assignValue assignment operator expression => Assignable source assignment operator ∧ reached expression
-  | .assignBitNot _ => False
+  | .assignBitNot assignment => BitNotAssignable source assignment
 
 theorem header_forms {source reached items}
-    (ready : ∀ item ∈ items, HeaderReady source reached item) : HeaderForms items := by
-  intro item member assignment same
-  have found := ready item member
-  simp only [same, HeaderReady] at found
+    (_ready : ∀ item ∈ items, HeaderReady source reached item) : HeaderForms items := True.intro
 
 /-- These conditions inspect one original node and its immediate operands. -/
 def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
@@ -45,7 +42,7 @@ def StatementReady (source : TypedSource) (reached : ExpressionId → Prop)
   | .forLoop initializer condition post _ =>
       (∀ item ∈ initializer, HeaderReady source reached item) ∧ reached condition ∧
       (∀ item ∈ post, HeaderReady source reached item)
-  | _ => False
+  | .assignBitNot assignment => BitNotAssignable source assignment
 
 structure Profile (source : TypedSource) (reached : ExpressionId → Prop) : Prop where
   nodes : ∀ node, Node.statement node ∈ source.nodes → StatementReady source reached node
@@ -79,6 +76,22 @@ def assignment? (source : TypedSource) (assignment : AssignmentResolution)
     else none
   else none
 
+def bitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
+    : Option (PLift (BitNotAssignable source assignment)) := do
+  if profile : assignment.target.type = .word then
+    if bare : assignment.target.projections = [] then
+      match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .error _ => none
+      | .ok binder =>
+        if typed : binder.scheme.body = assignment.target.type then
+          some ⟨⟨profile, bare, by
+            intro actual accepted
+            cases Except.ok.inj (found.symm.trans accepted)
+            exact typed⟩⟩
+        else none
+    else none
+  else none
+
 def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
     (item : ForItemForm) : Option (PLift (HeaderReady source reached item)) := by
   cases item with
@@ -93,7 +106,7 @@ def header? (source : TypedSource) (reached : ExpressionId → Prop) [DecidableP
     exact do
       let ⟨target⟩ ← assignment? source assignment operator
       if present : reached expression then pure ⟨⟨target, present⟩⟩ else none
-  | assignBitNot _ => exact none
+  | assignBitNot assignment => exact bitNotAssignment? source assignment
 
 def statement? (source : TypedSource) (reached : ExpressionId → Prop) [DecidablePred reached]
     (node : StatementNode) : Option (PLift (StatementReady source reached node)) := by
@@ -117,6 +130,10 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
       if present : reached expression then
         pure ⟨by simpa only [StatementReady, form] using And.intro target present⟩
       else none
+  case assignBitNot assignment =>
+    exact do
+      let ⟨target⟩ ← bitNotAssignment? source assignment
+      pure ⟨by simpa only [StatementReady, form] using target⟩
   case expression expression semicolon =>
     exact if present : reached expression then some ⟨by simpa only [StatementReady, form] using present⟩ else none
   case block body => exact some ⟨by simp only [StatementReady, form]⟩
@@ -135,7 +152,6 @@ def statement? (source : TypedSource) (reached : ExpressionId → Prop) [Decidab
         let ⟨after⟩ ← allProof? (HeaderReady source reached) (header? source reached) post
         pure ⟨by simpa only [StatementReady, form] using And.intro initial (And.intro present after)⟩
       else none
-  all_goals exact none
 
 /-- Every original statement node is inspected once. Expression membership
 and assignment layout checks are finite data tests. -/
@@ -183,7 +199,7 @@ theorem HasReturn.tail {source : TypedSource} {id : StatementId} {rest : List St
   · exact ⟨actual, member, original, lookup, returned⟩
 
 private theorem StatementReady.expanded {source : TypedSource} {reached : ExpressionId → Prop}
-    {node : StatementNode} (ready : StatementReady source reached node) : expanded node.form = true := by
+    {node : StatementNode} (_ready : StatementReady source reached node) : expanded node.form = true := by
   cases form : node.form <;> simp_all [StatementReady, AcceptedNamedBodyFlow.expanded]
 
 theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
@@ -234,6 +250,11 @@ theorem header_facts {policy : SourceCoreLoops.Policy} {source : TypedSource}
     rcases List.mem_cons.mp member with rfl | member
     · exact head.2
     · exact tail.2.2 actual member
+
+  | bitNotting remaining accepted ih =>
+    exact False.elim (ready.1 (profile _ List.mem_cons_self))
+  | bitNotted remaining receipt targetType ih =>
+    exact ih (fun item member => profile item (List.mem_cons_of_mem _ member)) ready
 
 /-- The actual compiler tree and finite original forms retain every visited
 operand and binder, including the emitted suffix of a stopped branch. -/
@@ -299,6 +320,10 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
       have original := profile.at (read_found (readPolicy ▸ read))
       simp only [StatementReady, form] at original
       exact False.elim (ready.1 original.1)
+  | bitNotting read form statementType remaining assigned ih =>
+      have original := profile.at (read_found (readPolicy ▸ read))
+      simp only [StatementReady, form] at original
+      exact False.elim (ready.1 original)
   | assigned read form statementType remaining receipt targetType ih =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found
@@ -309,6 +334,9 @@ theorem facts_forms {policy : SourceCoreLoops.Policy} {checked : SourceCoreCompa
       rcases List.mem_cons.mp member with rfl | member
       · exact original.2
       · exact next.2.2 actual member
+  | bitNotted read form statementType remaining receipt targetType ih =>
+      have found := read_found (readPolicy ▸ read)
+      exact ih ready (finish.tail found (by simp [form, stopsHere]))
   | discard read form child generated statementType remaining tailIH =>
       have found := read_found (readPolicy ▸ read)
       have original := profile.at found

@@ -1,6 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsLexicalLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsDiscardLifting
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsAssignmentLifting
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForItemsBitNotLifting
 import Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedStagedForHeaderPreservation
 
 set_option autoImplicit false
@@ -110,8 +111,11 @@ theorem lifts {budget : Nat}
       unique head bare (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).1
       typedChildren typedPreservation
       (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2) within
-  | bitNot =>
-    intro shape _
-    cases shape
+  | @bitNot context scope assignment rest body head tail ih =>
+    intro shape sourceTyped
+    obtain ⟨_rawWord, _bare, tailShape⟩ := shape.bitNot_tail
+    exact SelectedCompilationStageForItemsBitNotLifting.lifts bridge functions transport condition
+      head (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
+      (ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2)
 
 end Solcore.SourceSemantics.CoreLowering.SelectedCompilationStageForHeaderLifting

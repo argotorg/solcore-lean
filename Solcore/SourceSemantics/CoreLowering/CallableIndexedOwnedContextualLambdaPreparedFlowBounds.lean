@@ -152,7 +152,7 @@ theorem preserves_flow (budget : Nat) {context : SourceSemantics.Context} {scope
     (transfers := CallableIndexedOwnedAdmittedLexicalReadiness.allocation_transfers bridge bindings source)
     (snapshots := CallableIndexedOwnedAdmittedForHeaderReadiness.snapshot_transfers bridge evidence wellFormed (Validity (compiled := compiled) (source := source) (solved := solved) evidence)
       (fun _ valid => valid.2) (fun _ valid => valid.1.covers))
-    (observations := observations)
+
     (assignments := fun context valid => CallableIndexedOwnedAdmittedForHeaderReadiness.assignment_prefix
       (values := SourceCoreCompatibleValues.Context.initial compiled.compatible.checked) (ambient := ambient)
       (certificate := certificates context) (administrative := administrative) (faults := faults)
@@ -257,7 +257,7 @@ theorem reflects_flow (budget : Nat) {context : SourceSemantics.Context} {scope 
     (transfers := CallableIndexedOwnedAdmittedLexicalReadiness.allocation_transfers bridge bindings source)
     (snapshots := CallableIndexedOwnedAdmittedForHeaderReadiness.snapshot_transfers bridge evidence wellFormed (Validity (compiled := compiled) (source := source) (solved := solved) evidence)
       (fun _ valid => valid.2) (fun _ valid => valid.1.covers))
-    (observations := observations)
+
     (reflection := fun context valid child smaller => CallableIndexedOwnedAdmittedLexicalReadiness.reflects_at bridge _ (meaning context valid child smaller))
     ((fun head => GenericForHeader.Structural.PreparedAssignment factory issued.invalidProjection issued.missingDefault head)) ((fun head => GenericForHeader.Structural.PreparedUnary true source issued.invalidUnary head)) ((fun tree => GenericImperativeMatch.Structural.PreparedHeader (factory := factory)
   (invalidProjection := issued.invalidProjection) (missingDefault := issued.missingDefault) (invalidUnary := issued.invalidUnary) tree)) ((fun compilation context => GenericImperativeMatch.Tree.MatchContextFields compilation context)) (ProtectedStateImperativeCatalogPayload.StructuralHeaderReceipt
@@ -275,7 +275,7 @@ theorem reflects_flow (budget : Nat) {context : SourceSemantics.Context} {scope 
       (layouts := compiled.indexed.layouts) (owner := owner) (active := active)
       (frame := compiled.indexed.ancestry.layout.frame) (globals := compiled.indexed.base.globals.length) (onError := onError)
       (registry := registry) (faults := faults)
-      bridge functions definitions registered extension evidence observations condition producer acquire transport bindings unique wellFormed
+      bridge functions definitions registered extension evidence condition producer acquire transport bindings unique wellFormed
       (Validity (compiled := compiled) (source := source) (solved := solved) evidence) (fun _ valid => valid.2) (fun _ valid => valid.1.covers)
       (fun valid extended => validity_extend evidence valid extended)
       budget diagnosticPolicy (fun _ valid => valid.1) issued.typing.1 issued.assignmentsPrepared unaryIncluded below assignments)
@@ -286,7 +286,7 @@ theorem reflects_flow (budget : Nat) {context : SourceSemantics.Context} {scope 
       (layouts := compiled.indexed.layouts) (owner := owner) (active := active)
       (frame := compiled.indexed.ancestry.layout.frame) (globals := compiled.indexed.base.globals.length) (onError := onError)
       (registry := registry) (faults := faults)
-      bridge functions definitions registered evidence observations condition producer acquire transport bindings unique wellFormed
+      bridge functions definitions registered evidence condition producer acquire transport bindings unique wellFormed
       (Validity (compiled := compiled) (source := source) (solved := solved) evidence) (fun _ valid => valid.2) (fun _ valid => valid.1.covers)
       (fun valid extended => validity_extend evidence valid extended)
       budget diagnosticPolicy issued.typing.1 issued.assignmentsPrepared unaryIncluded below assignments)

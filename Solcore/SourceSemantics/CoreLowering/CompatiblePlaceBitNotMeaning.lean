@@ -121,7 +121,7 @@ theorem reflects_numeric
     exact .fault (.target sourceFault) resultEq tokenRep heaps maps worlds frame metadata
   | resolved sourceTrace resolution remainder =>
     obtain ⟨replacement, native, represented, applies, _, _⟩ :=
-      CompatiblePlaceNumericBitNotModifier.success observations profile resolution.snapshotRelated
+      CompatiblePlaceNumericBitNotModifier.success profile resolution.snapshotRelated
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit coreEnvironment) (rhs := .var 0) (.var (index := 1) rfl)
         operator resolution.store invalid

@@ -66,7 +66,8 @@ def support_reads
     sourceSignatures (CallableIndexedOwnedLocalIdentityFreshness.match_hidden_fresh ownership)
     (CallableIndexedOwnedPublicSignatureCatalog.well_formed compiled wellFormed)
     support.body.valid.ledger support.body.projection
-    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile) syntaxTree
+    (fun origin rawProfile => choiceIssued.operands code support.caller.selected support.source receiver origin rawProfile)
+    (fun origin rawWord => choiceIssued.unary code support.caller.selected support.source receiver origin rawWord) syntaxTree
     (certificates := fun context scope id lowered => Nonempty (RootAt compiled context child scope id lowered faults))
     (fun context fields current fuel id node lowered declarations read reached found typed accepted _nativeType _native => by
       obtain ⟨readNode, name, binder, readFound, form⟩ := read

@@ -41,8 +41,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before after : Dynamic.Heap}
     {store : Store} {index : Nat} {reason : Dynamic.SemanticFault}
     (layout : Layout prepared) (bare : place.projections = [])
-    {identities : Dynamic.Value → Word → Prop}
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
+
     (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -95,7 +94,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
         cases represented with
         | initialized related =>
           have profile := cellType ▸ profile
-          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.success observations profile related
+          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.success profile related
             (environment := [_]) (rhs := .unit) (.var (index := 0) rfl) operator store invalid
           exact (valid invalidOperand).elim
 
