@@ -1,3 +1,6 @@
+import Solcore.Test.SourceCoreSelectedCompilationProfile
+import Solcore.Test.SourceCoreSelectedOperatorAlias
+import Solcore.Test.SourceCoreMethodOriginEvidenceSelectedSourceOutcomes
 import Solcore.Test.SourceCoreCompilationScope
 import Solcore.Test.SourceCoreConstructorCallsCompilerProfile
 import Solcore.Test.SourceCoreCanonicalScopedCompilerProfile
@@ -3721,6 +3724,9 @@ end Tests
 
 def main : IO UInt32 := do
   Tests.SourceCoreCompilationScope.run
+  Tests.SourceCoreSelectedOperatorAlias.run
+  Tests.SourceCoreSelectedCompilationProfile.run
+  Tests.SourceCoreMethodOriginEvidence.SelectedSourceOutcomes.run
   Tests.staticSemanticsSpineTests
   Tests.run
   IO.println "solcore-lean tests passed"
