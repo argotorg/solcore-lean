@@ -1,5 +1,6 @@
 import Solcore.Test.SourceCoreCompilationScope
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedBodyTyping
 
 /-! The actual compiler profile accepts the selected identity cache even when
 an unrelated checked conversion has no executable coercion method. -/
@@ -29,9 +30,11 @@ def run : IO Unit := do
           exact checked
         let some profile := SelectedCompilationCompilerStaticProfile.validateCheckedProfile cached accepted
           | throw (IO.userError "scope profile rejected the selected identity")
+        have _selectedBodies : SelectedCompilationBodyTyping.Bodies cached :=
+          SelectedCompilationCheckedBodyTyping.of_checked accepted profile
         unless cached.sourceProgram.functions.length == 2 &&
             cached.indexed.base.functions.length == 1 && profile.table.rows.length == 1 do
           throw (IO.userError "scope profile changed original declarations or selected cache")
-        IO.println "SELECTED_COMPILATION_PROFILE_PASS: checker-derived signatures; original functions2; selected cache1/table1; unrelated missing coercion method retained"
+        IO.println "SELECTED_COMPILATION_PROFILE_PASS: checker-derived signatures and selected body typing; original functions2; selected cache1/table1; unrelated missing coercion method retained"
 
 end Tests.SourceCoreSelectedCompilationProfile

@@ -2115,6 +2115,12 @@ import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDire
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationPublicSessionDirectFailureForward
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfiledPublicSessionDirectFailures
 
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationSpecializationBinders
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationProfileBinders
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationSelectedBodyInterfaces
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedBodyTyping
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
+
 /-! Proofs connecting executable Core lowering to the independent source
 semantics. This boundary is separate from the specification's umbrella so that
 the specification does not depend on executable frontend passes. -/

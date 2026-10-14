@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
 import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCompilerStaticProfile
 import Solcore.Test.SourceCoreMethodOriginEvidenceSelectedCertifiedSequence
 import Solcore.Test.SourceCoreMethodOriginEvidenceFuelFixture
@@ -34,10 +35,10 @@ theorem first_meaning
     (stages : ObservedStages fixture observed.wordRow.toObservedRow)
     (first : ObservedPublicRun fixture observed.wordRow.toObservedRow) :
     ∃ issued : Issued fixture.recipe, Nonempty (FirstMeaning issued stages first) := by
-  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_profile_initial_row
+  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_checked_profile_initial_row
     (by rw [fixture.sameProgram]; exact checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
-    fixture.issued profile.value (SelectedCompilationBodyTyping.Bodies.of_program fixture.source_wellFormed) first.opened
+    fixture.issued profile.value first.opened
     first.as_function_call.toCall.toStartedCall first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 102400 first.session from .single first.ready)
     (selected_row observed.wordRow.toObservedRow)

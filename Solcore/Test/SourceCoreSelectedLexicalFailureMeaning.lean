@@ -1,3 +1,4 @@
+import Solcore.SourceSemantics.CoreLowering.SelectedCompilationCheckedPublicSession
 import Solcore.Test.SourceCoreSelectedLexicalFailureProfile
 import Solcore.Test.SourceCoreInitialLexicalFailureHeap
 
@@ -80,10 +81,10 @@ theorem first_meaning (profile : CompilerProgramStaticProfile.StaticProfile fixt
     (stages : ObservedStages fixture observed.failedRow) (first : First fixture observed) :
     ∃ issued : Profiled fixture.recipe, Nonempty (FirstMeaning issued stages first) := by
   obtain ⟨row, sameRow⟩ := eligible_row observed.failedRow
-  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_profiled_initial_row
+  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_checked_profiled_initial_row
     (by rw [fixture.sameProgram]; exact fixture.checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
-    fixture.issued profile (SelectedCompilationBodyTyping.Bodies.of_program fixture.source_wellFormed) first.opened
+    fixture.issued profile first.opened
     (first_call first) first.bootstrap first.fresh first.authority
     (show first.bootstrap.ReadyAt 100000 first.session from .single first.ready) row
   obtain ⟨actual, actualEq⟩ := header_of_member observed.failedRow issued.catalog.rows
@@ -140,10 +141,10 @@ theorem fresh_meaning (profile : CompilerProgramStaticProfile.StaticProfile fixt
     (stages : ObservedStages fixture observed.identityRow) (fresh : FreshIdentity fixture observed) :
     ∃ issued : Profiled fixture.recipe, Nonempty (FreshMeaning issued stages fresh) := by
   obtain ⟨row, sameRow⟩ := eligible_row observed.identityRow
-  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_profiled_initial_row
+  obtain ⟨issued, initial, namedEq⟩ := SelectedCompilationCertifiedPublicSession.from_checked_profiled_initial_row
     (by rw [fixture.sameProgram]; exact fixture.checked)
     (by rw [fixture.sameProgram]; exact fixture.accepted)
-    fixture.issued profile (SelectedCompilationBodyTyping.Bodies.of_program fixture.source_wellFormed) fresh.opened
+    fixture.issued profile fresh.opened
     fresh.call.toStartedCall fresh.bootstrap fresh.fresh fresh.authority
     (show fresh.bootstrap.ReadyAt 100000 fresh.session from .single fresh.ready) row
   obtain ⟨actual, actualEq⟩ := header_of_member observed.identityRow issued.catalog.rows
