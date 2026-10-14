@@ -6,6 +6,18 @@ References: [Main design](core-runtime-unification.md), [T0 audit](core-runtime-
 
 This log supports handover during the migration. Public execution and all registered tests for the old evaluator have moved to Core, and the two old execution evaluator files have been deleted. Consumers have moved to the shared public carrier and session, and the separate old facade implementation has also been deleted. The proof that the entire transformation preserves semantics is still incomplete.
 
+## Match compilation reaches the same Source and public proof (2026-10-14)
+
+The automatic compiler profile now admits match statements through the actual compatible match callback. Receipts retain every ordered original arm/default request, its lexical scope, predecessor fuel and emitted code. Original Source pattern typing supplies the hidden local and pattern binder context. Named functions, selected methods and returned closures derive this support from their existing compiler receipts. The public constructors require no additional branch-typing, body-meaning or whole-program validity premise.
+
+The Source-first consumer preserves the original `update(value, next)` program. Before public execution, its independent Source trace allocates both parameters, the hidden scrutinee and the pattern binder, updates the outer parameter, restores its scope and returns the new value. The exact four-cell Source heap reaches closed initial whole-output forwarding, retaining the genuine earlier-stage-stop alternative. Runtime calls return `12` and `23`, with native heap sizes `2 / 14 / 26`; the independent proof covers the initial call.
+
+A separate six-function runtime corpus checks ordered literal cases, defaults, non-unit early returns, tuple-pattern allocation, scrutinee and arm faults, loop continue/break and reuse after failure. Its native heaps are `7 / 16 / 25 / 34 / 40 / 46 / 61 / 64 / 73 / 79 / 92`. A returned-closure companion exercises the subset profile and calls the same captured handle twice, with heaps `2 / 5 / 14 / 23`. These companions are runtime coverage, not independent Source derivations for each call. Four negative checks reject missing scrutinee or arm-expression coverage and nonexistent original arm/default statement edges.
+
+Validation: 32 changed or new modules checked in a coherent graph of 7,756 modules, including 279 affected modules. All twelve focused runtime markers and 1,215 endpoint audits pass. Full build (7,809 jobs), registered tests, kernel policy and the same 1,215 canonical endpoint audits pass. Audited proofs use only `propext`, `Classical.choice` and `Quot.sound`. Twelve unrelated workspace changes remain excluded.
+
+The automatic profile still requires an explicit outer return and excludes non-unit conditional annotations, broader assignment and local forms, and general factory/coercion shapes. Remaining compiler coverage and actual-pass composition are unfinished. The second goal remains incomplete; Core instructions and public execution behavior are unchanged.
+
 ## For-loop compilation and scoped transfers reach public execution (2026-10-14)
 
 The automatic profile now follows the actual compilation of for-loop initializer, condition, post and body, including nested break and continue statements. The compiler receipts retain header order, original binder ownership, lexical scope and child fuel. The same checked public-session constructor derives the resulting body support internally.

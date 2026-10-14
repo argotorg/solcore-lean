@@ -8,6 +8,18 @@ Runtime Core unification was completed in `a3168382`. See the [API migration rec
 
 Compilation preparation has been separated into `SourceCompilationPlan`. The historical investigations below refer to definition names at the time rather than line numbers.
 
+## Actual match compiler and public-session audit (2026-10-14)
+
+Actual callback inversion retains every original arm/default request, including duplicate requests in order. Each child keeps its real fuel, lexical scope and code. The original-case provenance relation supplies coverage of every retained request; occurrence membership alone is not used to reconstruct arm typing. Original pattern typing and local identity ownership supply the hidden local and complete binder context.
+
+The actual named header, selected cached method and returned closure producers derive callback identity internally. All nine Source-admission callers obtain the internal ownership fact from their existing authentic certificates. Their public signatures are unchanged. The flat profile checks the real scrutinee, and the subset profile checks every original arm/default statement edge. Non-unit match annotations follow original Source typing without a unit-only profile gate.
+
+An independent Source derivation for the unchanged named `update` program precedes Core execution. It retains two parameter cells, hidden and pattern allocations, the outer-variable write, restored lexical scope and the exact final four-cell heap. The same automatic public issuance connects this trace to whole-output forwarding or a genuine earlier stage stop. Separate runtime tests cover six selected case functions and a captured match closure called twice; they retain exact heap sequences and failure continuation, without claiming independent Source proofs for all runtime examples.
+
+Eight independent review gates cover compiler receipts, Source admission, internal producer/caller connections, finite profiles and the public consumer. Four existing fixture inversions also account for the new match constructors; their original let/return forms rule those alternatives out. Validation checks 32 changed or new modules in an exact 7,756-module source/object graph, all imported-object edges, twelve focused runtime markers and 1,215 endpoint audits. Full build (7,809 jobs), registered tests, kernel policy and the same 1,215 canonical endpoint audits pass. The audited proofs use only `propext`, `Classical.choice` and `Quot.sound`; twelve unrelated workspace changes remain excluded.
+
+An explicit outer return is still required by the automatic body profile. Full compiler forms and actual-pass composition remain unfinished. This checkpoint changes proof admission and tests, with no Core instruction or runtime behavior change.
+
 ## For-loop and scoped control audit (2026-10-14)
 
 The compiler-derived body tree retains actual for-header actions, ordered initializers and posts, condition code, body code and predecessor fuel. Source admission checks original monomorphic binder metadata and each expression/body edge. Break and continue are represented as scoped outcomes, so a following statement is not evaluated after a transfer. Blocks, conditionals and match arms restore the outer environment while retaining reached heap effects.

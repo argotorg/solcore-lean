@@ -43,6 +43,16 @@ Each endpoint returns either the original outcome and exact final Source heap wi
 
 Complete compiler-form and actual-pass preservation remain unfinished. The accepted compiler profile, actual startup/input receipts and typed public input conditions remain explicit.
 
+### Match statements and original pattern contexts
+
+`AcceptedNamedMatchFlow` recovers the original ordered requests from actual compatible match compilation. `AcceptedNamedBodyFlow.Tree` retains each child action and exact emitted code. Refinement derives callback identity from the selected named header, cached method or returned closure. Duplicate requests remain in order.
+
+`ScopedSourceMatchAdmission` and `ScopedSourceMatchRequests` recover the original branch typing, hidden local identity and complete pattern binder context. The flat body profile checks the actual scrutinee; the subset profile checks every statement in each original arm and default body. The same checked public-session constructor derives the resulting body support internally. No caller-supplied match execution or branch-typing callback is added.
+
+`SourceCoreSelectedMatchSourceFirst.from_source` constructs an ordinary Source execution before public completion. Its two parameter cells, hidden scrutinee cell and pattern binder cell give the exact four-cell Source heap, with the outer parameter updated and its scope restored. Closed initial whole-output forwarding retains the existing genuine earlier-stage-stop alternative. Separate runtime companions cover ordered cases, defaults, tuple patterns, non-unit early return, scrutinee and arm faults, loop transfers and later execution in the returned session.
+
+The common profile still has an outer-return condition; accepting match nodes does not remove that separate boundary.
+
 ### Loops and scoped control transfers
 
 The common compiler profile accepts for-loop headers with monomorphic declarations, discarded expressions and bare assignments. It retains each actual compiler action, initializer/post order, generated scope and nested body. Break and continue retain their original loop depth and stop before the statement suffix.
