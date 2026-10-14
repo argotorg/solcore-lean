@@ -1,3 +1,4 @@
+import Solcore.Test.SourceCoreSelectedFailurePublicExecution
 import Solcore.Test.SourceCoreSelectedCompilationProfile
 import Solcore.Test.SourceCoreSelectedOperatorAlias
 import Solcore.Test.SourceCoreMethodOriginEvidenceSelectedSourceOutcomes
@@ -3723,6 +3724,7 @@ def run : IO Unit := do
 end Tests
 
 def main : IO UInt32 := do
+  Tests.SourceCoreSelectedLexicalFailure.run
   Tests.SourceCoreCompilationScope.run
   Tests.SourceCoreSelectedOperatorAlias.run
   Tests.SourceCoreSelectedCompilationProfile.run
