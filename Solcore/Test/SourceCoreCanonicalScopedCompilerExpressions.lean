@@ -68,7 +68,7 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
     (reached : RelayReached observed id) (cause : Cause root head) : False := by
   have forms := actual.relay_reached_form reached head.found
   cases cause with
-  | form _ notLeaf notDirect _notIndirect _notMethod _notIndex _notConstructor _notComposite =>
+  | form _ notLeaf notDirect _notIndirect _notMethod _notIndex _notConstructor _notComposite _notBuiltin =>
       rcases forms with ⟨name, binder, form⟩ | ⟨callee, instantiation, form⟩
       · exact notLeaf (form ▸ LeafForm.read name binder)
       · exact notDirect ⟨_, _, _, form⟩
@@ -94,7 +94,7 @@ private theorem no_cause {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
         cases form
       · rw [directForm] at form
         cases form
-  | operatorOrdinary _ operator _ | operatorCoercions _ operator _ =>
+  | operatorCoercions _ operator _ =>
       exact no_method actual reached head.found operator
 
 private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope}
@@ -147,6 +147,14 @@ private theorem children_reached {fuel : Nat} {scope : SourceCoreLocalCell.Scope
         cases form
       · rw [directForm] at form
         cases form
+  | primitive _ _ receipt =>
+      exact False.elim (no_method actual reached receipt.found receipt.form)
+  | builtin _ _ receipt =>
+      have form := receipt.form
+      rcases actual.relay_reached_form reached receipt.metadata.found with
+        ⟨name, binder, localForm⟩ | ⟨callee, instantiation, directForm⟩
+      · rw [localForm] at form; cases form
+      · rw [directForm] at form; cases form
   | method _head _selected receipt =>
       apply False.elim
       apply no_method actual reached receipt.metadata.found

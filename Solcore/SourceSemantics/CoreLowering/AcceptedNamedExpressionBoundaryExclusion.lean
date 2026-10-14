@@ -84,6 +84,21 @@ private theorem not_composite {form : ExpressionForm}
   · cases composite
   · cases composite
 
+private theorem not_builtin {form : ExpressionForm}
+    (allowed : (((LeafForm form ∨ DirectForm form ∨ IndirectForm form ∨ MethodForm form) ∨ IndexForm form) ∨ ConstructorForm form) ∨ CompositeForm form) :
+    ¬ BuiltinForm form := by
+  intro ⟨callee, ids, function, same⟩
+  rcases allowed with (((leaf | ⟨callee, args, inst, rfl⟩ | ⟨callee, args, metadata, rfl⟩ | method) | ⟨base, key, rfl⟩) | ⟨inst, ids, rfl⟩) | composite
+  · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
+    · cases atomic <;> cases same
+    · cases same
+  · cases same
+  · cases same
+  · rcases method with ⟨operator, operand, rfl⟩ | ⟨operator, left, right, rfl⟩ <;> cases same
+  · cases same
+  · cases same
+  · cases composite <;> cases same
+
 private theorem receipt_method_form
     (receipt : CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt
       root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
@@ -109,7 +124,7 @@ theorem Cause.impossible
     (cause : Cause root head) (present : reached id) : False := by
   have form := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect _ _ _ _ _ =>
+  | form _ notLeaf notDirect _ _ _ _ _ _ =>
     rcases form with leaf | direct
     · exact notLeaf leaf
     · exact notDirect direct
@@ -124,7 +139,7 @@ theorem Cause.impossible
       cases same
     · exact outside direct
 
-  | operatorOrdinary _ operator _ | operatorCoercions _ operator _ =>
+  | operatorCoercions _ operator _ =>
     exact forms_not_method forms present head.found operator
 
   | indexOperands _ indexForm _ => exact not_index (by rcases form with leaf | direct; exact .inl leaf; exact .inr (.inl direct)) ⟨_, _, indexForm⟩
@@ -166,6 +181,11 @@ theorem Step.child_reached
 
   | composite head plain receipt =>
     exact False.elim (not_composite (by rcases forms id receipt.node present receipt.found with leaf | direct; exact .inl (.inl (.inl leaf)); exact .inl (.inl (.inr (.inl direct)))) receipt.form)
+
+  | primitive head plain receipt =>
+    exact False.elim (forms_not_method forms present receipt.found receipt.form)
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct))))) ⟨_, _, _, receipt.form⟩)
 
 /-- The excluded endpoint belongs to this same trace and its actual child path. -/
 theorem Boundary.impossible
@@ -244,7 +264,7 @@ theorem Cause.impossible_calls
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect _ _ _ _ =>
+  | form _ notLeaf notDirect notIndirect _ _ _ _ _ =>
     rcases original with leaf | direct | indirect
     · exact notLeaf leaf
     · exact notDirect direct
@@ -270,7 +290,7 @@ theorem Cause.impossible_calls
       rw [selected] at same
       cases same
 
-  | operatorOrdinary _ operator _ | operatorCoercions _ operator _ =>
+  | operatorCoercions _ operator _ =>
     exact callForms_not_method forms present head.found operator
 
   | indexOperands _ indexForm _ => exact not_index (by rcases original with leaf | direct | indirect; exact .inl leaf; exact .inr (.inl direct); exact .inr (.inr (.inl indirect))) ⟨_, _, indexForm⟩
@@ -309,6 +329,11 @@ theorem Step.child_reached_calls
 
   | composite head plain receipt =>
     exact False.elim (not_composite (by rcases forms id receipt.node present receipt.found with leaf | direct | indirect; exact .inl (.inl (.inl leaf)); exact .inl (.inl (.inr (.inl direct))); exact .inl (.inl (.inr (.inr (.inl indirect))))) receipt.form)
+
+  | primitive head plain receipt =>
+    exact False.elim (callForms_not_method forms present receipt.found receipt.form)
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct | indirect; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct)))); exact .inl (.inl (.inl (.inr (.inr (.inl indirect)))))) ⟨_, _, _, receipt.form⟩)
 
 theorem Boundary.impossible_calls
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -382,20 +407,19 @@ theorem Cause.impossible_methods
     (initializers : ∀ id, reached id →
       ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
     (rawMetadata : ReachedMethodMetadata compiled.indexed named source reached)
-    (requirements : ReachedMethodRequirements source reached)
+    (_requirements : ReachedMethodRequirements source reached)
     {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
       source scope id reasonAt lowered}
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect notMethod _ _ _ =>
+  | form _ notLeaf notDirect notIndirect notMethod _ _ _ _ =>
     rcases original with leaf | direct | indirect | method
     · exact notLeaf leaf
     · exact notDirect direct
     · exact notIndirect indirect
     · exact notMethod method
   | initializer _ selected => exact initializers id present ⟨selected⟩
-  | operatorOrdinary _ form empty => exact requirements id head.node present head.found form empty
   | operatorCoercions _ form nonempty => exact nonempty (rawMetadata.2 id head.node present head.found form).1
   | special selected outside outsideMethod =>
     rcases original with leaf | direct | ⟨callee, arguments, callMetadata, form⟩ | method
@@ -468,6 +492,19 @@ theorem Step.child_reached_methods
   | composite head plain receipt =>
     exact False.elim (not_composite (.inl (.inl (forms id receipt.node present receipt.found))) receipt.form)
 
+  | primitive head plain receipt =>
+    have member := (List.of_mem_zip member).1
+    rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+    · have same : entry.1 = operand := by simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_singleton] using member
+      exact same ▸ arguments.2.1 id receipt.node present receipt.found operator operand form
+    · have choices : entry.1 = left ∨ entry.1 = right := by
+        simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using member
+      rcases choices with same | same
+      · exact same ▸ (arguments.2.2 id receipt.node present receipt.found operator left right form).1
+      · exact same ▸ (arguments.2.2 id receipt.node present receipt.found operator left right form).2
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (.inl (.inl (.inl (forms id receipt.node present receipt.metadata.found)))) ⟨_, _, _, receipt.form⟩)
+
 theorem Boundary.impossible_methods
     (metadata : MetadataFor compiled.indexed named source directSites)
     (forms : ReachedMethodForms source reached)
@@ -536,14 +573,14 @@ theorem Cause.impossible_indices
     (initializers : ∀ id, reached id →
       ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
     (rawMetadata : ReachedIndexMetadata compiled.indexed named source reached)
-    (requirements : ReachedMethodRequirements source reached)
+    (_requirements : ReachedMethodRequirements source reached)
     (operands : ReachedIndexOperands source reached)
     {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
       source scope id reasonAt lowered}
     (cause : Cause root head) (present : reached id) : False := by
   have original := forms id head.node present head.found
   cases cause with
-  | form _ notLeaf notDirect notIndirect notMethod notIndex _ _ =>
+  | form _ notLeaf notDirect notIndirect notMethod notIndex _ _ _ =>
     rcases original with (leaf | direct | indirect | method) | index
     · exact notLeaf leaf
     · exact notDirect direct
@@ -551,7 +588,6 @@ theorem Cause.impossible_indices
     · exact notMethod method
     · exact notIndex index
   | initializer _ selected => exact initializers id present ⟨selected⟩
-  | operatorOrdinary _ form empty => exact requirements id head.node present head.found form empty
   | operatorCoercions _ form nonempty => exact nonempty (rawMetadata.1.2 id head.node present head.found form).1
   | special selected outside outsideMethod =>
     rcases original with (leaf | direct | ⟨callee, arguments, callMetadata, form⟩ | method) | ⟨base, key, form⟩
@@ -633,6 +669,19 @@ theorem Step.child_reached_indices
   | composite head plain receipt =>
     exact False.elim (not_composite (.inl (forms id receipt.node present receipt.found)) receipt.form)
 
+  | primitive head plain receipt =>
+    have member := (List.of_mem_zip member).1
+    rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+    · have same : entry.1 = operand := by simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_singleton] using member
+      exact same ▸ arguments.1.2.1 id receipt.node present receipt.found operator operand form
+    · have choices : entry.1 = left ∨ entry.1 = right := by
+        simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using member
+      rcases choices with same | same
+      · exact same ▸ (arguments.1.2.2 id receipt.node present receipt.found operator left right form).1
+      · exact same ▸ (arguments.1.2.2 id receipt.node present receipt.found operator left right form).2
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (.inl (.inl (forms id receipt.node present receipt.metadata.found))) ⟨_, _, _, receipt.form⟩)
+
 theorem Boundary.impossible_indices
     (metadata : MetadataFor compiled.indexed named source directSites)
     (forms : ReachedIndexForms source reached)
@@ -703,7 +752,6 @@ private theorem Cause.impossible_constructor_at
     (initializers : ∀ id, reached id →
       ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
     (rawMetadata : ReachedConstructorMetadata compiled.indexed named source reached)
-    (requirements : ReachedMethodRequirements source reached)
     (operands : ReachedIndexOperands source reached)
     (ranges : ReachedConstructorRanges source reached)
     {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
@@ -712,7 +760,7 @@ private theorem Cause.impossible_constructor_at
     (original : ((LeafForm head.node.form ∨ DirectForm head.node.form ∨ IndirectForm head.node.form ∨ MethodForm head.node.form) ∨ IndexForm head.node.form) ∨ ConstructorForm head.node.form)
     (present : reached id) : False := by
   cases cause with
-  | form _ notLeaf notDirect notIndirect notMethod notIndex notConstructor _ =>
+  | form _ notLeaf notDirect notIndirect notMethod notIndex notConstructor _ _ =>
     rcases original with ((leaf | direct | indirect | method) | index) | constructor
     · exact notLeaf leaf
     · exact notDirect direct
@@ -721,7 +769,6 @@ private theorem Cause.impossible_constructor_at
     · exact notIndex index
     · exact notConstructor constructor
   | initializer _ selected => exact initializers id present ⟨selected⟩
-  | operatorOrdinary _ form empty => exact requirements id head.node present head.found form empty
   | operatorCoercions _ form nonempty => exact nonempty (rawMetadata.1.1.2 id head.node present head.found form).1
   | special selected outside outsideMethod =>
     rcases original with ((leaf | direct | ⟨callee, arguments, callMetadata, form⟩ | method) | ⟨base, key, form⟩) | ⟨instantiation, ids, form⟩
@@ -768,13 +815,13 @@ theorem Cause.impossible_constructors
     (initializers : ∀ id, reached id →
       ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
     (rawMetadata : ReachedConstructorMetadata compiled.indexed named source reached)
-    (requirements : ReachedMethodRequirements source reached)
+    (_requirements : ReachedMethodRequirements source reached)
     (operands : ReachedIndexOperands source reached)
     (ranges : ReachedConstructorRanges source reached)
     {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
       source scope id reasonAt lowered}
     (cause : Cause root head) (present : reached id) : False :=
-  cause.impossible_constructor_at metadata initializers rawMetadata requirements operands ranges
+  cause.impossible_constructor_at metadata initializers rawMetadata operands ranges
     (forms id head.node present head.found) present
 
 theorem Step.child_reached_constructors
@@ -825,6 +872,19 @@ theorem Step.child_reached_constructors
 
   | composite head plain receipt =>
     exact False.elim (not_composite (forms id receipt.node present receipt.found) receipt.form)
+
+  | primitive head plain receipt =>
+    have member := (List.of_mem_zip member).1
+    rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+    · have same : entry.1 = operand := by simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_singleton] using member
+      exact same ▸ arguments.1.1.2.1 id receipt.node present receipt.found operator operand form
+    · have choices : entry.1 = left ∨ entry.1 = right := by
+        simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using member
+      rcases choices with same | same
+      · exact same ▸ (arguments.1.1.2.2 id receipt.node present receipt.found operator left right form).1
+      · exact same ▸ (arguments.1.1.2.2 id receipt.node present receipt.found operator left right form).2
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (.inl (forms id receipt.node present receipt.metadata.found)) ⟨_, _, _, receipt.form⟩)
 
 theorem Boundary.impossible_constructors
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -893,22 +953,22 @@ theorem ReachedCompositeMetadata.of_accepted {checked : SourceCoreCompatibleCata
   · exact .tuple _
   · exact .conditional _ _ _
 
-theorem Cause.impossible_composites
+theorem Cause.impossible_composite_at
     (metadata : MetadataFor compiled.indexed named source directSites)
-    (forms : ReachedCompositeForms source reached)
     (initializers : ∀ id, reached id →
       ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
     (rawMetadata : ReachedCompositeMetadata compiled.indexed named source reached)
-    (requirements : ReachedMethodRequirements source reached)
     (operands : ReachedIndexOperands source reached)
     (ranges : ReachedConstructorRanges source reached)
     {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
       source scope id reasonAt lowered}
-    (cause : Cause root head) (present : reached id) : False := by
-  rcases forms id head.node present head.found with old | composite
-  · exact cause.impossible_constructor_at metadata initializers rawMetadata.1 requirements operands ranges old present
+    (cause : Cause root head)
+    (original : (((LeafForm head.node.form ∨ DirectForm head.node.form ∨ IndirectForm head.node.form ∨ MethodForm head.node.form) ∨ IndexForm head.node.form) ∨ ConstructorForm head.node.form) ∨ CompositeForm head.node.form)
+    (present : reached id) : False := by
+  rcases original with old | composite
+  · exact cause.impossible_constructor_at metadata initializers rawMetadata.1 operands ranges old present
   · cases cause with
-    | form _ _ _ _ _ _ _ outside => exact outside composite
+    | form _ _ _ _ _ _ _ outside _ => exact outside composite
     | initializer _ selected => exact initializers id present ⟨selected⟩
     | special selected _ _ =>
       have noneSelected := AcceptedCompositeExpressionReceipt.special_none root (scope := scope) (reasonAt := reasonAt)
@@ -917,12 +977,27 @@ theorem Cause.impossible_composites
       have same := head.selected.symm.trans noneSelected
       rw [selected] at same
       cases same
-    | operatorOrdinary _ method _ | operatorCoercions _ method _ =>
+    | operatorCoercions _ method _ =>
       exact not_composite (.inl (.inl (.inr (.inr (.inr method))))) composite
     | indexOperands _ form _ => exact not_composite (.inl (.inr ⟨_, _, form⟩)) composite
     | constructorRange _ form _ => exact not_composite (.inr ⟨_, _, form⟩) composite
 
+theorem Cause.impossible_composites
+    (metadata : MetadataFor compiled.indexed named source directSites)
+    (forms : ReachedCompositeForms source reached)
+    (initializers : ∀ id, reached id →
+      ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
+    (rawMetadata : ReachedCompositeMetadata compiled.indexed named source reached)
+    (_requirements : ReachedMethodRequirements source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
+      source scope id reasonAt lowered}
+    (cause : Cause root head) (present : reached id) : False :=
+  cause.impossible_composite_at metadata initializers rawMetadata operands ranges (forms id head.node present head.found) present
+
 theorem Step.child_reached_composites
+    (forms : ReachedCompositeForms source reached)
     (arguments : ReachedCompositeArguments source reached)
     (step : Step root source scope reasonAt fuel id lowered)
     (present : reached id) {entry : ExpressionId × SourceCoreBasic.LoweredExpr}
@@ -970,6 +1045,19 @@ theorem Step.child_reached_composites
   | composite head plain receipt =>
     exact arguments.2 id receipt.node present receipt.found receipt.form entry.1 (List.of_mem_zip member).1
 
+  | primitive head plain receipt =>
+    have member := (List.of_mem_zip member).1
+    rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+    · have same : entry.1 = operand := by simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_singleton] using member
+      exact same ▸ arguments.1.1.1.2.1 id receipt.node present receipt.found operator operand form
+    · have choices : entry.1 = left ∨ entry.1 = right := by
+        simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using member
+      rcases choices with same | same
+      · exact same ▸ (arguments.1.1.1.2.2 id receipt.node present receipt.found operator left right form).1
+      · exact same ▸ (arguments.1.1.1.2.2 id receipt.node present receipt.found operator left right form).2
+  | builtin head plain receipt =>
+    exact False.elim (not_builtin (forms id receipt.node present receipt.metadata.found) ⟨_, _, _, receipt.form⟩)
+
 theorem Boundary.impossible_composites
     (metadata : MetadataFor compiled.indexed named source directSites)
     (forms : ReachedCompositeForms source reached)
@@ -984,7 +1072,7 @@ theorem Boundary.impossible_composites
     (boundary : Boundary tree) (present : reached id) : False := by
   induction boundary with
   | here head cause children => exact cause.impossible_composites metadata forms initializers rawMetadata requirements operands ranges present
-  | child step children entry member next ih => exact ih (step.child_reached_composites arguments present member)
+  | child step children entry member next ih => exact ih (step.child_reached_composites forms arguments present member)
 
 theorem Residual.impossible_composites {row : SourceSpecialization.SpecializedFunction}
     {prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row}
@@ -1003,5 +1091,155 @@ theorem Residual.impossible_composites {row : SourceSpecialization.SpecializedFu
   residual.boundary.impossible_composites metadata forms initializers arguments rawMetadata requirements operands ranges present
 
 
+
+/-- The broad lane includes accepted builtin calls and both operator routes. -/
+def ReachedOrdinaryForms (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ((((LeafForm node.form ∨ DirectForm node.form ∨ IndirectForm node.form ∨ MethodForm node.form) ∨ IndexForm node.form) ∨ ConstructorForm node.form) ∨ CompositeForm node.form) ∨ BuiltinForm node.form
+
+def ReachedOrdinaryArguments (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ReachedCompositeArguments source reached ∧
+  ∀ id node, reached id → source.lookupExpression? id = some node →
+    ∀ callee ids function, node.form = .call callee ids (.builtinFunction function) → ∀ child ∈ ids, reached child
+
+def ReachedOrdinaryMetadata {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : CallableIndexedNamedGeneration.Prepared checked) (named : Named)
+    (source : TypedSource) (reached : ExpressionId → Prop) : Prop :=
+  ReachedCompositeMetadata prepared named source reached ∧
+  ∀ id node, reached id → source.lookupExpression? id = some node → BuiltinForm node.form →
+    CallableIndexedOwnedPreparedNamedSyntaxAdmission.MetadataTest prepared named node
+
+theorem ReachedOrdinaryMetadata.of_accepted {checked : SourceCoreCompatibleCatalog.Checked}
+    {prepared : CallableIndexedNamedGeneration.Prepared checked} {named : Named}
+    {source : TypedSource} {reached : ExpressionId → Prop}
+    {directSites : DeclarationInstantiation → Prop}
+    {receipt : PLift (MetadataFor prepared named source directSites)}
+    (accepted : CallableIndexedOwnedPreparedNamedSyntaxAdmission.metadata?
+      prepared named source directSites = some receipt) :
+    ReachedOrdinaryMetadata prepared named source reached := by
+  refine ⟨ReachedCompositeMetadata.of_accepted accepted, ?_⟩
+  intro id node _ found form
+  obtain ⟨callee, ids, function, form⟩ := form
+  exact AcceptedNamedExpressionMetadata.at_of_accepted accepted found (form ▸ .builtin callee ids function)
+
+theorem Cause.impossible_ordinary
+    (metadata : MetadataFor compiled.indexed named source directSites)
+    (forms : ReachedOrdinaryForms source reached)
+    (initializers : ∀ id, reached id →
+      ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
+    (rawMetadata : ReachedOrdinaryMetadata compiled.indexed named source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    {head : Head root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)
+      source scope id reasonAt lowered}
+    (cause : Cause root head) (present : reached id) : False := by
+  rcases forms id head.node present head.found with old | builtin
+  · exact cause.impossible_composite_at metadata initializers rawMetadata.1 operands ranges old present
+  · cases cause with
+    | form _ _ _ _ _ _ _ _ outside => exact outside builtin
+    | initializer _ selected => exact initializers id present ⟨selected⟩
+    | special selected _ _ =>
+      have noneSelected := AcceptedOrdinaryExpressionReceipt.builtin_special_none root (scope := scope) (reasonAt := reasonAt)
+        head.found builtin (rawMetadata.2 id head.node present head.found builtin)
+        (Child root.selected.policy root.selected.lowerBody fuel (context compiled.indexed named)) (fuel + 1)
+      have same := head.selected.symm.trans noneSelected
+      rw [selected] at same
+      cases same
+    | operatorCoercions _ method _ =>
+      exact not_builtin (.inl (.inl (.inl (.inr (.inr (.inr method)))))) builtin
+    | indexOperands _ form _ => exact not_builtin (.inl (.inl (.inr ⟨_, _, form⟩))) builtin
+    | constructorRange _ form _ => exact not_builtin (.inl (.inr ⟨_, _, form⟩)) builtin
+
+theorem Step.child_reached_ordinary
+    (arguments : ReachedOrdinaryArguments source reached)
+    (step : Step root source scope reasonAt fuel id lowered)
+    (present : reached id) {entry : ExpressionId × SourceCoreBasic.LoweredExpr}
+    (member : entry ∈ step.children) : reached entry.1 := by
+  cases step with
+  | leaf => cases member
+  | boundary => cases member
+  | ordinary head _ receipt =>
+    exact arguments.1.1.1.1.1.1 id receipt.node present receipt.metadata.found _ _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+  | evidence head _ receipt =>
+    exact arguments.1.1.1.1.1.1 id head.node present receipt.found _ _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+  | indirect head _ receipt =>
+    have children := arguments.1.1.1.1.1.2 id receipt.original present receipt.found _ _ _ receipt.originalForm
+    rcases List.mem_cons.mp member with same | member
+    · exact same ▸ children.1
+    · exact children.2 entry.1 (List.of_mem_zip member).1
+  | method head _ receipt =>
+    have child := (List.of_mem_zip member).1
+    rcases receipt.operator.form with ⟨operator, operand, form, actual⟩ |
+      ⟨operator, left, right, form, actual⟩
+    · have same : entry.1 = operand := by
+        simpa only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+          actual, List.mem_singleton] using child
+      exact same ▸ arguments.1.1.1.1.2.1 id receipt.node present receipt.metadata.found operator operand form
+    · have cases : entry.1 = left ∨ entry.1 = right := by
+        simpa only [CallableIndexedOwnedPreparedStagedOperatorMethodCertificates.Receipt.arguments,
+          actual, List.mem_cons, List.not_mem_nil, or_false] using child
+      have children := arguments.1.1.1.1.2.2 id receipt.node present receipt.metadata.found operator left right form
+      rcases cases with same | same
+      · exact same ▸ children.1
+      · exact same ▸ children.2
+
+  | index head plain receipt =>
+    have children := arguments.1.1.1.2 id receipt.node present receipt.found _ _ receipt.form
+    rcases List.mem_cons.mp member with same | member
+    · exact same ▸ children.1
+    · exact (List.mem_singleton.mp member) ▸ children.2
+
+  | constructor head plain receipt =>
+    exact arguments.1.1.2 id receipt.node present receipt.found _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+
+  | composite head plain receipt =>
+    exact arguments.1.2 id receipt.node present receipt.found receipt.form entry.1 (List.of_mem_zip member).1
+
+  | primitive head plain receipt =>
+    have member := (List.of_mem_zip member).1
+    rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+    · have same : entry.1 = operand := by simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_singleton] using member
+      exact same ▸ arguments.1.1.1.1.2.1 id receipt.node present receipt.found operator operand form
+    · have choices : entry.1 = left ∨ entry.1 = right := by
+        simpa only [form, AcceptedOrdinaryExpressionReceipt.operands, List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using member
+      rcases choices with same | same
+      · exact same ▸ (arguments.1.1.1.1.2.2 id receipt.node present receipt.found operator left right form).1
+      · exact same ▸ (arguments.1.1.1.1.2.2 id receipt.node present receipt.found operator left right form).2
+  | builtin head plain receipt =>
+    exact arguments.2 id receipt.node present receipt.metadata.found _ _ _ receipt.form
+      entry.1 (List.of_mem_zip member).1
+
+theorem Boundary.impossible_ordinary
+    (metadata : MetadataFor compiled.indexed named source directSites)
+    (forms : ReachedOrdinaryForms source reached)
+    (initializers : ∀ id, reached id →
+      ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt compiled.indexed (context compiled.indexed named) id))
+    (arguments : ReachedOrdinaryArguments source reached)
+    (rawMetadata : ReachedOrdinaryMetadata compiled.indexed named source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    {tree : Trace root source scope reasonAt fuel id lowered}
+    (boundary : Boundary tree) (present : reached id) : False := by
+  induction boundary with
+  | here head cause children => exact cause.impossible_ordinary metadata forms initializers rawMetadata operands ranges present
+  | child step children entry member next ih => exact ih (step.child_reached_ordinary arguments present member)
+
+theorem Residual.impossible_ordinary {row : SourceSpecialization.SpecializedFunction}
+    {prepared : RecursiveNamedPublicSpecializationMeaning.Prepared compiled row}
+    {header : CallableIndexedOwnedFunctionValues.Header compiled (Program.ofChecked compiled.sourceProgram)}
+    (residual : Residual prepared header directSites fuel source scope id lowered)
+    (metadata : MetadataFor compiled.indexed prepared.named source directSites)
+    (forms : ReachedOrdinaryForms source reached)
+    (initializers : ∀ id, reached id → ¬ Nonempty (AcceptedContextualDirectReceipt.InitializerAt
+      compiled.indexed (context compiled.indexed prepared.named) id))
+    (arguments : ReachedOrdinaryArguments source reached)
+    (rawMetadata : ReachedOrdinaryMetadata compiled.indexed prepared.named source reached)
+    (operands : ReachedIndexOperands source reached)
+    (ranges : ReachedConstructorRanges source reached)
+    (present : reached id) : False :=
+  residual.boundary.impossible_ordinary metadata forms initializers arguments rawMetadata operands ranges present
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow

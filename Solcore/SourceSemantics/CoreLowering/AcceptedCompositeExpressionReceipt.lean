@@ -195,7 +195,7 @@ private theorem tuple_of_actual {policy : SourceCoreFunctions.Policy} {body : So
   · simp [owner, bind, Except.bind] at accepted
 
 
-private theorem conditional_of_actual
+theorem ordinary_step_of_actual
     {policy : SourceCoreFunctions.Policy} {body : SourceCoreFunctions.BodyLowerer}
     {fuel : Nat} {context : SourceCoreFunctions.Context} {values : SourceCoreCompatibleValues.Context}
     {source : TypedSource} {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
@@ -309,7 +309,7 @@ theorem of_head
       by simpa only [form, operands] using generated,
       by simpa only [form, Output] using output⟩⟩
   | group inner =>
-    have step := conditional_of_actual (values := .initial compiled.compatible.checked) head.found (form ▸ Compound.group inner) bypass read head.accepted
+    have step := ordinary_step_of_actual (values := .initial compiled.compatible.checked) head.found (form ▸ Compound.group inner) bypass read head.accepted
     cases step with
     | group actual metadata generated =>
       have same := ExpressionForm.group.inj (form.symm.trans actual)
@@ -321,7 +321,7 @@ theorem of_head
       simp only [form] at actual
       cases actual
   | conditional test yes no =>
-    have step := conditional_of_actual (values := .initial compiled.compatible.checked) head.found (form ▸ Compound.conditional test yes no) bypass read head.accepted
+    have step := ordinary_step_of_actual (values := .initial compiled.compatible.checked) head.found (form ▸ Compound.conditional test yes no) bypass read head.accepted
     cases step with
     | @conditional _ _ _ testCode yesCode noCode type actual metadata testAccepted yesAccepted noAccepted =>
       have same := ExpressionForm.conditional.inj (form.symm.trans actual)

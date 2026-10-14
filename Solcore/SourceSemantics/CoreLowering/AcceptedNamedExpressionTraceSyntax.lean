@@ -68,6 +68,23 @@ theorem Trace.syntax_or_boundary
         exact .inl (.index receipt.found receipt.form receipt.keyFound receipt.scalar
           (all (_, receipt.first) (by simp only [Step.children, List.mem_cons_self]))
           (all (_, receipt.second) (by simp [Step.children])))
+      | primitive head plain receipt =>
+        have grammar : ∀ child ∈ AcceptedOrdinaryExpressionReceipt.operands receipt.node.form,
+            GeneralSyntax source child directSites := by
+          intro child member
+          obtain ⟨code, present⟩ := (mapM_receipt receipt.generated).2.2 child member
+          exact all (child, code) present
+        rcases receipt.form with ⟨operator, operand, form⟩ | ⟨operator, left, right, form⟩
+        · exact .inl (.unary receipt.found form
+            (grammar operand (by simp [form, AcceptedOrdinaryExpressionReceipt.operands])))
+        · exact .inl (.binary receipt.found form
+            (grammar left (by simp [form, AcceptedOrdinaryExpressionReceipt.operands]))
+            (grammar right (by simp [form, AcceptedOrdinaryExpressionReceipt.operands])))
+      | builtin head plain receipt =>
+        refine .inl (.builtin receipt.metadata.found receipt.form ?_)
+        intro child member
+        obtain ⟨code, present⟩ := (mapM_receipt receipt.generated).2.2 child member
+        exact all (child, code) present
       | composite head plain receipt =>
         have grammar : ∀ child ∈ AcceptedCompositeExpressionReceipt.operands receipt.node.form,
             GeneralSyntax source child directSites := by

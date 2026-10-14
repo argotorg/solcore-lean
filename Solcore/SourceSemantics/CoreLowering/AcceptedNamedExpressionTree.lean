@@ -1,5 +1,6 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionFlow
 import Solcore.SourceSemantics.CoreLowering.AcceptedCompositeExpressionReceipt
+import Solcore.SourceSemantics.CoreLowering.AcceptedOrdinaryExpressionReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedContextualDirectReceipt
 import Solcore.SourceSemantics.CoreLowering.AcceptedNamedExpressionPolicy
 import Solcore.SourceSemantics.CoreLowering.AcceptedIndirectExpressionReceipt
@@ -39,6 +40,8 @@ def ConstructorForm (form : ExpressionForm) : Prop :=
 
 abbrev CompositeForm := AcceptedCompositeExpressionReceipt.Form
 
+abbrev BuiltinForm := AcceptedOrdinaryExpressionReceipt.BuiltinForm
+
 abbrev MethodForm := AcceptedContextualOperatorReceipt.Form
 
 def IndirectForm (form : ExpressionForm) : Prop :=
@@ -68,15 +71,13 @@ inductive Cause {fuel : Nat} {source : TypedSource} {scope : SourceCoreLocalCell
       (notLeaf : ¬ LeafForm head.node.form) (notDirect : ¬ DirectForm head.node.form)
       (notIndirect : ¬ IndirectForm head.node.form) (notMethod : ¬ MethodForm head.node.form)
       (notIndex : ¬ IndexForm head.node.form) (notConstructor : ¬ ConstructorForm head.node.form)
-      (notComposite : ¬ CompositeForm head.node.form)
+      (notComposite : ¬ CompositeForm head.node.form) (notBuiltin : ¬ BuiltinForm head.node.form)
   | constructorRange (selected : head.special = none) {instantiation : DataConstructorInstantiation} {ids : List ExpressionId}
       (form : head.node.form = .constructor instantiation ids)
       (missing : ¬ CompatibleSourceInstantiationClosure.ClosedParameterRange instantiation.parameterSubstitution)
   | indexOperands (selected : head.special = none) {base key : ExpressionId}
       (form : head.node.form = .index base key)
       (missing : ¬ AcceptedIndexExpressionReceipt.Operands source base key)
-  | operatorOrdinary (selected : head.special = none) (form : MethodForm head.node.form)
-      (requirements : head.node.requirements = [])
   | operatorCoercions (selected : head.special = some lowered) (form : MethodForm head.node.form)
       (coercions : head.node.coercions ≠ [])
 
@@ -115,6 +116,13 @@ inductive Step (source : TypedSource) (scope : SourceCoreLocalCell.Scope)
   | composite (head : Head policy body fuel current source scope id reasonAt lowered)
       (plain : head.special = none)
       (receipt : AcceptedCompositeExpressionReceipt.Receipt root source scope reasonAt fuel id lowered)
+  | primitive (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none)
+      (receipt : AcceptedOrdinaryExpressionReceipt.OperatorReceipt root source scope reasonAt fuel id lowered)
+  | builtin (head : Head policy body fuel current source scope id reasonAt lowered)
+      (plain : head.special = none) {callee : ExpressionId} {ids : List ExpressionId} {function : BuiltinFunctionId}
+      (receipt : CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body fuel current valueContext
+        source scope id callee ids function reasonAt lowered)
   | boundary (head : Head policy body fuel current source scope id reasonAt lowered)
       (cause : Cause root head)
 
@@ -145,6 +153,8 @@ def Step.children : Step root source scope reasonAt fuel id lowered →
   | .index (base := base) (key := key) _ _ receipt => [(base, receipt.first), (key, receipt.second)]
   | .constructor (ids := ids) _ _ receipt => ids.zip receipt.codes
   | .composite _ _ receipt => (AcceptedCompositeExpressionReceipt.operands receipt.node.form).zip receipt.codes
+  | .primitive _ _ receipt => (AcceptedOrdinaryExpressionReceipt.operands receipt.node.form).zip receipt.codes
+  | .builtin (ids := ids) _ _ receipt => ids.zip receipt.codes
 
 inductive Trace (root : RootPolicyReceipt (compiled := compiled) named diagnostics namedCode compilation
     rootFuel rootSource rootScope rootId rootReasonAt rootLowered)
@@ -220,6 +230,8 @@ theorem Step.child_accepted (actual : Step root source scope reasonAt fuel id lo
   | method head selected receipt => exact (mapM_receipt receipt.generated).2.1 entry member
   | constructor head plain receipt => exact (mapM_receipt (receipt.generated root)).2.1 entry member
   | composite head plain receipt => exact (mapM_receipt receipt.generated).2.1 entry member
+  | primitive head plain receipt => exact (mapM_receipt receipt.generated).2.1 entry member
+  | builtin head plain receipt => exact (mapM_receipt receipt.generated).2.1 entry member
   | index head plain receipt =>
     rcases List.mem_cons.mp member with same | member
     · exact same ▸ receipt.firstAccepted
@@ -270,8 +282,8 @@ theorem Step.of_head
     · by_cases method : MethodForm head.node.form
       · cases selected : head.special with
         | none =>
-          exact ⟨.boundary head (.operatorOrdinary selected method
-            (AcceptedContextualOperatorReceipt.plain_requirements root head selected method))⟩
+          obtain ⟨receipt⟩ := AcceptedOrdinaryExpressionReceipt.operator_of_head root head selected method
+          exact ⟨.primitive head selected receipt⟩
         | some output =>
           have same := head.result output selected
           have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)
@@ -306,7 +318,11 @@ theorem Step.of_head
               · by_cases composite : CompositeForm head.node.form
                 · obtain ⟨receipt⟩ := AcceptedCompositeExpressionReceipt.of_head root head selected composite
                   exact ⟨.composite head selected receipt⟩
-                · exact ⟨.boundary head (.form selected leaf direct indirect method index constructor composite)⟩
+                · by_cases builtin : BuiltinForm head.node.form
+                  · obtain ⟨callee, ids, function, form⟩ := builtin
+                    obtain ⟨receipt⟩ := AcceptedOrdinaryExpressionReceipt.builtin_of_head root head selected form
+                    exact ⟨.builtin head selected receipt⟩
+                  · exact ⟨.boundary head (.form selected leaf direct indirect method index constructor composite builtin)⟩
         | some output =>
           have same := head.result output selected
           have selected' : head.special = some lowered := selected.trans (congrArg some same.symm)
